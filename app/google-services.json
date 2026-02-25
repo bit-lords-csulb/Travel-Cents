@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "805994740096",
+    "project_id": "travel-cents-3e2d9",
+    "storage_bucket": "travel-cents-3e2d9.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:805994740096:android:b1a7f6911066cbe5766965",
+        "android_client_info": {
+          "package_name": "com.example.travelcents"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDJIQCD888-mQ1MRRt6sRPAvF1EktwIDv4"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
