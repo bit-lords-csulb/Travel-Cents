@@ -6,6 +6,7 @@ import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import com.example.travelcents.ui.auth.AuthViewModel
+import com.example.travelcents.ui.auth.ForgotPassword
 import com.example.travelcents.ui.auth.LoginPage
 import com.example.travelcents.ui.auth.SignUpPage
 import com.example.travelcents.ui.main.HomePage
@@ -26,6 +27,10 @@ fun TravelCentsNavigation(modifier: Modifier = Modifier, authViewModel: AuthView
         composable("home") {
             HomePage(modifier, navController, authViewModel)
 
+        }
+
+        composable("forgot_password") {
+            ForgotPassword(modifier, navController, authViewModel)
         }
 
     })
