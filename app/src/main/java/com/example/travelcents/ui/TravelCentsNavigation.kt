@@ -1,0 +1,38 @@
+package com.example.travelcents.ui
+
+import androidx.compose.runtime.Composable
+import androidx.compose.ui.Modifier
+import androidx.navigation.compose.NavHost
+import androidx.navigation.compose.composable
+import androidx.navigation.compose.rememberNavController
+import com.example.travelcents.ui.auth.AuthViewModel
+import com.example.travelcents.ui.auth.ForgotPassword
+import com.example.travelcents.ui.auth.LoginPage
+import com.example.travelcents.ui.auth.SignUpPage
+import com.example.travelcents.ui.main.HomePage
+
+@Composable
+fun TravelCentsNavigation(modifier: Modifier = Modifier, authViewModel: AuthViewModel) {
+    val navController = rememberNavController()
+
+    NavHost(navController = navController, startDestination = "login", builder = {
+        composable("login") {
+            LoginPage(modifier, navController, authViewModel)
+        }
+
+        composable("signup") {
+            SignUpPage(modifier, navController, authViewModel)
+        }
+
+        composable("home") {
+            HomePage(modifier, navController, authViewModel)
+
+        }
+
+        composable("forgot_password") {
+            ForgotPassword(modifier, navController, authViewModel)
+        }
+
+    })
+
+}
