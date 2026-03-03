@@ -9,10 +9,10 @@ import androidx.compose.ui.Modifier
 import com.example.travelcents.ui.theme.DeepSea5
 
 @Composable
-fun HomePage(modifier: Modifier = Modifier) {
+fun NewTripPage(modifier: Modifier = Modifier) {
     Box(modifier = modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
         Text(
-            text = "HOME",
+            text = "NEW TRIP",
             color = DeepSea5,
         )
     }
