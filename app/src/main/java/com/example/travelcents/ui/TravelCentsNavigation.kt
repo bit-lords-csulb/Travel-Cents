@@ -9,13 +9,13 @@ import com.example.travelcents.ui.auth.AuthViewModel
 import com.example.travelcents.ui.auth.ForgotPassword
 import com.example.travelcents.ui.auth.LoginPage
 import com.example.travelcents.ui.auth.SignUpPage
-import com.example.travelcents.ui.main.HomePage
+import com.example.travelcents.ui.main.MainScaffold
 
 @Composable
 fun TravelCentsNavigation(modifier: Modifier = Modifier, authViewModel: AuthViewModel) {
     val navController = rememberNavController()
 
-    NavHost(navController = navController, startDestination = "login", builder = {
+    NavHost(navController = navController, startDestination = "home", builder = {
         composable("login") {
             LoginPage(modifier, navController, authViewModel)
         }
@@ -25,8 +25,7 @@ fun TravelCentsNavigation(modifier: Modifier = Modifier, authViewModel: AuthView
         }
 
         composable("home") {
-            HomePage(modifier, navController, authViewModel)
-
+            MainScaffold(modifier = modifier)
         }
 
         composable("forgot_password") {
