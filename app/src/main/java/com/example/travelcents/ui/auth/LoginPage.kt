@@ -18,8 +18,6 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
-import androidx.compose.material3.Checkbox
-import androidx.compose.material3.CheckboxDefaults
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TextField
@@ -35,10 +33,13 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.PasswordVisualTransformation
-import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.navigation.NavController
+import com.example.travelcents.ui.theme.DeepSea1
+import com.example.travelcents.ui.theme.DeepSea2
+import com.example.travelcents.ui.theme.DeepSea4
+import com.example.travelcents.ui.theme.DeepSea5
 
 @Composable
 fun LoginPage(modifier: Modifier = Modifier, navController: NavController, authViewModel: AuthViewModel) {
@@ -49,7 +50,7 @@ fun LoginPage(modifier: Modifier = Modifier, navController: NavController, authV
     Column(
         modifier = modifier
             .fillMaxSize()
-            .background(Color(0xFF0D1B2A))
+            .background(DeepSea1)
             .padding(horizontal = 40.dp),
         verticalArrangement = Arrangement.Top,
         horizontalAlignment = Alignment.Start
@@ -61,7 +62,7 @@ fun LoginPage(modifier: Modifier = Modifier, navController: NavController, authV
             text = "Log In",
             fontSize = 32.sp,
             fontWeight = FontWeight.Bold,
-            color = Color(0xFFE0E1DD)
+            color = DeepSea5
         )
 
         Box(
@@ -69,13 +70,13 @@ fun LoginPage(modifier: Modifier = Modifier, navController: NavController, authV
                 .padding(top = 8.dp)
                 .requiredWidth(74.dp)
                 .height(3.dp)
-                .background(Color(0xFF778DA9))
+                .background(DeepSea4)
         )
 
         Spacer(modifier = Modifier.height(40.dp))
 
         // EMAIL SECTION
-        Text(text = "Email", color = Color(0xFFE0E1DD), fontSize = 16.sp)
+        Text(text = "Email", color = DeepSea5, fontSize = 16.sp)
         TextField(
             value = email,
             onValueChange = { email = it },
@@ -84,15 +85,15 @@ fun LoginPage(modifier: Modifier = Modifier, navController: NavController, authV
             colors = TextFieldDefaults.colors(
                 focusedContainerColor = Color.Transparent,
                 unfocusedContainerColor = Color.Transparent,
-                focusedIndicatorColor = Color(0xFFE0E1DD),
-                unfocusedIndicatorColor = Color(0xFF778DA9)
+                focusedIndicatorColor = DeepSea5,
+                unfocusedIndicatorColor = DeepSea4
             )
         )
 
         Spacer(modifier = Modifier.height(20.dp))
 
         // PASSWORD SECTION
-        Text(text = "Password", color = Color(0xFFE0E1DD), fontSize = 16.sp)
+        Text(text = "Password", color = DeepSea5, fontSize = 16.sp)
         TextField(
             value = password,
             onValueChange = { password = it },
@@ -102,8 +103,8 @@ fun LoginPage(modifier: Modifier = Modifier, navController: NavController, authV
             colors = TextFieldDefaults.colors(
                 focusedContainerColor = Color.Transparent,
                 unfocusedContainerColor = Color.Transparent,
-                focusedIndicatorColor = Color(0xFFE0E1DD),
-                unfocusedIndicatorColor = Color(0xFF778DA9)
+                focusedIndicatorColor = DeepSea5,
+                unfocusedIndicatorColor = DeepSea4
             )
         )
 
@@ -119,7 +120,7 @@ fun LoginPage(modifier: Modifier = Modifier, navController: NavController, authV
                     modifier = Modifier
                         .requiredSize(16.dp)
                         .clip(RoundedCornerShape(3.dp))
-                        .border(1.5.dp, Color(0xFF778DA9), RoundedCornerShape(3.dp))
+                        .border(1.5.dp, DeepSea4, RoundedCornerShape(3.dp))
                         .clickable { rememberMeState = !rememberMeState },
                     contentAlignment = Alignment.Center
                 ) {
@@ -128,7 +129,7 @@ fun LoginPage(modifier: Modifier = Modifier, navController: NavController, authV
                             modifier = Modifier
                                 .requiredSize(10.dp)
                                 .clip(RoundedCornerShape(2.dp))
-                                .background(Color(0xFF778DA9))
+                                .background(DeepSea4)
                         )
                     }
                 }
@@ -137,13 +138,13 @@ fun LoginPage(modifier: Modifier = Modifier, navController: NavController, authV
 
                 Text(
                     text = "Remember Me",
-                    color = Color(0xFFE0E1DD),
+                    color = DeepSea5,
                     fontSize = 12.sp,
                     fontWeight = FontWeight.Medium // Matches the medium weight in Figma
                 )
             }
             TextButton(onClick = { navController.navigate("forgot_password") }) {
-                Text("Forgot Password?", color = Color(0xFF778DA9), fontSize = 12.sp)
+                Text("Forgot Password?", color = DeepSea4, fontSize = 12.sp)
             }
         }
 
@@ -151,14 +152,18 @@ fun LoginPage(modifier: Modifier = Modifier, navController: NavController, authV
 
         // LOGIN BUTTON
         Button(
-            onClick = { /* Login Logic */ },
+            onClick = {
+                navController.navigate("home") {
+                    popUpTo("login") { inclusive = true }
+                }
+            },
             modifier = Modifier
                 .fillMaxWidth()
                 .height(48.dp),
             shape = RoundedCornerShape(12.dp),
-            colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF1B263B))
+            colors = ButtonDefaults.buttonColors(containerColor = DeepSea2)
         ) {
-            Text("Login", color = Color(0xFFE0E1DD), fontSize = 18.sp)
+            Text("Login", color = DeepSea5, fontSize = 18.sp)
         }
     }
 }

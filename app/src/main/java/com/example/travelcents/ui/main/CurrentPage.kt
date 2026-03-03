@@ -9,10 +9,10 @@ import androidx.compose.ui.Modifier
 import com.example.travelcents.ui.theme.DeepSea5
 
 @Composable
-fun HomePage(modifier: Modifier = Modifier) {
+fun CurrentPage(modifier: Modifier = Modifier) {
     Box(modifier = modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
         Text(
-            text = "HOME",
+            text = "CURRENT",
             color = DeepSea5,
         )
     }
