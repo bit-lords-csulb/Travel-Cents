@@ -2,73 +2,148 @@ package com.example.travelcents.ui.auth
 
 import androidx.compose.runtime.mutableStateOf
 import androidx.lifecycle.ViewModel
+import androidx.lifecycle.viewModelScope
 import com.example.travelcents.data.AuthModel
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.launch
+import kotlin.Result
+import kotlin.runCatching
 
-class AuthViewModel() : ViewModel() {
-
+class AuthViewModel : ViewModel() {
     private val authModel = AuthModel()
 
-    // State to track if we are talking to Firebase
-    var isLoading = mutableStateOf(false)
-        private set
+    companion object {
+        private const val MIN_PASSWORD_LENGTH = 8
+    }
 
-    // State to store error messages to show in the UI
-    var errorMessage = mutableStateOf<String?>(null)
-        private set
+    // State to track if we are talking to Firebase
+    private val _isLoading = MutableStateFlow(false)
+    val isLoading: StateFlow<Boolean> = _isLoading.asStateFlow()
 
     // State to track if the account was created successfully
-    var isAccountCreated = mutableStateOf(false)
-        private set
+    private val _isAccountCreated = MutableStateFlow(false)
+    val isAccountCreated: StateFlow<Boolean> = _isAccountCreated.asStateFlow()
 
     // State to track log in success
-    var isLoggedIn = mutableStateOf(false)
-        private set
+    private val _isLoggedIn = MutableStateFlow(false)
+    val isLoggedIn: StateFlow<Boolean> = _isLoggedIn.asStateFlow()
+
+    // Error messages (failures only)
+    private val _errorMessage = MutableStateFlow<String?>(null)
+    val errorMessage: StateFlow<String?> = _errorMessage.asStateFlow()
+
+    // Success / info messages (non-error feedback)
+    private val _statusMessage = MutableStateFlow<String?>(null)
+    val statusMessage: StateFlow<String?> = _statusMessage.asStateFlow()
 
     // Sign up a new user with email and password
     fun signUp(firstName: String, lastName: String, email: String, password: String) {
-        isLoading.value = true
-        errorMessage.value = null
+        if (!validateSignUpInputs(firstName, lastName, email, password)) return
 
-        authModel.createAccountWithEmailAndPassword(firstName, lastName, email, password) { success, message ->
-            isLoading.value = false
-            if (success) {
-                isAccountCreated.value = true
-                errorMessage.value = message
-            } else {
-                errorMessage.value = message ?: "An unknown error occurred"
-            }
+        viewModelScope.launch {
+            _isLoading.value = true
+            _errorMessage.value = null
+            _statusMessage.value = null
+
+            val result = authModel.createAccountWithEmailAndPassword(firstName, lastName, email, password)
+
+            _isLoading.value = false
+            result.fold(
+                onSuccess = { message ->
+                    _isAccountCreated.value = true
+                    _statusMessage.value = message
+                },
+                onFailure = { error ->
+                    _errorMessage.value = error.message ?: "An unknown error occurred"
+                }
+            )
         }
     }
 
     // Log in user
     fun logIn(email: String, password: String) {
-        isLoading.value = true
-        errorMessage.value = null
+        if (!validateLogInInputs(email, password)) return
 
-        authModel.signInWithEmailAndPassword(email, password) { success, message ->
-            isLoading.value = false
-            if (success) {
-                isLoggedIn.value = true
-            } else {
-                errorMessage.value = message ?: "Login failed"
-            }
+        viewModelScope.launch {
+            _isLoading.value = true
+            _errorMessage.value = null
+
+            val result = authModel.signInWithEmailAndPassword(email, password)
+
+            _isLoading.value = false
+            result.fold(
+                onSuccess = { _isLoggedIn.value = true },
+                onFailure = { error ->
+                    _errorMessage.value = when {
+                        error.message?.contains("credential is incorrect", ignoreCase = true) == true ||
+                                error.message?.contains("malformed", ignoreCase = true) == true ||
+                                error.message?.contains("expired", ignoreCase = true) == true
+                            -> "Incorrect email or password."
+                        error.message?.contains("network", ignoreCase = true) == true
+                            -> "Network error. Please check your connection."
+                        error.message?.contains("too-many-requests", ignoreCase = true) == true
+                            -> "Too many attempts. Please try again later."
+                        else -> "Login failed. Please try again."
+                    }
+                }
+            )
         }
     }
 
-    // Log Out
+    // Log out and reset all state
     fun signOut() {
         authModel.signOut()
-        isLoggedIn.value = false
+        _isLoggedIn.value = false
+        _isAccountCreated.value = false
+        _errorMessage.value = null
+        _statusMessage.value = null
     }
 
-    // A reset function for the Sign-Up flow
+    // Reset sign-up flow state (e.g. after navigating away)
     fun resetSignUpState() {
-        isAccountCreated.value = false
-        errorMessage.value = null
+        _isAccountCreated.value = false
+        _errorMessage.value = null
+        _statusMessage.value = null
     }
 
-    fun cleanError() {
-        errorMessage.value = null
+    fun clearError() {
+        _errorMessage.value = null
     }
 
+    // Validation
+
+    private fun validateSignUpInputs(
+        firstName: String,
+        lastName: String,
+        email: String,
+        password: String
+    ): Boolean {
+        if (firstName.isBlank() || lastName.isBlank()) {
+            _errorMessage.value = "Name fields cannot be empty"
+            return false
+        }
+        if (!android.util.Patterns.EMAIL_ADDRESS.matcher(email).matches()) {
+            _errorMessage.value = "Invalid email address"
+            return false
+        }
+        if (password.length < MIN_PASSWORD_LENGTH) {
+            _errorMessage.value = "Password must be at least $MIN_PASSWORD_LENGTH characters"
+            return false
+        }
+        return true
+    }
+
+    private fun validateLogInInputs(email: String, password: String): Boolean {
+        if (!android.util.Patterns.EMAIL_ADDRESS.matcher(email).matches()) {
+            _errorMessage.value = "Invalid email address"
+            return false
+        }
+        if (password.isBlank()) {
+            _errorMessage.value = "Password cannot be empty"
+            return false
+        }
+        return true
+    }
 }
