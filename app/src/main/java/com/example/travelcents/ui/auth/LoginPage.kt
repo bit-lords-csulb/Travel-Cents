@@ -18,11 +18,13 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TextField
 import androidx.compose.material3.TextFieldDefaults
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.mutableStateOf
@@ -33,6 +35,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.PasswordVisualTransformation
+import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.navigation.NavController
@@ -40,12 +43,20 @@ import com.example.travelcents.ui.theme.DeepSea1
 import com.example.travelcents.ui.theme.DeepSea2
 import com.example.travelcents.ui.theme.DeepSea4
 import com.example.travelcents.ui.theme.DeepSea5
-
 @Composable
 fun LoginPage(modifier: Modifier = Modifier, navController: NavController, authViewModel: AuthViewModel) {
     var email by remember { mutableStateOf("") }
     var password by remember { mutableStateOf("") }
     var rememberMeState by remember { mutableStateOf(false) }
+
+    // Navigate to the home screen if the user is logged in
+    LaunchedEffect(authViewModel.isLoggedIn.value) {
+        if (authViewModel.isLoggedIn.value) {
+            navController.navigate("home") {
+                popUpTo("login") { inclusive = true }
+            }
+        }
+    }
 
     Column(
         modifier = modifier
@@ -148,22 +159,34 @@ fun LoginPage(modifier: Modifier = Modifier, navController: NavController, authV
             }
         }
 
+        // ERROR OR SUCCESS MESSAGE DISPLAY
+        authViewModel.errorMessage.value?.let { message ->
+            Text(
+                text = message,
+                // If account was created, show green for success and red for errors
+                color = if (authViewModel.isAccountCreated.value) Color.Green else Color.Red,
+                fontSize = 12.sp,
+                modifier = Modifier.padding(vertical = 8.dp)
+            )
+        }
+
         Spacer(modifier = Modifier.height(32.dp))
 
         // LOGIN BUTTON
         Button(
-            onClick = {
-                navController.navigate("home") {
-                    popUpTo("login") { inclusive = true }
-                }
-            },
+            onClick = { authViewModel.logIn(email, password) },
+            enabled = !authViewModel.isLoading.value,
             modifier = Modifier
                 .fillMaxWidth()
                 .height(48.dp),
             shape = RoundedCornerShape(12.dp),
             colors = ButtonDefaults.buttonColors(containerColor = DeepSea2)
         ) {
-            Text("Login", color = DeepSea5, fontSize = 18.sp)
+            if (authViewModel.isLoading.value) {
+                CircularProgressIndicator(color = DeepSea5, modifier = Modifier.requiredSize(24.dp))
+            } else {
+                Text("Login", color = DeepSea5, fontSize = 18.sp)
+            }
         }
     }
 }
