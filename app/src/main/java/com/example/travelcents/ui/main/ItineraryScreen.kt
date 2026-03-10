@@ -136,7 +136,15 @@ fun TripHeader(tripName: String) {
                 color = Color(0xFF94A3B8),
                 modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp)
             )
+
         }
+        HorizontalDivider(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(top = 24.dp), // Space between the buttons and the line
+            thickness = 1.dp,
+            color = Color(0xFF1E293B) // A muted slate gray to match the dark theme
+        )
     }
 }
 
