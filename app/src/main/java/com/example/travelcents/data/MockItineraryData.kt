@@ -82,6 +82,84 @@ object MockItineraryData {
             dietary_options = listOf("meat-heavy"),
             reservation_id = "No Reservations",
             notes = "Famous for serving only steak and fries. Heavy on the meat, carbs, and fats. Zero vegetables or beans to deal with. They don't take reservations, so we have to wait in line."
-        )
+        ),
+        TripEvent.Restaurant(
+        event_id = "evt_204",
+        itinerary_id = "trip_002",
+        day = 3,
+        date = "2026-06-07",
+        meal_time = "lunch",
+        restaurant_name = "L'As du Fallafel",
+        cuisine = "Middle Eastern",
+        address = "32-34 Rue des Rosiers, 75004 Paris",
+        reservation_time = "13:00",
+        price_per_person = 15.0,
+        total_price = 30.0,
+        dress_code = "casual",
+        michelin_stars = 0,
+        dietary_options = listOf("meat"),
+        reservation_id = "Walk-in",
+        notes = "Iconic spot in Le Marais. Stick to the shawarma."
+    ),
+
+    // Day 4: Museums
+    TripEvent.Restaurant(
+    event_id = "evt_205",
+    itinerary_id = "trip_002",
+    day = 4,
+    date = "2026-06-08",
+    meal_time = "dinner",
+    restaurant_name = "Le Comptoir de La Relais",
+    cuisine = "French Bistro",
+    address = "9 Carrefour de l'Odéon, 75006 Paris",
+    reservation_time = "20:00",
+    price_per_person = 60.0,
+    total_price = 120.0,
+    dress_code = "smart-casual",
+    michelin_stars = 0,
+    dietary_options = listOf("meat-heavy"),
+    reservation_id = "N/A",
+    notes = "Classic bistro vibes. Very high quality meat."
+    ),
+
+    // Day 5: Day Trip
+    TripEvent.Flight(
+    event_id = "evt_206",
+    itinerary_id = "trip_002",
+    day = 5,
+    date = "2026-06-09",
+    airline = "SNCF (Train)", // Using Flight model for transport for now
+    flight_number = "TGV 8812",
+    origin_airport = "Gare du Nord",
+    destination_airport = "Bordeaux",
+    departure_time = "09:00",
+    arrival_time = "11:00",
+    cabin_class = "first",
+    price_per_person = 90.0,
+    total_price = 180.0,
+    booking_reference = "BXD-992",
+    baggage_allowance_kg = 30,
+    notes = "Quick day trip out of the city."
+    ),
+
+    // Day 6: Final Dinner
+    TripEvent.Restaurant(
+    event_id = "evt_207",
+    itinerary_id = "trip_002",
+    day = 6,
+    date = "2026-06-10",
+    meal_time = "dinner",
+    restaurant_name = "Beefbar Paris",
+    cuisine = "Steakhouse",
+    address = "5 Rue du Commandant Rivière, 75008 Paris",
+    reservation_time = "20:30",
+    price_per_person = 100.0,
+    total_price = 200.0,
+    dress_code = "formal",
+    michelin_stars = 0,
+    dietary_options = listOf("Premium Meat"),
+    reservation_id = "BFB-P-112",
+    notes = "Fancy final dinner. Great steak selection."
+    )
     )
 }
