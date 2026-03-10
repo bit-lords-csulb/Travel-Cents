@@ -7,6 +7,8 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.rounded.AutoAwesome
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
@@ -106,16 +108,24 @@ fun TripHeader(tripName: String) {
 
             Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                 Surface(
+                    modifier = Modifier.size(40.dp),
                     shape = CircleShape,
-                    color = Color(0xFF1E293B),
-                    modifier = Modifier.size(40.dp)
+                    color = Color(0xFF1E293B), // That deep navy background
+                    border = BorderStroke(1.dp, Color(0xFF334155)) // Subtle border from your image
                 ) {
-                    Box(contentAlignment = Alignment.Center) { Text("✨", fontSize = 16.sp) }
+                    IconButton(onClick = { /* Handle AI/Magic action */ }) {
+                        Icon(
+                            imageVector = Icons.Rounded.AutoAwesome,
+                            contentDescription = "AI Assistant",
+                            tint = Color(0xFF94A3B8), // Muted blue icon color
+                            modifier = Modifier.size(20.dp) // Making the icon slightly smaller inside
+                        )
+                    }
                 }
 
                 Surface(
                     shape = CircleShape,
-                    color = Color(0xFF3B82F6),
+                    color = Color(0xFF415A77),
                     modifier = Modifier.size(40.dp)
                 ) {
                     Box(contentAlignment = Alignment.Center) { Text("+", color = Color.White, fontSize = 24.sp) }
