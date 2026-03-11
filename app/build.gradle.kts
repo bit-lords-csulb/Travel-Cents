@@ -1,7 +1,14 @@
+import java.util.Properties
+
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.compose)
     alias(libs.plugins.google.gms.google.services)
+}
+
+val localProperties = Properties().apply {
+    val file = rootProject.file("local.properties")
+    if (file.exists()) load(file.inputStream())
 }
 
 android {
@@ -23,7 +30,7 @@ android {
 
         buildConfigField(
             "String", "GROQ_API_KEY",
-            "\"${project.findProperty("GROQ_API_KEY") ?: ""}\""
+            "\"${localProperties.getProperty("GROQ_API_KEY") ?: ""}\""
         )
     }
 
