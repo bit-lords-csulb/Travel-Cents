@@ -23,14 +23,10 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.lifecycle.viewmodel.compose.viewModel
 import coil.compose.AsyncImage
 import com.example.travelcents.ui.theme.*
 import com.google.firebase.Timestamp
-import com.google.firebase.Firebase
-import com.google.firebase.auth.auth
-import com.google.firebase.firestore.FieldValue
-import com.google.firebase.firestore.Query
-import com.google.firebase.firestore.firestore
 import java.text.SimpleDateFormat
 import java.util.*
 
@@ -50,70 +46,17 @@ fun formatMessageTime(timestamp: Timestamp?): String {
 @Composable
 fun ChatPage(
     group: Group,
-    onBackClick: () -> Unit = {}
+    onBackClick: () -> Unit = {},
+    viewModel: ChatViewModel = viewModel(factory = ChatViewModel.Factory(group))
 ) {
-    val db = Firebase.firestore
-    val auth = Firebase.auth
-    val currentUid = auth.currentUser?.uid ?: ""
-    var currentName by remember { mutableStateOf("") }
-
-    var messages by remember { mutableStateOf<List<Message>>(emptyList()) }
-    var messageText by remember { mutableStateOf("") }
+    val messages by viewModel.messages.collectAsState()
+    val messageText by viewModel.messageText.collectAsState()
+    val currentUid = viewModel.currentUid
     val listState = rememberLazyListState()
 
-    LaunchedEffect(currentUid) {
-        if (currentUid.isNotEmpty()) {
-            db.collection("users").document(currentUid).get()
-                .addOnSuccessListener { doc ->
-                    val first = doc.getString("firstName") ?: ""
-                    val last = doc.getString("lastName") ?: ""
-                    currentName = "$first $last".trim().ifBlank { "Me" }
-                }
-        }
-    }
-
-    // Real-time messages listener
-    DisposableEffect(group.id) {
-        val listener = db.collection("groups")
-            .document(group.id)
-            .collection("messages")
-            .orderBy("timestamp", Query.Direction.ASCENDING)
-            .addSnapshotListener { snapshot, error ->
-                if (error != null) return@addSnapshotListener
-                messages = snapshot?.documents?.mapNotNull { doc ->
-                    doc.toObject(Message::class.java)?.copy(id = doc.id)
-                } ?: emptyList()
-            }
-        onDispose { listener.remove() }
-    }
-
-    // Auto-scroll to bottom when new messages arrive
+    // Auto-scroll to bottom on new messages
     LaunchedEffect(messages.size) {
-        if (messages.isNotEmpty()) {
-            listState.animateScrollToItem(messages.size - 1)
-        }
-    }
-
-    fun sendMessage() {
-        val text = messageText.trim()
-        if (text.isEmpty()) return
-
-        val message = hashMapOf(
-            "text" to text,
-            "senderId" to currentUid,
-            "senderName" to currentName,
-            "timestamp" to FieldValue.serverTimestamp()
-        )
-
-        val groupRef = db.collection("groups").document(group.id)
-        db.runBatch { batch ->
-            batch.set(groupRef.collection("messages").document(), message)
-            batch.update(groupRef, mapOf(
-                "lastMessage" to text,
-                "lastMessageTime" to FieldValue.serverTimestamp()
-            ))
-        }
-        messageText = ""
+        if (messages.isNotEmpty()) listState.animateScrollToItem(messages.size - 1)
     }
 
     Column(
@@ -149,9 +92,7 @@ fun ChatPage(
                             model = group.groupImageUrl,
                             contentDescription = null,
                             contentScale = ContentScale.Crop,
-                            modifier = Modifier
-                                .size(42.dp)
-                                .clip(CircleShape)
+                            modifier = Modifier.size(42.dp).clip(CircleShape)
                         )
                     } else {
                         Text(
@@ -166,12 +107,7 @@ fun ChatPage(
                 Spacer(modifier = Modifier.width(10.dp))
 
                 Column(modifier = Modifier.weight(1f)) {
-                    Text(
-                        text = group.name,
-                        color = DeepSea5,
-                        fontWeight = FontWeight.Bold,
-                        fontSize = 16.sp
-                    )
+                    Text(text = group.name, color = DeepSea5, fontWeight = FontWeight.Bold, fontSize = 16.sp)
                     Text(
                         text = "${group.members.size} members",
                         color = DeepSea5.copy(alpha = 0.5f),
@@ -207,12 +143,11 @@ fun ChatPage(
             contentPadding = PaddingValues(top = 16.dp, bottom = 8.dp)
         ) {
             items(messages, key = { it.id }) { message ->
-                val isMine = message.senderId == currentUid
-                ChatBubble(message = message, isMine = isMine)
+                ChatBubble(message = message, isMine = message.senderId == currentUid)
             }
         }
 
-        // Message Text Input
+        // Input
         Row(
             modifier = Modifier
                 .fillMaxWidth()
@@ -223,13 +158,9 @@ fun ChatPage(
         ) {
             TextField(
                 value = messageText,
-                onValueChange = { messageText = it },
-                modifier = Modifier
-                    .weight(1f)
-                    .clip(RoundedCornerShape(28.dp)),
-                placeholder = {
-                    Text("Type a message...", color = DeepSea5.copy(alpha = 0.4f))
-                },
+                onValueChange = { viewModel.onMessageTextChange(it) },
+                modifier = Modifier.weight(1f).clip(RoundedCornerShape(28.dp)),
+                placeholder = { Text("Type a message...", color = DeepSea5.copy(alpha = 0.4f)) },
                 singleLine = true,
                 colors = TextFieldDefaults.colors(
                     focusedContainerColor = DeepSea3,
@@ -249,7 +180,7 @@ fun ChatPage(
                     .size(48.dp)
                     .clip(CircleShape)
                     .background(DeepSea3)
-                    .clickable { sendMessage() },
+                    .clickable { viewModel.sendMessage() },
                 contentAlignment = Alignment.Center
             ) {
                 Icon(
@@ -292,11 +223,7 @@ fun ChatBubble(message: Message, isMine: Boolean) {
                 .background(if (isMine) DeepSea3 else DeepSea2)
                 .padding(horizontal = 14.dp, vertical = 10.dp)
         ) {
-            Text(
-                text = message.text,
-                color = DeepSea5,
-                fontSize = 14.sp
-            )
+            Text(text = message.text, color = DeepSea5, fontSize = 14.sp)
         }
 
         Text(
