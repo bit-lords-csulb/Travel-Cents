@@ -20,11 +20,8 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.travelcents.ui.theme.*
-import com.google.firebase.auth.auth
-import com.google.firebase.firestore.Query
-import com.google.firebase.firestore.firestore
-import com.google.firebase.Firebase
 import com.google.firebase.Timestamp
 import java.text.SimpleDateFormat
 import java.util.*
@@ -42,7 +39,6 @@ fun formatTimestamp(timestamp: Timestamp?): String {
     if (timestamp == null) return ""
     val now = Calendar.getInstance()
     val msgCal = Calendar.getInstance().apply { time = timestamp.toDate() }
-
     return when {
         now.get(Calendar.DATE) == msgCal.get(Calendar.DATE) ->
             SimpleDateFormat("h:mm a", Locale.getDefault()).format(timestamp.toDate())
@@ -56,34 +52,13 @@ fun formatTimestamp(timestamp: Timestamp?): String {
 @Composable
 fun ChatsPage(
     modifier: Modifier = Modifier,
+    viewModel: ChatsViewModel = viewModel(),
     onNewChatClick: () -> Unit = {},
     onGroupClick: (Group) -> Unit = {}
 ) {
-    val auth = Firebase.auth
-    val db = Firebase.firestore
-    val currentUid = auth.currentUser?.uid
-
-    var groups by remember { mutableStateOf<List<Group>>(emptyList()) }
-    var searchQuery by remember { mutableStateOf("") }
-
-    // Real-time Firestore listener for logged-in user
-    DisposableEffect(currentUid) {
-        if (currentUid == null) return@DisposableEffect onDispose {}
-
-        val listener = db.collection("groups")
-            .whereArrayContains("members", currentUid)
-            .orderBy("lastMessageTime", Query.Direction.DESCENDING)
-            .addSnapshotListener { snapshot, _ ->
-                groups = snapshot?.documents?.mapNotNull { doc ->
-                    doc.toObject(Group::class.java)?.copy(id = doc.id)
-                } ?: emptyList()
-            }
-
-        onDispose { listener.remove() }
-    }
-
-    val filteredGroups = if (searchQuery.isBlank()) groups
-    else groups.filter { it.name.contains(searchQuery, ignoreCase = true) }
+    val groups by viewModel.groups.collectAsState()
+    val searchQuery by viewModel.searchQuery.collectAsState()
+    val filteredGroups = viewModel.filteredGroups
 
     Column(
         modifier = modifier
@@ -110,7 +85,6 @@ fun ChatsPage(
                         fontWeight = FontWeight.Bold,
                         color = DeepSea5
                     )
-                    // + button to create a new group
                     Box(
                         modifier = Modifier
                             .size(40.dp)
@@ -127,7 +101,7 @@ fun ChatsPage(
 
                 TextField(
                     value = searchQuery,
-                    onValueChange = { searchQuery = it },
+                    onValueChange = { viewModel.onSearchQueryChange(it) },
                     modifier = Modifier
                         .fillMaxWidth()
                         .height(52.dp)
@@ -154,7 +128,6 @@ fun ChatsPage(
 
         Spacer(modifier = Modifier.height(12.dp))
 
-        // Group List
         if (filteredGroups.isEmpty()) {
             Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                 Text(
@@ -190,7 +163,6 @@ fun GroupChatRow(group: Group, onClick: () -> Unit) {
             .padding(horizontal = 16.dp, vertical = 14.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        // Avatar circle with initials (Will change to group image later)
         Box(
             modifier = Modifier
                 .size(52.dp)
@@ -208,7 +180,6 @@ fun GroupChatRow(group: Group, onClick: () -> Unit) {
 
         Spacer(modifier = Modifier.width(14.dp))
 
-        // Group Name + Last Message
         Column(modifier = Modifier.weight(1f)) {
             Text(
                 text = group.name,
@@ -230,7 +201,6 @@ fun GroupChatRow(group: Group, onClick: () -> Unit) {
 
         Spacer(modifier = Modifier.width(8.dp))
 
-        // Timestamp
         Text(
             text = formatTimestamp(group.lastMessageTime),
             color = DeepSea5.copy(alpha = 0.4f),
@@ -239,7 +209,7 @@ fun GroupChatRow(group: Group, onClick: () -> Unit) {
     }
 }
 
-// Wrapper for navigating to chat page
+// Nav Wrapper
 @Composable
 fun ChatsScreen(modifier: Modifier = Modifier) {
     var selectedGroup by remember { mutableStateOf<Group?>(null) }
@@ -257,14 +227,14 @@ fun ChatsScreen(modifier: Modifier = Modifier) {
                 onBackClick = { showNewTrip = false },
                 onTripCreated = { newGroup ->
                     showNewTrip = false
-                    selectedGroup = newGroup   // immediately open the new chat
+                    selectedGroup = newGroup
                 }
             )
         }
         else -> {
             ChatsPage(
                 modifier = modifier,
-                onNewChatClick = { showNewTrip = true },   // <-- new param
+                onNewChatClick = { showNewTrip = true },
                 onGroupClick = { group -> selectedGroup = group }
             )
         }
