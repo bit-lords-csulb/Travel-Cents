@@ -56,6 +56,7 @@ fun formatTimestamp(timestamp: Timestamp?): String {
 @Composable
 fun ChatsPage(
     modifier: Modifier = Modifier,
+    onNewChatClick: () -> Unit = {},
     onGroupClick: (Group) -> Unit = {}
 ) {
     val auth = Firebase.auth
@@ -115,7 +116,7 @@ fun ChatsPage(
                             .size(40.dp)
                             .clip(CircleShape)
                             .background(DeepSea3)
-                            .clickable { /* TODO: create group */ },
+                            .clickable { onNewChatClick() },
                         contentAlignment = Alignment.Center
                     ) {
                         Icon(Icons.Default.Add, contentDescription = "New Chat", tint = DeepSea5)
@@ -242,18 +243,30 @@ fun GroupChatRow(group: Group, onClick: () -> Unit) {
 @Composable
 fun ChatsScreen(modifier: Modifier = Modifier) {
     var selectedGroup by remember { mutableStateOf<Group?>(null) }
+    var showNewTrip by remember { mutableStateOf(false) }
 
-    if (selectedGroup != null) {
-        ChatPage(
-            group = selectedGroup!!,
-            onBackClick = { selectedGroup = null }
-        )
-    } else {
-        ChatsPage(
-            modifier = modifier,
-            onGroupClick = { group ->
-                selectedGroup = group
-            }
-        )
+    when {
+        selectedGroup != null -> {
+            ChatPage(
+                group = selectedGroup!!,
+                onBackClick = { selectedGroup = null }
+            )
+        }
+        showNewTrip -> {
+            NewTripChatPage(
+                onBackClick = { showNewTrip = false },
+                onTripCreated = { newGroup ->
+                    showNewTrip = false
+                    selectedGroup = newGroup   // immediately open the new chat
+                }
+            )
+        }
+        else -> {
+            ChatsPage(
+                modifier = modifier,
+                onNewChatClick = { showNewTrip = true },   // <-- new param
+                onGroupClick = { group -> selectedGroup = group }
+            )
+        }
     }
 }

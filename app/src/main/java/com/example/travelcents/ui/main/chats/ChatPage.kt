@@ -55,11 +55,22 @@ fun ChatPage(
     val db = Firebase.firestore
     val auth = Firebase.auth
     val currentUid = auth.currentUser?.uid ?: ""
-    val currentName = auth.currentUser?.displayName ?: "Me"
+    var currentName by remember { mutableStateOf("") }
 
     var messages by remember { mutableStateOf<List<Message>>(emptyList()) }
     var messageText by remember { mutableStateOf("") }
     val listState = rememberLazyListState()
+
+    LaunchedEffect(currentUid) {
+        if (currentUid.isNotEmpty()) {
+            db.collection("users").document(currentUid).get()
+                .addOnSuccessListener { doc ->
+                    val first = doc.getString("firstName") ?: ""
+                    val last = doc.getString("lastName") ?: ""
+                    currentName = "$first $last".trim().ifBlank { "Me" }
+                }
+        }
+    }
 
     // Real-time messages listener
     DisposableEffect(group.id) {
