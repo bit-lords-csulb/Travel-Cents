@@ -1,12 +1,17 @@
 package com.example.travelcents.ui.main.chats
 
 import androidx.lifecycle.ViewModel
+import androidx.lifecycle.viewModelScope
 import com.example.travelcents.data.FirestoreRepository
 import com.google.firebase.Firebase
 import com.google.firebase.auth.auth
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.stateIn
+import kotlin.collections.emptyList
 
 class ChatsViewModel(
     private val repository: FirestoreRepository = FirestoreRepository()
@@ -21,11 +26,10 @@ class ChatsViewModel(
     private val _searchQuery = MutableStateFlow("")
     val searchQuery: StateFlow<String> = _searchQuery.asStateFlow()
 
-    val filteredGroups: List<Group>
-        get () = if (_searchQuery.value.isBlank()) _groups.value
-                 else _groups.value.filter {
-                     it.name.contains(_searchQuery.value, ignoreCase = true)
-                 }
+    val filteredGroups: StateFlow<List<Group>> = combine(_groups, _searchQuery) { groups, query ->
+        if (query.isBlank()) groups
+        else groups.filter { it.name.contains(query, ignoreCase = true) }
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
     private var groupsListener: com.google.firebase.firestore.ListenerRegistration? = null
 

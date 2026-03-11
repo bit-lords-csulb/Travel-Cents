@@ -56,9 +56,8 @@ fun ChatsPage(
     onNewChatClick: () -> Unit = {},
     onGroupClick: (Group) -> Unit = {}
 ) {
-    val groups by viewModel.groups.collectAsState()
     val searchQuery by viewModel.searchQuery.collectAsState()
-    val filteredGroups = viewModel.filteredGroups
+    val filteredGroups by viewModel.filteredGroups.collectAsState()
 
     Column(
         modifier = modifier
