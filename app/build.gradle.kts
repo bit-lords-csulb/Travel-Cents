@@ -20,6 +20,11 @@ android {
         versionName = "1.0"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+
+        buildConfigField(
+            "String", "GROQ_API_KEY",
+            "\"${project.findProperty("GROQ_API_KEY") ?: ""}\""
+        )
     }
 
     buildTypes {
@@ -37,6 +42,7 @@ android {
     }
     buildFeatures {
         compose = true
+        buildConfig = true
     }
 }
 
@@ -58,6 +64,15 @@ dependencies {
     implementation(libs.googleid)
     implementation(libs.ads.mobile.sdk)
     implementation(libs.androidx.navigation.compose)
+
+    // Coroutines support for Firebase Tasks (.await())
+    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-play-services:1.8.1")
+
+    // Retrofit + OkHttp for Groq API
+    implementation("com.squareup.retrofit2:retrofit:2.11.0")
+    implementation("com.squareup.retrofit2:converter-gson:2.11.0")
+    implementation("com.squareup.okhttp3:okhttp:4.12.0")
+    implementation("com.squareup.okhttp3:logging-interceptor:4.12.0")
     implementation(libs.androidx.compose.foundation.layout)
     implementation(libs.androidx.lifecycle.runtime.compose)
     testImplementation(libs.junit)
