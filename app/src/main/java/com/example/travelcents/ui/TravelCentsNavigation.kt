@@ -15,7 +15,7 @@ import com.example.travelcents.ui.main.MainScaffold
 fun TravelCentsNavigation(modifier: Modifier = Modifier, authViewModel: AuthViewModel) {
     val navController = rememberNavController()
 
-    NavHost(navController = navController, startDestination = "home", builder = {
+    NavHost(navController = navController, startDestination = "login", builder = {
         composable("login") {
             LoginPage(modifier, navController, authViewModel)
         }

@@ -16,13 +16,16 @@ import androidx.compose.foundation.layout.requiredSize
 import androidx.compose.foundation.layout.requiredWidth
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TextField
 import androidx.compose.material3.TextFieldDefaults
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.mutableStateOf
@@ -32,20 +35,41 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
+import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.NavController
 import com.example.travelcents.ui.theme.DeepSea1
 import com.example.travelcents.ui.theme.DeepSea2
 import com.example.travelcents.ui.theme.DeepSea4
 import com.example.travelcents.ui.theme.DeepSea5
-
+import kotlin.Result
+import kotlin.runCatching
 @Composable
 fun LoginPage(modifier: Modifier = Modifier, navController: NavController, authViewModel: AuthViewModel) {
     var email by remember { mutableStateOf("") }
     var password by remember { mutableStateOf("") }
     var rememberMeState by remember { mutableStateOf(false) }
+
+    // Collect StateFlows as Compose state
+    val isLoggedIn by authViewModel.isLoggedIn.collectAsStateWithLifecycle()
+    val isLoading by authViewModel.isLoading.collectAsStateWithLifecycle()
+    val isAccountCreated by authViewModel.isAccountCreated.collectAsStateWithLifecycle()
+    val errorMessage by authViewModel.errorMessage.collectAsStateWithLifecycle()
+    val statusMessage by authViewModel.statusMessage.collectAsStateWithLifecycle()
+
+    // Navigate to the home screen if the user is logged in
+    LaunchedEffect(isLoggedIn) {
+        if (isLoggedIn) {
+            navController.navigate("home") {
+                popUpTo("login") { inclusive = true }
+            }
+        }
+    }
 
     Column(
         modifier = modifier
@@ -79,9 +103,12 @@ fun LoginPage(modifier: Modifier = Modifier, navController: NavController, authV
         Text(text = "Email", color = DeepSea5, fontSize = 16.sp)
         TextField(
             value = email,
-            onValueChange = { email = it },
+            onValueChange = {
+                email = it
+                authViewModel.clearError()
+            },
             placeholder = { Text("demo@student.csulb.edu", color = Color.Gray, fontSize = 14.sp) },
-            modifier = Modifier.fillMaxWidth().height(50.dp), // Slimmer height
+            modifier = Modifier.fillMaxWidth().height(50.dp),
             colors = TextFieldDefaults.colors(
                 focusedContainerColor = Color.Transparent,
                 unfocusedContainerColor = Color.Transparent,
@@ -96,9 +123,12 @@ fun LoginPage(modifier: Modifier = Modifier, navController: NavController, authV
         Text(text = "Password", color = DeepSea5, fontSize = 16.sp)
         TextField(
             value = password,
-            onValueChange = { password = it },
+            onValueChange = {
+                password = it
+                authViewModel.clearError()
+            },
             placeholder = { Text("enter password", color = Color.Gray, fontSize = 14.sp) },
-            visualTransformation = PasswordVisualTransformation(), // Hide password dots
+            visualTransformation = PasswordVisualTransformation(),
             modifier = Modifier.fillMaxWidth().height(50.dp),
             colors = TextFieldDefaults.colors(
                 focusedContainerColor = Color.Transparent,
@@ -115,7 +145,6 @@ fun LoginPage(modifier: Modifier = Modifier, navController: NavController, authV
             verticalAlignment = Alignment.CenterVertically
         ) {
             Row(verticalAlignment = Alignment.CenterVertically) {
-                // Checkbox (Custom box to match figma design)
                 Box(
                     modifier = Modifier
                         .requiredSize(16.dp)
@@ -140,7 +169,7 @@ fun LoginPage(modifier: Modifier = Modifier, navController: NavController, authV
                     text = "Remember Me",
                     color = DeepSea5,
                     fontSize = 12.sp,
-                    fontWeight = FontWeight.Medium // Matches the medium weight in Figma
+                    fontWeight = FontWeight.Medium
                 )
             }
             TextButton(onClick = { navController.navigate("forgot_password") }) {
@@ -148,22 +177,43 @@ fun LoginPage(modifier: Modifier = Modifier, navController: NavController, authV
             }
         }
 
+        // SUCCESS MESSAGE (e.g. "Account created! Please log in.")
+        statusMessage?.let { message ->
+            Text(
+                text = message,
+                color = Color.Green,
+                fontSize = 12.sp,
+                modifier = Modifier.padding(vertical = 8.dp)
+            )
+        }
+
+        // ERROR MESSAGE
+        errorMessage?.let { message ->
+            Text(
+                text = message,
+                color = Color.Red,
+                fontSize = 12.sp,
+                modifier = Modifier.padding(vertical = 8.dp)
+            )
+        }
+
         Spacer(modifier = Modifier.height(32.dp))
 
         // LOGIN BUTTON
         Button(
-            onClick = {
-                navController.navigate("home") {
-                    popUpTo("login") { inclusive = true }
-                }
-            },
+            onClick = { authViewModel.logIn(email, password) },
+            enabled = !isLoading,
             modifier = Modifier
                 .fillMaxWidth()
                 .height(48.dp),
             shape = RoundedCornerShape(12.dp),
             colors = ButtonDefaults.buttonColors(containerColor = DeepSea2)
         ) {
-            Text("Login", color = DeepSea5, fontSize = 18.sp)
+            if (isLoading) {
+                CircularProgressIndicator(color = DeepSea5, modifier = Modifier.requiredSize(24.dp))
+            } else {
+                Text("Login", color = DeepSea5, fontSize = 18.sp)
+            }
         }
     }
 }
