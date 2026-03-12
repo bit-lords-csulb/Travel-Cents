@@ -3,12 +3,18 @@ package com.example.travelcents.ui.main
 import androidx.compose.runtime.mutableStateListOf
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.example.travelcents.BuildConfig
 import com.example.travelcents.data.ChatMessage
-import com.google.ai.client.generativeai.GenerativeModel
-import com.google.ai.client.generativeai.type.content
+import com.example.travelcents.data.GroqApi
+import com.example.travelcents.data.GroqMessage
+import com.example.travelcents.data.GroqRequest
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
+import okhttp3.OkHttpClient
+import okhttp3.logging.HttpLoggingInterceptor
+import retrofit2.Retrofit
+import retrofit2.converter.gson.GsonConverterFactory
 
 class ChatViewModel : ViewModel() {
     private val _messages = mutableStateListOf<ChatMessage>()
@@ -17,21 +23,31 @@ class ChatViewModel : ViewModel() {
     private val _isLoading = MutableStateFlow(false)
     val isLoading = _isLoading.asStateFlow()
 
-    private val generativeModel = GenerativeModel(
-        modelName = "gemini-2.5-flash",
-        apiKey = "AIzaSyDvH65TdP3q3py2O6lNXrfW68Ot7A_rZk4"
-    )
+    private val groqApi: GroqApi by lazy {
+        val logging = HttpLoggingInterceptor().apply {
+            level = HttpLoggingInterceptor.Level.BODY
+        }
+        val client = OkHttpClient.Builder()
+            .addInterceptor(logging)
+            .build()
 
-    private val chat = generativeModel.startChat(
-        history = listOf(
-            content(role = "user") { text("You are a helpful travel assistant for an app called TravelCents. Provide travel advice, trip suggestions, and help with itineraries.") },
-            content(role = "model") { text("Bonjour! I'm your AI travel agent. How can I help you with your trips today?") }
-        )
+        Retrofit.Builder()
+            .baseUrl("https://api.groq.com/openai/")
+            .addConverterFactory(GsonConverterFactory.create())
+            .client(client)
+            .build()
+            .create(GroqApi::class.java)
+    }
+
+    private val chatHistory = mutableListOf(
+        GroqMessage("system", "You are a helpful travel assistant for an app called TravelCents. Provide travel advice, trip suggestions, and help with itineraries.")
     )
 
     init {
         if (_messages.isEmpty()) {
-            _messages.add(ChatMessage(text = "Bonjour! I'm your TravelCents AI travel agent. How can I help you today?", isFromUser = false))
+            val initialAssistantMessage = "Bonjour! I'm your TravelCents AI travel agent. How can I help you today?"
+            _messages.add(ChatMessage(text = initialAssistantMessage, isFromUser = false))
+            chatHistory.add(GroqMessage("assistant", initialAssistantMessage))
         }
     }
 
@@ -40,27 +56,26 @@ class ChatViewModel : ViewModel() {
 
         val userMessage = ChatMessage(text = text, isFromUser = true)
         _messages.add(userMessage)
+        chatHistory.add(GroqMessage("user", text))
 
         viewModelScope.launch {
             _isLoading.value = true
             try {
-                val response = chat.sendMessage(text)
-                val responseText = response.text
+                val request = GroqRequest(
+                    model = "llama-3.3-70b-versatile",
+                    messages = chatHistory.toList()
+                )
+                val response = groqApi.getChatCompletion(
+                    apiKey = "Bearer ${BuildConfig.GROQ_API_KEY}",
+                    request = request
+                )
+                val assistantResponse = response.choices.firstOrNull()?.message?.content ?: "I'm sorry, I couldn't generate a response."
                 
-                if (responseText != null) {
-                    _messages.add(ChatMessage(text = responseText, isFromUser = false))
-                } else {
-                    _messages.add(ChatMessage(text = "I received an empty response. This can happen due to safety filters.", isFromUser = false))
-                }
+                _messages.add(ChatMessage(text = assistantResponse, isFromUser = false))
+                chatHistory.add(GroqMessage("assistant", assistantResponse))
             } catch (e: Exception) {
-                val errorMsg = e.message ?: ""
-                val userFriendlyError = when {
-                    errorMsg.contains("404") -> "Error: Model 'gemini-2.5-flash' not found. Please ensure your API key is from Google AI Studio and has permission for this model."
-                    errorMsg.contains("API_KEY_INVALID") -> "Error: The API Key provided is invalid."
-                    errorMsg.contains("429") -> "Error: Rate limit exceeded. Please wait a moment."
-                    else -> "Connection Error: Please check your internet and API key settings."
-                }
-                _messages.add(ChatMessage(text = userFriendlyError, isFromUser = false))
+                val errorMsg = "Error: ${e.localizedMessage ?: "Check your API key and network connection."}"
+                _messages.add(ChatMessage(text = errorMsg, isFromUser = false))
             } finally {
                 _isLoading.value = false
             }
