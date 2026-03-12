@@ -170,55 +170,102 @@ fun EventCardDispatcher(event: TripEvent) {
 }
 
 @Composable
-fun RestaurantCard(restaurant: TripEvent.Restaurant) {
+fun FlightCard(flight: TripEvent.Flight) {
     Card(
         modifier = Modifier.fillMaxWidth().height(68.dp),
         shape = RoundedCornerShape(12.dp),
-        colors = CardDefaults.cardColors(containerColor = Color.White),
-        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+        colors = CardDefaults.cardColors(containerColor = Color(0xFF2D2438)) // Dark purple background
     ) {
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(16.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Text(text = "🍽️", fontSize = 24.sp, modifier = Modifier.padding(end = 16.dp))
-            Column(modifier = Modifier.weight(1f)) {
+        Row(modifier = Modifier.fillMaxSize()) {
+            // 1. The Accent Strip (Updated to Pink)
+            Box(
+                modifier = Modifier
+                    .fillMaxHeight()
+                    .width(4.dp)
+                    .background(Color(0xFFEC4899)) // Vibrant Pink
+            )
+
+            // 2. The Text Content
+            Column(
+                modifier = Modifier.fillMaxHeight().padding(horizontal = 16.dp),
+                verticalArrangement = Arrangement.Center
+            ) {
+                Text(text = flight.departure_time, fontSize = 10.sp, color = Color(0xFF94A3B8))
                 Text(
-                    text = restaurant.restaurant_name,
-                    fontSize = 16.sp,
-                    fontWeight = FontWeight.SemiBold,
-                    color = Color.Black
+                    text = "Flight to ${flight.destination_airport}",
+                    fontSize = 15.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = Color.White
                 )
-                Text(
-                    text = "Reservation: ${restaurant.reservation_time}",
-                    fontSize = 14.sp,
-                    color = Color.Gray,
-                    modifier = Modifier.padding(top = 4.dp)
-                )
-                Text(
-                    text = restaurant.cuisine,
-                    fontSize = 12.sp,
-                    color = Color(0xFFE53935),
-                    modifier = Modifier.padding(top = 4.dp)
-                )
+                Text(text = "${flight.airline} ${flight.flight_number}", fontSize = 11.sp, color = Color(0xFF64748B))
             }
         }
     }
 }
 
 @Composable
-fun FlightCard(flight: TripEvent.Flight) {
-    Card(modifier = Modifier.fillMaxWidth().height(68.dp), colors = CardDefaults.cardColors(containerColor = Color.White)) {
-        Text(text = "✈️ Flight: ${flight.airline}", modifier = Modifier.padding(16.dp), color = Color.Black)
+fun HotelCard(hotel: TripEvent.Hotel) {
+    Card(
+        modifier = Modifier.fillMaxWidth().height(68.dp),
+        shape = RoundedCornerShape(12.dp),
+        colors = CardDefaults.cardColors(containerColor = Color(0xFF1E3535)) // Dark teal background
+    ) {
+        Row(modifier = Modifier.fillMaxSize()) {
+            // 1. The Accent Strip (Bright Cyan for Hotels)
+            Box(
+                modifier = Modifier
+                    .fillMaxHeight()
+                    .width(4.dp)
+                    .background(Color(0xFF06B6D4))
+            )
+
+            Column(
+                modifier = Modifier.fillMaxHeight().padding(horizontal = 16.dp),
+                verticalArrangement = Arrangement.Center
+            ) {
+                Text(text = "Check-in: 15:00", fontSize = 10.sp, color = Color(0xFF94A3B8))
+                Text(
+                    text = "Hotel Check-in",
+                    fontSize = 15.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = Color.White
+                )
+                Text(text = hotel.hotel_name, fontSize = 11.sp, color = Color(0xFF64748B))
+            }
+        }
     }
 }
 
 @Composable
-fun HotelCard(hotel: TripEvent.Hotel) {
-    Card(modifier = Modifier.fillMaxWidth().height(68.dp), colors = CardDefaults.cardColors(containerColor = Color.White)) {
-        Text(text = "🏨 Hotel: ${hotel.hotel_name}", modifier = Modifier.padding(16.dp), color = Color.Black)
+fun RestaurantCard(restaurant: TripEvent.Restaurant) {
+    Card(
+        modifier = Modifier.fillMaxWidth().height(68.dp),
+        shape = RoundedCornerShape(12.dp),
+        colors = CardDefaults.cardColors(containerColor = Color(0xFF2A3324)) // Dark olive background
+    ) {
+        Row(modifier = Modifier.fillMaxSize()) {
+            // 1. The Accent Strip (Yellow/Gold for Food)
+            Box(
+                modifier = Modifier
+                    .fillMaxHeight()
+                    .width(4.dp)
+                    .background(Color(0xFFEAB308))
+            )
+
+            Column(
+                modifier = Modifier.fillMaxHeight().padding(horizontal = 16.dp),
+                verticalArrangement = Arrangement.Center
+            ) {
+                Text(text = restaurant.reservation_time, fontSize = 10.sp, color = Color(0xFF94A3B8))
+                Text(
+                    text = restaurant.restaurant_name,
+                    fontSize = 15.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = Color.White
+                )
+                Text(text = restaurant.cuisine, fontSize = 11.sp, color = Color(0xFF64748B))
+            }
+        }
     }
 }
 
