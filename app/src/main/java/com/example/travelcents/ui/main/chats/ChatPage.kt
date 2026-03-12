@@ -47,7 +47,10 @@ fun formatMessageTime(timestamp: Timestamp?): String {
 fun ChatPage(
     group: Group,
     onBackClick: () -> Unit = {},
-    viewModel: ChatViewModel = viewModel(factory = ChatViewModel.Factory(group))
+    viewModel: ChatViewModel = viewModel(
+        key = group.id,
+        factory = ChatViewModel.Factory(group)
+    )
 ) {
     val messages by viewModel.messages.collectAsState()
     val messageText by viewModel.messageText.collectAsState()
