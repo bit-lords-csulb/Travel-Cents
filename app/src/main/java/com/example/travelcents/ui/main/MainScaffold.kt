@@ -80,17 +80,7 @@ fun MainScaffold(modifier: Modifier = Modifier) {
                 modifier = Modifier.fillMaxSize()
             ) {
                 composable(MainRoutes.Current) { CurrentPage(modifier = Modifier.fillMaxSize()) }
-                composable(MainRoutes.NewTrip) { 
-                    NewTripPage(
-                        modifier = Modifier.fillMaxSize(),
-                        onClose = {
-                            navController.navigate(MainRoutes.Home) {
-                                popUpTo(MainRoutes.Home)
-                                launchSingleTop = true
-                            }
-                        }
-                    ) 
-                }
+                composable(MainRoutes.NewTrip) { NewTripPage(modifier = Modifier.fillMaxSize()) }
                 composable(MainRoutes.Home) { HomePage(modifier = Modifier.fillMaxSize()) }
                 composable(MainRoutes.Chats) { ChatsPage(modifier = Modifier.fillMaxSize()) }
                 composable(MainRoutes.Settings) { SettingsPage(modifier = Modifier.fillMaxSize()) }
