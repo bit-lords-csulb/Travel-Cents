@@ -80,7 +80,6 @@ fun TripHeader(tripName: String) {
     Column(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(bottom = 24.dp)
             .height(126.dp)
     ) {
         Row(
