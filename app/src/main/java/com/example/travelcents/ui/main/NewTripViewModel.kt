@@ -10,12 +10,14 @@ import com.example.travelcents.data.model.Itinerary
 import com.example.travelcents.data.model.TravelEvent
 import com.example.travelcents.data.model.TravelRequest
 import com.example.travelcents.data.remote.GroqRepository
+import com.example.travelcents.data.remote.SerpRepository
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.Firebase
 import com.google.firebase.firestore.firestore
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.async
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.tasks.await
 
@@ -71,9 +73,23 @@ class NewTripViewModel : ViewModel() {
         viewModelScope.launch {
             _uiState.value = TripUiState.Loading
             try {
-                val (itinerary, events) = GroqRepository.planTrip(request)
-                saveToFirestore(uid, itinerary, events)
-                _uiState.value = TripUiState.Success(itinerary, events)
+                // Step 1: generate itinerary metadata (includes IATA codes)
+                val itinerary = GroqRepository.generateItinerary(request)
+
+                // Step 2: fetch real flights + hotels in parallel
+                val flightsDeferred = async { SerpRepository.searchFlights(request, itinerary) }
+                val hotelsDeferred = async { SerpRepository.searchHotels(request, itinerary) }
+                val realFlights = flightsDeferred.await()
+                val realHotels = hotelsDeferred.await()
+
+                // Step 3: Groq generates only restaurants + activities, with real context
+                val aiEvents = GroqRepository.generateEvents(itinerary, request, realFlights, realHotels)
+
+                val allEvents = realFlights + realHotels + aiEvents
+                val linkedItinerary = itinerary.copy(eventIds = allEvents.map { it.eventId })
+
+                saveToFirestore(uid, linkedItinerary, allEvents)
+                _uiState.value = TripUiState.Success(linkedItinerary, allEvents)
             } catch (e: Exception) {
                 _uiState.value = TripUiState.Error(e.message ?: "Failed to generate trip.")
             }
