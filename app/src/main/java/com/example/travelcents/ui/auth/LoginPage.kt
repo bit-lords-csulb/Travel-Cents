@@ -16,6 +16,7 @@ import androidx.compose.foundation.layout.requiredSize
 import androidx.compose.foundation.layout.requiredWidth
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
@@ -33,7 +34,15 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.input.key.Key
+import androidx.compose.ui.input.key.KeyEventType
+import androidx.compose.ui.input.key.isShiftPressed
+import androidx.compose.ui.input.key.key
+import androidx.compose.ui.input.key.onPreviewKeyEvent
+import androidx.compose.ui.input.key.type
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
@@ -54,6 +63,9 @@ fun LoginPage(modifier: Modifier = Modifier, navController: NavController, authV
     var email by remember { mutableStateOf("") }
     var password by remember { mutableStateOf("") }
     var rememberMeState by remember { mutableStateOf(false) }
+
+    val emailFocusRequester = remember { FocusRequester() }
+    val passwordFocusRequester = remember { FocusRequester() }
 
     // Collect StateFlows as Compose state
     val isLoggedIn by authViewModel.isLoggedIn.collectAsStateWithLifecycle()
@@ -86,7 +98,7 @@ fun LoginPage(modifier: Modifier = Modifier, navController: NavController, authV
             text = "Log In",
             fontSize = 32.sp,
             fontWeight = FontWeight.Bold,
-            color = DeepSea5
+            color = Color.White
         )
 
         Box(
@@ -100,47 +112,108 @@ fun LoginPage(modifier: Modifier = Modifier, navController: NavController, authV
         Spacer(modifier = Modifier.height(40.dp))
 
         // EMAIL SECTION
-        Text(text = "Email", color = DeepSea5, fontSize = 16.sp)
+        Text(text = "Email", color = Color.White, fontSize = 16.sp)
         TextField(
             value = email,
-            onValueChange = {
-                email = it
-                authViewModel.clearError()
+            onValueChange = { newValue ->
+                // Ignore tab characters
+                if (!newValue.contains('\t')) {
+                    email = newValue
+                    authViewModel.clearError()
+                }
             },
             placeholder = { Text("demo@student.csulb.edu", color = Color.Gray, fontSize = 14.sp) },
-            modifier = Modifier.fillMaxWidth().height(50.dp),
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(50.dp)
+                .focusRequester(emailFocusRequester)
+                .onPreviewKeyEvent { event ->
+                    when {
+                        event.key == Key.Tab && event.type == KeyEventType.KeyDown && !event.isShiftPressed -> {
+                            passwordFocusRequester.requestFocus()
+                            true // consume the event
+                        }
+
+                        else -> false
+                    }
+                },
+            keyboardOptions = KeyboardOptions(
+                keyboardType = KeyboardType.Email,
+                imeAction = ImeAction.Next
+            ),
+            keyboardActions = KeyboardActions(
+                onNext = { passwordFocusRequester.requestFocus() }
+            ),
             colors = TextFieldDefaults.colors(
                 focusedContainerColor = Color.Transparent,
                 unfocusedContainerColor = Color.Transparent,
-                focusedIndicatorColor = DeepSea5,
-                unfocusedIndicatorColor = DeepSea4
+                focusedIndicatorColor = Color.White,
+                unfocusedIndicatorColor = DeepSea4,
+                focusedTextColor = Color.White,
+                unfocusedTextColor = Color.White
             )
         )
 
         Spacer(modifier = Modifier.height(20.dp))
 
         // PASSWORD SECTION
-        Text(text = "Password", color = DeepSea5, fontSize = 16.sp)
+        Text(text = "Password", color = Color.White, fontSize = 16.sp)
         TextField(
             value = password,
-            onValueChange = {
-                password = it
-                authViewModel.clearError()
+            onValueChange = { newValue ->
+                // Ignore tab characters
+                if (!newValue.contains('\t')) {
+                    password = newValue
+                    authViewModel.clearError()
+                }
             },
             placeholder = { Text("enter password", color = Color.Gray, fontSize = 14.sp) },
             visualTransformation = PasswordVisualTransformation(),
-            modifier = Modifier.fillMaxWidth().height(50.dp),
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(50.dp)
+                .focusRequester(passwordFocusRequester)
+                .onPreviewKeyEvent { event ->
+                    when {
+                        event.key == Key.Tab && event.type == KeyEventType.KeyDown && event.isShiftPressed -> {
+                            emailFocusRequester.requestFocus()
+                            true // consume the event
+                        }
+
+                        event.key == Key.Tab && event.type == KeyEventType.KeyDown -> {
+                            true // consume tab, nowhere to go forward
+                        }
+
+                        event.key == Key.Enter && event.type == KeyEventType.KeyDown -> {
+                            authViewModel.logIn(email, password)
+                            true
+                        }
+
+                        else -> false
+                    }
+                },
+            keyboardOptions = KeyboardOptions(
+                keyboardType = KeyboardType.Password,
+                imeAction = ImeAction.Done
+            ),
+            keyboardActions = KeyboardActions(
+                onDone = { authViewModel.logIn(email, password) }
+            ),
             colors = TextFieldDefaults.colors(
                 focusedContainerColor = Color.Transparent,
                 unfocusedContainerColor = Color.Transparent,
-                focusedIndicatorColor = DeepSea5,
-                unfocusedIndicatorColor = DeepSea4
+                focusedIndicatorColor = Color.White,
+                unfocusedIndicatorColor = DeepSea4,
+                focusedTextColor = Color.White,
+                unfocusedTextColor = Color.White
             )
         )
 
         // REMEMBER ME & FORGOT PASSWORD
         Row(
-            modifier = Modifier.fillMaxWidth().padding(top = 12.dp),
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(top = 12.dp),
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically
         ) {
@@ -167,7 +240,7 @@ fun LoginPage(modifier: Modifier = Modifier, navController: NavController, authV
 
                 Text(
                     text = "Remember Me",
-                    color = DeepSea5,
+                    color = Color.White,
                     fontSize = 12.sp,
                     fontWeight = FontWeight.Medium
                 )
@@ -212,7 +285,7 @@ fun LoginPage(modifier: Modifier = Modifier, navController: NavController, authV
             if (isLoading) {
                 CircularProgressIndicator(color = DeepSea5, modifier = Modifier.requiredSize(24.dp))
             } else {
-                Text("Login", color = DeepSea5, fontSize = 18.sp)
+                Text("Login", color = Color.White, fontSize = 18.sp)
             }
         }
     }
