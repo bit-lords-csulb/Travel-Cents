@@ -19,19 +19,19 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.travelcents.data.MockItineraryData
-import com.example.travelcents.data.TripEvent
+import com.example.travelcents.data.model.TravelEvent
 
 @Composable
 fun ItineraryScreen(
-    events: List<TripEvent> = MockItineraryData.sampleEvents
+    events: List<TravelEvent> = MockItineraryData.sampleEvents
 ) {
-    val eventsByDay = events.groupBy { it.day }
+    val eventsByDay = events.groupBy { it.date }
 
     val days = eventsByDay.keys.toList().sorted()
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .background(Color(0xFF0F172A)) // Dark background covers the whole screen
+            .background(Color(0xFF0F172A))
             .padding(top = 24.dp)
     ) {
         Box(modifier = Modifier.padding(horizontal = 24.dp)) {
@@ -158,53 +158,48 @@ fun TripHeader(tripName: String) {
 }
 
 @Composable
-fun EventCardDispatcher(event: TripEvent) {
-    when (event) {
-        is TripEvent.Flight -> FlightCard(flight = event)
-        is TripEvent.Hotel -> HotelCard(hotel = event)
-        is TripEvent.Restaurant -> RestaurantCard(restaurant = event)
-        is TripEvent.Activity -> { /* TODO */ }
-        is TripEvent.ConcertEvent -> { /* TODO */ }
-        is TripEvent.Transport -> { /* TODO */ }
+fun EventCardDispatcher(event: TravelEvent) {
+    when (event.type.lowercase()) {
+        "flight" -> FlightCard(event = event)
+        "hotel" -> HotelCard(event = event)
+        "restaurant" -> RestaurantCard(event = event)
+        else -> { /* Handle others */ }
     }
 }
 
 @Composable
-fun FlightCard(flight: TripEvent.Flight) {
+fun FlightCard(event: TravelEvent) {
     Card(
         modifier = Modifier.fillMaxWidth().height(68.dp),
         shape = RoundedCornerShape(12.dp),
-        colors = CardDefaults.cardColors(containerColor = Color(0xFF2D2438)) // Dark purple background
+        colors = CardDefaults.cardColors(containerColor = Color(0xFF2D2438))
     ) {
         Row(modifier = Modifier.fillMaxSize()) {
-            // 1. The Accent Strip (Updated to Pink)
-            Box(
-                modifier = Modifier
-                    .fillMaxHeight()
-                    .width(4.dp)
-                    .background(Color(0xFFEC4899)) // Vibrant Pink
-            )
+            Box(modifier = Modifier.fillMaxHeight().width(4.dp).background(Color(0xFFEC4899)))
 
-            // 2. The Text Content
-            Column(
-                modifier = Modifier.fillMaxHeight().padding(horizontal = 16.dp),
-                verticalArrangement = Arrangement.Center
-            ) {
-                Text(text = flight.departure_time, fontSize = 10.sp, color = Color(0xFF94A3B8))
+            Column(modifier = Modifier.fillMaxHeight().padding(horizontal = 16.dp), verticalArrangement = Arrangement.Center) {
+                Text(text = event.startTime, fontSize = 10.sp, color = Color(0xFF94A3B8))
+
+                // 3. Fix: Pull from the details map
+                val destination = event.details["destination_airport"] ?: "Destination"
+                val airline = event.details["airline"] ?: ""
+                val flightNo = event.details["flight_number"] ?: ""
+
                 Text(
-                    text = "Flight to ${flight.destination_airport}",
+                    text = "Flight to $destination",
                     fontSize = 15.sp,
                     fontWeight = FontWeight.Bold,
                     color = Color.White
                 )
-                Text(text = "${flight.airline} ${flight.flight_number}", fontSize = 11.sp, color = Color(0xFF64748B))
+                Text(text = "$airline $flightNo", fontSize = 11.sp, color = Color(0xFF64748B))
             }
         }
     }
 }
 
+
 @Composable
-fun HotelCard(hotel: TripEvent.Hotel) {
+fun HotelCard(event: TravelEvent) {
     Card(
         modifier = Modifier.fillMaxWidth().height(68.dp),
         shape = RoundedCornerShape(12.dp),
@@ -223,21 +218,26 @@ fun HotelCard(hotel: TripEvent.Hotel) {
                 modifier = Modifier.fillMaxHeight().padding(horizontal = 16.dp),
                 verticalArrangement = Arrangement.Center
             ) {
-                Text(text = "Check-in: 15:00", fontSize = 10.sp, color = Color(0xFF94A3B8))
+                // Using the main TravelEvent startTime instead of a hardcoded string
+                Text(text = "Check-in: ${event.startTime}", fontSize = 10.sp, color = Color(0xFF94A3B8))
+
+                // Pulling the specific hotel name from the details map
+                val hotelName = event.details["hotel_name"] ?: "Unknown Hotel"
+
                 Text(
                     text = "Hotel Check-in",
                     fontSize = 15.sp,
                     fontWeight = FontWeight.Bold,
                     color = Color.White
                 )
-                Text(text = hotel.hotel_name, fontSize = 11.sp, color = Color(0xFF64748B))
+                Text(text = hotelName, fontSize = 11.sp, color = Color(0xFF64748B))
             }
         }
     }
 }
 
 @Composable
-fun RestaurantCard(restaurant: TripEvent.Restaurant) {
+fun RestaurantCard(event: TravelEvent) {
     Card(
         modifier = Modifier.fillMaxWidth().height(68.dp),
         shape = RoundedCornerShape(12.dp),
@@ -256,14 +256,20 @@ fun RestaurantCard(restaurant: TripEvent.Restaurant) {
                 modifier = Modifier.fillMaxHeight().padding(horizontal = 16.dp),
                 verticalArrangement = Arrangement.Center
             ) {
-                Text(text = restaurant.reservation_time, fontSize = 10.sp, color = Color(0xFF94A3B8))
+                // Using the main TravelEvent startTime
+                Text(text = event.startTime, fontSize = 10.sp, color = Color(0xFF94A3B8))
+
+                // Pulling specific restaurant info from the details map
+                val restaurantName = event.details["restaurant_name"] ?: "Unknown Restaurant"
+                val cuisine = event.details["cuisine"] ?: ""
+
                 Text(
-                    text = restaurant.restaurant_name,
+                    text = restaurantName,
                     fontSize = 15.sp,
                     fontWeight = FontWeight.Bold,
                     color = Color.White
                 )
-                Text(text = restaurant.cuisine, fontSize = 11.sp, color = Color(0xFF64748B))
+                Text(text = cuisine, fontSize = 11.sp, color = Color(0xFF64748B))
             }
         }
     }
