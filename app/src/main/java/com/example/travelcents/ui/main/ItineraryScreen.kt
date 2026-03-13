@@ -20,14 +20,27 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.travelcents.data.MockItineraryData
 import com.example.travelcents.data.model.TravelEvent
+import androidx.lifecycle.viewmodel.compose.viewModel
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.LaunchedEffect
 
 @Composable
 fun ItineraryScreen(
-    events: List<TravelEvent> = MockItineraryData.sampleEvents
+    tripId: String = "3fa85f64-5717-4562-b3fc-2c963f66afa6", // We will pass a real ID here later
+    viewModel: ItineraryViewModel = viewModel()
 ) {
-    val eventsByDay = events.groupBy { it.date }
+    // 1. Observe the "bucket" from the ViewModel
+    val events by viewModel.events.collectAsState()
 
-    val days = eventsByDay.keys.toList().sorted()
+    // 2. Turn on the faucet the moment the screen loads
+    LaunchedEffect(tripId) {
+        viewModel.fetchItinerary(tripId)
+    }
+
+    // 3. Keep the grouping logic exactly the same!
+    val eventsByDay = events.groupBy { it.date }
+    val sortedDates = eventsByDay.keys.toList().sorted()
     Column(
         modifier = Modifier
             .fillMaxSize()
@@ -51,21 +64,20 @@ fun ItineraryScreen(
             ),
             verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
-            days.forEach { day ->
+            sortedDates.forEach { date ->
 
-                val dailyEvents = eventsByDay[day] ?: emptyList()
+                // Grab the events for this specific date
+                val dailyEvents = eventsByDay[date] ?: emptyList()
 
                 item {
                     Text(
-                        text = "Day $day",
+                        text = date, // This will now show "2026-03-20" or whatever the database holds
                         color = Color.White,
                         fontSize = 20.sp,
                         fontWeight = FontWeight.Bold,
                         modifier = Modifier.padding(top = 8.dp, bottom = 4.dp)
-
                     )
                 }
-
 
                 items(dailyEvents) { event ->
                     EventCardDispatcher(event = event)
@@ -275,8 +287,8 @@ fun RestaurantCard(event: TravelEvent) {
     }
 }
 
-@Preview(showBackground = true)
-@Composable
-fun ItineraryScreenPreview() {
-    ItineraryScreen()
-}
+//@Preview(showBackground = true)
+//@Composable
+//fun ItineraryScreenPreview() {
+//    ItineraryScreen()
+//}
