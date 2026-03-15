@@ -12,21 +12,44 @@ import com.google.firebase.firestore.Query
 
 class ItineraryViewModel : ViewModel() {
 
-    // This is the bucket that will hold the data for your UI
     private val _events = MutableStateFlow<List<TravelEvent>>(emptyList())
     val events: StateFlow<List<TravelEvent>> = _events.asStateFlow()
 
     private val db = FirebaseFirestore.getInstance()
     private val auth = FirebaseAuth.getInstance()
 
-    fun fetchItinerary(tripId: String) {
+    private fun fetchLatestItinerary(uid: String) {
         val uid = auth.currentUser?.uid
         if (uid == null) {
             Log.e("ItineraryViewModel", "User is not logged in!")
             return
         }
 
-        // Following your teammate's exact path!
+        // Step 1: Find the most recently created trip
+        db.collection("users").document(uid)
+            .collection("trips")
+            .orderBy("createdAt", Query.Direction.DESCENDING)
+            .limit(1)
+            .get()
+            .addOnSuccessListener { tripSnapshot ->
+                if (tripSnapshot.isEmpty) {
+                    Log.d("ItineraryViewModel", "No trips found for user.")
+                    return@addOnSuccessListener
+                }
+
+                // Step 2: Grab the ID of that newest trip
+                val newestTripId = tripSnapshot.documents.first().id
+
+                // Step 3: Trigger the event listener using that ID
+                listenToEvents(uid, newestTripId)
+            }
+            .addOnFailureListener { e ->
+                Log.e("ItineraryViewModel", "Error fetching latest trip", e)
+            }
+    }
+
+    private fun listenToEvents(uid: String, tripId: String) {
+        // This is your exact same listener code from before!
         db.collection("users").document(uid)
             .collection("trips").document(tripId)
             .collection("events")
@@ -38,12 +61,19 @@ class ItineraryViewModel : ViewModel() {
 
                 if (snapshot != null) {
                     val fetchedEvents = snapshot.documents.mapNotNull { doc ->
-                        // Because your teammate flattened the data, we reconstruct it here
                         val allData = doc.data ?: emptyMap()
 
-                        // Separate the core fields from the "details"
-                        val coreKeys = listOf("eventId", "type", "itineraryId", "tz", "date", "startTime", "endTime")
-                        val detailsMap = allData.filterKeys { it !in coreKeys }.mapValues { it.value.toString() }
+                        val coreKeys = listOf(
+                            "eventId",
+                            "type",
+                            "itineraryId",
+                            "tz",
+                            "date",
+                            "startTime",
+                            "endTime"
+                        )
+                        val detailsMap =
+                            allData.filterKeys { it !in coreKeys }.mapValues { it.value.toString() }
 
                         TravelEvent(
                             eventId = doc.getString("eventId") ?: "",
@@ -57,9 +87,25 @@ class ItineraryViewModel : ViewModel() {
                         )
                     }
 
-                    // Pour the data into the bucket!
                     _events.value = fetchedEvents
                 }
             }
+    }
+
+
+    fun loadTrip(tripId: String? = null) {
+        val uid = auth.currentUser?.uid
+        if (uid == null) {
+            Log.e("ItineraryViewModel", "User is not logged in!")
+            return
+        }
+
+        if (tripId != null) {
+            // Scenario A: We were given a specific ID (from the Home screen)
+            listenToEvents(uid, tripId)
+        } else {
+            // Scenario B: We were given nothing (from the Current tab)
+            fetchLatestItinerary(uid) // Make sure to update fetchLatestItinerary to accept the uid!
+        }
     }
 }
