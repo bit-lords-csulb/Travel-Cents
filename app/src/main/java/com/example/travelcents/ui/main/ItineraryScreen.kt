@@ -30,22 +30,15 @@ import com.google.firebase.auth.FirebaseAuth
 @Composable
 fun ItineraryScreen(
     tripId: String? = null,
-    viewModel: ItineraryViewModel = viewModel(),
-    authViewModel: AuthViewModel = viewModel()
+    viewModel: ItineraryViewModel = viewModel() // Removed AuthViewModel completely!
 ) {
-    // 1. Watch the login success switch from your teammate's code
-    val isLoggedIn by authViewModel.isLoggedIn.collectAsState()
     val events by viewModel.events.collectAsState()
 
-    // 2. The Trigger
-    LaunchedEffect(isLoggedIn, tripId) {
-        // If the switch is 'true', grab the UID directly from Firebase
-        if (isLoggedIn) {
-            val uid = FirebaseAuth.getInstance().currentUser?.uid
-            if (uid != null) {
-                viewModel.loadTrip(tripId)
-            }
-        }
+    // The True Trigger
+    // By using 'Unit', this fires exactly once the moment the screen opens.
+    LaunchedEffect(Unit) {
+        // The ViewModel is smart enough to check Firebase for the UID itself
+        viewModel.loadTrip(tripId)
     }
 
     // 3. Keep the grouping logic exactly the same!
@@ -58,7 +51,7 @@ fun ItineraryScreen(
             .padding(top = 24.dp)
     ) {
         Box(modifier = Modifier.padding(horizontal = 24.dp)) {
-            TripHeader(tripName = MockItineraryData.sampleTrip.trip_name)
+            TripHeader(tripName = "DEBUG: ${events.size} Events Loaded")
         }
 
         LazyColumn(
@@ -185,7 +178,14 @@ fun EventCardDispatcher(event: TravelEvent) {
         "flight" -> FlightCard(event = event)
         "hotel" -> HotelCard(event = event)
         "restaurant" -> RestaurantCard(event = event)
-        else -> { /* Handle others */ }
+        else -> {
+            // Draw a temporary fallback text so we know it exists!
+            Text(
+                text = "Generic Event: ${event.type} at ${event.startTime}",
+                color = Color.White,
+                modifier = Modifier.padding(8.dp)
+            )
+        }
     }
 }
 
