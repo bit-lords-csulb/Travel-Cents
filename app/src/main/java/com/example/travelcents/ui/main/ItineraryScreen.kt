@@ -24,18 +24,28 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.LaunchedEffect
+import com.example.travelcents.ui.auth.AuthViewModel
+import com.google.firebase.auth.FirebaseAuth
 
 @Composable
 fun ItineraryScreen(
-    tripId: String = "3fa85f64-5717-4562-b3fc-2c963f66afa6", // We will pass a real ID here later
-    viewModel: ItineraryViewModel = viewModel()
+    tripId: String? = null,
+    viewModel: ItineraryViewModel = viewModel(),
+    authViewModel: AuthViewModel = viewModel()
 ) {
-    // 1. Observe the "bucket" from the ViewModel
+    // 1. Watch the login success switch from your teammate's code
+    val isLoggedIn by authViewModel.isLoggedIn.collectAsState()
     val events by viewModel.events.collectAsState()
 
-    // 2. Turn on the faucet the moment the screen loads
-    LaunchedEffect(tripId) {
-        viewModel.fetchItinerary(tripId)
+    // 2. The Trigger
+    LaunchedEffect(isLoggedIn, tripId) {
+        // If the switch is 'true', grab the UID directly from Firebase
+        if (isLoggedIn) {
+            val uid = FirebaseAuth.getInstance().currentUser?.uid
+            if (uid != null) {
+                viewModel.loadTrip(tripId)
+            }
+        }
     }
 
     // 3. Keep the grouping logic exactly the same!
