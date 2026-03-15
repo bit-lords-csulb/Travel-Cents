@@ -27,14 +27,13 @@ class FriendsViewModel : ViewModel() {
     private val _searchQuery = MutableStateFlow("")
     val searchQuery: StateFlow<String> = _searchQuery.asStateFlow()
 
-    // Live count of pending received friend requests for the badge
     private val _pendingRequestCount = MutableStateFlow(0)
     val pendingRequestCount: StateFlow<Int> = _pendingRequestCount.asStateFlow()
 
     val filteredFriends: StateFlow<List<Friend>> = combine(_friends, _searchQuery) { list, query ->
         if (query.isBlank()) list
         else list.filter { it.displayName.contains(query, ignoreCase = true) }
-    }.stateIn(viewModelScope, SharingStarted.Companion.WhileSubscribed(5000), emptyList())
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
     private val userDocListeners            = mutableMapOf<String, ListenerRegistration>()
     private var friendsCollectionListener: ListenerRegistration? = null
@@ -51,12 +50,12 @@ class FriendsViewModel : ViewModel() {
         val isOnline      = snap.getBoolean("isOnline") ?: false
         val lastSeenLabel = buildLastSeenLabel(isOnline, snap)
         return Friend(
-            uid = fUid,
-            displayName = "$first $last".trim().ifBlank { "Unknown" },
-            email = snap.getString("email") ?: "",
+            uid             = fUid,
+            displayName     = "$first $last".trim().ifBlank { "Unknown" },
+            email           = snap.getString("email") ?: "",
             profileImageUrl = snap.getString("profileImageUrl") ?: "",
-            isOnline = isOnline,
-            lastSeenLabel = lastSeenLabel
+            isOnline        = isOnline,
+            lastSeenLabel   = lastSeenLabel
         )
     }
 
@@ -109,6 +108,14 @@ class FriendsViewModel : ViewModel() {
             .addSnapshotListener { snapshot, _ ->
                 _pendingRequestCount.value = snapshot?.documents?.size ?: 0
             }
+    }
+
+    fun removeFriend(friendUid: String) {
+        if (currentUid.isEmpty()) return
+        val batch = db.batch()
+        batch.delete(db.collection("users").document(currentUid).collection("friends").document(friendUid))
+        batch.delete(db.collection("users").document(friendUid).collection("friends").document(currentUid))
+        batch.commit()
     }
 
     fun onSearchQueryChange(query: String) { _searchQuery.value = query }

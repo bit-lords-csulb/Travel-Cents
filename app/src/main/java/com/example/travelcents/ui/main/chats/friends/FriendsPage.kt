@@ -1,7 +1,9 @@
 package com.example.travelcents.ui.main.chats.friends
 
+import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -25,7 +27,6 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import coil.compose.AsyncImage
-import com.example.travelcents.ui.main.chats.friends.FriendsViewModel
 import com.example.travelcents.ui.theme.*
 
 data class Friend(
@@ -44,9 +45,9 @@ fun FriendsPage(
     onRequestsClick: () -> Unit = {},
     viewModel: FriendsViewModel = viewModel()
 ) {
-    val searchQuery      by viewModel.searchQuery.collectAsState()
-    val filteredFriends  by viewModel.filteredFriends.collectAsState()
-    val pendingCount     by viewModel.pendingRequestCount.collectAsState()
+    val searchQuery     by viewModel.searchQuery.collectAsState()
+    val filteredFriends by viewModel.filteredFriends.collectAsState()
+    val pendingCount    by viewModel.pendingRequestCount.collectAsState()
 
     Column(
         modifier = Modifier
@@ -94,13 +95,8 @@ fun FriendsPage(
                                     .clickable { onRequestsClick() },
                                 contentAlignment = Alignment.Center
                             ) {
-                                Icon(
-                                    imageVector = Icons.Default.Inbox,
-                                    contentDescription = "Friend Requests",
-                                    tint = DeepSea5
-                                )
+                                Icon(Icons.Default.Inbox, contentDescription = "Friend Requests", tint = DeepSea5)
                             }
-                            // Badge
                             if (pendingCount > 0) {
                                 Box(
                                     modifier = Modifier
@@ -120,7 +116,6 @@ fun FriendsPage(
                             }
                         }
 
-                        // Add friend button
                         Box(
                             modifier = Modifier
                                 .size(40.dp)
@@ -129,11 +124,7 @@ fun FriendsPage(
                                 .clickable { onAddFriendClick() },
                             contentAlignment = Alignment.Center
                         ) {
-                            Icon(
-                                imageVector = Icons.Default.PersonAdd,
-                                contentDescription = "Add Friend",
-                                tint = DeepSea5
-                            )
+                            Icon(Icons.Default.PersonAdd, contentDescription = "Add Friend", tint = DeepSea5)
                         }
                     }
                 }
@@ -147,12 +138,8 @@ fun FriendsPage(
                         .fillMaxWidth()
                         .height(52.dp)
                         .clip(RoundedCornerShape(48.dp)),
-                    placeholder = {
-                        Text("Search friends...", color = DeepSea5.copy(alpha = 0.5f))
-                    },
-                    leadingIcon = {
-                        Icon(Icons.Default.Search, contentDescription = null, tint = DeepSea5.copy(alpha = 0.7f))
-                    },
+                    placeholder = { Text("Search friends...", color = DeepSea5.copy(alpha = 0.5f)) },
+                    leadingIcon = { Icon(Icons.Default.Search, contentDescription = null, tint = DeepSea5.copy(alpha = 0.7f)) },
                     singleLine = true,
                     colors = TextFieldDefaults.colors(
                         focusedContainerColor = DeepSea3,
@@ -188,7 +175,8 @@ fun FriendsPage(
                 items(filteredFriends, key = { it.uid }) { friend ->
                     FriendRow(
                         friend = friend,
-                        onMessageClick = { onMessageFriendClick(friend) }
+                        onMessageClick = { onMessageFriendClick(friend) },
+                        onRemove = { viewModel.removeFriend(friend.uid) }
                     )
                 }
             }
@@ -196,13 +184,57 @@ fun FriendsPage(
     }
 }
 
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
-fun FriendRow(friend: Friend, onMessageClick: () -> Unit) {
+fun FriendRow(
+    friend: Friend,
+    onMessageClick: () -> Unit,
+    onRemove: () -> Unit
+) {
+    var showConfirmDialog by remember { mutableStateOf(false) }
+
+    if (showConfirmDialog) {
+        AlertDialog(
+            onDismissRequest = { showConfirmDialog = false },
+            containerColor = DeepSea2,
+            title = {
+                Text(
+                    text = "Remove Friend",
+                    color = DeepSea5,
+                    fontWeight = FontWeight.Bold
+                )
+            },
+            text = {
+                Text(
+                    text = "Are you sure you want to remove ${friend.displayName}?",
+                    color = DeepSea5.copy(alpha = 0.7f)
+                )
+            },
+            confirmButton = {
+                TextButton(onClick = {
+                    onRemove()
+                    showConfirmDialog = false
+                }) {
+                    Text("Remove", color = Color(0xFFE53935))
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showConfirmDialog = false }) {
+                    Text("Cancel", color = DeepSea5.copy(alpha = 0.6f))
+                }
+            }
+        )
+    }
+
     Row(
         modifier = Modifier
             .fillMaxWidth()
             .clip(RoundedCornerShape(16.dp))
             .background(DeepSea2)
+            .combinedClickable(
+                onClick = {},
+                onLongClick = { showConfirmDialog = true }
+            )
             .padding(horizontal = 16.dp, vertical = 14.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
