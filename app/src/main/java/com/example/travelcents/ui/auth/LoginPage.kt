@@ -215,5 +215,30 @@ fun LoginPage(modifier: Modifier = Modifier, navController: NavController, authV
                 Text("Login", color = DeepSea5, fontSize = 18.sp)
             }
         }
+
+        Spacer(modifier = Modifier.height(28.dp))
+
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.Center,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text(
+                text = "Don't have an Account? ",
+                color = DeepSea5,
+                fontSize = 12.sp
+            )
+            Text(
+                text = "Sign Up",
+                color = DeepSea4,
+                fontSize = 12.sp,
+                fontWeight = FontWeight.SemiBold,
+                modifier = Modifier.clickable(enabled = !isLoading) {
+                    navController.navigate("signup") {
+                        launchSingleTop = true
+                    }
+                }
+            )
+        }
     }
 }
