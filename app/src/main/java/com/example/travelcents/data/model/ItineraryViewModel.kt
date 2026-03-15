@@ -15,36 +15,29 @@ class ItineraryViewModel : ViewModel() {
     private val _events = MutableStateFlow<List<TravelEvent>>(emptyList())
     val events: StateFlow<List<TravelEvent>> = _events.asStateFlow()
 
+
     private val db = FirebaseFirestore.getInstance()
     private val auth = FirebaseAuth.getInstance()
 
     private fun fetchLatestItinerary(uid: String) {
-        val uid = auth.currentUser?.uid
-        if (uid == null) {
-            Log.e("ItineraryViewModel", "User is not logged in!")
-            return
-        }
-
-        // Step 1: Find the most recently created trip
         db.collection("users").document(uid)
             .collection("trips")
-            .orderBy("createdAt", Query.Direction.DESCENDING)
-            .limit(1)
+            .orderBy("createdAt", Query.Direction.DESCENDING) // <-- ADD THIS BACK
+            .limit(1)                                         // <-- ADD THIS BACK
             .get()
             .addOnSuccessListener { tripSnapshot ->
                 if (tripSnapshot.isEmpty) {
-                    Log.d("ItineraryViewModel", "No trips found for user.")
+                    Log.d("ItineraryViewModel", "No trips found.")
                     return@addOnSuccessListener
                 }
 
-                // Step 2: Grab the ID of that newest trip
-                val newestTripId = tripSnapshot.documents.first().id
+                val doc = tripSnapshot.documents.first()
+                val newestTripId = doc.id
 
-                // Step 3: Trigger the event listener using that ID
                 listenToEvents(uid, newestTripId)
             }
             .addOnFailureListener { e ->
-                Log.e("ItineraryViewModel", "Error fetching latest trip", e)
+                Log.e("ItineraryViewModel", "DATABASE ERROR: ${e.message}")
             }
     }
 
@@ -94,18 +87,21 @@ class ItineraryViewModel : ViewModel() {
 
 
     fun loadTrip(tripId: String? = null) {
+        // Grab the UID inside the function to ensure it's fresh
         val uid = auth.currentUser?.uid
+
         if (uid == null) {
-            Log.e("ItineraryViewModel", "User is not logged in!")
+            // If the user isn't ready yet, let's log it so we know for sure
+            Log.e("ItineraryViewModel", "UID is NULL. Firebase isn't ready yet.")
             return
         }
 
+        Log.d("ItineraryViewModel", "UID found: $uid. Fetching trip: ${tripId ?: "Latest"}")
+
         if (tripId != null) {
-            // Scenario A: We were given a specific ID (from the Home screen)
             listenToEvents(uid, tripId)
         } else {
-            // Scenario B: We were given nothing (from the Current tab)
-            fetchLatestItinerary(uid) // Make sure to update fetchLatestItinerary to accept the uid!
+            fetchLatestItinerary(uid)
         }
     }
 }
