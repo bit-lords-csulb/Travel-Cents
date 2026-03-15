@@ -45,6 +45,13 @@ fun ItineraryScreen(
     // 3. Keep the grouping logic exactly the same!
     val eventsByDay = events.groupBy { it.date }
     val sortedDates = eventsByDay.keys.toList().sorted()
+    val dateRange = if (sortedDates.isNotEmpty()) {
+        val firstDate = sortedDates.first()
+        val lastDate = sortedDates.last()
+        if (firstDate == lastDate) firstDate else "$firstDate - $lastDate"
+    } else {
+        "DATES TBD"
+    }
     Column(
         modifier = Modifier
             .fillMaxSize()
@@ -52,7 +59,7 @@ fun ItineraryScreen(
             .padding(top = 24.dp)
     ) {
         Box(modifier = Modifier.padding(horizontal = 24.dp)) {
-            TripHeader(tripName = tripTitle)
+            TripHeader(tripName = tripTitle, dateRange = dateRange)
         }
 
         LazyColumn(
@@ -92,7 +99,7 @@ fun ItineraryScreen(
 }
 
 @Composable
-fun TripHeader(tripName: String) {
+fun TripHeader(tripName: String, dateRange: String) {
     Column(
         modifier = Modifier
             .fillMaxWidth()
@@ -113,7 +120,7 @@ fun TripHeader(tripName: String) {
                     letterSpacing = 2.sp
                 )
                 Text(
-                    text = "FEB 10 - FEB 13",
+                    text = dateRange,
                     fontSize = 12.sp,
                     fontWeight = FontWeight.SemiBold,
                     color = Color(0xFF94A3B8),
