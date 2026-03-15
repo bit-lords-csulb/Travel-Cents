@@ -6,10 +6,7 @@ import com.google.firebase.Firebase
 import com.google.firebase.auth.auth
 import com.google.firebase.firestore.firestore
 import kotlinx.coroutines.FlowPreview
-import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.asStateFlow
-import kotlinx.coroutines.flow.debounce
+import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
 
 @OptIn(FlowPreview::class)
@@ -29,18 +26,22 @@ class AddFriendViewModel : ViewModel() {
     private val _isSearching   = MutableStateFlow(false)
     val isSearching: StateFlow<Boolean> = _isSearching.asStateFlow()
 
-    // UIDs of users we've already sent a request to
     private val _sentRequestUids = MutableStateFlow<Set<String>>(emptySet())
     val sentRequestUids: StateFlow<Set<String>> = _sentRequestUids.asStateFlow()
 
+    private val _friendUids = MutableStateFlow<Set<String>>(emptySet())
+
     init {
-        // Debounce search so we don't query on every keystroke
         viewModelScope.launch {
             _searchQuery
                 .debounce(400)
-                .collect { query -> if (query.isNotBlank()) searchUsers(query) else _searchResults.value = emptyList() }
+                .collect { query ->
+                    if (query.isNotBlank()) searchUsers(query.trim())
+                    else _searchResults.value = emptyList()
+                }
         }
         loadSentRequests()
+        loadExistingFriends()
     }
 
     fun onSearchQueryChange(query: String) { _searchQuery.value = query }
@@ -49,65 +50,86 @@ class AddFriendViewModel : ViewModel() {
         if (currentUid.isEmpty()) return
         _isSearching.value = true
 
-        val trimmed = query.trim().lowercase()
+        val results = mutableMapOf<String, Friend>()
 
-        // Search by email exact match first, then by displayName prefix
-        db.collection("users")
-            .whereEqualTo("email", trimmed)
-            .get()
-            .addOnSuccessListener { emailSnap ->
-                val byEmail = emailSnap.documents
-                    .filter { it.id != currentUid }
-                    .mapNotNull { doc ->
-                        val first = doc.getString("firstName") ?: ""
-                        val last  = doc.getString("lastName")  ?: ""
-                        Friend(
-                            uid = doc.id,
-                            displayName = "$first $last".trim().ifBlank { "Unknown" },
-                            email = doc.getString("email") ?: ""
-                        )
-                    }
+        // Split query into parts, "user two" → ["user", "two"]
+        val parts = query.split(" ").filter { it.isNotBlank() }
+        val firstPart  = parts.getOrNull(0) ?: query
+        val secondPart = parts.getOrNull(1)
 
-                // Also search by firstName prefix
-                val endStr = trimmed.replaceRange(trimmed.length - 1, trimmed.length,
-                    (trimmed.last() + 1).toString())
-
-                db.collection("users")
-                    .whereGreaterThanOrEqualTo("firstName", trimmed)
-                    .whereLessThan("firstName", endStr)
-                    .get()
-                    .addOnSuccessListener { nameSnap ->
-                        val byName = nameSnap.documents
-                            .filter { it.id != currentUid }
-                            .mapNotNull { doc ->
-                                val first = doc.getString("firstName") ?: ""
-                                val last  = doc.getString("lastName")  ?: ""
-                                Friend(
-                                    uid = doc.id,
-                                    displayName = "$first $last".trim().ifBlank { "Unknown" },
-                                    email = doc.getString("email") ?: ""
-                                )
-                            }
-
-                        // Merge, deduplicate, exclude existing friends
-                        val merged = (byEmail + byName)
-                            .distinctBy { it.uid }
-                            .filter { it.uid !in _sentRequestUids.value }
-
-                        _searchResults.value = merged
-                        _isSearching.value   = false
-                    }
-                    .addOnFailureListener { _isSearching.value = false }
+        fun addDoc(doc: com.google.firebase.firestore.DocumentSnapshot) {
+            val first = doc.getString("firstName") ?: ""
+            val last  = doc.getString("lastName")  ?: ""
+            val fullName = "$first $last".trim()
+            // If multi-word query, filter client-side to ensure full name matches
+            if (query.contains(" ")) {
+                if (!fullName.contains(query, ignoreCase = true)) return
             }
-            .addOnFailureListener { _isSearching.value = false }
+            results[doc.id] = Friend(
+                uid         = doc.id,
+                displayName = fullName.ifBlank { "Unknown" },
+                email       = doc.getString("email") ?: ""
+            )
+        }
+
+        // Build list of queries to run
+        // For "user two": search firstName="User" AND lastName prefix="Two"
+        // We fetch all users matching firstName prefix, then filter by lastName client-side
+        val queries = mutableListOf<com.google.firebase.firestore.Query>()
+
+        // firstName prefix variants
+        listOf(firstPart, firstPart.replaceFirstChar { it.uppercaseChar() }).forEach { term ->
+            queries.add(
+                db.collection("users")
+                    .whereGreaterThanOrEqualTo("firstName", term)
+                    .whereLessThanOrEqualTo("firstName", term + "\uf8ff")
+            )
+        }
+
+        // lastName prefix variants (catches "Two" when searching "two")
+        listOf(firstPart, firstPart.replaceFirstChar { it.uppercaseChar() }).forEach { term ->
+            queries.add(
+                db.collection("users")
+                    .whereGreaterThanOrEqualTo("lastName", term)
+                    .whereLessThanOrEqualTo("lastName", term + "\uf8ff")
+            )
+        }
+
+        // Email exact match
+        queries.add(db.collection("users").whereEqualTo("email", query.lowercase()))
+
+        var pending = queries.size
+
+        fun finish() {
+            pending--
+            if (pending <= 0) {
+                _searchResults.value = results.values
+                    .filter { it.uid != currentUid }
+                    .filter { it.uid !in _friendUids.value }
+                    .toList()
+                _isSearching.value = false
+            }
+        }
+
+        queries.forEach { q ->
+            q.get()
+                .addOnSuccessListener { snap -> snap.documents.forEach { addDoc(it) }; finish() }
+                .addOnFailureListener { finish() }
+        }
     }
 
-    // Load UIDs we've already sent requests to so UI reflects pending state
+    private fun loadExistingFriends() {
+        if (currentUid.isEmpty()) return
+        db.collection("users").document(currentUid).collection("friends")
+            .whereEqualTo("status", "accepted")
+            .addSnapshotListener { snap, _ ->
+                _friendUids.value = snap?.documents?.map { it.id }?.toSet() ?: emptySet()
+            }
+    }
+
     private fun loadSentRequests() {
         if (currentUid.isEmpty()) return
-        db.collection("users")
-            .document(currentUid)
-            .collection("friends")
+        db.collection("users").document(currentUid).collection("friends")
             .whereEqualTo("direction", "sent")
             .whereEqualTo("status", "pending")
             .addSnapshotListener { snap, _ ->
@@ -117,36 +139,27 @@ class AddFriendViewModel : ViewModel() {
 
     fun sendFriendRequest(theirUid: String) {
         if (currentUid.isEmpty()) return
-
-        val db = Firebase.firestore
         val batch = db.batch()
-
-        // My side: sent + pending
-        val myRef = db.collection("users").document(currentUid)
-            .collection("friends").document(theirUid)
-        batch.set(myRef, mapOf("status" to "pending", "direction" to "sent"))
-
-        // Their side: received + pending
-        val theirRef = db.collection("users").document(theirUid)
-            .collection("friends").document(currentUid)
-        batch.set(theirRef, mapOf("status" to "pending", "direction" to "received"))
-
+        batch.set(
+            db.collection("users").document(currentUid).collection("friends").document(theirUid),
+            mapOf("status" to "pending", "direction" to "sent")
+        )
+        batch.set(
+            db.collection("users").document(theirUid).collection("friends").document(currentUid),
+            mapOf("status" to "pending", "direction" to "received")
+        )
         batch.commit().addOnSuccessListener {
-            _sentRequestUids.value = _sentRequestUids.value + theirUid
+            _sentRequestUids.value += theirUid
         }
     }
 
     fun cancelFriendRequest(theirUid: String) {
         if (currentUid.isEmpty()) return
-
-        val db = Firebase.firestore
         val batch = db.batch()
-
         batch.delete(db.collection("users").document(currentUid).collection("friends").document(theirUid))
         batch.delete(db.collection("users").document(theirUid).collection("friends").document(currentUid))
-
         batch.commit().addOnSuccessListener {
-            _sentRequestUids.value = _sentRequestUids.value - theirUid
+            _sentRequestUids.value -= theirUid
         }
     }
 }
