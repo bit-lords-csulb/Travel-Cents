@@ -15,7 +15,8 @@ class ItineraryViewModel : ViewModel() {
     private val _events = MutableStateFlow<List<TravelEvent>>(emptyList())
     val events: StateFlow<List<TravelEvent>> = _events.asStateFlow()
 
-
+    private val _tripTitle = MutableStateFlow("Loading Trip...")
+    val tripTitle: StateFlow<String> = _tripTitle.asStateFlow()
     private val db = FirebaseFirestore.getInstance()
     private val auth = FirebaseAuth.getInstance()
 
@@ -33,6 +34,8 @@ class ItineraryViewModel : ViewModel() {
 
                 val doc = tripSnapshot.documents.first()
                 val newestTripId = doc.id
+
+                _tripTitle.value = doc.getString("tripName") ?: "Unnamed Trip"
 
                 listenToEvents(uid, newestTripId)
             }
