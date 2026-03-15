@@ -11,7 +11,6 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.*
@@ -24,13 +23,8 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
+import com.example.travelcents.ui.main.chats.chat.Group
 import com.example.travelcents.ui.theme.*
-
-data class Friend(
-    val uid: String = "",
-    val displayName: String = "",
-    val email: String = ""
-)
 
 data class Destination(
     val name: String,
@@ -71,21 +65,20 @@ fun NewTripChatPage(
                 .fillMaxWidth()
                 .clip(RoundedCornerShape(bottomStart = 24.dp, bottomEnd = 24.dp))
                 .background(DeepSea2)
-                .padding(top = 48.dp, start = 20.dp, end = 20.dp, bottom = 20.dp)
+                .padding(top = 48.dp, start = 12.dp, end = 20.dp, bottom = 20.dp)
         ) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Box(
-                    modifier = Modifier
-                        .size(36.dp)
-                        .clip(CircleShape)
-                        .background(DeepSea3)
-                        .clickable { onBackClick() },
-                    contentAlignment = Alignment.Center
-                ) {
-                    Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back", tint = DeepSea5, modifier = Modifier.size(18.dp))
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                IconButton(onClick = onBackClick) {
+                    Icon(
+                        imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+                        contentDescription = "Back",
+                        tint = DeepSea5
+                    )
                 }
-                Spacer(modifier = Modifier.width(14.dp))
-                Text("New Trip Chat", fontSize = 22.sp, fontWeight = FontWeight.Bold, color = DeepSea5)
+                Text("New Trip Chat", fontSize = 24.sp, fontWeight = FontWeight.Bold, color = DeepSea5)
             }
         }
 
@@ -139,7 +132,11 @@ fun NewTripChatPage(
                         Spacer(modifier = Modifier.width(12.dp))
                         Column {
                             Text(friend.displayName, color = DeepSea5, fontWeight = FontWeight.SemiBold, fontSize = 14.sp)
-                            Text(friend.email, color = DeepSea5.copy(alpha = 0.5f), fontSize = 11.sp)
+                            Text(
+                                text = friend.lastSeenLabel,
+                                color = if (friend.isOnline) Color(0xFF4CAF50) else DeepSea5.copy(alpha = 0.5f),
+                                fontSize = 11.sp
+                            )
                         }
                     }
                 }
