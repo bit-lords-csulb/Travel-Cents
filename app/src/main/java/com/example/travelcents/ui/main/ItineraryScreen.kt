@@ -1,5 +1,6 @@
 package com.example.travelcents.ui.main
 
+import android.annotation.SuppressLint
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.background
@@ -26,28 +27,26 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.LaunchedEffect
 import com.example.travelcents.ui.auth.AuthViewModel
 import com.google.firebase.auth.FirebaseAuth
+import java.time.LocalDate
+import java.time.format.DateTimeFormatter
 
 @Composable
 fun ItineraryScreen(
     tripId: String? = null,
-    viewModel: ItineraryViewModel = viewModel() // Removed AuthViewModel completely!
+    viewModel: ItineraryViewModel = viewModel()
 ) {
     val events by viewModel.events.collectAsState()
     val tripTitle by viewModel.tripTitle.collectAsState()
 
-    // The True Trigger
-    // By using 'Unit', this fires exactly once the moment the screen opens.
     LaunchedEffect(Unit) {
-        // The ViewModel is smart enough to check Firebase for the UID itself
         viewModel.loadTrip(tripId)
     }
 
-    // 3. Keep the grouping logic exactly the same!
     val eventsByDay = events.groupBy { it.date }
     val sortedDates = eventsByDay.keys.toList().sorted()
     val dateRange = if (sortedDates.isNotEmpty()) {
-        val firstDate = sortedDates.first()
-        val lastDate = sortedDates.last()
+        val firstDate = formatHeaderDate(sortedDates.first())
+        val lastDate = formatHeaderDate(sortedDates.last())
         if (firstDate == lastDate) firstDate else "$firstDate - $lastDate"
     } else {
         "DATES TBD"
@@ -82,7 +81,7 @@ fun ItineraryScreen(
 
                 item {
                     Text(
-                        text = date, // This will now show "2026-03-20" or whatever the database holds
+                        text = formatDailyHeader(date),
                         color = Color.White,
                         fontSize = 20.sp,
                         fontWeight = FontWeight.Bold,
@@ -302,6 +301,36 @@ fun RestaurantCard(event: TravelEvent) {
                 Text(text = cuisine, fontSize = 11.sp, color = Color(0xFF64748B))
             }
         }
+    }
+}
+
+fun getOrdinal(day: Int): String {
+    if (day in 11..13) return "${day}th"
+    return when (day % 10) {
+        1 -> "${day}st"
+        2 -> "${day}nd"
+        3 -> "${day}rd"
+        else -> "${day}th"
+    }
+}
+
+fun formatHeaderDate(dateString: String): String {
+    return try {
+        val date = LocalDate.parse(dateString)
+        val formatter = DateTimeFormatter.ofPattern("MMM")
+        val month = date.format(formatter)
+        "$month ${getOrdinal(date.dayOfMonth)}"
+    } catch (e: Exception) {
+        dateString // If it fails, just show the raw string
+    }
+}
+fun formatDailyHeader(dateString: String): String {
+    return try {
+        val date = LocalDate.parse(dateString)
+        val dayOfWeek = date.format(DateTimeFormatter.ofPattern("EEE"))
+        "$dayOfWeek, ${getOrdinal(date.dayOfMonth)}"
+    } catch (e: Exception) {
+        dateString
     }
 }
 
