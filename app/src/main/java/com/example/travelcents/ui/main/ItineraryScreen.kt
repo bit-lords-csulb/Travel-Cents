@@ -33,6 +33,7 @@ fun ItineraryScreen(
     viewModel: ItineraryViewModel = viewModel() // Removed AuthViewModel completely!
 ) {
     val events by viewModel.events.collectAsState()
+    val tripTitle by viewModel.tripTitle.collectAsState()
 
     // The True Trigger
     // By using 'Unit', this fires exactly once the moment the screen opens.
@@ -51,7 +52,7 @@ fun ItineraryScreen(
             .padding(top = 24.dp)
     ) {
         Box(modifier = Modifier.padding(horizontal = 24.dp)) {
-            TripHeader(tripName = "DEBUG: ${events.size} Events Loaded")
+            TripHeader(tripName = tripTitle)
         }
 
         LazyColumn(
