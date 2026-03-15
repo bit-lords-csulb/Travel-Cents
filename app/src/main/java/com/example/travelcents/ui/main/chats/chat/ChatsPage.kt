@@ -54,12 +54,26 @@ fun formatTimestamp(timestamp: Timestamp?): String {
     val now    = Calendar.getInstance()
     val msgCal = Calendar.getInstance().apply { time = timestamp.toDate() }
     return when {
-        now.get(Calendar.DATE) == msgCal.get(Calendar.DATE) ->
+        // Same day
+        now.get(Calendar.DATE) == msgCal.get(Calendar.DATE) &&
+                now.get(Calendar.YEAR) == msgCal.get(Calendar.YEAR) ->
             SimpleDateFormat("h:mm a", Locale.getDefault()).format(timestamp.toDate())
-        now.get(Calendar.DATE) - msgCal.get(Calendar.DATE) == 1 -> "Yesterday"
-        now.get(Calendar.WEEK_OF_YEAR) == msgCal.get(Calendar.WEEK_OF_YEAR) ->
+
+        // Yesterday
+        now.get(Calendar.DATE) - msgCal.get(Calendar.DATE) == 1 &&
+                now.get(Calendar.YEAR) == msgCal.get(Calendar.YEAR) -> "Yesterday"
+
+        // Same week
+        now.get(Calendar.WEEK_OF_YEAR) == msgCal.get(Calendar.WEEK_OF_YEAR) &&
+                now.get(Calendar.YEAR) == msgCal.get(Calendar.YEAR) ->
             SimpleDateFormat("EEE", Locale.getDefault()).format(timestamp.toDate())
-        else -> "Last week"
+
+        // Same year
+        now.get(Calendar.YEAR) == msgCal.get(Calendar.YEAR) ->
+            SimpleDateFormat("MMM d", Locale.getDefault()).format(timestamp.toDate())
+
+        // Older
+        else -> SimpleDateFormat("M/d/yy", Locale.getDefault()).format(timestamp.toDate())
     }
 }
 

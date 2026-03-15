@@ -41,7 +41,30 @@ data class Message(
 
 fun formatMessageTime(timestamp: Timestamp?): String {
     if (timestamp == null) return ""
-    return SimpleDateFormat("h:mm a", Locale.getDefault()).format(timestamp.toDate())
+    val now    = Calendar.getInstance()
+    val msgCal = Calendar.getInstance().apply { time = timestamp.toDate() }
+    val time   = SimpleDateFormat("h:mm a", Locale.getDefault()).format(timestamp.toDate())
+    return when {
+        // Same day — just show time
+        now.get(Calendar.DATE) == msgCal.get(Calendar.DATE) &&
+                now.get(Calendar.YEAR) == msgCal.get(Calendar.YEAR) -> time
+
+        // Yesterday
+        now.get(Calendar.DATE) - msgCal.get(Calendar.DATE) == 1 &&
+                now.get(Calendar.YEAR) == msgCal.get(Calendar.YEAR) -> "Yesterday $time"
+
+        // Same week — show day name
+        now.get(Calendar.WEEK_OF_YEAR) == msgCal.get(Calendar.WEEK_OF_YEAR) &&
+                now.get(Calendar.YEAR) == msgCal.get(Calendar.YEAR) ->
+            SimpleDateFormat("EEE h:mm a", Locale.getDefault()).format(timestamp.toDate())
+
+        // Same year — show month/day
+        now.get(Calendar.YEAR) == msgCal.get(Calendar.YEAR) ->
+            SimpleDateFormat("M/d h:mm a", Locale.getDefault()).format(timestamp.toDate())
+
+        // Different year — show full date
+        else -> SimpleDateFormat("M/d/yy h:mm a", Locale.getDefault()).format(timestamp.toDate())
+    }
 }
 
 @Composable
