@@ -1,6 +1,5 @@
-package com.example.travelcents.ui.main.chats
+package com.example.travelcents.ui.main.chats.chat
 
-import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
@@ -12,52 +11,42 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.Send
-import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
-import coil.compose.AsyncImage
+import com.example.travelcents.ui.main.chats.chat.DirectChatViewModel
+import com.example.travelcents.ui.main.chats.friends.Friend
 import com.example.travelcents.ui.theme.*
 import com.google.firebase.Timestamp
-import java.text.SimpleDateFormat
-import java.util.*
 
-data class Message(
+data class DirectChatPage(
     val id: String = "",
-    val text: String = "",
-    val senderId: String = "",
-    val senderName: String = "",
-    val timestamp: Timestamp? = null
+    val members: List<String> = emptyList(),
+    val lastMessage: String = "",
+    val lastMessageTime: Timestamp? = null
 )
 
-fun formatMessageTime(timestamp: Timestamp?): String {
-    if (timestamp == null) return ""
-    return SimpleDateFormat("h:mm a", Locale.getDefault()).format(timestamp.toDate())
-}
-
 @Composable
-fun ChatPage(
-    group: Group,
+fun DirectChatPage(
+    friend: Friend,
     onBackClick: () -> Unit = {},
-    viewModel: ChatViewModel = viewModel(
-        key = group.id,
-        factory = ChatViewModel.Factory(group)
+    viewModel: DirectChatViewModel = viewModel(
+        key = friend.uid,
+        factory = DirectChatViewModel.Factory(friend)
     )
 ) {
-    val messages by viewModel.messages.collectAsState()
-    val messageText by viewModel.messageText.collectAsState()
-    val currentUid = viewModel.currentUid
-    val listState = rememberLazyListState()
+    val messages     by viewModel.messages.collectAsState()
+    val messageText  by viewModel.messageText.collectAsState()
+    val currentUid    = viewModel.currentUid
+    val listState     = rememberLazyListState()
 
-    // Auto-scroll to bottom on new messages
     LaunchedEffect(messages.size) {
         if (messages.isNotEmpty()) listState.animateScrollToItem(messages.size - 1)
     }
@@ -90,47 +79,28 @@ fun ChatPage(
                         .background(DeepSea3),
                     contentAlignment = Alignment.Center
                 ) {
-                    if (group.groupImageUrl.isNotEmpty()) {
-                        AsyncImage(
-                            model = group.groupImageUrl,
-                            contentDescription = null,
-                            contentScale = ContentScale.Crop,
-                            modifier = Modifier.size(42.dp).clip(CircleShape)
-                        )
-                    } else {
-                        Text(
-                            text = group.name.take(2).uppercase(),
-                            color = DeepSea5,
-                            fontWeight = FontWeight.Bold,
-                            fontSize = 14.sp
-                        )
-                    }
+                    Text(
+                        text = friend.displayName.take(2).uppercase(),
+                        color = DeepSea5,
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 14.sp
+                    )
                 }
 
                 Spacer(modifier = Modifier.width(10.dp))
 
                 Column(modifier = Modifier.weight(1f)) {
-                    Text(text = group.name, color = DeepSea5, fontWeight = FontWeight.Bold, fontSize = 16.sp)
                     Text(
-                        text = "${group.members.size} members",
-                        color = DeepSea5.copy(alpha = 0.5f),
+                        text = friend.displayName,
+                        color = DeepSea5,
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 16.sp
+                    )
+                    Text(
+                        text = friend.lastSeenLabel,
+                        color = if (friend.isOnline) Color(0xFF4CAF50) else DeepSea5.copy(alpha = 0.5f),
                         fontSize = 12.sp
                     )
-                }
-
-                OutlinedButton(
-                    onClick = { },
-                    shape = RoundedCornerShape(20.dp),
-                    colors = ButtonDefaults.outlinedButtonColors(contentColor = DeepSea5),
-                    border = BorderStroke(1.dp, DeepSea5.copy(alpha = 0.3f)),
-                    contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp),
-                    modifier = Modifier.height(34.dp)
-                ) {
-                    Text("EVENTS", fontSize = 11.sp, fontWeight = FontWeight.SemiBold)
-                }
-
-                IconButton(onClick = { }) {
-                    Icon(Icons.Default.MoreVert, contentDescription = "More", tint = DeepSea5)
                 }
             }
         }
@@ -194,48 +164,5 @@ fun ChatPage(
                 )
             }
         }
-    }
-}
-
-@Composable
-fun ChatBubble(message: Message, isMine: Boolean) {
-    Column(
-        modifier = Modifier.fillMaxWidth(),
-        horizontalAlignment = if (isMine) Alignment.End else Alignment.Start
-    ) {
-        if (!isMine) {
-            Text(
-                text = message.senderName,
-                color = DeepSea5.copy(alpha = 0.5f),
-                fontSize = 11.sp,
-                modifier = Modifier.padding(start = 4.dp, bottom = 2.dp)
-            )
-        }
-
-        Box(
-            modifier = Modifier
-                .widthIn(max = 280.dp)
-                .clip(
-                    RoundedCornerShape(
-                        topStart = 18.dp,
-                        topEnd = 18.dp,
-                        bottomStart = if (isMine) 18.dp else 4.dp,
-                        bottomEnd = if (isMine) 4.dp else 18.dp
-                    )
-                )
-                .background(if (isMine) DeepSea3 else DeepSea2)
-                .padding(horizontal = 14.dp, vertical = 10.dp)
-        ) {
-            Text(text = message.text, color = DeepSea5, fontSize = 14.sp)
-        }
-
-        Text(
-            text = formatMessageTime(message.timestamp),
-            color = DeepSea5.copy(alpha = 0.35f),
-            fontSize = 10.sp,
-            modifier = Modifier.padding(top = 2.dp, end = 4.dp)
-        )
-
-        Spacer(modifier = Modifier.height(6.dp))
     }
 }

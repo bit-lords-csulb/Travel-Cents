@@ -1,10 +1,11 @@
-package com.example.travelcents.ui.main.chats
+package com.example.travelcents.ui.main.chats.chat
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import com.example.travelcents.data.FirestoreRepository
 import com.google.firebase.Firebase
 import com.google.firebase.auth.auth
+import com.google.firebase.firestore.ListenerRegistration
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -26,7 +27,7 @@ class ChatViewModel(
     private val _currentName = MutableStateFlow("")
     val currentName: StateFlow<String> = _currentName.asStateFlow()
 
-    private var messagesListener: com.google.firebase.firestore.ListenerRegistration? = null
+    private var messagesListener: ListenerRegistration? = null
 
     init {
         fetchCurrentUserName()

@@ -40,7 +40,7 @@ import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
 import com.example.travelcents.ui.itinerary.EditPlanScreen
-import com.example.travelcents.ui.main.chats.ChatsScreen
+import com.example.travelcents.ui.main.chats.chat.ChatsScreen
 import com.example.travelcents.ui.theme.DeepSea1
 import com.example.travelcents.ui.theme.DeepSea2
 import com.example.travelcents.ui.theme.DeepSea3
