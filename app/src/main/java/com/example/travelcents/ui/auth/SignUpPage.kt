@@ -17,6 +17,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.outlined.AccountCircle
 import androidx.compose.material.icons.outlined.Email
 import androidx.compose.material.icons.outlined.Lock
 import androidx.compose.material.icons.outlined.Visibility
@@ -61,6 +62,7 @@ fun SignUpPage(
 ) {
     var firstName by remember { mutableStateOf("") }
     var lastName by remember { mutableStateOf("") }
+    var username by remember { mutableStateOf("") }
     var email by remember { mutableStateOf("") }
     var password by remember { mutableStateOf("") }
     var isPasswordVisible by remember { mutableStateOf(false) }
@@ -139,6 +141,31 @@ fun SignUpPage(
             singleLine = true,
             textStyle = TextStyle(color = DeepSea5, fontSize = 15.sp),
             keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(imeAction = ImeAction.Next),
+            colors = signUpTextFieldColors()
+        )
+
+        Spacer(modifier = Modifier.height(18.dp))
+
+        Text(text = "Username", color = DeepSea5, fontSize = 16.sp)
+        TextField(
+            value = username,
+            onValueChange = {
+                username = it
+                authViewModel.clearError()
+            },
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(56.dp),
+            singleLine = true,
+            textStyle = TextStyle(color = DeepSea5, fontSize = 15.sp),
+            keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(imeAction = ImeAction.Next),
+            leadingIcon = {
+                Icon(
+                    imageVector = Icons.Outlined.AccountCircle,
+                    contentDescription = null,
+                    tint = DeepSea4
+                )
+            },
             colors = signUpTextFieldColors()
         )
 
@@ -245,7 +272,7 @@ fun SignUpPage(
         Spacer(modifier = Modifier.height(28.dp))
 
         Button(
-            onClick = { authViewModel.signUp(firstName, lastName, email, password) },
+            onClick = { authViewModel.signUp(firstName, lastName, username, email, password) },
             enabled = !isLoading,
             modifier = Modifier
                 .fillMaxWidth()
