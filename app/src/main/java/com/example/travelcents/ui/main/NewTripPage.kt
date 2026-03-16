@@ -30,6 +30,7 @@ import androidx.compose.material3.FilterChip
 import androidx.compose.material3.FilterChipDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.SegmentedButton
@@ -59,7 +60,8 @@ import java.util.Calendar
 @Composable
 fun NewTripPage(
     modifier: Modifier = Modifier,
-    viewModel: NewTripViewModel
+    viewModel: NewTripViewModel,
+    onChatClick: () -> Unit = {}
 ) {
     val uiState by viewModel.uiState.collectAsState()
     val scrollState = rememberScrollState()
@@ -254,7 +256,9 @@ fun NewTripPage(
             onValueChange = { viewModel.specialRequests = it },
             label = { Text("Special Requests") },
             placeholder = { Text("e.g. Anniversary dinner on day 3", color = DeepSea4.copy(alpha = 0.5f)) },
-            modifier = Modifier.fillMaxWidth().height(100.dp),
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(100.dp),
             maxLines = 4,
             colors = textFieldColors
         )
@@ -325,6 +329,23 @@ fun NewTripPage(
                 text = if (uiState is TripUiState.Loading) "Generating..." else "Generate Trip",
                 fontSize = 16.sp,
                 fontWeight = FontWeight.SemiBold
+            )
+        }
+
+        // AI chat alternative
+        OutlinedButton(
+            onClick = onChatClick,
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(52.dp),
+            colors = ButtonDefaults.outlinedButtonColors(contentColor = DeepSea4),
+            border = androidx.compose.foundation.BorderStroke(1.dp, DeepSea3),
+            shape = RoundedCornerShape(12.dp)
+        ) {
+            Text(
+                text = "Plan with AI Chat instead",
+                fontSize = 15.sp,
+                fontWeight = FontWeight.Medium
             )
         }
 

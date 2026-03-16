@@ -49,7 +49,16 @@ object MainRoutes {
     const val Home = "home"
     const val Chats = "chats"
     const val Settings = "settings"
+    const val AiTripChat = "ai_trip_chat"
 }
+
+private val bottomNavRoutes = setOf(
+    MainRoutes.Current,
+    MainRoutes.NewTrip,
+    MainRoutes.Home,
+    MainRoutes.Chats,
+    MainRoutes.Settings
+)
 
 private data class BottomNavItem(
     val route: String,
@@ -83,28 +92,42 @@ fun MainScaffold(modifier: Modifier = Modifier) {
                 startDestination = MainRoutes.Home,
                 modifier = Modifier.fillMaxSize()
             ) {
-               // composable(MainRoutes.Current) { CurrentPage(modifier = Modifier.fillMaxSize()) }
                 composable(MainRoutes.Current) { ItineraryScreen() }
-                composable(MainRoutes.NewTrip) { NewTripPage(modifier = Modifier.fillMaxSize(), viewModel = newTripViewModel) }
+                composable(MainRoutes.NewTrip) {
+                    NewTripPage(
+                        modifier = Modifier.fillMaxSize(),
+                        viewModel = newTripViewModel,
+                        onChatClick = { navController.navigate(MainRoutes.AiTripChat) }
+                    )
+                }
                 composable(MainRoutes.Home) { HomePage(modifier = Modifier.fillMaxSize()) }
                 composable(MainRoutes.Chats) { ChatsScreen(modifier = Modifier.fillMaxSize()) }
                 composable(MainRoutes.Settings) { SettingsPage(modifier = Modifier.fillMaxSize()) }
+                composable(MainRoutes.AiTripChat) {
+                    AiTripChatPage(
+                        modifier = Modifier.fillMaxSize(),
+                        onBackClick = { navController.popBackStack() }
+                    )
+                }
             }
         }
 
-        BottomNavBar(
-            items = items,
-            currentRoute = currentRoute,
-            onItemSelected = { route ->
-                navController.navigate(route) {
-                    popUpTo(navController.graph.findStartDestination().id) {
-                        saveState = true
+        // Hide bottom nav on the AI chat screen
+        if (currentRoute in bottomNavRoutes) {
+            BottomNavBar(
+                items = items,
+                currentRoute = currentRoute,
+                onItemSelected = { route ->
+                    navController.navigate(route) {
+                        popUpTo(navController.graph.findStartDestination().id) {
+                            saveState = true
+                        }
+                        launchSingleTop = true
+                        restoreState = true
                     }
-                    launchSingleTop = true
-                    restoreState = true
                 }
-            }
-        )
+            )
+        }
     }
 }
 
