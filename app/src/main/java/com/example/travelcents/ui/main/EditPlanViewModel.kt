@@ -30,6 +30,22 @@ class EditPlanViewModel : ViewModel() {
         val uid = auth.currentUser?.uid
         if (uid == null || eventId == null || tripId == null) return
 
+        // 1. CLEAR FIELDS FOR NEW EVENTS
+        if (eventId == "new") {
+            type = "activity" // Default to activity for new events
+            title = ""
+            date = ""
+            time = ""
+            endTime = ""
+            location = ""
+            notes = ""
+            airline = ""
+            flightNumber = ""
+            cuisine = ""
+            return
+        }
+
+        // 2. FETCH EXISTING EVENTS
         db.collection("users").document(uid)
             .collection("trips").document(tripId)
             .collection("events").document(eventId)
@@ -39,10 +55,8 @@ class EditPlanViewModel : ViewModel() {
                     val allData = document.data ?: emptyMap()
                     val detailsMap = allData["details"] as? Map<*, *>
 
-                    // 1. Get the Type
                     type = document.getString("type") ?: ""
 
-                    // 2. Map Core Fields
                     title = document.getString("title")
                         ?: document.getString("activity_name")
                                 ?: detailsMap?.get("title")?.toString()
@@ -62,7 +76,6 @@ class EditPlanViewModel : ViewModel() {
                         ?: document.getString("description")
                                 ?: ""
 
-                    // 3. Map Type-Specific Fields
                     airline = document.getString("airline") ?: ""
                     flightNumber = document.getString("flight_number") ?: ""
                     cuisine = document.getString("cuisine") ?: ""
@@ -77,43 +90,54 @@ class EditPlanViewModel : ViewModel() {
         val uid = auth.currentUser?.uid
         if (uid == null || eventId == null || tripId == null) return
 
-        // Base updates for all event types
-        val updates = mutableMapOf<String, Any>(
+        // Base data for all event types
+        val eventData = mutableMapOf<String, Any>(
+            "type" to type,
             "title" to title,
             "activity_name" to title, // Fallback for UI
             "date" to date,
             "startTime" to time,
             "endTime" to endTime,
             "location" to location,
-            "notes" to notes
+            "notes" to notes,
+            "itineraryId" to tripId
         )
 
-        // Inject specific fields based on the type so the Itinerary Cards update properly
+        // Inject specific fields based on the type
         when (type.lowercase()) {
             "flight" -> {
-                updates["destination_airport"] = location
-                updates["airline"] = airline
-                updates["flight_number"] = flightNumber
+                eventData["destination_airport"] = location
+                eventData["airline"] = airline
+                eventData["flight_number"] = flightNumber
             }
             "hotel" -> {
-                updates["hotel_name"] = title
+                eventData["hotel_name"] = title
             }
             "restaurant" -> {
-                updates["restaurant_name"] = title
-                updates["cuisine"] = cuisine
+                eventData["restaurant_name"] = title
+                eventData["cuisine"] = cuisine
             }
         }
 
-        db.collection("users").document(uid)
+        val eventsCollection = db.collection("users").document(uid)
             .collection("trips").document(tripId)
-            .collection("events").document(eventId)
-            .update(updates)
-            .addOnSuccessListener {
-                onComplete()
-            }
-            .addOnFailureListener { e ->
-                Log.e("EditPlanViewModel", "Update Failed: ${e.message}")
-            }
+            .collection("events")
+
+        // 3. CREATE NEW VS. UPDATE EXISTING
+        if (eventId == "new") {
+            // Create a brand new document reference to get a unique ID
+            val newDocRef = eventsCollection.document()
+            eventData["eventId"] = newDocRef.id // Save the ID inside the document itself
+
+            newDocRef.set(eventData)
+                .addOnSuccessListener { onComplete() }
+                .addOnFailureListener { e -> Log.e("EditPlanViewModel", "Create Failed: ${e.message}") }
+        } else {
+            // Update the existing document
+            eventsCollection.document(eventId).update(eventData)
+                .addOnSuccessListener { onComplete() }
+                .addOnFailureListener { e -> Log.e("EditPlanViewModel", "Update Failed: ${e.message}") }
+        }
     }
 
     fun deleteEvent(eventId: String?, tripId: String?, onComplete: () -> Unit) {
