@@ -4,6 +4,7 @@ import android.annotation.SuppressLint
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -100,7 +101,16 @@ fun ItineraryScreen(
                 }
 
                 items(dailyEvents) { event ->
-                    EventCardDispatcher(event = event)
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clickable {
+                                // TODO: Navigate to Edit Screen and pass this 'event'
+                                println("CLICKED EVENT: ${event.eventId}")
+                            }
+                    ) {
+                        EventCardDispatcher(event = event)
+                    }
                 }
             }
         }
