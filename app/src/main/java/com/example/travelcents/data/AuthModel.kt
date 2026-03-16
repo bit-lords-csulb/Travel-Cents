@@ -24,6 +24,7 @@ class AuthModel {
     suspend fun createAccountWithEmailAndPassword(
         firstName: String,
         lastName: String,
+        username: String,
         email: String,
         password: String
     ): Result<String> = suspendCancellableCoroutine { continuation ->
@@ -33,7 +34,7 @@ class AuthModel {
                     Log.d(TAG, "createUserWithEmail:success")
                     val user = auth.currentUser
                     user?.sendEmailVerification()
-                    saveUserToFirestore(user?.uid, firstName, lastName, email) { success, error ->
+                    saveUserToFirestore(user?.uid, firstName, lastName, username, email) { success, error ->
                         if (success) {
                             auth.signOut()
                             continuation.resume(Result.success("Account created! Please log in."))
@@ -57,6 +58,7 @@ class AuthModel {
         uid: String?,
         firstName: String,
         lastName: String,
+        username: String,
         email: String,
         onResult: (Boolean, String?) -> Unit
     ) {
@@ -68,6 +70,7 @@ class AuthModel {
             "uid" to uid,
             "firstName" to firstName,
             "lastName" to lastName,
+            "username" to username.trim().lowercase(),
             "email" to email,
             "createdAt" to FieldValue.serverTimestamp()
         )
