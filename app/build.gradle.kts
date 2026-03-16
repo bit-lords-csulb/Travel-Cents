@@ -32,6 +32,10 @@ android {
             "String", "GROQ_API_KEY",
             "\"${localProperties.getProperty("GROQ_API_KEY") ?: ""}\""
         )
+        buildConfigField(
+            "String", "SERP_API_KEY",
+            "\"${localProperties.getProperty("SERP_API_KEY") ?: ""}\""
+        )
     }
 
     buildTypes {
