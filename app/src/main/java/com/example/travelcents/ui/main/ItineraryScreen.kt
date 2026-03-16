@@ -77,7 +77,6 @@ fun ItineraryScreen(
         ) {
             sortedDates.forEachIndexed { index, date ->
 
-                // Grab the events for this specific date
                 val dailyEvents = eventsByDay[date] ?: emptyList()
 
                 if (index > 0) {
@@ -142,15 +141,15 @@ fun TripHeader(tripName: String, dateRange: String) {
                 Surface(
                     modifier = Modifier.size(40.dp),
                     shape = CircleShape,
-                    color = Color(0xFF1E293B), // That deep navy background
-                    border = BorderStroke(1.dp, Color(0xFF334155)) // Subtle border from your image
+                    color = Color(0xFF1E293B),
+                    border = BorderStroke(1.dp, Color(0xFF334155))
                 ) {
                     IconButton(onClick = { /* Handle AI/Magic action */ }) {
                         Icon(
                             imageVector = Icons.Rounded.AutoAwesome,
                             contentDescription = "AI Assistant",
-                            tint = Color(0xFF94A3B8), // Muted blue icon color
-                            modifier = Modifier.size(20.dp) // Making the icon slightly smaller inside
+                            tint = Color(0xFF94A3B8),
+                            modifier = Modifier.size(20.dp)
                         )
                     }
                 }
@@ -235,7 +234,7 @@ fun HotelCard(event: TravelEvent) {
     Card(
         modifier = Modifier.fillMaxWidth().height(68.dp),
         shape = RoundedCornerShape(12.dp),
-        colors = CardDefaults.cardColors(containerColor = Color(0xFF1E3535)) // Dark teal background
+        colors = CardDefaults.cardColors(containerColor = Color(0xFF1E3535))
     ) {
         Row(modifier = Modifier.fillMaxSize()) {
             Box(
@@ -249,9 +248,7 @@ fun HotelCard(event: TravelEvent) {
                 modifier = Modifier.fillMaxHeight().padding(horizontal = 16.dp),
                 verticalArrangement = Arrangement.Center
             ) {
-                // Using the main TravelEvent startTime instead of a hardcoded string
                 Text(text = "Check-in: ${formatTime(event.startTime)}", fontSize = 10.sp, color = Color(0xFF94A3B8))
-                // Pulling the specific hotel name from the details map
                 val hotelName = event.details["hotel_name"] ?: "Unknown Hotel"
 
                 Text(
@@ -271,7 +268,7 @@ fun RestaurantCard(event: TravelEvent) {
     Card(
         modifier = Modifier.fillMaxWidth().height(68.dp),
         shape = RoundedCornerShape(12.dp),
-        colors = CardDefaults.cardColors(containerColor = Color(0xFF2A3324)) // Dark olive background
+        colors = CardDefaults.cardColors(containerColor = Color(0xFF2A3324))
     ) {
         Row(modifier = Modifier.fillMaxSize()) {
             Box(
