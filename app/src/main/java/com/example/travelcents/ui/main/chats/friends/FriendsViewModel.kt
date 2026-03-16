@@ -2,6 +2,7 @@ package com.example.travelcents.ui.main.chats.friends
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.example.travelcents.data.FirestoreRepository
 import com.google.firebase.Firebase
 import com.google.firebase.auth.auth
 import com.google.firebase.firestore.DocumentSnapshot
@@ -14,7 +15,9 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.stateIn
 
-class FriendsViewModel : ViewModel() {
+class FriendsViewModel(
+    private val repository: FirestoreRepository = FirestoreRepository()
+) : ViewModel() {
 
     private val auth = Firebase.auth
     private val db   = Firebase.firestore
@@ -35,7 +38,7 @@ class FriendsViewModel : ViewModel() {
         else list.filter { it.displayName.contains(query, ignoreCase = true) }
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
-    private val userDocListeners            = mutableMapOf<String, ListenerRegistration>()
+    private val userDocListeners          = mutableMapOf<String, ListenerRegistration>()
     private var friendsCollectionListener: ListenerRegistration? = null
     private var pendingRequestsListener:   ListenerRegistration? = null
 
@@ -110,12 +113,20 @@ class FriendsViewModel : ViewModel() {
             }
     }
 
+    // Removes friend relationship and deletes the DM chat
     fun removeFriend(friendUid: String) {
         if (currentUid.isEmpty()) return
         val batch = db.batch()
         batch.delete(db.collection("users").document(currentUid).collection("friends").document(friendUid))
         batch.delete(db.collection("users").document(friendUid).collection("friends").document(currentUid))
-        batch.commit()
+        batch.commit().addOnSuccessListener {
+            android.util.Log.d("FriendsViewModel", "Friend removed, now deleting DM with $friendUid")
+            repository.deleteDirectChat(currentUid, friendUid) {
+                android.util.Log.d("FriendsViewModel", "DM delete completed")
+            }
+        }.addOnFailureListener {
+            android.util.Log.e("FriendsViewModel", "Batch failed: ${it.message}")
+        }
     }
 
     fun onSearchQueryChange(query: String) { _searchQuery.value = query }

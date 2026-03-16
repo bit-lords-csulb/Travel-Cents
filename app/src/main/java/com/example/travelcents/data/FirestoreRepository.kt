@@ -15,8 +15,7 @@ class FirestoreRepository {
 
     private val db = Firebase.firestore
 
-    // ── User ─────────────────────────────────────────────────────────────────
-
+    // User
     fun fetchUser(uid: String, onResult: (String) -> Unit) {
         db.collection("users").document(uid).get()
             .addOnSuccessListener { doc ->
@@ -35,7 +34,6 @@ class FirestoreRepository {
             .addOnSuccessListener { snapshot ->
                 val friendUids = snapshot.documents.map { it.id }
                 if (friendUids.isEmpty()) { onResult(emptyList()); return@addOnSuccessListener }
-
                 db.collection("users")
                     .whereIn(com.google.firebase.firestore.FieldPath.documentId(), friendUids)
                     .get()
@@ -57,8 +55,7 @@ class FirestoreRepository {
             }
     }
 
-    // ── Groups ────────────────────────────────────────────────────────────────
-
+    // Groups
     fun listenToGroups(uid: String, onUpdate: (List<Group>) -> Unit): ListenerRegistration {
         return db.collection("groups")
             .whereArrayContains("members", uid)
@@ -97,8 +94,7 @@ class FirestoreRepository {
             }
     }
 
-    // ── Group Messages ────────────────────────────────────────────────────────
-
+    // Group Messages
     fun listenToMessages(groupId: String, onUpdate: (List<Message>) -> Unit): ListenerRegistration {
         return db.collection("groups")
             .document(groupId)
@@ -130,8 +126,7 @@ class FirestoreRepository {
         }
     }
 
-    // ── Direct Chats ──────────────────────────────────────────────────────────
-
+    // Direct Messages
     fun getOrCreateDirectChat(myUid: String, theirUid: String, onResult: (String) -> Unit) {
         db.collection("directChats")
             .whereArrayContains("members", myUid)
@@ -154,59 +149,57 @@ class FirestoreRepository {
                 }
             }
     }
-
-    // Listen to direct chats and resolve the other user's name for preview
     fun listenToDirectChatPreviews(
         myUid: String,
         onUpdate: (List<DirectChatPreview>) -> Unit
     ): ListenerRegistration {
+        // name cache so we don't re-fetch on every snapshot
+        val nameCache = mutableMapOf<String, String>()
+        // previews keyed by chatId so each update replaces the right entry
+        val previewMap = mutableMapOf<String, DirectChatPreview>()
+
+        fun publish() {
+            onUpdate(previewMap.values.sortedByDescending { it.lastMessageTime })
+        }
+
         return db.collection("directChats")
             .whereArrayContains("members", myUid)
             .orderBy("lastMessageTime", Query.Direction.DESCENDING)
             .addSnapshotListener { snapshot, error ->
+                android.util.Log.d("DirectChats", "snapshot fired, docs: ${snapshot?.documents?.size}, error: $error")
                 if (error != null || snapshot == null) return@addSnapshotListener
 
-                val docs = snapshot.documents
-                if (docs.isEmpty()) { onUpdate(emptyList()); return@addSnapshotListener }
+                if (snapshot.isEmpty) { previewMap.clear(); publish(); return@addSnapshotListener }
 
-                val previews = mutableListOf<DirectChatPreview>()
-                var remaining = docs.size
+                snapshot.documents.forEach { doc ->
+                    val members  = (doc.get("members") as? List<*>)?.filterIsInstance<String>() ?: emptyList()
+                    val otherUid = members.firstOrNull { it != myUid } ?: return@forEach
+                    val lastMsg  = doc.getString("lastMessage") ?: ""
+                    val lastTime = doc.getTimestamp("lastMessageTime")
+                    val chatId   = doc.id
 
-                docs.forEach { doc ->
-                    val members    = (doc.get("members") as? List<*>)?.filterIsInstance<String>() ?: emptyList()
-                    val otherUid   = members.firstOrNull { it != myUid } ?: ""
-                    val lastMsg    = doc.getString("lastMessage") ?: ""
-                    val lastTime   = doc.getTimestamp("lastMessageTime")
-                    val chatId     = doc.id
-
-                    if (otherUid.isEmpty()) {
-                        remaining--
-                        if (remaining == 0) onUpdate(previews.sortedByDescending { it.lastMessageTime })
-                        return@forEach
+                    val cachedName = nameCache[otherUid]
+                    if (cachedName != null) {
+                        // Already have the name — update preview immediately
+                        previewMap[chatId] = DirectChatPreview(chatId, otherUid, cachedName, lastMsg, lastTime)
+                        publish()
+                    } else {
+                        // Fetch name then update
+                        db.collection("users").document(otherUid).get()
+                            .addOnSuccessListener { userDoc ->
+                                val first = userDoc.getString("firstName") ?: ""
+                                val last  = userDoc.getString("lastName")  ?: ""
+                                val name  = "$first $last".trim().ifBlank { "Unknown" }
+                                nameCache[otherUid] = name
+                                previewMap[chatId] = DirectChatPreview(chatId, otherUid, name, lastMsg, lastTime)
+                                publish()
+                            }
                     }
-
-                    // Fetch other user's name
-                    db.collection("users").document(otherUid).get()
-                        .addOnSuccessListener { userDoc ->
-                            val first = userDoc.getString("firstName") ?: ""
-                            val last  = userDoc.getString("lastName")  ?: ""
-                            previews.add(
-                                DirectChatPreview(
-                                    id              = chatId,
-                                    otherUid        = otherUid,
-                                    otherUserName   = "$first $last".trim().ifBlank { "Unknown" },
-                                    lastMessage     = lastMsg,
-                                    lastMessageTime = lastTime
-                                )
-                            )
-                            remaining--
-                            if (remaining == 0) onUpdate(previews.sortedByDescending { it.lastMessageTime })
-                        }
-                        .addOnFailureListener {
-                            remaining--
-                            if (remaining == 0) onUpdate(previews.sortedByDescending { it.lastMessageTime })
-                        }
                 }
+
+                // Remove any chats that were deleted
+                val currentIds = snapshot.documents.map { it.id }.toSet()
+                previewMap.keys.retainAll(currentIds)
             }
     }
 
@@ -239,5 +232,30 @@ class FirestoreRepository {
                 "lastMessageTime" to FieldValue.serverTimestamp()
             ))
         }
+    }
+
+    // Delete a direct chat and all its messages
+    fun deleteDirectChat(myUid: String, theirUid: String, onComplete: () -> Unit = {}) {
+        db.collection("directChats")
+            .whereArrayContains("members", myUid)
+            .get()
+            .addOnSuccessListener { snapshot ->
+                val chatDoc = snapshot.documents.firstOrNull { doc ->
+                    val members = doc.get("members") as? List<*>
+                    members != null && members.contains(theirUid)
+                } ?: run { onComplete(); return@addOnSuccessListener }
+
+                val chatRef = db.collection("directChats").document(chatDoc.id)
+
+                // Delete all messages first then the chat doc
+                chatRef.collection("messages").get()
+                    .addOnSuccessListener { messages ->
+                        val batch = db.batch()
+                        messages.documents.forEach { batch.delete(it.reference) }
+                        batch.delete(chatRef)
+                        batch.commit().addOnSuccessListener { onComplete() }
+                    }
+                    .addOnFailureListener { onComplete() }
+            }
     }
 }

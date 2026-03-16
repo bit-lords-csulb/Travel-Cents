@@ -20,7 +20,7 @@ class ChatsViewModel(
     private val auth = Firebase.auth
     val currentUid: String get() = auth.currentUser?.uid ?: ""
 
-    // ── Groups ────────────────────────────────────────────────────────────────
+    // Groups
     private val _groups = MutableStateFlow<List<Group>>(emptyList())
 
     val filteredGroups: StateFlow<List<Group>> = combine(
@@ -29,11 +29,11 @@ class ChatsViewModel(
     ) { groups, _ -> groups }
         .stateIn(viewModelScope, SharingStarted.Companion.WhileSubscribed(5000), emptyList())
 
-    // ── Direct chats ──────────────────────────────────────────────────────────
+    // Direct Chats
     private val _directChats = MutableStateFlow<List<DirectChatPreview>>(emptyList())
     val directChats: StateFlow<List<DirectChatPreview>> = _directChats.asStateFlow()
 
-    // ── Search ────────────────────────────────────────────────────────────────
+    // Search
     private val _searchQuery = MutableStateFlow("")
     val searchQuery: StateFlow<String> = _searchQuery.asStateFlow()
 
@@ -76,6 +76,7 @@ class ChatsViewModel(
 
         directChatsListener?.remove()
         directChatsListener = repository.listenToDirectChatPreviews(currentUid) { chats ->
+            android.util.Log.d("DirectChats", "got ${chats.size} chats")
             _directChats.value = chats
         }
     }
