@@ -47,6 +47,15 @@ class ItineraryViewModel : ViewModel() {
             }
     }
 
+    private fun fetchTripTitle(uid: String, tripId: String) {
+        db.collection("users").document(uid)
+            .collection("trips").document(tripId)
+            .get()
+            .addOnSuccessListener { doc ->
+                _tripTitle.value = doc.getString("tripName") ?: "Unnamed Trip"
+            }
+    }
+
     private fun listenToEvents(uid: String, tripId: String) {
         snapshotListener = db.collection("users").document(uid)
             .collection("trips").document(tripId)
@@ -102,6 +111,7 @@ class ItineraryViewModel : ViewModel() {
         Log.d("ItineraryViewModel", "UID found: $uid. Fetching trip: ${tripId ?: "Latest"}")
 
         if (tripId != null) {
+            fetchTripTitle(uid, tripId)
             listenToEvents(uid, tripId)
         } else {
             fetchLatestItinerary(uid)
