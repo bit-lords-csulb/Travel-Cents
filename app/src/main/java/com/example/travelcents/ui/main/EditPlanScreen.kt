@@ -23,7 +23,8 @@ import androidx.compose.runtime.setValue
 
 @Composable
 fun EditPlanScreen(
-    onBackClick: () -> Unit = {},
+    eventId: String? = null, // <--- Add this line!
+    onBackClick: () -> Unit,
     onDeleteClick: () -> Unit = {}
 ) {
     Column(
