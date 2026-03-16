@@ -136,8 +136,6 @@ fun MainScaffold(modifier: Modifier = Modifier) {
                     )
                 }
 
-                composable(MainRoutes.NewTrip) { NewTripPage(modifier = Modifier.fillMaxSize(), viewModel = newTripViewModel) }
-                composable(MainRoutes.Current) { ItineraryScreen() }
                 composable(MainRoutes.NewTrip) {
                     NewTripPage(
                         modifier = Modifier.fillMaxSize(),
