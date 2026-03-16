@@ -11,8 +11,7 @@ import com.example.travelcents.data.model.TravelEvent
 import com.example.travelcents.data.model.TravelRequest
 import com.example.travelcents.data.remote.GroqRepository
 import com.google.firebase.auth.FirebaseAuth
-import com.google.firebase.Firebase
-import com.google.firebase.firestore.firestore
+import com.google.firebase.firestore.FirebaseFirestore
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -85,7 +84,7 @@ class NewTripViewModel : ViewModel() {
         itinerary: Itinerary,
         events: List<TravelEvent>
     ) {
-        val db = Firebase.firestore
+        val db = FirebaseFirestore.getInstance()
         val tripRef = db.collection("users").document(uid)
             .collection("trips").document(itinerary.itineraryId)
 

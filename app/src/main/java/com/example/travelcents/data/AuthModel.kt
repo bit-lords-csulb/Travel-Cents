@@ -1,20 +1,15 @@
 package com.example.travelcents.data
 
-import android.content.ContentValues.TAG
 import android.util.Log
-import android.widget.Toast
-import com.google.firebase.Firebase
 import com.google.firebase.auth.FirebaseAuth
-import com.google.firebase.auth.FirebaseUser
 import com.google.firebase.firestore.FieldValue
-import com.google.firebase.firestore.firestore
+import com.google.firebase.firestore.FirebaseFirestore
 import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlin.coroutines.resume
-import kotlin.coroutines.suspendCoroutine
 
 class AuthModel {
     private val auth: FirebaseAuth by lazy { FirebaseAuth.getInstance() }
-    private val db = Firebase.firestore
+    private val db = FirebaseFirestore.getInstance()
 
     companion object {
         private const val TAG = "AuthModel"
