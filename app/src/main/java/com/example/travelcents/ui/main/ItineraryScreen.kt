@@ -29,6 +29,7 @@ import com.example.travelcents.ui.auth.AuthViewModel
 import com.google.firebase.auth.FirebaseAuth
 import java.time.LocalDate
 import java.time.format.DateTimeFormatter
+import java.time.LocalTime
 
 @Composable
 fun ItineraryScreen(
@@ -211,9 +212,7 @@ fun FlightCard(event: TravelEvent) {
             Box(modifier = Modifier.fillMaxHeight().width(4.dp).background(Color(0xFFEC4899)))
 
             Column(modifier = Modifier.fillMaxHeight().padding(horizontal = 16.dp), verticalArrangement = Arrangement.Center) {
-                Text(text = event.startTime, fontSize = 10.sp, color = Color(0xFF94A3B8))
-
-                // 3. Fix: Pull from the details map
+                Text(text = formatTime(event.startTime), fontSize = 10.sp, color = Color(0xFF94A3B8))
                 val destination = event.details["destination_airport"] ?: "Destination"
                 val airline = event.details["airline"] ?: ""
                 val flightNo = event.details["flight_number"] ?: ""
@@ -239,7 +238,6 @@ fun HotelCard(event: TravelEvent) {
         colors = CardDefaults.cardColors(containerColor = Color(0xFF1E3535)) // Dark teal background
     ) {
         Row(modifier = Modifier.fillMaxSize()) {
-            // 1. The Accent Strip (Bright Cyan for Hotels)
             Box(
                 modifier = Modifier
                     .fillMaxHeight()
@@ -252,8 +250,7 @@ fun HotelCard(event: TravelEvent) {
                 verticalArrangement = Arrangement.Center
             ) {
                 // Using the main TravelEvent startTime instead of a hardcoded string
-                Text(text = "Check-in: ${event.startTime}", fontSize = 10.sp, color = Color(0xFF94A3B8))
-
+                Text(text = "Check-in: ${formatTime(event.startTime)}", fontSize = 10.sp, color = Color(0xFF94A3B8))
                 // Pulling the specific hotel name from the details map
                 val hotelName = event.details["hotel_name"] ?: "Unknown Hotel"
 
@@ -288,8 +285,7 @@ fun RestaurantCard(event: TravelEvent) {
                 modifier = Modifier.fillMaxHeight().padding(horizontal = 16.dp),
                 verticalArrangement = Arrangement.Center
             ) {
-                Text(text = event.startTime, fontSize = 10.sp, color = Color(0xFF94A3B8))
-
+                Text(text = formatTime(event.startTime), fontSize = 10.sp, color = Color(0xFF94A3B8))
                 val restaurantName = event.details["restaurant_name"] ?: "Unknown Restaurant"
                 val cuisine = event.details["cuisine"] ?: ""
 
@@ -325,7 +321,7 @@ fun ActivityCard(event: TravelEvent) {
                 modifier = Modifier.fillMaxHeight().padding(horizontal = 16.dp),
                 verticalArrangement = Arrangement.Center
             ) {
-                Text(text = event.startTime, fontSize = 10.sp, color = Color(0xFF94A3B8))
+                Text(text = formatTime(event.startTime), fontSize = 10.sp, color = Color(0xFF94A3B8))
 
 
                 val title = event.details["activity_name"]
@@ -369,7 +365,7 @@ fun formatHeaderDate(dateString: String): String {
         val month = date.format(formatter)
         "$month ${getOrdinal(date.dayOfMonth)}"
     } catch (e: Exception) {
-        dateString // If it fails, just show the raw string
+        dateString
     }
 }
 fun formatDailyHeader(dateString: String): String {
@@ -379,6 +375,15 @@ fun formatDailyHeader(dateString: String): String {
         "$dayOfWeek, ${getOrdinal(date.dayOfMonth)}"
     } catch (e: Exception) {
         dateString
+    }
+}
+
+fun formatTime(timeString: String): String {
+    return try {
+        val time = LocalTime.parse(timeString)
+        time.format(DateTimeFormatter.ofPattern("h:mm a"))
+    } catch (e: Exception) {
+        timeString
     }
 }
 
