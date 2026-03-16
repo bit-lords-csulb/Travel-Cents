@@ -4,6 +4,7 @@ import android.annotation.SuppressLint
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -33,6 +34,9 @@ import java.time.LocalTime
 
 @Composable
 fun ItineraryScreen(
+    modifier: Modifier = Modifier,
+    onEditEventClick: (String) -> Unit = {},
+    onAddEventClick: () -> Unit = {},
     tripId: String? = null,
     viewModel: ItineraryViewModel = viewModel()
 ) {
@@ -59,7 +63,11 @@ fun ItineraryScreen(
             .padding(top = 24.dp)
     ) {
         Box(modifier = Modifier.padding(horizontal = 24.dp)) {
-            TripHeader(tripName = tripTitle, dateRange = dateRange)
+            TripHeader(
+                tripName = tripTitle,
+                dateRange = dateRange,
+                onAddClick = onAddEventClick
+            )
         }
 
         LazyColumn(
@@ -100,7 +108,15 @@ fun ItineraryScreen(
                 }
 
                 items(dailyEvents) { event ->
-                    EventCardDispatcher(event = event)
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clickable {
+                                onEditEventClick(event.eventId)
+                            }
+                    ) {
+                        EventCardDispatcher(event = event)
+                    }
                 }
             }
         }
@@ -108,7 +124,7 @@ fun ItineraryScreen(
 }
 
 @Composable
-fun TripHeader(tripName: String, dateRange: String) {
+fun TripHeader(tripName: String, dateRange: String, onAddClick: () -> Unit) {
     Column(
         modifier = Modifier
             .fillMaxWidth()
@@ -157,7 +173,9 @@ fun TripHeader(tripName: String, dateRange: String) {
                 Surface(
                     shape = CircleShape,
                     color = Color(0xFF415A77),
-                    modifier = Modifier.size(40.dp)
+                    modifier = Modifier
+                        .size(40.dp)
+                        .clickable { onAddClick() }
                 ) {
                     Box(contentAlignment = Alignment.Center) { Text("+", color = Color.White, fontSize = 24.sp) }
                 }
@@ -203,31 +221,58 @@ fun EventCardDispatcher(event: TravelEvent) {
 @Composable
 fun FlightCard(event: TravelEvent) {
     Card(
-        modifier = Modifier.fillMaxWidth().height(68.dp),
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(68.dp),
         shape = RoundedCornerShape(12.dp),
         colors = CardDefaults.cardColors(containerColor = Color(0xFF2D2438))
     ) {
         Row(modifier = Modifier.fillMaxSize()) {
-            Box(modifier = Modifier.fillMaxHeight().width(4.dp).background(Color(0xFFEC4899)))
+            Box(
+                modifier = Modifier
+                    .fillMaxHeight()
+                    .width(4.dp)
+                    .background(Color(0xFFEC4899))
+            )
 
-            Column(modifier = Modifier.fillMaxHeight().padding(horizontal = 16.dp), verticalArrangement = Arrangement.Center) {
-                Text(text = formatTime(event.startTime), fontSize = 10.sp, color = Color(0xFF94A3B8))
-                val destination = event.details["destination_airport"] ?: "Destination"
-                val airline = event.details["airline"] ?: ""
-                val flightNo = event.details["flight_number"] ?: ""
+            Column(
+                modifier = Modifier
+                    .fillMaxHeight()
+                    .padding(horizontal = 16.dp),
+                verticalArrangement = Arrangement.Center
+            ) {
+                // Time Display
+                Text(
+                    text = formatTime(event.startTime),
+                    fontSize = 10.sp,
+                    color = Color(0xFF94A3B8)
+                )
+
+                // 1. Resolve the Main Title
+                val displayTitle = event.details["title"]
+                    ?: event.details["activity_name"]
+                    ?: "Flight to ${event.details["destination_airport"] ?: "Destination"}"
 
                 Text(
-                    text = "Flight to $destination",
+                    text = displayTitle,
                     fontSize = 15.sp,
                     fontWeight = FontWeight.Bold,
                     color = Color.White
                 )
-                Text(text = "$airline $flightNo", fontSize = 11.sp, color = Color(0xFF64748B))
+
+                // 2. Resolve the Subtitle (Airline and Flight Number)
+                val airline = event.details["airline"] ?: ""
+                val flightNo = event.details["flight_number"] ?: ""
+
+                Text(
+                    text = "$airline $flightNo".trim(),
+                    fontSize = 11.sp,
+                    color = Color(0xFF64748B)
+                )
             }
         }
     }
 }
-
 
 @Composable
 fun HotelCard(event: TravelEvent) {
@@ -237,22 +282,22 @@ fun HotelCard(event: TravelEvent) {
         colors = CardDefaults.cardColors(containerColor = Color(0xFF1E3535))
     ) {
         Row(modifier = Modifier.fillMaxSize()) {
-            Box(
-                modifier = Modifier
-                    .fillMaxHeight()
-                    .width(4.dp)
-                    .background(Color(0xFF06B6D4))
-            )
+            Box(modifier = Modifier.fillMaxHeight().width(4.dp).background(Color(0xFF06B6D4)))
 
             Column(
                 modifier = Modifier.fillMaxHeight().padding(horizontal = 16.dp),
                 verticalArrangement = Arrangement.Center
             ) {
                 Text(text = "Check-in: ${formatTime(event.startTime)}", fontSize = 10.sp, color = Color(0xFF94A3B8))
-                val hotelName = event.details["hotel_name"] ?: "Unknown Hotel"
+
+                val displayTitle = event.details["title"]
+                    ?: event.details["activity_name"]
+                    ?: "Hotel Check-in"
+
+                val hotelName = event.details["hotel_name"] ?: event.details["location"] ?: ""
 
                 Text(
-                    text = "Hotel Check-in",
+                    text = displayTitle,
                     fontSize = 15.sp,
                     fontWeight = FontWeight.Bold,
                     color = Color.White
@@ -271,23 +316,23 @@ fun RestaurantCard(event: TravelEvent) {
         colors = CardDefaults.cardColors(containerColor = Color(0xFF2A3324))
     ) {
         Row(modifier = Modifier.fillMaxSize()) {
-            Box(
-                modifier = Modifier
-                    .fillMaxHeight()
-                    .width(4.dp)
-                    .background(Color(0xFFEAB308))
-            )
+            Box(modifier = Modifier.fillMaxHeight().width(4.dp).background(Color(0xFFEAB308)))
 
             Column(
                 modifier = Modifier.fillMaxHeight().padding(horizontal = 16.dp),
                 verticalArrangement = Arrangement.Center
             ) {
                 Text(text = formatTime(event.startTime), fontSize = 10.sp, color = Color(0xFF94A3B8))
-                val restaurantName = event.details["restaurant_name"] ?: "Unknown Restaurant"
-                val cuisine = event.details["cuisine"] ?: ""
+
+                val displayTitle = event.details["title"]
+                    ?: event.details["activity_name"]
+                    ?: event.details["restaurant_name"]
+                    ?: "Dining"
+
+                val cuisine = event.details["cuisine"] ?: event.details["location"] ?: ""
 
                 Text(
-                    text = restaurantName,
+                    text = displayTitle,
                     fontSize = 15.sp,
                     fontWeight = FontWeight.Bold,
                     color = Color.White
@@ -383,9 +428,3 @@ fun formatTime(timeString: String): String {
         timeString
     }
 }
-
-//@Preview(showBackground = true)
-//@Composable
-//fun ItineraryScreenPreview() {
-//    ItineraryScreen()
-//}
