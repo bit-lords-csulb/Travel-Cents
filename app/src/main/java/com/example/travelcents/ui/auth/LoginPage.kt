@@ -16,6 +16,7 @@ import androidx.compose.foundation.layout.requiredSize
 import androidx.compose.foundation.layout.requiredWidth
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
@@ -32,6 +33,14 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.input.key.Key
+import androidx.compose.ui.input.key.KeyEventType
+import androidx.compose.ui.input.key.isShiftPressed
+import androidx.compose.ui.input.key.key
+import androidx.compose.ui.input.key.onPreviewKeyEvent
+import androidx.compose.ui.input.key.type
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
@@ -54,6 +63,8 @@ fun LoginPage(modifier: Modifier = Modifier, navController: NavController, authV
     var email by remember { mutableStateOf("") }
     var password by remember { mutableStateOf("") }
     var rememberMeState by remember { mutableStateOf(false) }
+    val emailFocusRequester = remember { FocusRequester() }
+    val passwordFocusRequester = remember { FocusRequester() }
 
     // Collect StateFlows as Compose state
     val isLoggedIn by authViewModel.isLoggedIn.collectAsStateWithLifecycle()
@@ -108,7 +119,26 @@ fun LoginPage(modifier: Modifier = Modifier, navController: NavController, authV
                 authViewModel.clearError()
             },
             placeholder = { Text("demo@student.csulb.edu", color = Color.Gray, fontSize = 14.sp) },
-            modifier = Modifier.fillMaxWidth().height(50.dp),
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(50.dp)
+                .focusRequester(emailFocusRequester)
+                .onPreviewKeyEvent { event ->
+                    when {
+                        event.key == Key.Tab && event.type == KeyEventType.KeyDown && !event.isShiftPressed -> {
+                            passwordFocusRequester.requestFocus()
+                            true
+                        }
+                        else -> false
+                    }
+                },
+            keyboardOptions = KeyboardOptions(
+                keyboardType = KeyboardType.Email,
+                imeAction = ImeAction.Next
+            ),
+            keyboardActions = KeyboardActions(
+                onNext = { passwordFocusRequester.requestFocus() }
+            ),
             colors = TextFieldDefaults.colors(
                 focusedContainerColor = Color.Transparent,
                 unfocusedContainerColor = Color.Transparent,
@@ -129,7 +159,33 @@ fun LoginPage(modifier: Modifier = Modifier, navController: NavController, authV
             },
             placeholder = { Text("enter password", color = Color.Gray, fontSize = 14.sp) },
             visualTransformation = PasswordVisualTransformation(),
-            modifier = Modifier.fillMaxWidth().height(50.dp),
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(50.dp)
+                .focusRequester(passwordFocusRequester)
+                .onPreviewKeyEvent { event ->
+                    when {
+                        event.key == Key.Tab && event.type == KeyEventType.KeyDown && event.isShiftPressed -> {
+                            emailFocusRequester.requestFocus()
+                            true
+                        }
+                        event.key == Key.Tab && event.type == KeyEventType.KeyDown -> {
+                            true
+                        }
+                        event.key == Key.Enter && event.type == KeyEventType.KeyDown -> {
+                            authViewModel.logIn(email, password)
+                            true
+                        }
+                        else -> false
+                    }
+                },
+            keyboardOptions = KeyboardOptions(
+                keyboardType = KeyboardType.Password,
+                imeAction = ImeAction.Done
+            ),
+            keyboardActions = KeyboardActions(
+                onDone = { authViewModel.logIn(email, password) }
+            ),
             colors = TextFieldDefaults.colors(
                 focusedContainerColor = Color.Transparent,
                 unfocusedContainerColor = Color.Transparent,
