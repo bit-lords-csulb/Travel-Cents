@@ -54,26 +54,12 @@ fun formatTimestamp(timestamp: Timestamp?): String {
     val now    = Calendar.getInstance()
     val msgCal = Calendar.getInstance().apply { time = timestamp.toDate() }
     return when {
-        // Same day
-        now.get(Calendar.DATE) == msgCal.get(Calendar.DATE) &&
-                now.get(Calendar.YEAR) == msgCal.get(Calendar.YEAR) ->
+        now.get(Calendar.DATE) == msgCal.get(Calendar.DATE) ->
             SimpleDateFormat("h:mm a", Locale.getDefault()).format(timestamp.toDate())
-
-        // Yesterday
-        now.get(Calendar.DATE) - msgCal.get(Calendar.DATE) == 1 &&
-                now.get(Calendar.YEAR) == msgCal.get(Calendar.YEAR) -> "Yesterday"
-
-        // Same week
-        now.get(Calendar.WEEK_OF_YEAR) == msgCal.get(Calendar.WEEK_OF_YEAR) &&
-                now.get(Calendar.YEAR) == msgCal.get(Calendar.YEAR) ->
+        now.get(Calendar.DATE) - msgCal.get(Calendar.DATE) == 1 -> "Yesterday"
+        now.get(Calendar.WEEK_OF_YEAR) == msgCal.get(Calendar.WEEK_OF_YEAR) ->
             SimpleDateFormat("EEE", Locale.getDefault()).format(timestamp.toDate())
-
-        // Same year
-        now.get(Calendar.YEAR) == msgCal.get(Calendar.YEAR) ->
-            SimpleDateFormat("MMM d", Locale.getDefault()).format(timestamp.toDate())
-
-        // Older
-        else -> SimpleDateFormat("M/d/yy", Locale.getDefault()).format(timestamp.toDate())
+        else -> "Last week"
     }
 }
 
@@ -84,13 +70,14 @@ fun ChatsPage(
     onNewChatClick: () -> Unit = {},
     onFriendsClick: () -> Unit = {},
     onGroupClick: (Group) -> Unit = {},
-    onDirectChatClick: (DirectChatPreview) -> Unit = {}
+    onDirectChatClick: (DirectChatPreview) -> Unit = {},
+    startTab: Int = 0
 ) {
     val searchQuery       by viewModel.searchQuery.collectAsState()
     val filteredGroups    by viewModel.filteredGroupsSearch.collectAsState()
     val filteredDMs       by viewModel.filteredDirectChats.collectAsState()
-    var selectedTab       by remember { mutableIntStateOf(0) }
-    val tabs               = listOf("Groups", "DMs")
+    var selectedTab       by remember { mutableIntStateOf(startTab) }
+    val tabs               = listOf("Groups", "Direct Messages")
 
     Column(modifier = modifier.fillMaxSize().background(DeepSea1)) {
         // Header
@@ -275,36 +262,40 @@ fun ChatsScreen(modifier: Modifier = Modifier) {
     var showAddFriend  by remember { mutableStateOf(false) }
     var showRequests   by remember { mutableStateOf(false) }
     var selectedDM     by remember { mutableStateOf<DirectChatPreview?>(null) }
+    var activeTab      by remember { mutableIntStateOf(0) }
 
     when {
-        selectedGroup  != null -> ChatPage(
+        selectedGroup != null -> ChatPage(
             group = selectedGroup!!,
-            onBackClick = { selectedGroup = null })
+            onBackClick = { selectedGroup = null }
+        )
         selectedFriend != null -> DirectChatPage(
             friend = selectedFriend!!,
-            onBackClick = { selectedFriend = null })
-        selectedDM     != null -> DirectChatPage(
-            friend = Friend(uid = selectedDM!!.otherUid, displayName = selectedDM!!.otherUserName),
-            onBackClick = { selectedDM = null }
+            onBackClick = { selectedFriend = null }
         )
-        showAddFriend  -> AddFriendPage(onBackClick = { showAddFriend = false })
-        showRequests   -> FriendRequestsPage(onBackClick = { showRequests = false })
-        showNewTrip    -> NewTripChatPage(
+        selectedDM != null -> DirectChatPage(
+            friend = Friend(uid = selectedDM!!.otherUid, displayName = selectedDM!!.otherUserName),
+            onBackClick = { selectedDM = null; activeTab = 1 }
+        )
+        showAddFriend -> AddFriendPage(onBackClick = { showAddFriend = false })
+        showRequests  -> FriendRequestsPage(onBackClick = { showRequests = false })
+        showNewTrip   -> NewTripChatPage(
             onBackClick = { showNewTrip = false },
             onTripCreated = { newGroup -> showNewTrip = false; selectedGroup = newGroup }
         )
-        showFriends    -> FriendsPage(
-            onBackClick      = { showFriends = false },
+        showFriends -> FriendsPage(
+            onBackClick          = { showFriends = false },
             onMessageFriendClick = { friend -> showFriends = false; selectedFriend = friend },
-            onAddFriendClick = { showAddFriend = true },
-            onRequestsClick  = { showRequests = true }
+            onAddFriendClick     = { showAddFriend = true },
+            onRequestsClick      = { showRequests = true }
         )
         else -> ChatsPage(
             modifier          = modifier,
+            startTab          = activeTab,
             onNewChatClick    = { showNewTrip = true },
             onFriendsClick    = { showFriends = true },
-            onGroupClick      = { group -> selectedGroup = group },
-            onDirectChatClick = { dm -> selectedDM = dm }
+            onGroupClick      = { group -> selectedGroup = group; activeTab = 0 },
+            onDirectChatClick = { dm -> selectedDM = dm; activeTab = 1 }
         )
     }
 }

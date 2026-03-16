@@ -100,7 +100,7 @@ fun FriendsPage(
                             if (pendingCount > 0) {
                                 Box(
                                     modifier = Modifier
-                                        .size(16.dp)
+                                        .size(18.dp)
                                         .align(Alignment.TopEnd)
                                         .clip(CircleShape)
                                         .background(Color(0xFFE53935)),
@@ -110,7 +110,8 @@ fun FriendsPage(
                                         text = if (pendingCount > 9) "9+" else "$pendingCount",
                                         color = Color.White,
                                         fontSize = 9.sp,
-                                        fontWeight = FontWeight.Bold
+                                        fontWeight = FontWeight.Bold,
+                                        lineHeight = 9.sp
                                     )
                                 }
                             }
