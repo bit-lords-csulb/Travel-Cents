@@ -5,10 +5,10 @@ import androidx.lifecycle.ViewModel
 import com.example.travelcents.data.model.TravelEvent
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FirebaseFirestore
+import com.google.firebase.firestore.Query
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
-import com.google.firebase.firestore.Query
 
 class ItineraryViewModel : ViewModel() {
 
