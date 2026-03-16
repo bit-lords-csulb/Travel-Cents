@@ -36,6 +36,7 @@ import java.time.LocalTime
 fun ItineraryScreen(
     modifier: Modifier = Modifier,
     onEditEventClick: (String) -> Unit = {},
+    onAddEventClick: () -> Unit = {},
     tripId: String? = null,
     viewModel: ItineraryViewModel = viewModel()
 ) {
@@ -62,7 +63,11 @@ fun ItineraryScreen(
             .padding(top = 24.dp)
     ) {
         Box(modifier = Modifier.padding(horizontal = 24.dp)) {
-            TripHeader(tripName = tripTitle, dateRange = dateRange)
+            TripHeader(
+                tripName = tripTitle,
+                dateRange = dateRange,
+                onAddClick = onAddEventClick
+            )
         }
 
         LazyColumn(
@@ -119,7 +124,7 @@ fun ItineraryScreen(
 }
 
 @Composable
-fun TripHeader(tripName: String, dateRange: String) {
+fun TripHeader(tripName: String, dateRange: String, onAddClick: () -> Unit) {
     Column(
         modifier = Modifier
             .fillMaxWidth()
@@ -168,7 +173,9 @@ fun TripHeader(tripName: String, dateRange: String) {
                 Surface(
                     shape = CircleShape,
                     color = Color(0xFF415A77),
-                    modifier = Modifier.size(40.dp)
+                    modifier = Modifier
+                        .size(40.dp)
+                        .clickable { onAddClick() }
                 ) {
                     Box(contentAlignment = Alignment.Center) { Text("+", color = Color.White, fontSize = 24.sp) }
                 }
@@ -242,8 +249,6 @@ fun FlightCard(event: TravelEvent) {
                 )
 
                 // 1. Resolve the Main Title
-                // We check for 'title' or 'activity_name' (updated by our Edit screen)
-                // first before falling back to the default "Flight to..."
                 val displayTitle = event.details["title"]
                     ?: event.details["activity_name"]
                     ?: "Flight to ${event.details["destination_airport"] ?: "Destination"}"
@@ -285,7 +290,6 @@ fun HotelCard(event: TravelEvent) {
             ) {
                 Text(text = "Check-in: ${formatTime(event.startTime)}", fontSize = 10.sp, color = Color(0xFF94A3B8))
 
-                // Logic: Priority to custom title, then hotel_name, then default
                 val displayTitle = event.details["title"]
                     ?: event.details["activity_name"]
                     ?: "Hotel Check-in"
@@ -320,7 +324,6 @@ fun RestaurantCard(event: TravelEvent) {
             ) {
                 Text(text = formatTime(event.startTime), fontSize = 10.sp, color = Color(0xFF94A3B8))
 
-                // Logic: Priority to custom title, then restaurant_name
                 val displayTitle = event.details["title"]
                     ?: event.details["activity_name"]
                     ?: event.details["restaurant_name"]
@@ -425,9 +428,3 @@ fun formatTime(timeString: String): String {
         timeString
     }
 }
-
-//@Preview(showBackground = true)
-//@Composable
-//fun ItineraryScreenPreview() {
-//    ItineraryScreen()
-//}
