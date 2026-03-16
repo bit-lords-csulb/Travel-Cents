@@ -62,25 +62,27 @@ class AuthViewModel : ViewModel() {
         }
     }
 
-    // Log in user
-    fun logIn(email: String, password: String) {
-        if (!validateLogInInputs(email, password)) return
+    // Log in user with email or username
+    fun logIn(emailOrUsername: String, password: String) {
+        if (!validateLogInInputs(emailOrUsername, password)) return
 
         viewModelScope.launch {
             _isLoading.value = true
             _errorMessage.value = null
 
-            val result = authModel.signInWithEmailAndPassword(email, password)
+            val result = authModel.signInWithEmailOrUsername(emailOrUsername, password)
 
             _isLoading.value = false
             result.fold(
                 onSuccess = { _isLoggedIn.value = true },
                 onFailure = { error ->
                     _errorMessage.value = when {
+                        error.message?.contains("No account found", ignoreCase = true) == true
+                            -> error.message
                         error.message?.contains("credential is incorrect", ignoreCase = true) == true ||
                                 error.message?.contains("malformed", ignoreCase = true) == true ||
                                 error.message?.contains("expired", ignoreCase = true) == true
-                            -> "Incorrect email or password."
+                            -> "Incorrect email/username or password."
                         error.message?.contains("network", ignoreCase = true) == true
                             -> "Network error. Please check your connection."
                         error.message?.contains("too-many-requests", ignoreCase = true) == true
@@ -135,9 +137,9 @@ class AuthViewModel : ViewModel() {
         return true
     }
 
-    private fun validateLogInInputs(email: String, password: String): Boolean {
-        if (!android.util.Patterns.EMAIL_ADDRESS.matcher(email).matches()) {
-            _errorMessage.value = "Invalid email address"
+    private fun validateLogInInputs(emailOrUsername: String, password: String): Boolean {
+        if (emailOrUsername.isBlank()) {
+            _errorMessage.value = "Email or username cannot be empty"
             return false
         }
         if (password.isBlank()) {
