@@ -54,7 +54,7 @@ fun ItineraryScreen(
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .background(Color(0xFF0F172A))
+            .background(Color(0xFF0D1B2A))
             .padding(top = 24.dp)
     ) {
         Box(modifier = Modifier.padding(horizontal = 24.dp)) {
@@ -68,24 +68,34 @@ fun ItineraryScreen(
                 .background(Color(0xFF0D1B2A)),
             contentPadding = PaddingValues(
                 top = 0.dp,
-                bottom = 0.dp,
+                bottom = 4.dp,
                 start = 24.dp,
                 end = 24.dp,
             ),
             verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
-            sortedDates.forEach { date ->
+            sortedDates.forEachIndexed { index, date ->
 
                 // Grab the events for this specific date
                 val dailyEvents = eventsByDay[date] ?: emptyList()
+
+                if (index > 0) {
+                    item {
+                        HorizontalDivider(
+                            modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
+                            thickness = 1.dp,
+                            color = Color(0xFF1E293B)
+                        )
+                    }
+                }
 
                 item {
                     Text(
                         text = formatDailyHeader(date),
                         color = Color.White,
-                        fontSize = 20.sp,
+                        fontSize = 16.sp,
                         fontWeight = FontWeight.Bold,
-                        modifier = Modifier.padding(top = 8.dp, bottom = 4.dp)
+                        modifier = Modifier.padding(top = 8.dp, bottom = 2.dp)
                     )
                 }
 
@@ -102,7 +112,7 @@ fun TripHeader(tripName: String, dateRange: String) {
     Column(
         modifier = Modifier
             .fillMaxWidth()
-            .height(126.dp)
+            .height(130.dp)
     ) {
         Row(
             modifier = Modifier.fillMaxWidth(),
@@ -172,9 +182,9 @@ fun TripHeader(tripName: String, dateRange: String) {
         HorizontalDivider(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(top = 24.dp), // Space between the buttons and the line
+                .padding(top = 24.dp),
             thickness = 1.dp,
-            color = Color(0xFF1E293B) // A muted slate gray to match the dark theme
+            color = Color(0xFF1E293B)
         )
     }
 }
