@@ -83,7 +83,8 @@ fun MainScaffold(modifier: Modifier = Modifier) {
                 startDestination = MainRoutes.Home,
                 modifier = Modifier.fillMaxSize()
             ) {
-                composable(MainRoutes.Current) { CurrentPage(modifier = Modifier.fillMaxSize()) }
+               // composable(MainRoutes.Current) { CurrentPage(modifier = Modifier.fillMaxSize()) }
+                composable(MainRoutes.Current) { ItineraryScreen() }
                 composable(MainRoutes.NewTrip) { NewTripPage(modifier = Modifier.fillMaxSize(), viewModel = newTripViewModel) }
                 composable(MainRoutes.Home) { HomePage(modifier = Modifier.fillMaxSize()) }
                 composable(MainRoutes.Chats) { ChatsScreen(modifier = Modifier.fillMaxSize()) }
