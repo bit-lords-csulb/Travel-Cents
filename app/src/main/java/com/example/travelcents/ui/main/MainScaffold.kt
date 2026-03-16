@@ -21,6 +21,7 @@ import androidx.compose.material.icons.outlined.Settings
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.compose.ui.Alignment
@@ -31,10 +32,13 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.navigation.NavGraph.Companion.findStartDestination
+import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
+import androidx.navigation.navArgument
+import com.example.travelcents.ui.itinerary.EditPlanScreen
 import com.example.travelcents.ui.theme.DeepSea1
 import com.example.travelcents.ui.theme.DeepSea2
 import com.example.travelcents.ui.theme.DeepSea3
@@ -48,7 +52,7 @@ object MainRoutes {
     const val Chats = "chats"
     const val Settings = "settings"
 
-    const val EditPlan = "edit_plan/{eventId}"
+    const val EditPlan = "edit_plan/{tripId}/{eventId}"
 }
 
 private data class BottomNavItem(
@@ -59,6 +63,8 @@ private data class BottomNavItem(
 
 @Composable
 fun MainScaffold(modifier: Modifier = Modifier) {
+    val itineraryViewModel: ItineraryViewModel = viewModel()
+    val currentTripId by itineraryViewModel.currentTripId.collectAsState()
     val newTripViewModel: NewTripViewModel = viewModel()
     val navController = rememberNavController()
     val navBackStackEntry by navController.currentBackStackEntryAsState()
@@ -84,24 +90,39 @@ fun MainScaffold(modifier: Modifier = Modifier) {
                 modifier = Modifier.fillMaxSize()
             ) {
                 composable(MainRoutes.Current) {
+                    // 1. We use the same ItineraryViewModel to get the dynamic tripId
+                    val itineraryViewModel: ItineraryViewModel = viewModel()
+                    val currentTripId by itineraryViewModel.currentTripId.collectAsState()
+
                     ItineraryScreen(
+                        viewModel = itineraryViewModel,
                         onEditEventClick = { clickedEventId ->
-                            navController.navigate("edit_plan/$clickedEventId")
+                            // 2. Only navigate if we actually have a tripId from Firebase
+                            currentTripId?.let { tripId ->
+                                navController.navigate("edit_plan/$tripId/$clickedEventId")
+                            }
                         }
                     )
                 }
 
-                // 2.
-                composable(MainRoutes.EditPlan) { backStackEntry ->
+                // 3. Register BOTH parameters in the route arguments
+                composable(
+                    route = MainRoutes.EditPlan,
+                    arguments = listOf(
+                        navArgument("tripId") { type = NavType.StringType },
+                        navArgument("eventId") { type = NavType.StringType }
+                    )
+                ) { backStackEntry ->
+                    val tripId = backStackEntry.arguments?.getString("tripId")
                     val eventId = backStackEntry.arguments?.getString("eventId")
 
                     EditPlanScreen(
-                        eventId = eventId, // <--- Add this line to pass the ID!
+                        tripId = tripId,
+                        eventId = eventId,
                         onBackClick = { navController.popBackStack() }
                     )
                 }
 
-                // 3. The rest of your existing tabs
                 composable(MainRoutes.NewTrip) { NewTripPage(modifier = Modifier.fillMaxSize(), viewModel = newTripViewModel) }
                 composable(MainRoutes.Home) { HomePage(modifier = Modifier.fillMaxSize()) }
                 composable(MainRoutes.Chats) { ChatsPage(modifier = Modifier.fillMaxSize()) }
