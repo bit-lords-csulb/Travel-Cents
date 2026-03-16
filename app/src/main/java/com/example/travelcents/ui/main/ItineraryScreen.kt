@@ -34,6 +34,8 @@ import java.time.LocalTime
 
 @Composable
 fun ItineraryScreen(
+    modifier: Modifier = Modifier,
+    onEditEventClick: (String) -> Unit = {},
     tripId: String? = null,
     viewModel: ItineraryViewModel = viewModel()
 ) {
@@ -105,8 +107,7 @@ fun ItineraryScreen(
                         modifier = Modifier
                             .fillMaxWidth()
                             .clickable {
-                                // TODO: Navigate to Edit Screen and pass this 'event'
-                                println("CLICKED EVENT: ${event.eventId}")
+                                onEditEventClick(event.eventId)
                             }
                     ) {
                         EventCardDispatcher(event = event)
