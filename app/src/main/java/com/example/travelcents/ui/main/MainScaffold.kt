@@ -90,22 +90,24 @@ fun MainScaffold(modifier: Modifier = Modifier) {
                 modifier = Modifier.fillMaxSize()
             ) {
                 composable(MainRoutes.Current) {
-                    // 1. We use the same ItineraryViewModel to get the dynamic tripId
                     val itineraryViewModel: ItineraryViewModel = viewModel()
                     val currentTripId by itineraryViewModel.currentTripId.collectAsState()
 
                     ItineraryScreen(
                         viewModel = itineraryViewModel,
                         onEditEventClick = { clickedEventId ->
-                            // 2. Only navigate if we actually have a tripId from Firebase
                             currentTripId?.let { tripId ->
                                 navController.navigate("edit_plan/$tripId/$clickedEventId")
+                            }
+                        },
+                        onAddEventClick = {
+                            currentTripId?.let { tripId ->
+                                navController.navigate("edit_plan/$tripId/new")
                             }
                         }
                     )
                 }
 
-                // 3. Register BOTH parameters in the route arguments
                 composable(
                     route = MainRoutes.EditPlan,
                     arguments = listOf(
