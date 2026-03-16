@@ -68,7 +68,6 @@ fun EditPlanScreen(
             confirmButton = {
                 TextButton(onClick = {
                     datePickerState.selectedDateMillis?.let { millis ->
-                        // Format to yyyy-MM-dd (Using UTC to prevent timezone shifts)
                         val formatter = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault())
                         formatter.timeZone = TimeZone.getTimeZone("UTC")
                         viewModel.date = formatter.format(Date(millis))
@@ -86,7 +85,6 @@ fun EditPlanScreen(
 
     // --- NATIVE START TIME PICKER ---
     if (showStartTimePicker) {
-        // Parse existing time string (e.g., "14:30") or default to 12:00
         val parts = viewModel.time.split(":")
         val initialHour = parts.getOrNull(0)?.toIntOrNull() ?: 12
         val initialMinute = parts.getOrNull(1)?.toIntOrNull() ?: 0
@@ -98,7 +96,6 @@ fun EditPlanScreen(
         TimePickerDialog(
             onCancel = { showStartTimePicker = false },
             onConfirm = {
-                // Format to HH:mm (24hr time makes it easier for your ItineraryScreen parser)
                 val h = startTimeState.hour.toString().padStart(2, '0')
                 val m = startTimeState.minute.toString().padStart(2, '0')
                 viewModel.time = "$h:$m"
@@ -111,7 +108,6 @@ fun EditPlanScreen(
 
     // --- NATIVE END TIME PICKER ---
     if (showEndTimePicker) {
-        // Parse existing end time string or default to 12:00
         val parts = viewModel.endTime.split(":")
         val initialHour = parts.getOrNull(0)?.toIntOrNull() ?: 12
         val initialMinute = parts.getOrNull(1)?.toIntOrNull() ?: 0
@@ -153,12 +149,16 @@ fun EditPlanScreen(
                     Icon(imageVector = Icons.Default.ArrowBackIosNew, contentDescription = "Back", tint = Color.White)
                 }
                 Spacer(modifier = Modifier.width(8.dp))
-                Text("EDIT PLAN", color = Color.White, fontSize = 18.sp, fontWeight = FontWeight.Bold, letterSpacing = 2.sp)
+
+                val headerText = if (eventId == "new") "NEW EVENT" else "EDIT PLAN"
+                Text(headerText, color = Color.White, fontSize = 18.sp, fontWeight = FontWeight.Bold, letterSpacing = 2.sp)
             }
 
             Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-                IconButton(onClick = { showDeleteDialog = true }) {
-                    Icon(imageVector = Icons.Default.Delete, contentDescription = "Delete Event", tint = Color(0xFFEF4444))
+                if (eventId != "new") {
+                    IconButton(onClick = { showDeleteDialog = true }) {
+                        Icon(imageVector = Icons.Default.Delete, contentDescription = "Delete Event", tint = Color(0xFFEF4444))
+                    }
                 }
                 IconButton(
                     onClick = {
@@ -172,6 +172,20 @@ fun EditPlanScreen(
 
         // --- DYNAMIC FORM FIELDS ---
 
+        // 1. EVENT TYPE DROPDOWN
+        val eventTypes = listOf("Flight", "Hotel", "Restaurant", "Activity")
+        val displayType = viewModel.type.replaceFirstChar {
+            if (it.isLowerCase()) it.titlecase(Locale.getDefault()) else it.toString()
+        }.ifEmpty { "Activity" }
+
+        DropdownEditField(
+            label = "Event Type",
+            options = eventTypes,
+            selectedValue = displayType,
+            onValueChange = { selected -> viewModel.type = selected.lowercase() }
+        )
+
+        // 2. MAIN TITLE
         val titleLabel = when (viewModel.type.lowercase()) {
             "flight" -> "Flight Name"
             "hotel" -> "Hotel Name"
@@ -180,7 +194,7 @@ fun EditPlanScreen(
         }
         CustomEditField(label = titleLabel, value = viewModel.title, onValueChange = { viewModel.title = it })
 
-        // 2. DATE, START TIME, END TIME (Now Clickable)
+        // 3. DATE, START TIME, END TIME
         Row(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.spacedBy(16.dp)
@@ -216,7 +230,7 @@ fun EditPlanScreen(
             )
         }
 
-        // 3. TYPE-SPECIFIC FIELDS
+        // 4. TYPE-SPECIFIC FIELDS
         when (viewModel.type.lowercase()) {
             "flight" -> {
                 Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(16.dp)) {
@@ -234,7 +248,7 @@ fun EditPlanScreen(
             }
         }
 
-        // 4. NOTES
+        // 5. NOTES
         CustomEditField(label = "Notes", value = viewModel.notes, onValueChange = { viewModel.notes = it }, singleLine = false, modifier = Modifier.height(120.dp), leadingIcon = { Icon(Icons.Default.Notes, contentDescription = null, tint = Color.Gray) })
 
         Spacer(modifier = Modifier.height(32.dp))
@@ -242,6 +256,54 @@ fun EditPlanScreen(
 }
 
 // --- HELPER COMPONENTS ---
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun DropdownEditField(
+    label: String,
+    options: List<String>,
+    selectedValue: String,
+    onValueChange: (String) -> Unit
+) {
+    var expanded by remember { mutableStateOf(false) }
+
+    Column(modifier = Modifier.padding(bottom = 16.dp).fillMaxWidth()) {
+        Text(text = label.uppercase(), color = Color.Gray, fontSize = 10.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(bottom = 8.dp))
+        ExposedDropdownMenuBox(
+            expanded = expanded,
+            onExpandedChange = { expanded = it }
+        ) {
+            TextField(
+                value = selectedValue,
+                onValueChange = {},
+                readOnly = true,
+                trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = expanded) },
+                modifier = Modifier.menuAnchor().fillMaxWidth(),
+                colors = TextFieldDefaults.colors(
+                    focusedContainerColor = Color(0xFF1E293B), unfocusedContainerColor = Color(0xFF1E293B),
+                    focusedTextColor = Color.White, unfocusedTextColor = Color.White,
+                    focusedIndicatorColor = Color.Transparent, unfocusedIndicatorColor = Color.Transparent
+                ),
+                shape = androidx.compose.foundation.shape.RoundedCornerShape(12.dp)
+            )
+            ExposedDropdownMenu(
+                expanded = expanded,
+                onDismissRequest = { expanded = false },
+                modifier = Modifier.background(Color(0xFF1E293B))
+            ) {
+                options.forEach { option ->
+                    DropdownMenuItem(
+                        text = { Text(option, color = Color.White) },
+                        onClick = {
+                            onValueChange(option)
+                            expanded = false
+                        }
+                    )
+                }
+            }
+        }
+    }
+}
 
 @Composable
 fun CustomEditField(
@@ -270,7 +332,6 @@ fun CustomEditField(
     }
 }
 
-// Intercepts the click to show the dialog instead of opening the keyboard
 @Composable
 fun ClickableEditField(
     label: String,
@@ -285,8 +346,8 @@ fun ClickableEditField(
             TextField(
                 value = value,
                 onValueChange = {},
-                readOnly = true, // Prevents keyboard from popping up
-                enabled = false, // Disables standard interaction
+                readOnly = true,
+                enabled = false,
                 leadingIcon = leadingIcon,
                 singleLine = true,
                 modifier = Modifier.fillMaxWidth(),
@@ -298,13 +359,11 @@ fun ClickableEditField(
                 ),
                 shape = androidx.compose.foundation.shape.RoundedCornerShape(12.dp)
             )
-            // Invisible box on top to capture the click cleanly
             Box(modifier = Modifier.matchParentSize().clickable { onClick() })
         }
     }
 }
 
-// Material 3 doesn't have a default TimePickerDialog yet, so we build a quick wrapper around AlertDialog
 @Composable
 fun TimePickerDialog(
     onCancel: () -> Unit,
