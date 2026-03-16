@@ -31,8 +31,11 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import android.view.View
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.input.key.Key
@@ -65,6 +68,14 @@ fun LoginPage(modifier: Modifier = Modifier, navController: NavController, authV
     var rememberMeState by remember { mutableStateOf(false) }
     val emailFocusRequester = remember { FocusRequester() }
     val passwordFocusRequester = remember { FocusRequester() }
+
+    // Suppress Android autofill overlay (clipboard/saved credentials popup)
+    val view = LocalView.current
+    DisposableEffect(Unit) {
+        val previous = view.importantForAutofill
+        view.importantForAutofill = View.IMPORTANT_FOR_AUTOFILL_NO_EXCLUDE_DESCENDANTS
+        onDispose { view.importantForAutofill = previous }
+    }
 
     // Collect StateFlows as Compose state
     val isLoggedIn by authViewModel.isLoggedIn.collectAsStateWithLifecycle()
