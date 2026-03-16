@@ -77,6 +77,39 @@ class AuthModel {
             .addOnFailureListener { e -> onResult(false, e.message) }
     }
 
+    // Log in with email or username
+    suspend fun signInWithEmailOrUsername(
+        emailOrUsername: String,
+        password: String
+    ): Result<String> {
+        val email = if (android.util.Patterns.EMAIL_ADDRESS.matcher(emailOrUsername).matches()) {
+            emailOrUsername
+        } else {
+            lookupEmailByUsername(emailOrUsername).getOrElse { return Result.failure(it) }
+        }
+        return signInWithEmailAndPassword(email, password)
+    }
+
+    // Resolve username to email via Firestore
+    private suspend fun lookupEmailByUsername(username: String): Result<String> =
+        suspendCancellableCoroutine { continuation ->
+            db.collection("users")
+                .whereEqualTo("username", username)
+                .limit(1)
+                .get()
+                .addOnSuccessListener { snapshot ->
+                    val email = snapshot.documents.firstOrNull()?.getString("email")
+                    if (email != null) {
+                        continuation.resume(Result.success(email))
+                    } else {
+                        continuation.resume(Result.failure(Exception("No account found with that username.")))
+                    }
+                }
+                .addOnFailureListener { e ->
+                    continuation.resume(Result.failure(e))
+                }
+        }
+
     // Log In
     suspend fun signInWithEmailAndPassword(
         email: String,

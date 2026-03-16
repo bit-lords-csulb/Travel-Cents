@@ -110,15 +110,15 @@ fun LoginPage(modifier: Modifier = Modifier, navController: NavController, authV
 
         Spacer(modifier = Modifier.height(40.dp))
 
-        // EMAIL SECTION
-        Text(text = "Email", color = DeepSea5, fontSize = 16.sp)
+        // EMAIL / USERNAME SECTION
+        Text(text = "Email or Username", color = DeepSea5, fontSize = 16.sp)
         TextField(
             value = email,
             onValueChange = {
                 email = it
                 authViewModel.clearError()
             },
-            placeholder = { Text("demo@student.csulb.edu", color = Color.Gray, fontSize = 14.sp) },
+            placeholder = { Text("email or username", color = Color.Gray, fontSize = 14.sp) },
             modifier = Modifier
                 .fillMaxWidth()
                 .height(50.dp)
@@ -133,7 +133,7 @@ fun LoginPage(modifier: Modifier = Modifier, navController: NavController, authV
                     }
                 },
             keyboardOptions = KeyboardOptions(
-                keyboardType = KeyboardType.Email,
+                keyboardType = KeyboardType.Text,
                 imeAction = ImeAction.Next
             ),
             keyboardActions = KeyboardActions(
