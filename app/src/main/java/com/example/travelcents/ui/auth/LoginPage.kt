@@ -97,7 +97,7 @@ fun LoginPage(modifier: Modifier = Modifier, navController: NavController, authV
             text = "Log In",
             fontSize = 32.sp,
             fontWeight = FontWeight.Bold,
-            color = DeepSea5
+            color = Color.White
         )
 
         Box(
@@ -111,7 +111,7 @@ fun LoginPage(modifier: Modifier = Modifier, navController: NavController, authV
         Spacer(modifier = Modifier.height(40.dp))
 
         // EMAIL / USERNAME SECTION
-        Text(text = "Email or Username", color = DeepSea5, fontSize = 16.sp)
+        Text(text = "Email or Username", color = Color.White, fontSize = 16.sp)
         TextField(
             value = email,
             onValueChange = {
@@ -142,7 +142,9 @@ fun LoginPage(modifier: Modifier = Modifier, navController: NavController, authV
             colors = TextFieldDefaults.colors(
                 focusedContainerColor = Color.Transparent,
                 unfocusedContainerColor = Color.Transparent,
-                focusedIndicatorColor = DeepSea5,
+                focusedTextColor = Color.White,
+                unfocusedTextColor = Color.White,
+                focusedIndicatorColor = Color.White,
                 unfocusedIndicatorColor = DeepSea4
             )
         )
@@ -150,7 +152,7 @@ fun LoginPage(modifier: Modifier = Modifier, navController: NavController, authV
         Spacer(modifier = Modifier.height(20.dp))
 
         // PASSWORD SECTION
-        Text(text = "Password", color = DeepSea5, fontSize = 16.sp)
+        Text(text = "Password", color = Color.White, fontSize = 16.sp)
         TextField(
             value = password,
             onValueChange = {
@@ -189,7 +191,9 @@ fun LoginPage(modifier: Modifier = Modifier, navController: NavController, authV
             colors = TextFieldDefaults.colors(
                 focusedContainerColor = Color.Transparent,
                 unfocusedContainerColor = Color.Transparent,
-                focusedIndicatorColor = DeepSea5,
+                focusedTextColor = Color.White,
+                unfocusedTextColor = Color.White,
+                focusedIndicatorColor = Color.White,
                 unfocusedIndicatorColor = DeepSea4
             )
         )
@@ -223,7 +227,7 @@ fun LoginPage(modifier: Modifier = Modifier, navController: NavController, authV
 
                 Text(
                     text = "Remember Me",
-                    color = DeepSea5,
+                    color = Color.White,
                     fontSize = 12.sp,
                     fontWeight = FontWeight.Medium
                 )
@@ -266,9 +270,9 @@ fun LoginPage(modifier: Modifier = Modifier, navController: NavController, authV
             colors = ButtonDefaults.buttonColors(containerColor = DeepSea2)
         ) {
             if (isLoading) {
-                CircularProgressIndicator(color = DeepSea5, modifier = Modifier.requiredSize(24.dp))
+                CircularProgressIndicator(color = Color.White, modifier = Modifier.requiredSize(24.dp))
             } else {
-                Text("Login", color = DeepSea5, fontSize = 18.sp)
+                Text("Login", color = Color.White, fontSize = 18.sp)
             }
         }
 
@@ -281,7 +285,7 @@ fun LoginPage(modifier: Modifier = Modifier, navController: NavController, authV
         ) {
             Text(
                 text = "Don't have an Account? ",
-                color = DeepSea5,
+                color = Color.White,
                 fontSize = 12.sp
             )
             Text(
