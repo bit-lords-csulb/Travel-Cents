@@ -23,8 +23,8 @@ class ItineraryViewModel : ViewModel() {
     private fun fetchLatestItinerary(uid: String) {
         db.collection("users").document(uid)
             .collection("trips")
-            .orderBy("createdAt", Query.Direction.DESCENDING) // <-- ADD THIS BACK
-            .limit(1)                                         // <-- ADD THIS BACK
+            .orderBy("createdAt", Query.Direction.DESCENDING)
+            .limit(1)
             .get()
             .addOnSuccessListener { tripSnapshot ->
                 if (tripSnapshot.isEmpty) {
@@ -45,7 +45,6 @@ class ItineraryViewModel : ViewModel() {
     }
 
     private fun listenToEvents(uid: String, tripId: String) {
-        // This is your exact same listener code from before!
         db.collection("users").document(uid)
             .collection("trips").document(tripId)
             .collection("events")
@@ -90,11 +89,9 @@ class ItineraryViewModel : ViewModel() {
 
 
     fun loadTrip(tripId: String? = null) {
-        // Grab the UID inside the function to ensure it's fresh
         val uid = auth.currentUser?.uid
 
         if (uid == null) {
-            // If the user isn't ready yet, let's log it so we know for sure
             Log.e("ItineraryViewModel", "UID is NULL. Firebase isn't ready yet.")
             return
         }
