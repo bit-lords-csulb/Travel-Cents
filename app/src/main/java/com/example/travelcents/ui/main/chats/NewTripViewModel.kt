@@ -3,6 +3,8 @@ package com.example.travelcents.ui.main.chats
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.travelcents.data.FirestoreRepository
+import com.example.travelcents.ui.main.chats.chat.Group
+import com.example.travelcents.ui.main.chats.friends.Friend
 import com.google.firebase.Firebase
 import com.google.firebase.auth.auth
 import kotlinx.coroutines.flow.MutableStateFlow
