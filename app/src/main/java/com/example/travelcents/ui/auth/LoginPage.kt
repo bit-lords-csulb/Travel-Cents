@@ -134,7 +134,8 @@ fun LoginPage(modifier: Modifier = Modifier, navController: NavController, authV
                 },
             keyboardOptions = KeyboardOptions(
                 keyboardType = KeyboardType.Text,
-                imeAction = ImeAction.Next
+                imeAction = ImeAction.Next,
+                autoCorrect = false
             ),
             keyboardActions = KeyboardActions(
                 onNext = { passwordFocusRequester.requestFocus() }
