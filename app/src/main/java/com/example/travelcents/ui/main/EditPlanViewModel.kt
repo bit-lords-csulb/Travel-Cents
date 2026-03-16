@@ -12,23 +12,23 @@ class EditPlanViewModel : ViewModel() {
     private val db = FirebaseFirestore.getInstance()
     private val auth = FirebaseAuth.getInstance()
 
-    // UI State variables
+    // Core Variables
+    var type by mutableStateOf("")
     var title by mutableStateOf("")
     var date by mutableStateOf("")
-    var time by mutableStateOf("")
+    var time by mutableStateOf("") // Maps to startTime
+    var endTime by mutableStateOf("")
     var location by mutableStateOf("")
     var notes by mutableStateOf("")
 
-    /**
-     * Fetches a specific event from the nested Firestore path:
-     * users/{uid}/trips/{tripId}/events/{eventId}
-     */
+    // Type-Specific Variables
+    var airline by mutableStateOf("")
+    var flightNumber by mutableStateOf("")
+    var cuisine by mutableStateOf("")
+
     fun loadEventDetails(eventId: String?, tripId: String?) {
         val uid = auth.currentUser?.uid
-        if (uid == null || eventId == null || tripId == null) {
-            Log.e("EditPlanViewModel", "Missing required IDs: uid=$uid, eventId=$eventId, tripId=$tripId")
-            return
-        }
+        if (uid == null || eventId == null || tripId == null) return
 
         db.collection("users").document(uid)
             .collection("trips").document(tripId)
@@ -37,27 +37,35 @@ class EditPlanViewModel : ViewModel() {
             .addOnSuccessListener { document ->
                 if (document != null && document.exists()) {
                     val allData = document.data ?: emptyMap()
+                    val detailsMap = allData["details"] as? Map<*, *>
 
-                    // We extract 'type' to use as a fallback for the title
-                    val type = document.getString("type") ?: ""
+                    // 1. Get the Type
+                    type = document.getString("type") ?: ""
 
-                    // Logic to find the best title: check field 'title', then 'activity_name', then fallback to type
+                    // 2. Map Core Fields
                     title = document.getString("title")
                         ?: document.getString("activity_name")
+                                ?: detailsMap?.get("title")?.toString()
+                                ?: document.getString("hotel_name")
+                                ?: document.getString("restaurant_name")
                                 ?: type.replaceFirstChar { it.uppercase() }
 
                     date = document.getString("date") ?: ""
-
-                    // Maps to the startTime field in your TravelEvent model
                     time = document.getString("startTime") ?: ""
+                    endTime = document.getString("endTime") ?: ""
 
-                    // Checks top-level flattened details
-                    location = document.getString("location") ?: document.getString("destination_airport") ?: ""
-                    notes = document.getString("notes") ?: document.getString("description") ?: ""
+                    location = document.getString("location")
+                        ?: document.getString("destination_airport")
+                                ?: ""
 
-                    Log.d("EditPlanViewModel", "Successfully loaded event: $title")
-                } else {
-                    Log.d("EditPlanViewModel", "No document found at path")
+                    notes = document.getString("notes")
+                        ?: document.getString("description")
+                                ?: ""
+
+                    // 3. Map Type-Specific Fields
+                    airline = document.getString("airline") ?: ""
+                    flightNumber = document.getString("flight_number") ?: ""
+                    cuisine = document.getString("cuisine") ?: ""
                 }
             }
             .addOnFailureListener { e ->
@@ -65,30 +73,62 @@ class EditPlanViewModel : ViewModel() {
             }
     }
 
-    /**
-     * Updates the event document at the same nested path
-     */
     fun updateEvent(eventId: String?, tripId: String?, onComplete: () -> Unit) {
         val uid = auth.currentUser?.uid
         if (uid == null || eventId == null || tripId == null) return
 
-        val updatedData = mapOf(
+        // Base updates for all event types
+        val updates = mutableMapOf<String, Any>(
             "title" to title,
+            "activity_name" to title, // Fallback for UI
             "date" to date,
             "startTime" to time,
+            "endTime" to endTime,
             "location" to location,
             "notes" to notes
         )
 
+        // Inject specific fields based on the type so the Itinerary Cards update properly
+        when (type.lowercase()) {
+            "flight" -> {
+                updates["destination_airport"] = location
+                updates["airline"] = airline
+                updates["flight_number"] = flightNumber
+            }
+            "hotel" -> {
+                updates["hotel_name"] = title
+            }
+            "restaurant" -> {
+                updates["restaurant_name"] = title
+                updates["cuisine"] = cuisine
+            }
+        }
+
         db.collection("users").document(uid)
             .collection("trips").document(tripId)
             .collection("events").document(eventId)
-            .update(updatedData)
+            .update(updates)
             .addOnSuccessListener {
                 onComplete()
             }
             .addOnFailureListener { e ->
                 Log.e("EditPlanViewModel", "Update Failed: ${e.message}")
+            }
+    }
+
+    fun deleteEvent(eventId: String?, tripId: String?, onComplete: () -> Unit) {
+        val uid = auth.currentUser?.uid
+        if (uid == null || eventId == null || tripId == null) return
+
+        db.collection("users").document(uid)
+            .collection("trips").document(tripId)
+            .collection("events").document(eventId)
+            .delete()
+            .addOnSuccessListener {
+                onComplete()
+            }
+            .addOnFailureListener { e ->
+                Log.e("EditPlanViewModel", "Error deleting event: ${e.message}")
             }
     }
 }
