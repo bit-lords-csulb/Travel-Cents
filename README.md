@@ -12,7 +12,7 @@ Travel Cents lets you:
 - **Chat with an AI travel assistant** conversationally to plan or refine your trip
 - **View your itinerary** with type-specific event cards grouped by day
 - **Collaborate via group chat** — create a trip group with friends and message in real time
-- **Authenticate** with email and password via Firebase
+- **Authenticate** with email or username via Firebase
 
 ---
 
@@ -23,6 +23,7 @@ Travel Cents lets you:
 - Android Studio Hedgehog or newer
 - Android device or emulator (API 24+)
 - A [Groq API key](https://console.groq.com/keys) (free)
+- A [SerpAPI key](https://serpapi.com/) for live flight and hotel data
 - A Firebase project with **Authentication** (email/password) and **Firestore** enabled
 
 ### Setup
@@ -32,9 +33,10 @@ Travel Cents lets you:
    git clone https://github.com/bit-lords-csulb/Travel-Cents.git
    ```
 
-2. Add your API key to `local.properties` (create the file if it doesn't exist — it is git-ignored):
+2. Add your API keys to `local.properties` (create the file if it doesn't exist — it is git-ignored):
    ```
    GROQ_API_KEY=your-groq-api-key-here
+   SERP_API_KEY=your-serpapi-key-here
    ```
 
 3. Add your Firebase config:
@@ -48,8 +50,9 @@ Travel Cents lets you:
 ## Current Features
 
 ### Authentication
-- Email and password sign-up and login
-- Input validation (email format, password length, required fields)
+a- Email or username login, email and password sign-up
+- Username resolved to email via Firestore lookup on login
+- Input validation (password length, required fields)
 - Loading states and error messages
 
 ### Trip Planning (New Trip tab)
@@ -94,6 +97,7 @@ Travel Cents lets you:
 | Auth | Firebase Authentication |
 | Database | Firebase Firestore |
 | AI | Groq API (llama-3.3-70b-versatile) |
+| Live Data | SerpAPI (flights + hotels) |
 | HTTP | Retrofit 2 + OkHttp 4 |
 | Serialization | Gson |
 | Images | Coil |
@@ -134,5 +138,4 @@ app/src/main/java/com/example/travelcents/
 
 | PR | Branch | Description |
 |---|---|---|
-| #6 | `feature/ai-chat-screen` | AI chat screen (conflict resolved, pending merge) |
 | #15 | `EditItinerary` | Edit, add, and delete itinerary events |
