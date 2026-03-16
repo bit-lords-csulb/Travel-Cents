@@ -185,14 +185,8 @@ fun EventCardDispatcher(event: TravelEvent) {
         "flight" -> FlightCard(event = event)
         "hotel" -> HotelCard(event = event)
         "restaurant" -> RestaurantCard(event = event)
-        else -> {
-            // Draw a temporary fallback text so we know it exists!
-            Text(
-                text = "Generic Event: ${event.type} at ${event.startTime}",
-                color = Color.White,
-                modifier = Modifier.padding(8.dp)
-            )
-        }
+        else -> ActivityCard(event = event)
+
     }
 }
 
@@ -273,7 +267,6 @@ fun RestaurantCard(event: TravelEvent) {
         colors = CardDefaults.cardColors(containerColor = Color(0xFF2A3324)) // Dark olive background
     ) {
         Row(modifier = Modifier.fillMaxSize()) {
-            // 1. The Accent Strip (Yellow/Gold for Food)
             Box(
                 modifier = Modifier
                     .fillMaxHeight()
@@ -285,10 +278,8 @@ fun RestaurantCard(event: TravelEvent) {
                 modifier = Modifier.fillMaxHeight().padding(horizontal = 16.dp),
                 verticalArrangement = Arrangement.Center
             ) {
-                // Using the main TravelEvent startTime
                 Text(text = event.startTime, fontSize = 10.sp, color = Color(0xFF94A3B8))
 
-                // Pulling specific restaurant info from the details map
                 val restaurantName = event.details["restaurant_name"] ?: "Unknown Restaurant"
                 val cuisine = event.details["cuisine"] ?: ""
 
@@ -299,6 +290,53 @@ fun RestaurantCard(event: TravelEvent) {
                     color = Color.White
                 )
                 Text(text = cuisine, fontSize = 11.sp, color = Color(0xFF64748B))
+            }
+        }
+    }
+}
+
+@Composable
+fun ActivityCard(event: TravelEvent) {
+    Card(
+        modifier = Modifier.fillMaxWidth().height(68.dp),
+        shape = RoundedCornerShape(12.dp),
+        colors = CardDefaults.cardColors(containerColor = Color(0xFF232336))
+    ) {
+        Row(modifier = Modifier.fillMaxSize()) {
+
+            Box(
+                modifier = Modifier
+                    .fillMaxHeight()
+                    .width(4.dp)
+                    .background(Color(0xFF8B5CF6))
+            )
+
+            Column(
+                modifier = Modifier.fillMaxHeight().padding(horizontal = 16.dp),
+                verticalArrangement = Arrangement.Center
+            ) {
+                Text(text = event.startTime, fontSize = 10.sp, color = Color(0xFF94A3B8))
+
+
+                val title = event.details["activity_name"]
+                    ?: event.details["name"]
+                    ?: event.details["title"]
+                    ?: event.type.replaceFirstChar { it.uppercase() }
+
+                val subtitle = event.details["location"] ?: event.details["description"]
+
+                Text(
+                    text = title,
+                    fontSize = 15.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = Color.White
+                )
+
+                if (!subtitle.isNullOrBlank()) {
+                    Text(text = subtitle, fontSize = 11.sp, color = Color(0xFF64748B))
+                } else {
+                    Text(text = " ", fontSize = 11.sp)
+                }
             }
         }
     }
