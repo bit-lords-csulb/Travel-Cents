@@ -5,6 +5,7 @@ import androidx.lifecycle.ViewModel
 import com.example.travelcents.data.model.TravelEvent
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FirebaseFirestore
+import com.google.firebase.firestore.ListenerRegistration
 import com.google.firebase.firestore.Query
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -14,6 +15,8 @@ class ItineraryViewModel : ViewModel() {
 
     private val _events = MutableStateFlow<List<TravelEvent>>(emptyList())
     val events: StateFlow<List<TravelEvent>> = _events.asStateFlow()
+
+    private var snapshotListener: ListenerRegistration? = null
 
     private val _tripTitle = MutableStateFlow("Loading Trip...")
     val tripTitle: StateFlow<String> = _tripTitle.asStateFlow()
@@ -45,7 +48,7 @@ class ItineraryViewModel : ViewModel() {
     }
 
     private fun listenToEvents(uid: String, tripId: String) {
-        db.collection("users").document(uid)
+        snapshotListener = db.collection("users").document(uid)
             .collection("trips").document(tripId)
             .collection("events")
             .addSnapshotListener { snapshot, error ->
@@ -104,4 +107,10 @@ class ItineraryViewModel : ViewModel() {
             fetchLatestItinerary(uid)
         }
     }
+    override fun onCleared() {
+        super.onCleared()
+        snapshotListener?.remove()
+    }
 }
+
+
