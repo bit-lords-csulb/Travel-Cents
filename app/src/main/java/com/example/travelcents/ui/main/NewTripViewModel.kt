@@ -10,12 +10,14 @@ import com.example.travelcents.data.model.Itinerary
 import com.example.travelcents.data.model.TravelEvent
 import com.example.travelcents.data.model.TravelRequest
 import com.example.travelcents.data.remote.GroqRepository
+import com.example.travelcents.data.remote.SerpRepository
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.Firebase
 import com.google.firebase.firestore.firestore
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.async
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.tasks.await
 
@@ -69,11 +71,29 @@ class NewTripViewModel : ViewModel() {
         )
 
         viewModelScope.launch {
-            _uiState.value = TripUiState.Loading
             try {
-                val (itinerary, events) = GroqRepository.planTrip(request)
-                saveToFirestore(uid, itinerary, events)
-                _uiState.value = TripUiState.Success(itinerary, events)
+                // Step 1: generate itinerary metadata (includes IATA codes)
+                _uiState.value = TripUiState.Loading(GROQ_ITINERARY_MESSAGES.random())
+                val itinerary = GroqRepository.generateItinerary(request)
+
+                // Step 2: fetch real flights + hotels in parallel
+                _uiState.value = TripUiState.Loading(SERP_FLIGHTS_MESSAGES.random())
+                val flightsDeferred = async { SerpRepository.searchFlights(request, itinerary) }
+                _uiState.value = TripUiState.Loading(SERP_HOTELS_MESSAGES.random())
+                val hotelsDeferred = async { SerpRepository.searchHotels(request, itinerary) }
+                val realFlights = flightsDeferred.await()
+                val realHotels = hotelsDeferred.await()
+
+                // Step 3: Groq generates only restaurants + activities, with real context
+                _uiState.value = TripUiState.Loading(GROQ_EVENTS_MESSAGES.random())
+                val aiEvents = GroqRepository.generateEvents(itinerary, request, realFlights, realHotels)
+
+                val allEvents = realFlights + realHotels + aiEvents
+                val linkedItinerary = itinerary.copy(eventIds = allEvents.map { it.eventId })
+
+                _uiState.value = TripUiState.Loading(FIRESTORE_MESSAGES.random())
+                saveToFirestore(uid, linkedItinerary, allEvents)
+                _uiState.value = TripUiState.Success(linkedItinerary, allEvents)
             } catch (e: Exception) {
                 _uiState.value = TripUiState.Error(e.message ?: "Failed to generate trip.")
             }
@@ -110,11 +130,43 @@ class NewTripViewModel : ViewModel() {
     fun toggleInterest(item: String) {
         interests = if (item in interests) interests - item else interests + item
     }
+
+    companion object {
+        private val GROQ_ITINERARY_MESSAGES = listOf(
+            "Asking Groq to plan your trip...",
+            "Groq is crafting your itinerary...",
+            "Generating trip structure with Groq...",
+            "Consulting Groq for travel ideas..."
+        )
+        private val SERP_FLIGHTS_MESSAGES = listOf(
+            "Checking flight availability...",
+            "Searching for the best flights...",
+            "Looking up flights via SerpAPI...",
+            "Scanning flight options for your dates..."
+        )
+        private val SERP_HOTELS_MESSAGES = listOf(
+            "Looking for suitable hotels...",
+            "Searching for accommodations...",
+            "Finding hotels via SerpAPI...",
+            "Browsing hotel options at your destination..."
+        )
+        private val GROQ_EVENTS_MESSAGES = listOf(
+            "Asking Groq for restaurant & activity suggestions...",
+            "Groq is picking the best local experiences...",
+            "Generating activities and dining with Groq...",
+            "Groq is curating your daily events..."
+        )
+        private val FIRESTORE_MESSAGES = listOf(
+            "Saving your trip...",
+            "Storing your itinerary...",
+            "Almost done — saving to the clouds..."
+        )
+    }
 }
 
 sealed class TripUiState {
     data object Idle : TripUiState()
-    data object Loading : TripUiState()
+    data class Loading(val statusMessage: String = "Getting things ready...") : TripUiState()
     data class Success(val itinerary: Itinerary, val events: List<TravelEvent>) : TripUiState()
     data class Error(val message: String) : TripUiState()
 }

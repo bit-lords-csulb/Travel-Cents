@@ -52,21 +52,16 @@ object GroqRepository {
         return parseItinerary(raw, request.userId)
     }
 
-    // Call 2: Generate events linked to an existing itinerary
-    suspend fun generateEvents(itinerary: Itinerary, request: TravelRequest): List<TravelEvent> {
-        val prompt = buildEventsPrompt(itinerary, request)
+    // Call 2: Generate restaurants + activities only (flights/hotels come from SerpAPI)
+    suspend fun generateEvents(
+        itinerary: Itinerary,
+        request: TravelRequest,
+        realFlights: List<TravelEvent> = emptyList(),
+        realHotels: List<TravelEvent> = emptyList()
+    ): List<TravelEvent> {
+        val prompt = buildEventsPrompt(itinerary, request, realFlights, realHotels)
         val raw = callGroq(prompt)
         return parseEvents(raw, itinerary.itineraryId)
-    }
-
-    // Full pipeline: itinerary + events
-    suspend fun planTrip(request: TravelRequest): Pair<Itinerary, List<TravelEvent>> {
-        val itinerary = generateItinerary(request)
-        val events = generateEvents(itinerary, request)
-        val linkedItinerary = itinerary.copy(
-            eventIds = events.map { it.eventId }
-        )
-        return linkedItinerary to events
     }
 
     private suspend fun callGroq(userPrompt: String): String {
@@ -93,6 +88,8 @@ Return a single JSON object with these fields only:
   "trip_name": "<short title>",
   "destination": "<city, country>",
   "origin": "<city, country>",
+  "origin_iata": "<IATA airport code for origin city, e.g. LAX>",
+  "destination_iata": "<IATA airport code for destination city, e.g. CDG>",
   "date_from": "<YYYY-MM-DD>",
   "date_to": "<YYYY-MM-DD>",
   "duration_days": <int>,
@@ -105,34 +102,34 @@ Return a single JSON object with these fields only:
         """.trimIndent()
     }
 
-    private fun buildEventsPrompt(itinerary: Itinerary, request: TravelRequest): String {
+    private fun buildEventsPrompt(
+        itinerary: Itinerary,
+        request: TravelRequest,
+        realFlights: List<TravelEvent>,
+        realHotels: List<TravelEvent>
+    ): String {
         val travelersJson = gson.toJson(mapOf("adults" to request.adults, "children" to request.children))
+
+        val flightContext = if (realFlights.isNotEmpty()) {
+            val firstFlight = realFlights.first()
+            "Arriving via ${firstFlight.details["airline"] ?: "flight"} at ${firstFlight.details["destination_airport"] ?: itinerary.destinationIata} around ${firstFlight.endTime}."
+        } else ""
+
+        val hotelContext = if (realHotels.isNotEmpty()) {
+            "Staying at ${realHotels.first().details["hotel_name"] ?: "a hotel"} in ${itinerary.destination}."
+        } else ""
+
         return """
-Generate travel events for this itinerary (id: ${itinerary.itineraryId}).
+Generate local events for this itinerary (id: ${itinerary.itineraryId}).
 Trip: ${itinerary.origin} to ${itinerary.destination}, ${itinerary.dateFrom} to ${itinerary.dateTo}.
 Travelers: $travelersJson. Style: ${itinerary.travelStyle}.
+Dietary preferences: ${request.dietary.joinToString(", ").ifBlank { "none" }}.
+Interests: ${request.interests.joinToString(", ").ifBlank { "general" }}.
+$flightContext
+$hotelContext
 
+Flights and hotel are already booked. Generate ONLY 2 restaurants and 2 activities.
 Return a JSON object: {"events": [...]} where each event uses ONLY the fields listed below.
-Include: outbound flight, return flight, hotel stay, 2 restaurants, 2 activities.
-
-FLIGHT:
-{
-  "event_id": "<uuid>", "type": "flight", "itinerary_id": "${itinerary.itineraryId}",
-  "tz": "<IANA timezone>",
-  "date": "<YYYY-MM-DD>",
-  "start_time": "<HH:MM>", "end_time": "<HH:MM>",
-  "airline": "<name>", "flight_number": "<code>",
-  "origin_airport": "<IATA>", "destination_airport": "<IATA>"
-}
-
-HOTEL:
-{
-  "event_id": "<uuid>", "type": "hotel", "itinerary_id": "${itinerary.itineraryId}",
-  "tz": "<IANA timezone>",
-  "start_time": "<check-in HH:MM>", "end_time": "<check-out HH:MM>",
-  "check_in_date": "<YYYY-MM-DD>", "check_out_date": "<YYYY-MM-DD>",
-  "hotel_name": "<name>", "room_type": "<type>"
-}
 
 RESTAURANT:
 {
@@ -168,6 +165,8 @@ ACTIVITY:
             tripName = json.get("trip_name")?.asString ?: "My Trip",
             destination = json.get("destination")?.asString ?: "",
             origin = json.get("origin")?.asString ?: "",
+            originIata = json.get("origin_iata")?.asString?.uppercase() ?: "",
+            destinationIata = json.get("destination_iata")?.asString?.uppercase() ?: "",
             dateFrom = json.get("date_from")?.asString ?: "",
             dateTo = json.get("date_to")?.asString ?: "",
             durationDays = json.get("duration_days")?.asInt ?: 0,

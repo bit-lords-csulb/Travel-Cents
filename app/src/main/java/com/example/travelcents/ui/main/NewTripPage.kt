@@ -270,7 +270,7 @@ fun NewTripPage(
                     Column(horizontalAlignment = Alignment.CenterHorizontally) {
                         CircularProgressIndicator(color = DeepSea3)
                         Spacer(modifier = Modifier.height(8.dp))
-                        Text("Generating your itinerary...", color = DeepSea4, fontSize = 14.sp)
+                        Text(state.statusMessage, color = DeepSea4, fontSize = 14.sp)
                     }
                 }
             }
