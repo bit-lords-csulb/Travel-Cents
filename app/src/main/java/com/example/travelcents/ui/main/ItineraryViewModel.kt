@@ -22,6 +22,9 @@ class ItineraryViewModel : ViewModel() {
     val tripTitle: StateFlow<String> = _tripTitle.asStateFlow()
     private val db = FirebaseFirestore.getInstance()
     private val auth = FirebaseAuth.getInstance()
+    private val _currentTripId = MutableStateFlow<String?>(null)
+
+    val currentTripId: StateFlow<String?> = _currentTripId.asStateFlow()
 
     private fun fetchLatestItinerary(uid: String) {
         db.collection("users").document(uid)
@@ -30,20 +33,16 @@ class ItineraryViewModel : ViewModel() {
             .limit(1)
             .get()
             .addOnSuccessListener { tripSnapshot ->
-                if (tripSnapshot.isEmpty) {
-                    Log.d("ItineraryViewModel", "No trips found.")
-                    return@addOnSuccessListener
-                }
+                if (tripSnapshot.isEmpty) return@addOnSuccessListener
 
                 val doc = tripSnapshot.documents.first()
                 val newestTripId = doc.id
 
+                // SAVE THE ID HERE
+                _currentTripId.value = newestTripId
                 _tripTitle.value = doc.getString("tripName") ?: "Unnamed Trip"
 
                 listenToEvents(uid, newestTripId)
-            }
-            .addOnFailureListener { e ->
-                Log.e("ItineraryViewModel", "DATABASE ERROR: ${e.message}")
             }
     }
 
@@ -111,6 +110,7 @@ class ItineraryViewModel : ViewModel() {
         Log.d("ItineraryViewModel", "UID found: $uid. Fetching trip: ${tripId ?: "Latest"}")
 
         if (tripId != null) {
+            _currentTripId.value = tripId
             fetchTripTitle(uid, tripId)
             listenToEvents(uid, tripId)
         } else {
