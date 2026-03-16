@@ -16,6 +16,7 @@ import androidx.compose.foundation.layout.requiredSize
 import androidx.compose.foundation.layout.requiredWidth
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
@@ -30,8 +31,19 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import android.view.View
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalView
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.input.key.Key
+import androidx.compose.ui.input.key.KeyEventType
+import androidx.compose.ui.input.key.isShiftPressed
+import androidx.compose.ui.input.key.key
+import androidx.compose.ui.input.key.onPreviewKeyEvent
+import androidx.compose.ui.input.key.type
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
@@ -54,6 +66,16 @@ fun LoginPage(modifier: Modifier = Modifier, navController: NavController, authV
     var email by remember { mutableStateOf("") }
     var password by remember { mutableStateOf("") }
     var rememberMeState by remember { mutableStateOf(false) }
+    val emailFocusRequester = remember { FocusRequester() }
+    val passwordFocusRequester = remember { FocusRequester() }
+
+    // Suppress Android autofill overlay (clipboard/saved credentials popup)
+    val view = LocalView.current
+    DisposableEffect(Unit) {
+        val previous = view.importantForAutofill
+        view.importantForAutofill = View.IMPORTANT_FOR_AUTOFILL_NO_EXCLUDE_DESCENDANTS
+        onDispose { view.importantForAutofill = previous }
+    }
 
     // Collect StateFlows as Compose state
     val isLoggedIn by authViewModel.isLoggedIn.collectAsStateWithLifecycle()
@@ -86,7 +108,7 @@ fun LoginPage(modifier: Modifier = Modifier, navController: NavController, authV
             text = "Log In",
             fontSize = 32.sp,
             fontWeight = FontWeight.Bold,
-            color = DeepSea5
+            color = Color.White
         )
 
         Box(
@@ -99,20 +121,42 @@ fun LoginPage(modifier: Modifier = Modifier, navController: NavController, authV
 
         Spacer(modifier = Modifier.height(40.dp))
 
-        // EMAIL SECTION
-        Text(text = "Email", color = DeepSea5, fontSize = 16.sp)
+        // EMAIL / USERNAME SECTION
+        Text(text = "Email or Username", color = Color.White, fontSize = 16.sp)
         TextField(
             value = email,
             onValueChange = {
                 email = it
                 authViewModel.clearError()
             },
-            placeholder = { Text("demo@student.csulb.edu", color = Color.Gray, fontSize = 14.sp) },
-            modifier = Modifier.fillMaxWidth().height(50.dp),
+            placeholder = { Text("email or username", color = Color.Gray, fontSize = 14.sp) },
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(50.dp)
+                .focusRequester(emailFocusRequester)
+                .onPreviewKeyEvent { event ->
+                    when {
+                        event.key == Key.Tab && event.type == KeyEventType.KeyDown && !event.isShiftPressed -> {
+                            passwordFocusRequester.requestFocus()
+                            true
+                        }
+                        else -> false
+                    }
+                },
+            keyboardOptions = KeyboardOptions(
+                keyboardType = KeyboardType.Text,
+                imeAction = ImeAction.Next,
+                autoCorrect = false
+            ),
+            keyboardActions = KeyboardActions(
+                onNext = { passwordFocusRequester.requestFocus() }
+            ),
             colors = TextFieldDefaults.colors(
                 focusedContainerColor = Color.Transparent,
                 unfocusedContainerColor = Color.Transparent,
-                focusedIndicatorColor = DeepSea5,
+                focusedTextColor = Color.White,
+                unfocusedTextColor = Color.White,
+                focusedIndicatorColor = Color.White,
                 unfocusedIndicatorColor = DeepSea4
             )
         )
@@ -120,7 +164,7 @@ fun LoginPage(modifier: Modifier = Modifier, navController: NavController, authV
         Spacer(modifier = Modifier.height(20.dp))
 
         // PASSWORD SECTION
-        Text(text = "Password", color = DeepSea5, fontSize = 16.sp)
+        Text(text = "Password", color = Color.White, fontSize = 16.sp)
         TextField(
             value = password,
             onValueChange = {
@@ -129,11 +173,39 @@ fun LoginPage(modifier: Modifier = Modifier, navController: NavController, authV
             },
             placeholder = { Text("enter password", color = Color.Gray, fontSize = 14.sp) },
             visualTransformation = PasswordVisualTransformation(),
-            modifier = Modifier.fillMaxWidth().height(50.dp),
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(50.dp)
+                .focusRequester(passwordFocusRequester)
+                .onPreviewKeyEvent { event ->
+                    when {
+                        event.key == Key.Tab && event.type == KeyEventType.KeyDown && event.isShiftPressed -> {
+                            emailFocusRequester.requestFocus()
+                            true
+                        }
+                        event.key == Key.Tab && event.type == KeyEventType.KeyDown -> {
+                            true
+                        }
+                        event.key == Key.Enter && event.type == KeyEventType.KeyDown -> {
+                            authViewModel.logIn(email, password)
+                            true
+                        }
+                        else -> false
+                    }
+                },
+            keyboardOptions = KeyboardOptions(
+                keyboardType = KeyboardType.Password,
+                imeAction = ImeAction.Done
+            ),
+            keyboardActions = KeyboardActions(
+                onDone = { authViewModel.logIn(email, password) }
+            ),
             colors = TextFieldDefaults.colors(
                 focusedContainerColor = Color.Transparent,
                 unfocusedContainerColor = Color.Transparent,
-                focusedIndicatorColor = DeepSea5,
+                focusedTextColor = Color.White,
+                unfocusedTextColor = Color.White,
+                focusedIndicatorColor = Color.White,
                 unfocusedIndicatorColor = DeepSea4
             )
         )
@@ -167,7 +239,7 @@ fun LoginPage(modifier: Modifier = Modifier, navController: NavController, authV
 
                 Text(
                     text = "Remember Me",
-                    color = DeepSea5,
+                    color = Color.White,
                     fontSize = 12.sp,
                     fontWeight = FontWeight.Medium
                 )
@@ -210,9 +282,9 @@ fun LoginPage(modifier: Modifier = Modifier, navController: NavController, authV
             colors = ButtonDefaults.buttonColors(containerColor = DeepSea2)
         ) {
             if (isLoading) {
-                CircularProgressIndicator(color = DeepSea5, modifier = Modifier.requiredSize(24.dp))
+                CircularProgressIndicator(color = Color.White, modifier = Modifier.requiredSize(24.dp))
             } else {
-                Text("Login", color = DeepSea5, fontSize = 18.sp)
+                Text("Login", color = Color.White, fontSize = 18.sp)
             }
         }
 
@@ -225,7 +297,7 @@ fun LoginPage(modifier: Modifier = Modifier, navController: NavController, authV
         ) {
             Text(
                 text = "Don't have an Account? ",
-                color = DeepSea5,
+                color = Color.White,
                 fontSize = 12.sp
             )
             Text(
