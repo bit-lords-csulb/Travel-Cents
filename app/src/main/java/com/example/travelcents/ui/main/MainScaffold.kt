@@ -47,6 +47,8 @@ object MainRoutes {
     const val Home = "home"
     const val Chats = "chats"
     const val Settings = "settings"
+
+    const val EditPlan = "edit_plan/{eventId}"
 }
 
 private data class BottomNavItem(
@@ -81,8 +83,25 @@ fun MainScaffold(modifier: Modifier = Modifier) {
                 startDestination = MainRoutes.Home,
                 modifier = Modifier.fillMaxSize()
             ) {
-               // composable(MainRoutes.Current) { CurrentPage(modifier = Modifier.fillMaxSize()) }
-                composable(MainRoutes.Current) { ItineraryScreen() }
+                composable(MainRoutes.Current) {
+                    ItineraryScreen(
+                        onEditEventClick = { clickedEventId ->
+                            navController.navigate("edit_plan/$clickedEventId")
+                        }
+                    )
+                }
+
+                // 2.
+                composable(MainRoutes.EditPlan) { backStackEntry ->
+                    val eventId = backStackEntry.arguments?.getString("eventId")
+
+                    EditPlanScreen(
+                        eventId = eventId, // <--- Add this line to pass the ID!
+                        onBackClick = { navController.popBackStack() }
+                    )
+                }
+
+                // 3. The rest of your existing tabs
                 composable(MainRoutes.NewTrip) { NewTripPage(modifier = Modifier.fillMaxSize(), viewModel = newTripViewModel) }
                 composable(MainRoutes.Home) { HomePage(modifier = Modifier.fillMaxSize()) }
                 composable(MainRoutes.Chats) { ChatsPage(modifier = Modifier.fillMaxSize()) }
