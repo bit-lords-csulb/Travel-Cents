@@ -18,6 +18,7 @@ import androidx.compose.material.icons.outlined.CalendarToday
 import androidx.compose.material.icons.outlined.ChatBubbleOutline
 import androidx.compose.material.icons.outlined.Home
 import androidx.compose.material.icons.outlined.Settings
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -39,6 +40,7 @@ import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
 import com.example.travelcents.ui.itinerary.EditPlanScreen
+import com.example.travelcents.ui.main.chats.ChatsScreen
 import com.example.travelcents.ui.theme.DeepSea1
 import com.example.travelcents.ui.theme.DeepSea2
 import com.example.travelcents.ui.theme.DeepSea3
@@ -53,7 +55,16 @@ object MainRoutes {
     const val Settings = "settings"
 
     const val EditPlan = "edit_plan/{tripId}/{eventId}"
+    const val AiTripChat = "ai_trip_chat"
 }
+
+private val bottomNavRoutes = setOf(
+    MainRoutes.Current,
+    MainRoutes.NewTrip,
+    MainRoutes.Home,
+    MainRoutes.Chats,
+    MainRoutes.Settings
+)
 
 private data class BottomNavItem(
     val route: String,
@@ -126,25 +137,42 @@ fun MainScaffold(modifier: Modifier = Modifier) {
                 }
 
                 composable(MainRoutes.NewTrip) { NewTripPage(modifier = Modifier.fillMaxSize(), viewModel = newTripViewModel) }
+                composable(MainRoutes.Current) { ItineraryScreen() }
+                composable(MainRoutes.NewTrip) {
+                    NewTripPage(
+                        modifier = Modifier.fillMaxSize(),
+                        viewModel = newTripViewModel,
+                        onChatClick = { navController.navigate(MainRoutes.AiTripChat) }
+                    )
+                }
                 composable(MainRoutes.Home) { HomePage(modifier = Modifier.fillMaxSize()) }
-                composable(MainRoutes.Chats) { ChatsPage(modifier = Modifier.fillMaxSize()) }
+                composable(MainRoutes.Chats) { ChatsScreen(modifier = Modifier.fillMaxSize()) }
                 composable(MainRoutes.Settings) { SettingsPage(modifier = Modifier.fillMaxSize()) }
+                composable(MainRoutes.AiTripChat) {
+                    AiTripChatPage(
+                        modifier = Modifier.fillMaxSize(),
+                        onBackClick = { navController.popBackStack() }
+                    )
+                }
             }
         }
 
-        BottomNavBar(
-            items = items,
-            currentRoute = currentRoute,
-            onItemSelected = { route ->
-                navController.navigate(route) {
-                    popUpTo(navController.graph.findStartDestination().id) {
-                        saveState = true
+        // Hide bottom nav on the AI chat screen
+        if (currentRoute in bottomNavRoutes) {
+            BottomNavBar(
+                items = items,
+                currentRoute = currentRoute,
+                onItemSelected = { route ->
+                    navController.navigate(route) {
+                        popUpTo(navController.graph.findStartDestination().id) {
+                            saveState = true
+                        }
+                        launchSingleTop = true
+                        restoreState = true
                     }
-                    launchSingleTop = true
-                    restoreState = true
                 }
-            }
-        )
+            )
+        }
     }
 }
 
@@ -154,50 +182,53 @@ private fun BottomNavBar(
     currentRoute: String,
     onItemSelected: (String) -> Unit
 ) {
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .height(88.dp)
-            .background(DeepSea2)
-            .padding(horizontal = 8.dp, vertical = 8.dp),
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        items.forEach { item ->
-            val selected = currentRoute == item.route
-            Column(
-                modifier = Modifier
-                    .weight(1f)
-                    .clickable {
-                        if (!selected) {
-                            onItemSelected(item.route)
-                        }
-                    }
-                    .padding(vertical = 4.dp),
-                horizontalAlignment = Alignment.CenterHorizontally
-            ) {
-                Box(
+    Column {
+        HorizontalDivider(color = DeepSea3, thickness = 1.dp)
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(88.dp)
+                .background(DeepSea2)
+                .padding(horizontal = 8.dp, vertical = 8.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            items.forEach { item ->
+                val selected = currentRoute == item.route
+                Column(
                     modifier = Modifier
-                        .size(36.dp)
-                        .background(
-                            color = if (selected) DeepSea3 else Color.Transparent,
-                            shape = CircleShape
-                        ),
-                    contentAlignment = Alignment.Center
+                        .weight(1f)
+                        .clickable {
+                            if (!selected) {
+                                onItemSelected(item.route)
+                            }
+                        }
+                        .padding(vertical = 4.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally
                 ) {
-                    Icon(
-                        imageVector = item.icon,
-                        contentDescription = item.label,
-                        tint = if (selected) DeepSea5 else DeepSea4
+                    Box(
+                        modifier = Modifier
+                            .size(36.dp)
+                            .background(
+                                color = if (selected) DeepSea3 else Color.Transparent,
+                                shape = CircleShape
+                            ),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Icon(
+                            imageVector = item.icon,
+                            contentDescription = item.label,
+                            tint = if (selected) DeepSea5 else DeepSea4
+                        )
+                    }
+                    Spacer(modifier = Modifier.height(4.dp))
+                    Text(
+                        text = item.label,
+                        color = if (selected) DeepSea5 else DeepSea4,
+                        fontSize = 11.sp,
+                        fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Medium,
+                        letterSpacing = 0.4.sp
                     )
                 }
-                Spacer(modifier = Modifier.height(4.dp))
-                Text(
-                    text = item.label,
-                    color = if (selected) DeepSea5 else DeepSea4,
-                    fontSize = 11.sp,
-                    fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Medium,
-                    letterSpacing = 0.4.sp
-                )
             }
         }
     }
