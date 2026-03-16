@@ -214,31 +214,60 @@ fun EventCardDispatcher(event: TravelEvent) {
 @Composable
 fun FlightCard(event: TravelEvent) {
     Card(
-        modifier = Modifier.fillMaxWidth().height(68.dp),
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(68.dp),
         shape = RoundedCornerShape(12.dp),
         colors = CardDefaults.cardColors(containerColor = Color(0xFF2D2438))
     ) {
         Row(modifier = Modifier.fillMaxSize()) {
-            Box(modifier = Modifier.fillMaxHeight().width(4.dp).background(Color(0xFFEC4899)))
+            Box(
+                modifier = Modifier
+                    .fillMaxHeight()
+                    .width(4.dp)
+                    .background(Color(0xFFEC4899))
+            )
 
-            Column(modifier = Modifier.fillMaxHeight().padding(horizontal = 16.dp), verticalArrangement = Arrangement.Center) {
-                Text(text = formatTime(event.startTime), fontSize = 10.sp, color = Color(0xFF94A3B8))
-                val destination = event.details["destination_airport"] ?: "Destination"
-                val airline = event.details["airline"] ?: ""
-                val flightNo = event.details["flight_number"] ?: ""
+            Column(
+                modifier = Modifier
+                    .fillMaxHeight()
+                    .padding(horizontal = 16.dp),
+                verticalArrangement = Arrangement.Center
+            ) {
+                // Time Display
+                Text(
+                    text = formatTime(event.startTime),
+                    fontSize = 10.sp,
+                    color = Color(0xFF94A3B8)
+                )
+
+                // 1. Resolve the Main Title
+                // We check for 'title' or 'activity_name' (updated by our Edit screen)
+                // first before falling back to the default "Flight to..."
+                val displayTitle = event.details["title"]
+                    ?: event.details["activity_name"]
+                    ?: "Flight to ${event.details["destination_airport"] ?: "Destination"}"
 
                 Text(
-                    text = "Flight to $destination",
+                    text = displayTitle,
                     fontSize = 15.sp,
                     fontWeight = FontWeight.Bold,
                     color = Color.White
                 )
-                Text(text = "$airline $flightNo", fontSize = 11.sp, color = Color(0xFF64748B))
+
+                // 2. Resolve the Subtitle (Airline and Flight Number)
+                val airline = event.details["airline"] ?: ""
+                val flightNo = event.details["flight_number"] ?: ""
+
+                Text(
+                    text = "$airline $flightNo".trim(),
+                    fontSize = 11.sp,
+                    color = Color(0xFF64748B)
+                )
             }
         }
     }
 }
-
 
 @Composable
 fun HotelCard(event: TravelEvent) {
@@ -248,22 +277,23 @@ fun HotelCard(event: TravelEvent) {
         colors = CardDefaults.cardColors(containerColor = Color(0xFF1E3535))
     ) {
         Row(modifier = Modifier.fillMaxSize()) {
-            Box(
-                modifier = Modifier
-                    .fillMaxHeight()
-                    .width(4.dp)
-                    .background(Color(0xFF06B6D4))
-            )
+            Box(modifier = Modifier.fillMaxHeight().width(4.dp).background(Color(0xFF06B6D4)))
 
             Column(
                 modifier = Modifier.fillMaxHeight().padding(horizontal = 16.dp),
                 verticalArrangement = Arrangement.Center
             ) {
                 Text(text = "Check-in: ${formatTime(event.startTime)}", fontSize = 10.sp, color = Color(0xFF94A3B8))
-                val hotelName = event.details["hotel_name"] ?: "Unknown Hotel"
+
+                // Logic: Priority to custom title, then hotel_name, then default
+                val displayTitle = event.details["title"]
+                    ?: event.details["activity_name"]
+                    ?: "Hotel Check-in"
+
+                val hotelName = event.details["hotel_name"] ?: event.details["location"] ?: ""
 
                 Text(
-                    text = "Hotel Check-in",
+                    text = displayTitle,
                     fontSize = 15.sp,
                     fontWeight = FontWeight.Bold,
                     color = Color.White
@@ -282,23 +312,24 @@ fun RestaurantCard(event: TravelEvent) {
         colors = CardDefaults.cardColors(containerColor = Color(0xFF2A3324))
     ) {
         Row(modifier = Modifier.fillMaxSize()) {
-            Box(
-                modifier = Modifier
-                    .fillMaxHeight()
-                    .width(4.dp)
-                    .background(Color(0xFFEAB308))
-            )
+            Box(modifier = Modifier.fillMaxHeight().width(4.dp).background(Color(0xFFEAB308)))
 
             Column(
                 modifier = Modifier.fillMaxHeight().padding(horizontal = 16.dp),
                 verticalArrangement = Arrangement.Center
             ) {
                 Text(text = formatTime(event.startTime), fontSize = 10.sp, color = Color(0xFF94A3B8))
-                val restaurantName = event.details["restaurant_name"] ?: "Unknown Restaurant"
-                val cuisine = event.details["cuisine"] ?: ""
+
+                // Logic: Priority to custom title, then restaurant_name
+                val displayTitle = event.details["title"]
+                    ?: event.details["activity_name"]
+                    ?: event.details["restaurant_name"]
+                    ?: "Dining"
+
+                val cuisine = event.details["cuisine"] ?: event.details["location"] ?: ""
 
                 Text(
-                    text = restaurantName,
+                    text = displayTitle,
                     fontSize = 15.sp,
                     fontWeight = FontWeight.Bold,
                     color = Color.White
