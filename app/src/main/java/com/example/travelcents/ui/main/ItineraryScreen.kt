@@ -1,6 +1,5 @@
 package com.example.travelcents.ui.main
 
-import android.annotation.SuppressLint
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -21,22 +20,21 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.example.travelcents.data.MockItineraryData
 import com.example.travelcents.data.model.TravelEvent
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.LaunchedEffect
-import com.example.travelcents.ui.auth.AuthViewModel
-import com.google.firebase.auth.FirebaseAuth
 import java.time.LocalDate
 import java.time.format.DateTimeFormatter
 import java.time.LocalTime
 
 @Composable
 fun ItineraryScreen(
+    modifier: Modifier = Modifier,
+    onEditEventClick: (String) -> Unit = {},
+    onAddEventClick: () -> Unit = {},
     tripId: String? = null,
     viewModel: ItineraryViewModel = viewModel()
 ) {
@@ -68,6 +66,7 @@ fun ItineraryScreen(
     } else {
         "DATES TBD"
     }
+
     Column(
         modifier = Modifier
             .fillMaxSize()
@@ -78,6 +77,7 @@ fun ItineraryScreen(
             TripHeader(
                 tripName = tripTitle,
                 dateRange = dateRange,
+                onAddClick = onAddEventClick,
                 onSwitchToCalendar = { showCalendar = true }
             )
         }
@@ -120,7 +120,13 @@ fun ItineraryScreen(
                 }
 
                 items(dailyEvents) { event ->
-                    EventCardDispatcher(event = event)
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clickable { onEditEventClick(event.eventId) }
+                    ) {
+                        EventCardDispatcher(event = event)
+                    }
                 }
             }
         }
@@ -131,6 +137,7 @@ fun ItineraryScreen(
 fun TripHeader(
     tripName: String,
     dateRange: String,
+    onAddClick: () -> Unit = {},
     onSwitchToCalendar: () -> Unit = {}
 ) {
     Column(
@@ -143,7 +150,6 @@ fun TripHeader(
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.Top
         ) {
-            // 1. ROW WITH TRIP NAME AND DATE
             Column {
                 Text(
                     text = tripName.uppercase(),
@@ -168,7 +174,7 @@ fun TripHeader(
                     color = Color(0xFF1E293B),
                     border = BorderStroke(1.dp, Color(0xFF334155))
                 ) {
-                    IconButton(onClick = { /* Handle AI/Magic action */ }) {
+                    IconButton(onClick = { /* AI action */ }) {
                         Icon(
                             imageVector = Icons.Rounded.AutoAwesome,
                             contentDescription = "AI Assistant",
@@ -181,9 +187,13 @@ fun TripHeader(
                 Surface(
                     shape = CircleShape,
                     color = Color(0xFF415A77),
-                    modifier = Modifier.size(40.dp)
+                    modifier = Modifier
+                        .size(40.dp)
+                        .clickable { onAddClick() }
                 ) {
-                    Box(contentAlignment = Alignment.Center) { Text("+", color = Color.White, fontSize = 24.sp) }
+                    Box(contentAlignment = Alignment.Center) {
+                        Text("+", color = Color.White, fontSize = 24.sp)
+                    }
                 }
             }
         }
@@ -203,8 +213,8 @@ fun TripHeader(
                 color = Color(0xFF94A3B8),
                 modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp)
             )
-
         }
+
         HorizontalDivider(
             modifier = Modifier
                 .fillMaxWidth()
@@ -222,7 +232,6 @@ fun EventCardDispatcher(event: TravelEvent) {
         "hotel" -> HotelCard(event = event)
         "restaurant" -> RestaurantCard(event = event)
         else -> ActivityCard(event = event)
-
     }
 }
 
@@ -236,24 +245,24 @@ fun FlightCard(event: TravelEvent) {
         Row(modifier = Modifier.fillMaxSize()) {
             Box(modifier = Modifier.fillMaxHeight().width(4.dp).background(Color(0xFFEC4899)))
 
-            Column(modifier = Modifier.fillMaxHeight().padding(horizontal = 16.dp), verticalArrangement = Arrangement.Center) {
+            Column(
+                modifier = Modifier.fillMaxHeight().padding(horizontal = 16.dp),
+                verticalArrangement = Arrangement.Center
+            ) {
                 Text(text = formatTime(event.startTime), fontSize = 10.sp, color = Color(0xFF94A3B8))
-                val destination = event.details["destination_airport"] ?: "Destination"
+
+                val displayTitle = event.details["title"]
+                    ?: event.details["activity_name"]
+                    ?: "Flight to ${event.details["destination_airport"] ?: "Destination"}"
                 val airline = event.details["airline"] ?: ""
                 val flightNo = event.details["flight_number"] ?: ""
 
-                Text(
-                    text = "Flight to $destination",
-                    fontSize = 15.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = Color.White
-                )
-                Text(text = "$airline $flightNo", fontSize = 11.sp, color = Color(0xFF64748B))
+                Text(text = displayTitle, fontSize = 15.sp, fontWeight = FontWeight.Bold, color = Color.White)
+                Text(text = "$airline $flightNo".trim(), fontSize = 11.sp, color = Color(0xFF64748B))
             }
         }
     }
 }
-
 
 @Composable
 fun HotelCard(event: TravelEvent) {
@@ -263,26 +272,20 @@ fun HotelCard(event: TravelEvent) {
         colors = CardDefaults.cardColors(containerColor = Color(0xFF1E3535))
     ) {
         Row(modifier = Modifier.fillMaxSize()) {
-            Box(
-                modifier = Modifier
-                    .fillMaxHeight()
-                    .width(4.dp)
-                    .background(Color(0xFF06B6D4))
-            )
+            Box(modifier = Modifier.fillMaxHeight().width(4.dp).background(Color(0xFF06B6D4)))
 
             Column(
                 modifier = Modifier.fillMaxHeight().padding(horizontal = 16.dp),
                 verticalArrangement = Arrangement.Center
             ) {
                 Text(text = "Check-in: ${formatTime(event.startTime)}", fontSize = 10.sp, color = Color(0xFF94A3B8))
-                val hotelName = event.details["hotel_name"] ?: "Unknown Hotel"
 
-                Text(
-                    text = "Hotel Check-in",
-                    fontSize = 15.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = Color.White
-                )
+                val displayTitle = event.details["title"]
+                    ?: event.details["activity_name"]
+                    ?: "Hotel Check-in"
+                val hotelName = event.details["hotel_name"] ?: event.details["location"] ?: ""
+
+                Text(text = displayTitle, fontSize = 15.sp, fontWeight = FontWeight.Bold, color = Color.White)
                 Text(text = hotelName, fontSize = 11.sp, color = Color(0xFF64748B))
             }
         }
@@ -297,27 +300,21 @@ fun RestaurantCard(event: TravelEvent) {
         colors = CardDefaults.cardColors(containerColor = Color(0xFF2A3324))
     ) {
         Row(modifier = Modifier.fillMaxSize()) {
-            Box(
-                modifier = Modifier
-                    .fillMaxHeight()
-                    .width(4.dp)
-                    .background(Color(0xFFEAB308))
-            )
+            Box(modifier = Modifier.fillMaxHeight().width(4.dp).background(Color(0xFFEAB308)))
 
             Column(
                 modifier = Modifier.fillMaxHeight().padding(horizontal = 16.dp),
                 verticalArrangement = Arrangement.Center
             ) {
                 Text(text = formatTime(event.startTime), fontSize = 10.sp, color = Color(0xFF94A3B8))
-                val restaurantName = event.details["restaurant_name"] ?: "Unknown Restaurant"
-                val cuisine = event.details["cuisine"] ?: ""
 
-                Text(
-                    text = restaurantName,
-                    fontSize = 15.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = Color.White
-                )
+                val displayTitle = event.details["title"]
+                    ?: event.details["activity_name"]
+                    ?: event.details["restaurant_name"]
+                    ?: "Dining"
+                val cuisine = event.details["cuisine"] ?: event.details["location"] ?: ""
+
+                Text(text = displayTitle, fontSize = 15.sp, fontWeight = FontWeight.Bold, color = Color.White)
                 Text(text = cuisine, fontSize = 11.sp, color = Color(0xFF64748B))
             }
         }
@@ -332,13 +329,7 @@ fun ActivityCard(event: TravelEvent) {
         colors = CardDefaults.cardColors(containerColor = Color(0xFF232336))
     ) {
         Row(modifier = Modifier.fillMaxSize()) {
-
-            Box(
-                modifier = Modifier
-                    .fillMaxHeight()
-                    .width(4.dp)
-                    .background(Color(0xFF8B5CF6))
-            )
+            Box(modifier = Modifier.fillMaxHeight().width(4.dp).background(Color(0xFF8B5CF6)))
 
             Column(
                 modifier = Modifier.fillMaxHeight().padding(horizontal = 16.dp),
@@ -346,20 +337,13 @@ fun ActivityCard(event: TravelEvent) {
             ) {
                 Text(text = formatTime(event.startTime), fontSize = 10.sp, color = Color(0xFF94A3B8))
 
-
                 val title = event.details["activity_name"]
                     ?: event.details["name"]
                     ?: event.details["title"]
                     ?: event.type.replaceFirstChar { it.uppercase() }
-
                 val subtitle = event.details["location"] ?: event.details["description"]
 
-                Text(
-                    text = title,
-                    fontSize = 15.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = Color.White
-                )
+                Text(text = title, fontSize = 15.sp, fontWeight = FontWeight.Bold, color = Color.White)
 
                 if (!subtitle.isNullOrBlank()) {
                     Text(text = subtitle, fontSize = 11.sp, color = Color(0xFF64748B))
@@ -391,6 +375,7 @@ fun formatHeaderDate(dateString: String): String {
         dateString
     }
 }
+
 fun formatDailyHeader(dateString: String): String {
     return try {
         val date = LocalDate.parse(dateString)
@@ -409,9 +394,3 @@ fun formatTime(timeString: String): String {
         timeString
     }
 }
-
-//@Preview(showBackground = true)
-//@Composable
-//fun ItineraryScreenPreview() {
-//    ItineraryScreen()
-//}
