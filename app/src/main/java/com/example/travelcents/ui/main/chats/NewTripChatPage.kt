@@ -11,7 +11,6 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.*
@@ -24,13 +23,9 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
+import com.example.travelcents.ui.main.chats.chat.Group
+import com.example.travelcents.ui.main.chats.friends.Friend
 import com.example.travelcents.ui.theme.*
-
-data class Friend(
-    val uid: String = "",
-    val displayName: String = "",
-    val email: String = ""
-)
 
 data class Destination(
     val name: String,
