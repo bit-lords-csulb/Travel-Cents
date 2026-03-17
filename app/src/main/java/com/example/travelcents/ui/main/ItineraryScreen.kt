@@ -2,10 +2,10 @@ package com.example.travelcents.ui.main
 
 import android.annotation.SuppressLint
 import androidx.compose.foundation.BorderStroke
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -13,6 +13,10 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.AutoAwesome
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -24,7 +28,6 @@ import com.example.travelcents.data.MockItineraryData
 import com.example.travelcents.data.model.TravelEvent
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.compose.runtime.collectAsState
-import androidx.compose.runtime.getValue
 import androidx.compose.runtime.LaunchedEffect
 import com.example.travelcents.ui.auth.AuthViewModel
 import com.google.firebase.auth.FirebaseAuth
@@ -40,11 +43,23 @@ fun ItineraryScreen(
     tripId: String? = null,
     viewModel: ItineraryViewModel = viewModel()
 ) {
+    var showCalendar by rememberSaveable { mutableStateOf(false) }
     val events by viewModel.events.collectAsState()
     val tripTitle by viewModel.tripTitle.collectAsState()
 
     LaunchedEffect(Unit) {
         viewModel.loadTrip(tripId)
+    }
+
+    if (showCalendar) {
+        CurrentPage(
+            modifier = Modifier.fillMaxSize(),
+            viewModel = viewModel,
+            startInCalendar = true,
+            autoLoadTrip = false,
+            onViewItineraryRequested = { showCalendar = false }
+        )
+        return
     }
 
     val eventsByDay = events.groupBy { it.date }
@@ -66,7 +81,7 @@ fun ItineraryScreen(
             TripHeader(
                 tripName = tripTitle,
                 dateRange = dateRange,
-                onAddClick = onAddEventClick
+                onSwitchToCalendar = { showCalendar = true }
             )
         }
 
@@ -124,7 +139,11 @@ fun ItineraryScreen(
 }
 
 @Composable
-fun TripHeader(tripName: String, dateRange: String, onAddClick: () -> Unit) {
+fun TripHeader(
+    tripName: String,
+    dateRange: String,
+    onSwitchToCalendar: () -> Unit = {}
+) {
     Column(
         modifier = Modifier
             .fillMaxWidth()
@@ -186,7 +205,9 @@ fun TripHeader(tripName: String, dateRange: String, onAddClick: () -> Unit) {
             color = Color.Transparent,
             shape = RoundedCornerShape(4.dp),
             border = BorderStroke(1.dp, Color(0xFF334155)),
-            modifier = Modifier.padding(top = 16.dp)
+            modifier = Modifier
+                .padding(top = 16.dp)
+                .clickable(onClick = onSwitchToCalendar)
         ) {
             Text(
                 text = "SWITCH TO CALENDAR",
