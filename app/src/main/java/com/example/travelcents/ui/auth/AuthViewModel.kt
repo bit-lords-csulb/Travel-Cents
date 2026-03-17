@@ -39,15 +39,15 @@ class AuthViewModel : ViewModel() {
     val statusMessage: StateFlow<String?> = _statusMessage.asStateFlow()
 
     // Sign up a new user with email and password
-    fun signUp(firstName: String, lastName: String, email: String, password: String) {
-        if (!validateSignUpInputs(firstName, lastName, email, password)) return
+    fun signUp(firstName: String, lastName: String, username: String, email: String, password: String) {
+        if (!validateSignUpInputs(firstName, lastName, username, email, password)) return
 
         viewModelScope.launch {
             _isLoading.value = true
             _errorMessage.value = null
             _statusMessage.value = null
 
-            val result = authModel.createAccountWithEmailAndPassword(firstName, lastName, email, password)
+            val result = authModel.createAccountWithEmailAndPassword(firstName, lastName, username, email, password)
 
             _isLoading.value = false
             result.fold(
@@ -117,11 +117,16 @@ class AuthViewModel : ViewModel() {
     private fun validateSignUpInputs(
         firstName: String,
         lastName: String,
+        username: String,
         email: String,
         password: String
     ): Boolean {
         if (firstName.isBlank() || lastName.isBlank()) {
             _errorMessage.value = "Name fields cannot be empty"
+            return false
+        }
+        if (username.isBlank()) {
+            _errorMessage.value = "Username cannot be empty"
             return false
         }
         if (!android.util.Patterns.EMAIL_ADDRESS.matcher(email).matches()) {
