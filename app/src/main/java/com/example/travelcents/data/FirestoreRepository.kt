@@ -4,17 +4,16 @@ import com.example.travelcents.ui.main.chats.chat.DirectChatPreview
 import com.example.travelcents.ui.main.chats.friends.Friend
 import com.example.travelcents.ui.main.chats.chat.Group
 import com.example.travelcents.ui.main.chats.chat.Message
-import com.google.firebase.Firebase
 import com.google.firebase.Timestamp
 import com.google.firebase.firestore.FieldPath
 import com.google.firebase.firestore.FieldValue
+import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.ListenerRegistration
 import com.google.firebase.firestore.Query
-import com.google.firebase.firestore.firestore
 
 class FirestoreRepository {
 
-    private val db = Firebase.firestore
+    private val db = FirebaseFirestore.getInstance()
 
     // User
     fun fetchUser(uid: String, onResult: (String) -> Unit) {
