@@ -47,7 +47,7 @@ fun ItineraryScreen(
     val events by viewModel.events.collectAsState()
     val tripTitle by viewModel.tripTitle.collectAsState()
 
-    LaunchedEffect(Unit) {
+    LaunchedEffect(tripId) {
         viewModel.loadTrip(tripId)
     }
 
@@ -81,6 +81,7 @@ fun ItineraryScreen(
             TripHeader(
                 tripName = tripTitle,
                 dateRange = dateRange,
+                onAddClick = onAddEventClick,
                 onSwitchToCalendar = { showCalendar = true }
             )
         }
@@ -142,6 +143,7 @@ fun ItineraryScreen(
 fun TripHeader(
     tripName: String,
     dateRange: String,
+    onAddClick: () -> Unit = {},
     onSwitchToCalendar: () -> Unit = {}
 ) {
     Column(
