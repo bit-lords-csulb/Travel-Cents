@@ -25,6 +25,7 @@ import androidx.compose.material.icons.filled.CalendarToday
 import androidx.compose.material.icons.filled.Remove
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.FilterChipDefaults
@@ -59,7 +60,8 @@ import java.util.Calendar
 @Composable
 fun NewTripPage(
     modifier: Modifier = Modifier,
-    viewModel: NewTripViewModel
+    viewModel: NewTripViewModel,
+    onChatClick: () -> Unit = {}
 ) {
     val uiState by viewModel.uiState.collectAsState()
     val scrollState = rememberScrollState()
@@ -326,6 +328,15 @@ fun NewTripPage(
                 fontSize = 16.sp,
                 fontWeight = FontWeight.SemiBold
             )
+        }
+
+        Spacer(modifier = Modifier.height(12.dp))
+
+        TextButton(
+            onClick = onChatClick,
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            Text("Plan with AI Chat instead", color = DeepSea4, fontSize = 14.sp)
         }
 
         Spacer(modifier = Modifier.height(16.dp))
