@@ -43,12 +43,14 @@ data class CurrentTripUiState(
 
 class ItineraryViewModel : ViewModel() {
 
+    companion object {
+        private const val DEFAULT_TRIP_TITLE = "Loading Trip..."
+    }
+
     private val _events = MutableStateFlow<List<TravelEvent>>(emptyList())
     val events: StateFlow<List<TravelEvent>> = _events.asStateFlow()
 
-    private var snapshotListener: ListenerRegistration? = null
-
-    private val _tripTitle = MutableStateFlow("Loading Trip...")
+    private val _tripTitle = MutableStateFlow(DEFAULT_TRIP_TITLE)
     val tripTitle: StateFlow<String> = _tripTitle.asStateFlow()
 
     private val _uiState = MutableStateFlow(CurrentTripUiState())
@@ -57,6 +59,24 @@ class ItineraryViewModel : ViewModel() {
     private val db = FirebaseFirestore.getInstance()
     private val auth = FirebaseAuth.getInstance()
     private var eventsListener: ListenerRegistration? = null
+
+    private fun resetTripState(
+        isLoading: Boolean = false,
+        tripTitle: String = DEFAULT_TRIP_TITLE,
+        infoMessage: String? = null,
+        errorMessage: String? = null
+    ) {
+        eventsListener?.remove()
+        eventsListener = null
+        _events.value = emptyList()
+        _tripTitle.value = tripTitle
+        _uiState.value = CurrentTripUiState(
+            isLoading = isLoading,
+            tripTitle = tripTitle,
+            infoMessage = infoMessage,
+            errorMessage = errorMessage
+        )
+    }
 
     private fun fetchLatestItinerary(uid: String) {
         db.collection("users").document(uid)
@@ -67,8 +87,7 @@ class ItineraryViewModel : ViewModel() {
             .addOnSuccessListener { tripSnapshot ->
                 if (tripSnapshot.isEmpty) {
                     Log.d("ItineraryViewModel", "No trips found.")
-                    _uiState.value = CurrentTripUiState(
-                        isLoading = false,
+                    resetTripState(
                         infoMessage = "No trip found yet. Create one from the New Trip tab."
                     )
                     return@addOnSuccessListener
@@ -78,12 +97,7 @@ class ItineraryViewModel : ViewModel() {
             }
             .addOnFailureListener { e ->
                 Log.e("ItineraryViewModel", "DATABASE ERROR: ${e.message}")
-                _uiState.update {
-                    it.copy(
-                        isLoading = false,
-                        errorMessage = e.message ?: "Failed to load trip."
-                    )
-                }
+                resetTripState(errorMessage = e.message ?: "Failed to load trip.")
             }
     }
 
@@ -94,12 +108,7 @@ class ItineraryViewModel : ViewModel() {
             .get()
             .addOnSuccessListener { document ->
                 if (!document.exists()) {
-                    _uiState.update {
-                        it.copy(
-                            isLoading = false,
-                            infoMessage = "That trip is no longer available."
-                        )
-                    }
+                    resetTripState(infoMessage = "That trip is no longer available.")
                     return@addOnSuccessListener
                 }
 
@@ -107,12 +116,7 @@ class ItineraryViewModel : ViewModel() {
             }
             .addOnFailureListener { e ->
                 Log.e("ItineraryViewModel", "DATABASE ERROR: ${e.message}")
-                _uiState.update {
-                    it.copy(
-                        isLoading = false,
-                        errorMessage = e.message ?: "Failed to load trip."
-                    )
-                }
+                resetTripState(errorMessage = e.message ?: "Failed to load trip.")
             }
     }
 
@@ -297,14 +301,13 @@ class ItineraryViewModel : ViewModel() {
 
         if (uid == null) {
             Log.e("ItineraryViewModel", "UID is NULL. Firebase isn't ready yet.")
-            _uiState.value = CurrentTripUiState(
-                isLoading = false,
+            resetTripState(
                 infoMessage = "Log in to load your current trip."
             )
             return
         }
 
-        _uiState.update { it.copy(isLoading = true, errorMessage = null) }
+        resetTripState(isLoading = true)
         Log.d("ItineraryViewModel", "UID found: $uid. Fetching trip: ${tripId ?: "Latest"}")
 
         if (tripId != null) {
@@ -316,6 +319,7 @@ class ItineraryViewModel : ViewModel() {
 
     override fun onCleared() {
         eventsListener?.remove()
+        eventsListener = null
         super.onCleared()
     }
 }
