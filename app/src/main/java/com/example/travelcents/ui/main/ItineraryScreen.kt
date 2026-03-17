@@ -1,16 +1,12 @@
 package com.example.travelcents.ui.main
 
 import android.annotation.SuppressLint
-import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.rounded.AutoAwesome
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -30,6 +26,7 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.LaunchedEffect
 import com.example.travelcents.ui.auth.AuthViewModel
+import com.example.travelcents.ui.theme.DeepSea1
 import com.google.firebase.auth.FirebaseAuth
 import java.time.LocalDate
 import java.time.format.DateTimeFormatter
@@ -44,8 +41,9 @@ fun ItineraryScreen(
     viewModel: ItineraryViewModel = viewModel()
 ) {
     var showCalendar by rememberSaveable { mutableStateOf(false) }
-    val events by viewModel.events.collectAsState()
-    val tripTitle by viewModel.tripTitle.collectAsState()
+    val uiState by viewModel.uiState.collectAsState()
+    val events = uiState.events
+    val tripTitle = uiState.tripTitle
 
     LaunchedEffect(tripId) {
         viewModel.loadTrip(tripId)
@@ -74,15 +72,17 @@ fun ItineraryScreen(
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .background(Color(0xFF0D1B2A))
+            .background(DeepSea1)
             .padding(top = 24.dp)
     ) {
         Box(modifier = Modifier.padding(horizontal = 24.dp)) {
-            TripHeader(
-                tripName = tripTitle,
+            SharedTripHeader(
+                tripTitle = tripTitle,
                 dateRange = dateRange,
+                canAdd = uiState.currentTripId != null,
                 onAddClick = onAddEventClick,
-                onSwitchToCalendar = { showCalendar = true }
+                primaryActionLabel = "SWITCH TO CALENDAR",
+                onPrimaryActionClick = { showCalendar = true }
             )
         }
 
@@ -90,7 +90,7 @@ fun ItineraryScreen(
             modifier = Modifier
                 .fillMaxSize()
                 .weight(1f)
-                .background(Color(0xFF0D1B2A)),
+                .background(DeepSea1),
             contentPadding = PaddingValues(
                 top = 0.dp,
                 bottom = 4.dp,
@@ -136,97 +136,6 @@ fun ItineraryScreen(
                 }
             }
         }
-    }
-}
-
-@Composable
-fun TripHeader(
-    tripName: String,
-    dateRange: String,
-    onAddClick: () -> Unit = {},
-    onSwitchToCalendar: () -> Unit = {}
-) {
-    Column(
-        modifier = Modifier
-            .fillMaxWidth()
-            .height(130.dp)
-    ) {
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.Top
-        ) {
-            // 1. ROW WITH TRIP NAME AND DATE
-            Column {
-                Text(
-                    text = tripName.uppercase(),
-                    fontSize = 14.sp,
-                    fontWeight = FontWeight.ExtraBold,
-                    color = Color.White,
-                    letterSpacing = 2.sp
-                )
-                Text(
-                    text = dateRange,
-                    fontSize = 12.sp,
-                    fontWeight = FontWeight.SemiBold,
-                    color = Color(0xFF94A3B8),
-                    modifier = Modifier.padding(top = 4.dp)
-                )
-            }
-
-            Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                Surface(
-                    modifier = Modifier.size(40.dp),
-                    shape = CircleShape,
-                    color = Color(0xFF1E293B),
-                    border = BorderStroke(1.dp, Color(0xFF334155))
-                ) {
-                    IconButton(onClick = { /* Handle AI/Magic action */ }) {
-                        Icon(
-                            imageVector = Icons.Rounded.AutoAwesome,
-                            contentDescription = "AI Assistant",
-                            tint = Color(0xFF94A3B8),
-                            modifier = Modifier.size(20.dp)
-                        )
-                    }
-                }
-
-                Surface(
-                    shape = CircleShape,
-                    color = Color(0xFF415A77),
-                    modifier = Modifier
-                        .size(40.dp)
-                        .clickable { onAddClick() }
-                ) {
-                    Box(contentAlignment = Alignment.Center) { Text("+", color = Color.White, fontSize = 24.sp) }
-                }
-            }
-        }
-
-        Surface(
-            color = Color.Transparent,
-            shape = RoundedCornerShape(4.dp),
-            border = BorderStroke(1.dp, Color(0xFF334155)),
-            modifier = Modifier
-                .padding(top = 16.dp)
-                .clickable(onClick = onSwitchToCalendar)
-        ) {
-            Text(
-                text = "SWITCH TO CALENDAR",
-                fontSize = 10.sp,
-                fontWeight = FontWeight.Bold,
-                color = Color(0xFF94A3B8),
-                modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp)
-            )
-
-        }
-        HorizontalDivider(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(top = 24.dp),
-            thickness = 1.dp,
-            color = Color(0xFF1E293B)
-        )
     }
 }
 

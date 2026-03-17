@@ -21,10 +21,7 @@ import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.layout.widthIn
-import androidx.compose.foundation.layout.wrapContentHeight
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
@@ -41,8 +38,6 @@ import androidx.compose.material.icons.filled.CalendarToday
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.DeleteOutline
 import androidx.compose.material.icons.filled.EditCalendar
-import androidx.compose.material.icons.filled.Send
-import androidx.compose.material.icons.outlined.AutoAwesome
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
@@ -59,10 +54,8 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -112,11 +105,6 @@ private data class EventPalette(
     val accent: Color
 )
 
-private data class GuideMessage(
-    val fromUser: Boolean,
-    val text: String
-)
-
 private data class ColorOption(
     val key: String,
     val color: Color
@@ -151,16 +139,6 @@ fun CurrentPage(
     val displayMode = CurrentDisplayMode.valueOf(displayModeName)
     var selectedDate by rememberSaveable { mutableStateOf("") }
     var editorPlan by remember { mutableStateOf<EditablePlan?>(null) }
-    var showGuide by rememberSaveable { mutableStateOf(false) }
-    var guideInput by rememberSaveable { mutableStateOf("") }
-    val guideMessages = remember {
-        mutableStateListOf(
-            GuideMessage(
-                fromUser = false,
-                text = "Bonjour! I can help you think through flights, hotel timing, and what to prioritize on the selected day."
-            )
-        )
-    }
 
     val tripDateRange = remember(uiState.dateFrom, uiState.dateTo, sortedDates) {
         buildTripDateRange(
@@ -188,39 +166,57 @@ fun CurrentPage(
             .fillMaxSize()
             .background(DeepSea1)
     ) {
-        Column(modifier = Modifier.fillMaxSize()) {
-            CurrentTripHeader(
-                tripTitle = uiState.tripTitle,
-                dateRange = tripDateRange,
-                displayMode = displayMode,
-                canEdit = uiState.currentTripId != null,
-                onPrimaryModeAction = {
-                    displayModeName = when (displayMode) {
-                        CurrentDisplayMode.ITINERARY -> CurrentDisplayMode.WEEK.name
-                        CurrentDisplayMode.WEEK -> CurrentDisplayMode.DAY.name
-                        CurrentDisplayMode.DAY -> CurrentDisplayMode.WEEK.name
-                    }
-                },
-                onViewItinerary = {
-                    if (onViewItineraryRequested != null) {
-                        onViewItineraryRequested()
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(top = 24.dp)
+        ) {
+            Box(modifier = Modifier.padding(horizontal = 24.dp)) {
+                SharedTripHeader(
+                    tripTitle = uiState.tripTitle,
+                    dateRange = tripDateRange,
+                    canAdd = uiState.currentTripId != null,
+                    onAddClick = {
+                        if (uiState.currentTripId == null) {
+                            viewModel.postError("Create a trip first before adding calendar plans.")
+                        } else {
+                            editorPlan = EditablePlan(
+                                date = selectedDate.ifBlank { uiState.dateFrom.ifBlank { todayIsoDate() } },
+                                startTime = "9:00 AM",
+                                colorKey = "rose"
+                            )
+                        }
+                    },
+                    primaryActionLabel = when (displayMode) {
+                        CurrentDisplayMode.ITINERARY -> "SWITCH TO CALENDAR"
+                        CurrentDisplayMode.WEEK -> "SWITCH TO DAY"
+                        CurrentDisplayMode.DAY -> "SWITCH TO WEEK"
+                    },
+                    onPrimaryActionClick = {
+                        displayModeName = when (displayMode) {
+                            CurrentDisplayMode.ITINERARY -> CurrentDisplayMode.WEEK.name
+                            CurrentDisplayMode.WEEK -> CurrentDisplayMode.DAY.name
+                            CurrentDisplayMode.DAY -> CurrentDisplayMode.WEEK.name
+                        }
+                    },
+                    secondaryActionLabel = if (displayMode != CurrentDisplayMode.ITINERARY) {
+                        "VIEW ITINERARY"
                     } else {
-                        displayModeName = CurrentDisplayMode.ITINERARY.name
-                    }
-                },
-                onAiClick = { showGuide = true },
-                onAddClick = {
-                    if (uiState.currentTripId == null) {
-                        viewModel.postError("Create a trip first before adding calendar plans.")
+                        null
+                    },
+                    onSecondaryActionClick = if (displayMode != CurrentDisplayMode.ITINERARY) {
+                        {
+                            if (onViewItineraryRequested != null) {
+                                onViewItineraryRequested()
+                            } else {
+                                displayModeName = CurrentDisplayMode.ITINERARY.name
+                            }
+                        }
                     } else {
-                        editorPlan = EditablePlan(
-                            date = selectedDate.ifBlank { uiState.dateFrom.ifBlank { todayIsoDate() } },
-                            startTime = "9:00 AM",
-                            colorKey = "rose"
-                        )
+                        null
                     }
-                }
-            )
+                )
+            }
 
             if (uiState.infoMessage != null || uiState.errorMessage != null) {
                 MessageCard(
@@ -276,180 +272,6 @@ fun CurrentPage(
                 viewModel.deletePlan(planToDelete)
                 editorPlan = null
             }
-        )
-    }
-
-    if (showGuide) {
-        AiTravelGuideDialog(
-            tripTitle = uiState.tripTitle,
-            selectedDate = selectedDate,
-            draft = guideInput,
-            messages = guideMessages,
-            onDismiss = { showGuide = false },
-            onDraftChange = { guideInput = it },
-            onSend = {
-                val prompt = guideInput.trim()
-                if (prompt.isBlank()) {
-                    return@AiTravelGuideDialog
-                }
-
-                guideMessages += GuideMessage(fromUser = true, text = prompt)
-                guideMessages += GuideMessage(
-                    fromUser = false,
-                    text = buildGuideResponse(prompt, uiState.tripTitle, selectedDate)
-                )
-                guideInput = ""
-            }
-        )
-    }
-}
-
-@Composable
-private fun CurrentTripHeader(
-    tripTitle: String,
-    dateRange: String,
-    displayMode: CurrentDisplayMode,
-    canEdit: Boolean,
-    onPrimaryModeAction: () -> Unit,
-    onViewItinerary: () -> Unit,
-    onAiClick: () -> Unit,
-    onAddClick: () -> Unit
-) {
-    Column(
-        modifier = Modifier
-            .fillMaxWidth()
-            .statusBarsPadding()
-            .padding(horizontal = 20.dp, vertical = 18.dp)
-    ) {
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.Top
-        ) {
-            Column(modifier = Modifier.weight(1f)) {
-                Text(
-                    text = tripTitle.uppercase(Locale.US),
-                    color = DeepSea5,
-                    fontSize = 18.sp,
-                    fontWeight = FontWeight.ExtraBold,
-                    letterSpacing = 1.8.sp
-                )
-                Spacer(modifier = Modifier.height(4.dp))
-                Text(
-                    text = dateRange,
-                    color = DeepSea4,
-                    fontSize = 12.sp,
-                    fontWeight = FontWeight.Medium
-                )
-            }
-
-            Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                CircularActionButton(
-                    icon = Icons.Outlined.AutoAwesome,
-                    contentDescription = "AI Travel Guide",
-                    enabled = true,
-                    filled = false,
-                    onClick = onAiClick
-                )
-                CircularActionButton(
-                    icon = Icons.Default.Add,
-                    contentDescription = "Add plan",
-                    enabled = canEdit,
-                    filled = true,
-                    onClick = onAddClick
-                )
-            }
-        }
-
-        Spacer(modifier = Modifier.height(16.dp))
-
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(10.dp)
-        ) {
-            SwitchPill(
-                label = when (displayMode) {
-                    CurrentDisplayMode.ITINERARY -> "SWITCH TO CALENDAR"
-                    CurrentDisplayMode.WEEK -> "SWITCH TO DAY"
-                    CurrentDisplayMode.DAY -> "SWITCH TO WEEK"
-                },
-                highlighted = true,
-                onClick = onPrimaryModeAction
-            )
-
-            if (displayMode != CurrentDisplayMode.ITINERARY) {
-                SwitchPill(
-                    label = "VIEW ITINERARY",
-                    highlighted = false,
-                    onClick = onViewItinerary
-                )
-            }
-        }
-
-        Spacer(modifier = Modifier.height(20.dp))
-        HorizontalDivider(color = DeepSea3.copy(alpha = 0.45f), thickness = 1.dp)
-    }
-}
-
-@Composable
-private fun CircularActionButton(
-    icon: androidx.compose.ui.graphics.vector.ImageVector,
-    contentDescription: String,
-    enabled: Boolean,
-    filled: Boolean,
-    onClick: () -> Unit
-) {
-    val background = when {
-        !enabled -> DeepSea3.copy(alpha = 0.3f)
-        filled -> DeepSea3
-        else -> DeepSea2
-    }
-
-    Box(
-        modifier = Modifier
-            .size(40.dp)
-            .clip(CircleShape)
-            .background(background)
-            .border(
-                width = 1.dp,
-                color = if (filled) Color.Transparent else DeepSea3.copy(alpha = 0.7f),
-                shape = CircleShape
-            )
-            .clickable(enabled = enabled, onClick = onClick),
-        contentAlignment = Alignment.Center
-    ) {
-        Icon(
-            imageVector = icon,
-            contentDescription = contentDescription,
-            tint = if (enabled) DeepSea5 else DeepSea4.copy(alpha = 0.45f)
-        )
-    }
-}
-
-@Composable
-private fun SwitchPill(
-    label: String,
-    highlighted: Boolean,
-    onClick: () -> Unit
-) {
-    Box(
-        modifier = Modifier
-            .clip(RoundedCornerShape(12.dp))
-            .background(if (highlighted) DeepSea2 else Color.Transparent)
-            .border(
-                width = 1.dp,
-                color = if (highlighted) DeepSea3 else DeepSea3.copy(alpha = 0.7f),
-                shape = RoundedCornerShape(12.dp)
-            )
-            .clickable(onClick = onClick)
-            .padding(horizontal = 12.dp, vertical = 8.dp)
-    ) {
-        Text(
-            text = label,
-            color = if (highlighted) DeepSea5 else DeepSea4,
-            fontSize = 10.sp,
-            fontWeight = FontWeight.Bold,
-            letterSpacing = 0.6.sp
         )
     }
 }
@@ -1345,158 +1167,6 @@ private fun PickerField(
     }
 }
 
-@Composable
-private fun AiTravelGuideDialog(
-    tripTitle: String,
-    selectedDate: String,
-    draft: String,
-    messages: List<GuideMessage>,
-    onDismiss: () -> Unit,
-    onDraftChange: (String) -> Unit,
-    onSend: () -> Unit
-) {
-    val latestOnSend by rememberUpdatedState(onSend)
-
-    Dialog(onDismissRequest = onDismiss) {
-        Surface(
-            modifier = Modifier
-                .fillMaxWidth()
-                .heightIn(min = 420.dp)
-                .widthIn(max = 360.dp),
-            shape = RoundedCornerShape(24.dp),
-            color = DeepSea1
-        ) {
-            Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(14.dp)
-            ) {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Box(
-                            modifier = Modifier
-                                .size(28.dp)
-                                .clip(CircleShape)
-                                .background(DeepSea3),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Icon(
-                                imageVector = Icons.Outlined.AutoAwesome,
-                                contentDescription = null,
-                                tint = DeepSea5,
-                                modifier = Modifier.size(16.dp)
-                            )
-                        }
-                        Spacer(modifier = Modifier.width(10.dp))
-                        Column {
-                            Text(
-                                text = "AI Travel Guide",
-                                color = DeepSea5,
-                                fontSize = 14.sp,
-                                fontWeight = FontWeight.Bold
-                            )
-                            Text(
-                                text = formatGuideSubtitle(tripTitle, selectedDate),
-                                color = DeepSea4,
-                                fontSize = 11.sp
-                            )
-                        }
-                    }
-
-                    IconButton(onClick = onDismiss) {
-                        Icon(
-                            imageVector = Icons.Default.Close,
-                            contentDescription = "Close guide",
-                            tint = DeepSea4
-                        )
-                    }
-                }
-
-                Spacer(modifier = Modifier.height(14.dp))
-
-                Column(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .weight(1f, fill = false)
-                        .heightIn(min = 260.dp, max = 360.dp)
-                        .verticalScroll(rememberScrollState()),
-                    verticalArrangement = Arrangement.spacedBy(10.dp)
-                ) {
-                    messages.forEach { message ->
-                        GuideBubble(message = message)
-                    }
-                }
-
-                Spacer(modifier = Modifier.height(12.dp))
-
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .clip(RoundedCornerShape(18.dp))
-                        .background(DeepSea2)
-                        .padding(horizontal = 10.dp, vertical = 8.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    OutlinedTextField(
-                        value = draft,
-                        onValueChange = onDraftChange,
-                        modifier = Modifier
-                            .weight(1f)
-                            .wrapContentHeight(),
-                        placeholder = { Text("Ask about your trip...") },
-                        colors = OutlinedTextFieldDefaults.colors(
-                            focusedContainerColor = Color.Transparent,
-                            unfocusedContainerColor = Color.Transparent,
-                            focusedBorderColor = Color.Transparent,
-                            unfocusedBorderColor = Color.Transparent,
-                            focusedTextColor = DeepSea5,
-                            unfocusedTextColor = DeepSea5,
-                            focusedPlaceholderColor = DeepSea4,
-                            unfocusedPlaceholderColor = DeepSea4,
-                            cursorColor = DeepSea5
-                        ),
-                        maxLines = 3
-                    )
-
-                    IconButton(onClick = latestOnSend) {
-                        Icon(
-                            imageVector = Icons.Default.Send,
-                            contentDescription = "Send prompt",
-                            tint = DeepSea5
-                        )
-                    }
-                }
-            }
-        }
-    }
-}
-
-@Composable
-private fun GuideBubble(message: GuideMessage) {
-    Row(
-        modifier = Modifier.fillMaxWidth(),
-        horizontalArrangement = if (message.fromUser) Arrangement.End else Arrangement.Start
-    ) {
-        Box(
-            modifier = Modifier
-                .widthIn(max = 260.dp)
-                .clip(RoundedCornerShape(18.dp))
-                .background(if (message.fromUser) DeepSea3 else DeepSea2)
-                .padding(horizontal = 14.dp, vertical = 12.dp)
-        ) {
-            Text(
-                text = message.text,
-                color = DeepSea5,
-                fontSize = 13.sp
-            )
-        }
-    }
-}
-
 private fun TravelEvent.toEditablePlan(): EditablePlan {
     return EditablePlan(
         eventId = eventId,
@@ -1707,35 +1377,6 @@ private fun formatMonthDayCompact(rawDate: String): String {
         ?.let { SimpleDateFormat("MMM d", Locale.US).format(it) }
         ?.uppercase(Locale.US)
         ?: rawDate
-}
-
-private fun formatGuideSubtitle(tripTitle: String, selectedDate: String): String {
-    val dateLabel = if (selectedDate.isBlank()) {
-        "Always online to help"
-    } else {
-        "Focused on ${formatTripDate(selectedDate)}"
-    }
-    return "$tripTitle - $dateLabel"
-}
-
-private fun buildGuideResponse(
-    prompt: String,
-    tripTitle: String,
-    selectedDate: String
-): String {
-    val normalized = prompt.lowercase(Locale.US)
-    val dateLabel = if (selectedDate.isBlank()) "your selected day" else formatTripDate(selectedDate)
-
-    return when {
-        "food" in normalized || "restaurant" in normalized || "dinner" in normalized ->
-            "For $dateLabel on $tripTitle, keep one anchor meal reservation and leave the rest flexible so transit delays do not break the day."
-        "flight" in normalized || "airport" in normalized ->
-            "Anchor the flight first, then block a buffer before hotel check-in or the first activity so the schedule stays realistic."
-        "hotel" in normalized || "check-in" in normalized ->
-            "Place hotel check-in close to arrival, then move heavier plans later in the day so you are not carrying luggage pressure into the itinerary."
-        else ->
-            "Use the day view to tighten $dateLabel, then switch back to itinerary view to confirm the overall trip still has good pacing."
-    }
 }
 
 private fun parseIsoDate(rawDate: String): Date? {
