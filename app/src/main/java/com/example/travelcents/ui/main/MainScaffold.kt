@@ -74,8 +74,6 @@ private data class BottomNavItem(
 
 @Composable
 fun MainScaffold(modifier: Modifier = Modifier) {
-    val itineraryViewModel: ItineraryViewModel = viewModel()
-    val currentTripId by itineraryViewModel.currentTripId.collectAsState()
     val newTripViewModel: NewTripViewModel = viewModel()
     val navController = rememberNavController()
     val navBackStackEntry by navController.currentBackStackEntryAsState()
@@ -102,17 +100,17 @@ fun MainScaffold(modifier: Modifier = Modifier) {
             ) {
                 composable(MainRoutes.Current) {
                     val itineraryViewModel: ItineraryViewModel = viewModel()
-                    val currentTripId by itineraryViewModel.currentTripId.collectAsState()
+                    val uiState by itineraryViewModel.uiState.collectAsState()
 
                     ItineraryScreen(
                         viewModel = itineraryViewModel,
                         onEditEventClick = { clickedEventId ->
-                            currentTripId?.let { tripId ->
+                            uiState.currentTripId?.let { tripId ->
                                 navController.navigate("edit_plan/$tripId/$clickedEventId")
                             }
                         },
                         onAddEventClick = {
-                            currentTripId?.let { tripId ->
+                            uiState.currentTripId?.let { tripId ->
                                 navController.navigate("edit_plan/$tripId/new")
                             }
                         }
