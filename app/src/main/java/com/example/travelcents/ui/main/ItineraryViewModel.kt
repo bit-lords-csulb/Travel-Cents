@@ -10,8 +10,11 @@ import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.ListenerRegistration
 import com.google.firebase.firestore.Query
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.tasks.await
@@ -51,6 +54,10 @@ class ItineraryViewModel : ViewModel() {
 
     private val _uiState = MutableStateFlow(CurrentTripUiState())
     val uiState: StateFlow<CurrentTripUiState> = _uiState.asStateFlow()
+
+    val currentTripId: StateFlow<String?> = _uiState
+        .map { it.currentTripId }
+        .stateIn(viewModelScope, SharingStarted.Eagerly, null)
 
     private val db = FirebaseFirestore.getInstance()
     private val auth = FirebaseAuth.getInstance()
