@@ -32,6 +32,10 @@ android {
             "String", "GROQ_API_KEY",
             "\"${localProperties.getProperty("GROQ_API_KEY") ?: ""}\""
         )
+        buildConfigField(
+            "String", "SERP_API_KEY",
+            "\"${localProperties.getProperty("SERP_API_KEY") ?: ""}\""
+        )
     }
 
     buildTypes {
@@ -82,10 +86,13 @@ dependencies {
     implementation("com.squareup.retrofit2:converter-gson:2.11.0")
     implementation("com.squareup.okhttp3:okhttp:4.12.0")
     implementation("com.squareup.okhttp3:logging-interceptor:4.12.0")
+
     implementation(libs.androidx.compose.foundation.layout)
     implementation(libs.androidx.lifecycle.runtime.compose)
     implementation("io.coil-kt:coil-compose:2.7.0")
+
     implementation(libs.androidx.material3)
+    implementation(libs.androidx.lifecycle.viewmodel.ktx)
     testImplementation(libs.junit)
     androidTestImplementation(libs.androidx.junit)
     androidTestImplementation(libs.androidx.espresso.core)
