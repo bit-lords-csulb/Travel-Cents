@@ -6,6 +6,7 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.Notes
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -249,7 +250,7 @@ fun EditPlanScreen(
         }
 
         // 5. NOTES
-        CustomEditField(label = "Notes", value = viewModel.notes, onValueChange = { viewModel.notes = it }, singleLine = false, modifier = Modifier.height(120.dp), leadingIcon = { Icon(Icons.Default.Notes, contentDescription = null, tint = Color.Gray) })
+        CustomEditField(label = "Notes", value = viewModel.notes, onValueChange = { viewModel.notes = it }, singleLine = false, modifier = Modifier.height(120.dp), leadingIcon = { Icon(Icons.AutoMirrored.Filled.Notes, contentDescription = null, tint = Color.Gray) })
 
         Spacer(modifier = Modifier.height(32.dp))
     }
@@ -278,7 +279,7 @@ fun DropdownEditField(
                 onValueChange = {},
                 readOnly = true,
                 trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = expanded) },
-                modifier = Modifier.menuAnchor().fillMaxWidth(),
+                modifier = Modifier.menuAnchor(ExposedDropdownMenuAnchorType.PrimaryNotEditable, true).fillMaxWidth(),
                 colors = TextFieldDefaults.colors(
                     focusedContainerColor = Color(0xFF1E293B), unfocusedContainerColor = Color(0xFF1E293B),
                     focusedTextColor = Color.White, unfocusedTextColor = Color.White,
