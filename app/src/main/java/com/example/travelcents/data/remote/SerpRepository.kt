@@ -62,9 +62,13 @@ object SerpRepository {
         return events
     }
 
-    suspend fun searchHotels(request: TravelRequest, itinerary: Itinerary): List<TravelEvent> {
+    suspend fun searchHotels(
+        request: TravelRequest,
+        itinerary: Itinerary,
+        maxPricePerNight: Double = 0.0
+    ): List<TravelEvent> {
         val destNorm = itinerary.destination.lowercase().trim()
-        val key = "${destNorm}_${request.dateFrom}_${request.dateTo}_${request.adults}_${request.currency}"
+        val key = "${destNorm}_${request.dateFrom}_${request.dateTo}_${request.adults}_${request.currency}_${maxPricePerNight.toInt()}"
 
         SerpCache.getHotels(key)?.let { cached ->
             return cached.map { it.copy(itineraryId = itinerary.itineraryId) }
@@ -80,12 +84,12 @@ object SerpRepository {
             put("currency", request.currency)
             put("sort_by", "3")
             put("api_key", BuildConfig.SERP_API_KEY)
-            if (request.budgetTotal > 0) put("max_price", request.budgetTotal.toInt().toString())
+            if (maxPricePerNight > 0) put("max_price", maxPricePerNight.toInt().toString())
         }
 
         val response = api.searchHotels(params)
         val events = (response.properties ?: emptyList())
-            .take(3)
+            .take(1)
             .map { hotelToEvent(it, request.dateFrom, request.dateTo, itinerary.itineraryId) }
 
         SerpCache.putHotels(key, events.map { it.copy(itineraryId = "") })
