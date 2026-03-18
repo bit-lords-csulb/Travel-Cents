@@ -40,6 +40,9 @@ class CurrencyViewModel : ViewModel() {
         private set
     var error by mutableStateOf<String?>(null)
         private set
+    // Last 3 currencies the user has picked (across both dropdowns), most recent first
+    var recentCurrencies by mutableStateOf(listOf<String>())
+        private set
 
     private var convertJob: Job? = null
 
@@ -58,12 +61,19 @@ class CurrencyViewModel : ViewModel() {
 
     fun onFromCurrencyChange(currency: String) {
         fromCurrency = currency
+        addToRecent(currency)
         scheduleConvert()
     }
 
     fun onToCurrencyChange(currency: String) {
         toCurrency = currency
+        addToRecent(currency)
         scheduleConvert()
+    }
+
+    private fun addToRecent(currency: String) {
+        // Prepend, deduplicate, keep max 3
+        recentCurrencies = (listOf(currency) + recentCurrencies).distinct().take(3)
     }
 
     fun swap() {
