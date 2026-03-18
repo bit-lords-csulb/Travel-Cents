@@ -107,7 +107,8 @@ Return a single JSON object with these fields only:
         itinerary: Itinerary,
         request: TravelRequest,
         realFlights: List<TravelEvent>,
-        realHotels: List<TravelEvent>
+        realHotels: List<TravelEvent>,
+        remainingBudget: Double = 0.0
     ): String {
         val travelersJson = gson.toJson(mapOf("adults" to request.adults, "children" to request.children))
 
@@ -116,38 +117,55 @@ Return a single JSON object with these fields only:
             "Arriving via ${firstFlight.details["airline"] ?: "flight"} at ${firstFlight.details["destination_airport"] ?: itinerary.destinationIata} around ${firstFlight.endTime}."
         } else ""
 
-        val hotelContext = if (realHotels.isNotEmpty()) {
-            "Staying at ${realHotels.first().details["hotel_name"] ?: "a hotel"} in ${itinerary.destination}."
-        } else ""
+        val hotelName = realHotels.firstOrNull()?.details?.get("hotel_name") ?: "the hotel"
+        val hotelContext = "Staying at $hotelName in ${itinerary.destination}. Plan activities near or around this hotel."
+
+        val budgetContext = if (remainingBudget > 0)
+            "Remaining budget after flights and hotel: \$${remainingBudget.toInt()}. Choose activities and restaurants accordingly — avoid expensive options if budget is tight."
+        else
+            "No specific budget constraint. Suggest a balanced mix of experiences."
 
         return """
-Generate local events for this itinerary (id: ${itinerary.itineraryId}).
-Trip: ${itinerary.origin} to ${itinerary.destination}, ${itinerary.dateFrom} to ${itinerary.dateTo}.
+Generate a full daily schedule of local events for this itinerary (id: ${itinerary.itineraryId}).
+Trip: ${itinerary.origin} to ${itinerary.destination}, ${itinerary.dateFrom} to ${itinerary.dateTo} (${itinerary.durationDays} days).
 Travelers: $travelersJson. Style: ${itinerary.travelStyle}.
 Dietary preferences: ${request.dietary.joinToString(", ").ifBlank { "none" }}.
 Interests: ${request.interests.joinToString(", ").ifBlank { "general" }}.
 $flightContext
 $hotelContext
+$budgetContext
 
-Flights and hotel are already booked. Generate ONLY 2 restaurants and 2 activities.
+Flights and hotel are already booked. Generate ONLY restaurants and activities — one set per day from ${itinerary.dateFrom} to ${itinerary.dateTo}.
+
+Rules:
+- Include EVERY day between dateFrom and dateTo (inclusive).
+- At least 1 restaurant per day (respect dietary preferences).
+- Multiple activities per day UNLESS it is an all-day activity (theme park, full-day tour, cruise) — in that case, just that 1 activity + 1 restaurant/dinner for the day.
+- For regular days: aim for 2–3 activities spread through the day.
+- Set is_all_day to true only for genuinely all-day activities.
+- Use realistic local start/end times.
+
 Return a JSON object: {"events": [...]} where each event uses ONLY the fields listed below.
 
 RESTAURANT:
 {
   "event_id": "<uuid>", "type": "restaurant", "itinerary_id": "${itinerary.itineraryId}",
-  "tz": "<IANA timezone>",
-  "date": "<YYYY-MM-DD>",
+  "tz": "<IANA timezone>", "date": "<YYYY-MM-DD>",
   "start_time": "<HH:MM>", "end_time": "<HH:MM>",
-  "restaurant_name": "<name>"
+  "restaurant_name": "<name>", "cuisine": "<cuisine type>",
+  "location": "<address or neighborhood>",
+  "estimated_cost_per_person": "<number>"
 }
 
 ACTIVITY:
 {
   "event_id": "<uuid>", "type": "activity", "itinerary_id": "${itinerary.itineraryId}",
-  "tz": "<IANA timezone>",
-  "date": "<YYYY-MM-DD>",
+  "tz": "<IANA timezone>", "date": "<YYYY-MM-DD>",
   "start_time": "<HH:MM>", "end_time": "<HH:MM>",
-  "activity_name": "<name>"
+  "activity_name": "<name>", "location": "<address or neighborhood>",
+  "description": "<1-2 sentence description>",
+  "is_all_day": <true|false>,
+  "estimated_cost_per_person": "<number>"
 }
         """.trimIndent()
     }
