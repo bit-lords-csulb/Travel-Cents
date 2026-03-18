@@ -57,9 +57,10 @@ object GroqRepository {
         itinerary: Itinerary,
         request: TravelRequest,
         realFlights: List<TravelEvent> = emptyList(),
-        realHotels: List<TravelEvent> = emptyList()
+        realHotels: List<TravelEvent> = emptyList(),
+        remainingBudget: Double = 0.0
     ): List<TravelEvent> {
-        val prompt = buildEventsPrompt(itinerary, request, realFlights, realHotels)
+        val prompt = buildEventsPrompt(itinerary, request, realFlights, realHotels, remainingBudget)
         val raw = callGroq(prompt)
         return parseEvents(raw, itinerary.itineraryId)
     }
