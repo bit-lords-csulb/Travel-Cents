@@ -5,11 +5,13 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -28,12 +30,14 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExposedDropdownMenuAnchorType
 import androidx.compose.material3.ExposedDropdownMenuBox
 import androidx.compose.material3.ExposedDropdownMenuDefaults
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -119,6 +123,7 @@ private fun CurrencyConverterCard(viewModel: CurrencyViewModel) {
                 CurrencyDropdown(
                     selected = viewModel.fromCurrency,
                     currencies = viewModel.currencies,
+                    recentCurrencies = viewModel.recentCurrencies,
                     onSelect = viewModel::onFromCurrencyChange
                 )
             }
@@ -183,6 +188,7 @@ private fun CurrencyConverterCard(viewModel: CurrencyViewModel) {
                 CurrencyDropdown(
                     selected = viewModel.toCurrency,
                     currencies = viewModel.currencies,
+                    recentCurrencies = viewModel.recentCurrencies,
                     onSelect = viewModel::onToCurrencyChange
                 )
             }
@@ -195,54 +201,92 @@ private fun CurrencyConverterCard(viewModel: CurrencyViewModel) {
 private fun CurrencyDropdown(
     selected: String,
     currencies: List<String>,
+    recentCurrencies: List<String>,
     onSelect: (String) -> Unit
 ) {
     var expanded by remember { mutableStateOf(false) }
+    // Search query lives here — reset to empty each time the menu closes
+    var searchQuery by remember { mutableStateOf("") }
+    LaunchedEffect(expanded) { if (!expanded) searchQuery = "" }
+
+    val filtered = remember(searchQuery, currencies) {
+        if (searchQuery.isBlank()) currencies
+        else currencies.filter { it.contains(searchQuery, ignoreCase = true) }
+    }
+    // Only show recents section when not actively searching
+    val showRecents = searchQuery.isBlank() && recentCurrencies.isNotEmpty()
 
     ExposedDropdownMenuBox(
         expanded = expanded,
         onExpandedChange = { expanded = it }
     ) {
+        // When expanded, this TextField doubles as the search input
         OutlinedTextField(
-            value = selected,
-            onValueChange = {},
-            readOnly = true,
+            value = if (expanded) searchQuery else selected,
+            onValueChange = { searchQuery = it },
             singleLine = true,
+            placeholder = {
+                if (expanded) Text("Search...", color = DeepSea4, fontSize = 12.sp)
+            },
             trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = expanded) },
             modifier = Modifier
                 .width(110.dp)
-                .menuAnchor(ExposedDropdownMenuAnchorType.PrimaryNotEditable, true),
+                // PrimaryEditable lets the keyboard appear so the user can type to filter
+                .menuAnchor(ExposedDropdownMenuAnchorType.PrimaryEditable, true),
             colors = OutlinedTextFieldDefaults.colors(
                 focusedTextColor = DeepSea5,
                 unfocusedTextColor = DeepSea5,
                 focusedBorderColor = DeepSea3,
                 unfocusedBorderColor = DeepSea3,
+                cursorColor = DeepSea5,
                 focusedContainerColor = DeepSea1,
                 unfocusedContainerColor = DeepSea1,
                 focusedTrailingIconColor = DeepSea4,
                 unfocusedTrailingIconColor = DeepSea4
             )
         )
+
         ExposedDropdownMenu(
             expanded = expanded,
             onDismissRequest = { expanded = false },
+            // Cap height so the list scrolls rather than getting clipped off-screen
+            modifier = Modifier.heightIn(max = 300.dp),
             containerColor = DeepSea2
         ) {
-            currencies.forEach { currency ->
-                DropdownMenuItem(
-                    text = {
-                        Text(
-                            text = currency,
-                            color = DeepSea5,
-                            fontSize = 14.sp
-                        )
-                    },
-                    onClick = {
-                        onSelect(currency)
-                        expanded = false
-                    }
+            // Recent section — only visible when not filtering
+            if (showRecents) {
+                Text(
+                    text = "RECENT",
+                    color = DeepSea4,
+                    fontSize = 10.sp,
+                    fontWeight = FontWeight.Bold,
+                    letterSpacing = 0.8.sp,
+                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 4.dp)
                 )
+                recentCurrencies.forEach { currency ->
+                    CurrencyItem(currency = currency, onSelect = { onSelect(it); expanded = false })
+                }
+                // Faded divider separating recent from the full list
+                HorizontalDivider(
+                    modifier = Modifier.padding(vertical = 4.dp),
+                    color = DeepSea4.copy(alpha = 0.2f)
+                )
+            }
+
+            // Full (or filtered) list
+            filtered.forEach { currency ->
+                CurrencyItem(currency = currency, onSelect = { onSelect(it); expanded = false })
             }
         }
     }
+}
+
+@Composable
+private fun CurrencyItem(currency: String, onSelect: (String) -> Unit) {
+    DropdownMenuItem(
+        text = { Text(text = currency, color = DeepSea5, fontSize = 12.sp) },
+        onClick = { onSelect(currency) },
+        // Tighter vertical padding so more items fit on screen
+        contentPadding = PaddingValues(horizontal = 12.dp, vertical = 2.dp)
+    )
 }
