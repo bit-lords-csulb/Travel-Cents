@@ -11,7 +11,6 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -249,8 +248,8 @@ private fun CurrencyDropdown(
         ExposedDropdownMenu(
             expanded = expanded,
             onDismissRequest = { expanded = false },
-            // Cap height so the list scrolls rather than getting clipped off-screen
-            modifier = Modifier.heightIn(max = 300.dp),
+            // Fixed height gives verticalScroll a bounded viewport so the list actually scrolls
+            modifier = Modifier.height(300.dp),
             containerColor = DeepSea2
         ) {
             // Recent section — only visible when not filtering
@@ -266,7 +265,6 @@ private fun CurrencyDropdown(
                 recentCurrencies.forEach { currency ->
                     CurrencyItem(currency = currency, onSelect = { onSelect(it); expanded = false })
                 }
-                // Faded divider separating recent from the full list
                 HorizontalDivider(
                     modifier = Modifier.padding(vertical = 4.dp),
                     color = DeepSea4.copy(alpha = 0.2f)
