@@ -161,10 +161,10 @@ class NewTripViewModel : ViewModel() {
             "Browsing hotel options at your destination..."
         )
         private val GROQ_EVENTS_MESSAGES = listOf(
-            "Asking Groq for restaurant & activity suggestions...",
-            "Groq is picking the best local experiences...",
-            "Generating activities and dining with Groq...",
-            "Groq is curating your daily events..."
+            "Groq is building your full daily schedule...",
+            "Planning restaurants and activities for every day...",
+            "Groq is curating budget-aware daily experiences...",
+            "Crafting a day-by-day itinerary with Groq..."
         )
         private val FIRESTORE_MESSAGES = listOf(
             "Saving your trip...",
