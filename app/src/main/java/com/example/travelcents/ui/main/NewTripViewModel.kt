@@ -75,17 +75,28 @@ class NewTripViewModel : ViewModel() {
                 _uiState.value = TripUiState.Loading(GROQ_ITINERARY_MESSAGES.random())
                 val itinerary = GroqRepository.generateItinerary(request)
 
-                // Step 2: fetch real flights + hotels in parallel
+                // Step 2: Compute hotel budget slice (~40% of total budget / nights)
+                val hotelBudgetPerNight = if (budget > 0 && itinerary.durationDays > 0)
+                    (budget * 0.40) / itinerary.durationDays
+                else 0.0
+
+                // Step 3: Fetch flights + hotels in parallel (hotels filtered by budget)
                 _uiState.value = TripUiState.Loading(SERP_FLIGHTS_MESSAGES.random())
                 val flightsDeferred = async { SerpRepository.searchFlights(request, itinerary) }
                 _uiState.value = TripUiState.Loading(SERP_HOTELS_MESSAGES.random())
-                val hotelsDeferred = async { SerpRepository.searchHotels(request, itinerary) }
+                val hotelsDeferred = async { SerpRepository.searchHotels(request, itinerary, hotelBudgetPerNight) }
                 val realFlights = flightsDeferred.await()
                 val realHotels = hotelsDeferred.await()
 
-                // Step 3: Groq generates only restaurants + activities, with real context
+                // Step 4: Compute remaining budget from real prices
+                val flightPrice = realFlights.firstOrNull()?.details?.get("total_price")?.toDoubleOrNull() ?: 0.0
+                val hotelPerNight = realHotels.firstOrNull()?.details?.get("price_per_night")?.toDoubleOrNull() ?: 0.0
+                val hotelTotal = hotelPerNight * itinerary.durationDays
+                val remainingBudget = if (budget > 0) maxOf(0.0, budget - flightPrice - hotelTotal) else 0.0
+
+                // Step 5: Groq generates full daily schedule with budget context
                 _uiState.value = TripUiState.Loading(GROQ_EVENTS_MESSAGES.random())
-                val aiEvents = GroqRepository.generateEvents(itinerary, request, realFlights, realHotels)
+                val aiEvents = GroqRepository.generateEvents(itinerary, request, realFlights, realHotels, remainingBudget)
 
                 val allEvents = realFlights + realHotels + aiEvents
                 val linkedItinerary = itinerary.copy(eventIds = allEvents.map { it.eventId })
@@ -150,10 +161,10 @@ class NewTripViewModel : ViewModel() {
             "Browsing hotel options at your destination..."
         )
         private val GROQ_EVENTS_MESSAGES = listOf(
-            "Asking Groq for restaurant & activity suggestions...",
-            "Groq is picking the best local experiences...",
-            "Generating activities and dining with Groq...",
-            "Groq is curating your daily events..."
+            "Groq is building your full daily schedule...",
+            "Planning restaurants and activities for every day...",
+            "Groq is curating budget-aware daily experiences...",
+            "Crafting a day-by-day itinerary with Groq..."
         )
         private val FIRESTORE_MESSAGES = listOf(
             "Saving your trip...",
