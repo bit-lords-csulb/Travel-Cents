@@ -102,6 +102,7 @@ fun HomePage(
         // ── Trips carousel ──────────────────────────────────
         TripsCarousel(
             trips = homeUiState.trips,
+            tripImages = homeUiState.tripImages,
             isLoading = homeUiState.isLoading
         )
 
@@ -152,7 +153,11 @@ fun HomePage(
 // ─────────────────────────────────────────────────────────────
 
 @Composable
-private fun TripsCarousel(trips: List<Itinerary>, isLoading: Boolean) {
+private fun TripsCarousel(
+    trips: List<Itinerary>,
+    tripImages: Map<String, String>,
+    isLoading: Boolean
+) {
     when {
         isLoading -> CarouselPlaceholder {
             CircularProgressIndicator(color = DeepSea4, strokeWidth = 2.dp)
@@ -175,7 +180,10 @@ private fun TripsCarousel(trips: List<Itinerary>, isLoading: Boolean) {
                     pageSpacing = 12.dp,
                     modifier = Modifier.fillMaxWidth()
                 ) { page ->
-                    TripCard(trip = trips[page])
+                    TripCard(
+                        trip = trips[page],
+                        imageUrl = tripImages[trips[page].destination]
+                    )
                 }
 
                 Spacer(modifier = Modifier.height(10.dp))
@@ -218,7 +226,7 @@ private fun CarouselPlaceholder(content: @Composable () -> Unit) {
 }
 
 @Composable
-private fun TripCard(trip: Itinerary) {
+private fun TripCard(trip: Itinerary, imageUrl: String?) {
     val today = LocalDate.now()
     val countdownDays: Long? = runCatching {
         val fmt = DateTimeFormatter.ofPattern("yyyy-MM-dd")
@@ -230,8 +238,9 @@ private fun TripCard(trip: Itinerary) {
         .takeIf { it.isNotBlank() }
         ?.let { "Flight to $it" }
 
-    // Stable image per destination using picsum seed
+    // Use Wikipedia image if available, fall back to picsum placeholder
     val imageSeed = abs(trip.destination.hashCode() % 1000)
+    val resolvedImageUrl = imageUrl ?: "https://picsum.photos/seed/$imageSeed/400/250"
 
     Box(
         modifier = Modifier
@@ -240,7 +249,7 @@ private fun TripCard(trip: Itinerary) {
             .clip(RoundedCornerShape(16.dp))
     ) {
         AsyncImage(
-            model = "https://picsum.photos/seed/$imageSeed/400/250",
+            model = resolvedImageUrl,
             contentDescription = trip.destination,
             contentScale = ContentScale.Crop,
             modifier = Modifier.fillMaxSize()
