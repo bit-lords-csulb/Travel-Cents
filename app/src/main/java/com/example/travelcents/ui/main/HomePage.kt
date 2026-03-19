@@ -46,6 +46,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
@@ -75,13 +76,39 @@ fun HomePage(
             letterSpacing = 1.sp
         )
         Spacer(modifier = Modifier.height(16.dp))
-        CurrencyConverterCard(viewModel = currencyViewModel)
+        CurrencyConverterCard(
+            amount = currencyViewModel.amount,
+            fromCurrency = currencyViewModel.fromCurrency,
+            toCurrency = currencyViewModel.toCurrency,
+            result = currencyViewModel.result,
+            isLoading = currencyViewModel.isLoading,
+            error = currencyViewModel.error,
+            currencies = currencyViewModel.currencies,
+            recentCurrencies = currencyViewModel.recentCurrencies,
+            onAmountChange = currencyViewModel::onAmountChange,
+            onFromCurrencyChange = currencyViewModel::onFromCurrencyChange,
+            onToCurrencyChange = currencyViewModel::onToCurrencyChange,
+            onSwap = currencyViewModel::swap
+        )
     }
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun CurrencyConverterCard(viewModel: CurrencyViewModel) {
+private fun CurrencyConverterCard(
+    amount: String,
+    fromCurrency: String,
+    toCurrency: String,
+    result: Double?,
+    isLoading: Boolean,
+    error: String?,
+    currencies: List<String>,
+    recentCurrencies: List<String>,
+    onAmountChange: (String) -> Unit,
+    onFromCurrencyChange: (String) -> Unit,
+    onToCurrencyChange: (String) -> Unit,
+    onSwap: () -> Unit
+) {
     Card(
         modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(16.dp),
@@ -104,8 +131,8 @@ private fun CurrencyConverterCard(viewModel: CurrencyViewModel) {
                 horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
                 OutlinedTextField(
-                    value = viewModel.amount,
-                    onValueChange = viewModel::onAmountChange,
+                    value = amount,
+                    onValueChange = onAmountChange,
                     modifier = Modifier.weight(1f),
                     singleLine = true,
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
@@ -120,10 +147,10 @@ private fun CurrencyConverterCard(viewModel: CurrencyViewModel) {
                     )
                 )
                 CurrencyDropdown(
-                    selected = viewModel.fromCurrency,
-                    currencies = viewModel.currencies,
-                    recentCurrencies = viewModel.recentCurrencies,
-                    onSelect = viewModel::onFromCurrencyChange
+                    selected = fromCurrency,
+                    currencies = currencies,
+                    recentCurrencies = recentCurrencies,
+                    onSelect = onFromCurrencyChange
                 )
             }
 
@@ -135,7 +162,7 @@ private fun CurrencyConverterCard(viewModel: CurrencyViewModel) {
                 contentAlignment = Alignment.Center
             ) {
                 IconButton(
-                    onClick = viewModel::swap,
+                    onClick = onSwap,
                     modifier = Modifier
                         .size(40.dp)
                         .background(DeepSea3, CircleShape)
@@ -165,18 +192,18 @@ private fun CurrencyConverterCard(viewModel: CurrencyViewModel) {
                     contentAlignment = Alignment.CenterStart
                 ) {
                     when {
-                        viewModel.isLoading -> CircularProgressIndicator(
+                        isLoading -> CircularProgressIndicator(
                             modifier = Modifier.size(20.dp),
                             color = DeepSea4,
                             strokeWidth = 2.dp
                         )
-                        viewModel.error != null -> Text(
-                            text = viewModel.error!!,
+                        error != null -> Text(
+                            text = error,
                             color = Color(0xFFFF6B6B),
                             fontSize = 14.sp
                         )
-                        viewModel.result != null -> Text(
-                            text = "%.2f".format(viewModel.result),
+                        result != null -> Text(
+                            text = "%.2f".format(result),
                             color = DeepSea5,
                             fontSize = 16.sp,
                             fontWeight = FontWeight.Medium
@@ -185,13 +212,48 @@ private fun CurrencyConverterCard(viewModel: CurrencyViewModel) {
                     }
                 }
                 CurrencyDropdown(
-                    selected = viewModel.toCurrency,
-                    currencies = viewModel.currencies,
-                    recentCurrencies = viewModel.recentCurrencies,
-                    onSelect = viewModel::onToCurrencyChange
+                    selected = toCurrency,
+                    currencies = currencies,
+                    recentCurrencies = recentCurrencies,
+                    onSelect = onToCurrencyChange
                 )
             }
         }
+    }
+}
+
+@Preview(showBackground = true, showSystemUi = true)
+@Composable
+private fun HomePagePreview() {
+    val sampleCurrencies = listOf("USD", "EUR", "GBP", "JPY", "CAD")
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(DeepSea1)
+            .padding(16.dp)
+    ) {
+        Text(
+            text = "HOME",
+            color = DeepSea4,
+            fontSize = 11.sp,
+            fontWeight = FontWeight.Bold,
+            letterSpacing = 1.sp
+        )
+        Spacer(modifier = Modifier.height(16.dp))
+        CurrencyConverterCard(
+            amount = "1",
+            fromCurrency = "USD",
+            toCurrency = "EUR",
+            result = 0.91,
+            isLoading = false,
+            error = null,
+            currencies = sampleCurrencies,
+            recentCurrencies = listOf("USD", "EUR"),
+            onAmountChange = {},
+            onFromCurrencyChange = {},
+            onToCurrencyChange = {},
+            onSwap = {}
+        )
     }
 }
 
