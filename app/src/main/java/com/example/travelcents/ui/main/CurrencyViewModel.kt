@@ -1,10 +1,12 @@
 package com.example.travelcents.ui.main
 
+import android.app.Application
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
-import androidx.lifecycle.ViewModel
+import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
+import com.example.travelcents.data.local.CurrencyRateCache
 import com.example.travelcents.data.remote.CurrencyApiService
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
@@ -12,13 +14,15 @@ import kotlinx.coroutines.launch
 import retrofit2.Retrofit
 import retrofit2.converter.gson.GsonConverterFactory
 
-class CurrencyViewModel : ViewModel() {
+class CurrencyViewModel(application: Application) : AndroidViewModel(application) {
 
     private val api: CurrencyApiService = Retrofit.Builder()
         .baseUrl("https://api.frankfurter.app/")
         .addConverterFactory(GsonConverterFactory.create())
         .build()
         .create(CurrencyApiService::class.java)
+
+    private val cache = CurrencyRateCache(application)
 
     // frankfurter.app supported currencies (stable list, no endpoint needed)
     val currencies = listOf(
@@ -47,8 +51,9 @@ class CurrencyViewModel : ViewModel() {
     private var convertJob: Job? = null
 
     init {
-        // Kick off an initial conversion on launch
+        // Show cached result immediately (fast path), then silently refresh in background
         scheduleConvert()
+        refreshRecentRatesAtStartup()
     }
 
     fun onAmountChange(newAmount: String) {
@@ -62,12 +67,14 @@ class CurrencyViewModel : ViewModel() {
     fun onFromCurrencyChange(currency: String) {
         fromCurrency = currency
         addToRecent(currency)
+        cache.saveRecentPair(fromCurrency, toCurrency)
         scheduleConvert()
     }
 
     fun onToCurrencyChange(currency: String) {
         toCurrency = currency
         addToRecent(currency)
+        cache.saveRecentPair(fromCurrency, toCurrency)
         scheduleConvert()
     }
 
@@ -83,7 +90,25 @@ class CurrencyViewModel : ViewModel() {
         scheduleConvert()
     }
 
-    // Debounce: wait 400ms after the last change before hitting the API
+    // Silently refresh all recently used pairs at startup so cached rates stay fresh
+    private fun refreshRecentRatesAtStartup() {
+        viewModelScope.launch {
+            val recentPairs = cache.getRecentPairs()
+            for ((from, to) in recentPairs) {
+                try {
+                    val response = api.convert(1.0, from, to)
+                    val baseRate = response.rates[to] ?: continue
+                    cache.saveRate(from, to, baseRate)
+                } catch (_: Exception) {
+                    // Stale cache is better than no result — swallow silently
+                }
+            }
+            // Recompute with fresh values after all refreshes complete
+            convert()
+        }
+    }
+
+    // Debounce: wait 400ms after the last change before computing/fetching
     private fun scheduleConvert() {
         convertJob?.cancel()
         convertJob = viewModelScope.launch {
@@ -99,11 +124,24 @@ class CurrencyViewModel : ViewModel() {
         // Same currency — no API call needed
         if (fromCurrency == toCurrency) { result = parsedAmount; return }
 
+        // Serve from cache when available (instant, no spinner)
+        val cachedRate = cache.getRate(fromCurrency, toCurrency)
+        if (cachedRate != null) {
+            result = parsedAmount * cachedRate
+            return
+        }
+
+        // Cache miss — fetch base rate from API, then cache it
         isLoading = true
         error = null
         try {
-            val response = api.convert(parsedAmount, fromCurrency, toCurrency)
-            result = response.rates[toCurrency]
+            val response = api.convert(1.0, fromCurrency, toCurrency)
+            val baseRate = response.rates[toCurrency]
+            if (baseRate != null) {
+                cache.saveRate(fromCurrency, toCurrency, baseRate)
+                cache.saveRecentPair(fromCurrency, toCurrency)
+                result = parsedAmount * baseRate
+            }
         } catch (e: Exception) {
             error = "Conversion failed"
             result = null
