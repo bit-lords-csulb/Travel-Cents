@@ -11,6 +11,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import org.json.JSONObject
+import java.util.Locale
 import kotlin.concurrent.thread
 
 // Foursquare API model
@@ -41,14 +42,6 @@ class CreateEventViewModel(private val groupId: String) : ViewModel() {
 
     private val auth = Firebase.auth
     private val db   = Firebase.firestore
-
-    private val httpClient = okhttp3.OkHttpClient.Builder()
-        .connectTimeout(30, java.util.concurrent.TimeUnit.SECONDS)
-        .readTimeout(30, java.util.concurrent.TimeUnit.SECONDS)
-        .writeTimeout(30, java.util.concurrent.TimeUnit.SECONDS)
-        .retryOnConnectionFailure(true)
-        .protocols(listOf(okhttp3.Protocol.HTTP_1_1))
-        .build()
 
     // Foursquare API key
     private val foursquareApiKey = BuildConfig.FOURSQUARE_API_KEY
@@ -107,69 +100,33 @@ class CreateEventViewModel(private val groupId: String) : ViewModel() {
         _photoUrl.value = place.photoUrl
     }
 
-    // Load place suggestions from Foursquare for all categories
+    // Mock data to simulate API call
     fun loadPlaces(destination: String) {
-        if (destination.isBlank() || foursquareApiKey.isBlank()) return
+        if (destination.isBlank()) return
         _isLoadingPlaces.value = true
 
-        val cleanApiKey = foursquareApiKey.replace("\"", "").trim()
-        val encodedCity = java.net.URLEncoder.encode(destination.trim(), "UTF-8")
-
         thread {
-            val allPlaces = mutableListOf<PlaceSuggestion>()
-            try {
-                PLACE_CATEGORIES.forEach { category ->
-                    val urlStr = "https://places-api.foursquare.com/places/search" +
-                            "?near=$encodedCity" +
-                            "&fsq_category_ids=${category.fsqCategoryId}" +
-                            "&limit=4" +
-                            "&fields=fsq_place_id,name,location,categories,photos"
+            Thread.sleep(1000)
+            val mockPlaces = mutableListOf<PlaceSuggestion>()
+            val city = destination.trim()
+            // Dining Mock
+            mockPlaces.add(PlaceSuggestion("1", "$city Bistro", "123 Main St, $city", "Dining", "https://images.unsplash.com/photo-1517248135467-4c7edcad34c4?w=400"))
+            mockPlaces.add(PlaceSuggestion("2", "The $city Grill", "456 Oak Ave, $city", "Dining", "https://images.unsplash.com/photo-1552566626-52f8b828add9?w=400"))
 
-                    val request = okhttp3.Request.Builder()
-                        .url(urlStr)
-                        .get()
-                        .addHeader("Authorization", cleanApiKey)
-                        .addHeader("Accept", "application/json")
-                        .addHeader("X-Places-Api-Version", "20250617") // Ensure no dashes
-                        .build()
+            // Nightlife Mock
+            mockPlaces.add(PlaceSuggestion("3", "Neon Lounge", "789 Pine St, $city", "Nightlife", "https://images.unsplash.com/photo-1514525253361-bee8d48700ef?w=400"))
 
-                    httpClient.newCall(request).execute().use { response ->
-                        if (response.isSuccessful) {
-                            val body = response.body?.string() ?: "{}"
-                            android.util.Log.d("FSQ_DEBUG", "Category ${category.name} raw response: $body")
-                            val results = JSONObject(body).optJSONArray("results") ?: org.json.JSONArray()
+            // Outdoors Mock
+            mockPlaces.add(PlaceSuggestion("4", "$city Central Park", "Park Rd, $city", "Outdoors", "https://images.unsplash.com/photo-1441974231531-c6227db76b6e?w=400"))
 
-                            for (i in 0 until results.length()) {
-                                val p = results.getJSONObject(i)
-                                val loc = p.optJSONObject("location")
-                                val addr = loc?.optString("formatted_address") ?: ""
+            // Arts Mock
+            mockPlaces.add(PlaceSuggestion("5", "Modern Art Gallery", "Gallery Way, $city", "Arts", "https://images.unsplash.com/photo-1499781350541-7783f6c6a0c8?w=400"))
 
-                                var photoUrl = ""
-                                val photos = p.optJSONArray("photos")
-                                if (photos != null && photos.length() > 0) {
-                                    val first = photos.getJSONObject(0)
-                                    photoUrl = "${first.optString("prefix")}400x300${first.optString("suffix")}"
-                                }
-
-                                allPlaces.add(PlaceSuggestion(
-                                    fsqId = p.optString("fsq_place_id"),
-                                    name = p.optString("name"),
-                                    address = addr,
-                                    category = category.name,
-                                    photoUrl = photoUrl
-                                ))
-                            }
-                        }
-                    }
-                }
-            } catch (e: Exception) {
-                android.util.Log.e("Foursquare", "Sequential Crash: ${e.message}")
-            } finally {
-                android.os.Handler(android.os.Looper.getMainLooper()).post {
-                    _placeSuggestions.value = allPlaces.toList()
-                    _isLoadingPlaces.value = false
-                    android.util.Log.d("Foursquare_Success", "UI Updated with ${allPlaces.size} places")
-                }
+            // 3. Update the UI on the Main Thread exactly like the real API would
+            android.os.Handler(android.os.Looper.getMainLooper()).post {
+                _placeSuggestions.value = mockPlaces
+                _isLoadingPlaces.value = false
+                android.util.Log.d("MOCK_DATA", "Successfully loaded ${mockPlaces.size} mock places for $city")
             }
         }
     }

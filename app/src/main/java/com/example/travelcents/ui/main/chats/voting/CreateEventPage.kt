@@ -19,11 +19,10 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Brush
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
@@ -84,12 +83,13 @@ fun CreateEventPage(
                             .clickable { onBackClick() },
                         contentAlignment = Alignment.Center
                     ) {
-                        Icon(
-                            imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                            contentDescription = "Back",
-                            tint = DeepSea5,
-                            modifier = Modifier.size(20.dp)
-                        )
+                        IconButton(onClick = onBackClick) {
+                            Icon(
+                                imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+                                contentDescription = "Back",
+                                tint = DeepSea5
+                            )
+                        }
                     }
                     Spacer(modifier = Modifier.width(12.dp))
                     Column {
@@ -273,46 +273,54 @@ fun CreateEventPage(
 
 @Composable
 fun PlaceSuggestionCard(place: PlaceSuggestion, onClick: () -> Unit) {
-    Box(
+    Column(
         modifier = Modifier
             .width(160.dp)
-            .height(180.dp)
-            .clip(RoundedCornerShape(14.dp))
+            .clip(RoundedCornerShape(16.dp))
             .background(DeepSea2)
             .clickable { onClick() }
+            .padding(bottom = 12.dp)
     ) {
-        // Photo
-        if (place.photoUrl.isNotEmpty()) {
-            AsyncImage(
-                model = place.photoUrl,
-                contentDescription = null,
-                contentScale = ContentScale.Crop,
-                modifier = Modifier.fillMaxSize()
-            )
-        } else {
-            Box(modifier = Modifier.fillMaxSize().background(DeepSea3))
-        }
-
-        // Gradient overlay + text at bottom
+        // Image Section
         Box(
             modifier = Modifier
-                .fillMaxSize()
-                .background(
-                    Brush.verticalGradient(
-                        colors = listOf(Color.Transparent, Color.Black.copy(alpha = 0.7f)),
-                        startY = 80f
-                    )
+                .fillMaxWidth()
+                .aspectRatio(1.1f)
+                .clip(RoundedCornerShape(12.dp))
+        ) {
+            if (place.photoUrl.isNotEmpty()) {
+                AsyncImage(
+                    model = place.photoUrl,
+                    contentDescription = null,
+                    contentScale = ContentScale.Crop,
+                    modifier = Modifier.fillMaxSize()
                 )
-        )
+            } else {
+                Box(modifier = Modifier.fillMaxSize().background(DeepSea3))
+            }
+        }
+
+        // Description
         Column(
             modifier = Modifier
-                .align(Alignment.BottomStart)
-                .padding(10.dp)
+                .padding(horizontal = 12.dp, vertical = 8.dp)
         ) {
-            Text(place.name, color = Color.White, fontWeight = FontWeight.SemiBold, fontSize = 13.sp, maxLines = 2)
-            if (place.address.isNotEmpty()) {
-                Text(place.address, color = Color.White.copy(alpha = 0.7f), fontSize = 11.sp, maxLines = 1)
-            }
+            Text(
+                text = place.name,
+                color = DeepSea5,
+                fontWeight = FontWeight.Bold,
+                fontSize = 14.sp,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
+            )
+
+            val displayAddress = place.address.split(",").firstOrNull() ?: ""
+            Text(
+                text = displayAddress.ifEmpty { "Tap to see details" },
+                color = DeepSea5.copy(alpha = 0.5f),
+                fontSize = 11.sp,
+                maxLines = 1
+            )
         }
     }
 }
