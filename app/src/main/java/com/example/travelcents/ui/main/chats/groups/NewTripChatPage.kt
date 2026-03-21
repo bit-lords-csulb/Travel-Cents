@@ -1,4 +1,4 @@
-package com.example.travelcents.ui.main.chats
+package com.example.travelcents.ui.main.chats.groups
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -23,7 +23,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
-import com.example.travelcents.ui.main.chats.chat.Group
+import com.example.travelcents.data.model.Group
 import com.example.travelcents.ui.theme.*
 
 data class Destination(

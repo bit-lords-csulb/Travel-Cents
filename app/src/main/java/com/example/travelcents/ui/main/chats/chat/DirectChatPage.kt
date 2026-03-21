@@ -26,12 +26,12 @@ import com.example.travelcents.ui.main.chats.friends.Friend
 import com.example.travelcents.ui.theme.*
 import com.google.firebase.Timestamp
 
-data class DirectChatPage(
-    val id: String = "",
-    val members: List<String> = emptyList(),
-    val lastMessage: String = "",
-    val lastMessageTime: Timestamp? = null
-)
+//data class DirectChatPage(
+//    val id: String = "",
+//    val members: List<String> = emptyList(),
+//    val lastMessage: String = "",
+//    val lastMessageTime: Timestamp? = null
+//)
 
 @Composable
 fun DirectChatPage(

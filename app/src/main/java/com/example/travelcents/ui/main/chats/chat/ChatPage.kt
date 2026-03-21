@@ -25,19 +25,12 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import coil.compose.AsyncImage
-import com.example.travelcents.ui.main.chats.chat.ChatViewModel
+import com.example.travelcents.data.model.Message
+import com.example.travelcents.data.model.Group
 import com.example.travelcents.ui.theme.*
 import com.google.firebase.Timestamp
 import java.text.SimpleDateFormat
 import java.util.*
-
-data class Message(
-    val id: String = "",
-    val text: String = "",
-    val senderId: String = "",
-    val senderName: String = "",
-    val timestamp: Timestamp? = null
-)
 
 fun formatMessageTime(timestamp: Timestamp?): String {
     if (timestamp == null) return ""
@@ -74,7 +67,8 @@ fun ChatPage(
     viewModel: ChatViewModel = viewModel(
         key = group.id,
         factory = ChatViewModel.Factory(group)
-    )
+    ),
+    onEventsClick: () -> Unit
 ) {
     val messages by viewModel.messages.collectAsState()
     val messageText by viewModel.messageText.collectAsState()
@@ -142,8 +136,9 @@ fun ChatPage(
                     )
                 }
 
+                // Event Button
                 OutlinedButton(
-                    onClick = { },
+                    onClick = { onEventsClick() },
                     shape = RoundedCornerShape(20.dp),
                     colors = ButtonDefaults.outlinedButtonColors(contentColor = DeepSea5),
                     border = BorderStroke(1.dp, DeepSea5.copy(alpha = 0.3f)),
@@ -153,6 +148,7 @@ fun ChatPage(
                     Text("EVENTS", fontSize = 11.sp, fontWeight = FontWeight.SemiBold)
                 }
 
+                // More Options Dots
                 IconButton(onClick = { }) {
                     Icon(Icons.Default.MoreVert, contentDescription = "More", tint = DeepSea5)
                 }
