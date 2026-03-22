@@ -1,25 +1,27 @@
 package com.example.travelcents.ui.main.chats.voting
 
+import android.net.Uri
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.filled.Add
-import androidx.compose.material.icons.filled.LocationOn
-import androidx.compose.material.icons.filled.Schedule
-import androidx.compose.material.icons.filled.Title
+import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
+import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -29,241 +31,255 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import coil.compose.AsyncImage
 import com.example.travelcents.data.model.Group
 import com.example.travelcents.ui.theme.*
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 
 @Composable
 fun CreateEventPage(
     group: Group,
     onBackClick: () -> Unit = {},
     onEventCreated: () -> Unit = {},
-    viewModel: CreateEventViewModel = viewModel(
-        key = group.id,
-        factory = CreateEventViewModel.Factory(group.id)
-    )
+    viewModel: CreateEventViewModel = viewModel(factory = CreateEventViewModel.Factory(group.id))
 ) {
-    val title           by viewModel.title.collectAsState()
-    val description     by viewModel.description.collectAsState()
-    val location        by viewModel.location.collectAsState()
-    val time            by viewModel.time.collectAsState()
-    val isCreating      by viewModel.isCreating.collectAsState()
+    val title by viewModel.title.collectAsState()
+    val description by viewModel.description.collectAsState()
+    val location by viewModel.location.collectAsState()
+    val time by viewModel.time.collectAsState()
+    val photoUrl by viewModel.photoUrl.collectAsState()
+
     val placeSuggestions by viewModel.placeSuggestions.collectAsState()
-    val isLoadingPlaces  by viewModel.isLoadingPlaces.collectAsState()
-    val categories       by viewModel.categories.collectAsState()
-    var showCustomForm   by remember { mutableStateOf(false) }
-    var citySearchQuery by remember { mutableStateOf("") }
+    val isLoadingPlaces by viewModel.isLoadingPlaces.collectAsState()
+    val isCreating by viewModel.isCreating.collectAsState()
 
-    // This will be where we connect the itinerary to the chat to get location for api data
-    //LaunchedEffect(group.name) {
-    //    viewModel.loadPlaces(group.name)
-    //}
+    var showCustomForm by remember { mutableStateOf(false) }
+    var businessQuery by remember { mutableStateOf("") }
+    var cityQuery by remember { mutableStateOf("") }
 
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(DeepSea1)
-    ) {
+    val listState = rememberLazyListState()
+    val coroutineScope = rememberCoroutineScope()
+
+    val imagePicker = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.GetContent()
+    ) { uri: Uri? ->
+        uri?.let { viewModel.handleLocalImage(it) }
+    }
+
+    //
+    BackHandler {
+        viewModel.clearForm()
+        viewModel.clearSuggestions()
+        onBackClick()
+    }
+
+    Column(modifier = Modifier.fillMaxSize().background(DeepSea1)) {
         // Header
         Box(
             modifier = Modifier
                 .fillMaxWidth()
                 .clip(RoundedCornerShape(bottomStart = 24.dp, bottomEnd = 24.dp))
                 .background(DeepSea2)
-                .padding(top = 48.dp, start = 20.dp, end = 20.dp, bottom = 20.dp)
+                .padding(top = 48.dp, bottom = 20.dp)
         ) {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
+            IconButton(
+                onClick = {
+                    viewModel.clearForm()
+                    viewModel.clearSuggestions()
+                    onBackClick()
+                },
+                modifier = Modifier.align(Alignment.CenterStart).padding(start = 8.dp)
             ) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Box(
-                        modifier = Modifier
-                            .size(40.dp)
-                            .clip(CircleShape)
-                            .background(DeepSea3)
-                            .clickable { onBackClick() },
-                        contentAlignment = Alignment.Center
-                    ) {
-                        IconButton(onClick = onBackClick) {
-                            Icon(
-                                imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                                contentDescription = "Back",
-                                tint = DeepSea5
-                            )
-                        }
-                    }
-                    Spacer(modifier = Modifier.width(12.dp))
-                    Column {
-                        Text("New Event", fontSize = 24.sp, fontWeight = FontWeight.Bold, color = DeepSea5)
-                        Text("Share a new idea with the squad", fontSize = 12.sp, color = DeepSea5.copy(alpha = 0.5f))
-                    }
-                }
+                Icon(Icons.AutoMirrored.Filled.ArrowBack, "Back", tint = DeepSea5)
+            }
+            Column(modifier = Modifier.align(Alignment.Center), horizontalAlignment = Alignment.CenterHorizontally) {
+                Text("New Event", fontSize = 20.sp, fontWeight = FontWeight.Bold, color = DeepSea5)
+                Text("Share a new idea with the squad", fontSize = 10.sp, color = DeepSea5.copy(alpha = 0.5f))
             }
         }
 
         LazyColumn(
-            modifier = Modifier.fillMaxSize().padding(horizontal = 16.dp),
+            state = listState,
+            modifier = Modifier.fillMaxSize(),
             verticalArrangement = Arrangement.spacedBy(16.dp),
-            contentPadding = PaddingValues(top = 16.dp, bottom = 32.dp)
+            contentPadding = PaddingValues(top = 16.dp, bottom = 48.dp)
         ) {
-            // Temporary City Search Bar until we connect itinerary to this
+            // Search Section
             item {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
-                ) {
-                    Box(modifier = Modifier.weight(1f)) {
-                        EventTextField(
-                            value = citySearchQuery,
-                            onValueChange = { citySearchQuery = it },
-                            label = "Where are we going? (e.g. Paris)",
-                            icon = Icons.Default.LocationOn,
-                            singleLine = true
-                        )
-                    }
-                    Button(
-                        onClick = { viewModel.loadPlaces(citySearchQuery) },
-                        enabled = citySearchQuery.isNotBlank() && !isLoadingPlaces,
-                        modifier = Modifier.height(56.dp),
-                        shape = RoundedCornerShape(12.dp),
-                        colors = ButtonDefaults.buttonColors(
-                            containerColor = DeepSea3,
-                            disabledContainerColor = DeepSea3.copy(alpha = 0.4f)
-                        )
-                    ) {
-                        Text("Search", color = DeepSea5, fontWeight = FontWeight.SemiBold)
+                Column(modifier = Modifier.padding(horizontal = 16.dp)) {
+                    EventTextField(businessQuery, { businessQuery = it }, "Search activity (e.g. Sushi)", Icons.Default.Search)
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Box(modifier = Modifier.weight(1f)) {
+                            EventTextField(cityQuery, { cityQuery = it }, "Where to?", Icons.Default.LocationOn)
+                        }
+                        Spacer(modifier = Modifier.width(8.dp))
+                        IconButton(
+                            onClick = { viewModel.loadPlaces(businessQuery, cityQuery) },
+                            modifier = Modifier.size(56.dp).clip(RoundedCornerShape(12.dp)).background(DeepSea3)
+                        ) {
+                            if (isLoadingPlaces) CircularProgressIndicator(color = DeepSea5, modifier = Modifier.size(24.dp))
+                            else Icon(Icons.Default.TravelExplore, null, tint = DeepSea5)
+                        }
                     }
                 }
-                Spacer(modifier = Modifier.height(16.dp))
             }
 
-            // Custom form: expands when Custom Activity is tapped
+            // Custom Activity Form
             if (showCustomForm) {
                 item {
                     Column(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .clip(RoundedCornerShape(14.dp))
+                            .padding(horizontal = 16.dp)
+                            .clip(RoundedCornerShape(16.dp))
                             .background(DeepSea2)
-                            .padding(16.dp),
-                        verticalArrangement = Arrangement.spacedBy(10.dp)
+                            .border(1.dp, DeepSea3.copy(alpha = 0.3f), RoundedCornerShape(16.dp))
+                            .padding(20.dp),
+                        verticalArrangement = Arrangement.spacedBy(16.dp)
                     ) {
-                        EventTextField(
-                            value = title,
-                            onValueChange = { viewModel.onTitleChange(it) },
-                            label = "Event Title *",
-                            icon = Icons.Default.Title,
-                            singleLine = true
-                        )
-                        EventTextField(
-                            value = description,
-                            onValueChange = { viewModel.onDescriptionChange(it) },
-                            label = "Description",
-                            icon = Icons.Default.Title,
-                            singleLine = false,
-                            minLines = 3
-                        )
-                        EventTextField(
-                            value = location,
-                            onValueChange = { viewModel.onLocationChange(it) },
-                            label = "Location",
-                            icon = Icons.Default.LocationOn,
-                            singleLine = true
-                        )
-                        EventTextField(
-                            value = time,
-                            onValueChange = { viewModel.onTimeChange(it) },
-                            label = "Time (e.g. 7:00 PM)",
-                            icon = Icons.Default.Schedule,
-                            singleLine = true
-                        )
-                        Button(
-                            onClick = { viewModel.createEvent(onSuccess = { onEventCreated() }) },
-                            enabled = title.isNotBlank() && !isCreating,
-                            modifier = Modifier.fillMaxWidth().height(48.dp),
-                            shape = RoundedCornerShape(12.dp),
-                            colors = ButtonDefaults.buttonColors(
-                                containerColor = DeepSea3,
-                                disabledContainerColor = DeepSea3.copy(alpha = 0.4f)
-                            )
+
+                        // --- NEW: Title Row with CLEAR Button ---
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
                         ) {
-                            if (isCreating) {
-                                CircularProgressIndicator(color = DeepSea5, modifier = Modifier.size(18.dp), strokeWidth = 2.dp)
-                            } else {
-                                Text("Propose Event", color = DeepSea5, fontWeight = FontWeight.SemiBold)
-                            }
-                        }
-                    }
-                }
-            }
+                            Text("Draft Details", color = DeepSea5, fontWeight = FontWeight.Bold, fontSize = 16.sp)
 
-            // Quick Suggestion: Custom Activity card
-            item {
-                Text(
-                    text = "⚡ QUICK SUGGESTION",
-                    color = DeepSea5.copy(alpha = 0.5f),
-                    fontSize = 11.sp,
-                    fontWeight = FontWeight.SemiBold,
-                    letterSpacing = 1.sp
-                )
-                Spacer(modifier = Modifier.height(8.dp))
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .clip(RoundedCornerShape(14.dp))
-                        .background(DeepSea2)
-                        .clickable { showCustomForm = !showCustomForm }
-                        .padding(16.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Box(
-                        modifier = Modifier
-                            .size(40.dp)
-                            .clip(RoundedCornerShape(10.dp))
-                            .background(DeepSea3),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Icon(Icons.Default.Add, contentDescription = null, tint = DeepSea5)
-                    }
-                    Spacer(modifier = Modifier.width(14.dp))
-                    Column {
-                        Text("Custom Activity", color = DeepSea5, fontWeight = FontWeight.SemiBold, fontSize = 15.sp)
-                        Text("Type your own idea", color = DeepSea5.copy(alpha = 0.5f), fontSize = 12.sp)
-                    }
-                }
-            }
-
-            // Place suggestion categories from Foursquare
-            if (isLoadingPlaces) {
-                item {
-                    Box(modifier = Modifier.fillMaxWidth().padding(24.dp), contentAlignment = Alignment.Center) {
-                        CircularProgressIndicator(color = DeepSea5)
-                    }
-                }
-            } else {
-                categories.forEach { category ->
-                    item {
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            Text(
-                                text = "${category.emoji} ${category.name.uppercase()}",
-                                color = DeepSea5.copy(alpha = 0.5f),
-                                fontSize = 11.sp,
-                                fontWeight = FontWeight.SemiBold,
-                                letterSpacing = 1.sp
-                            )
-                        }
-                        Spacer(modifier = Modifier.height(8.dp))
-                        LazyRow(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                            items(placeSuggestions.filter { it.category == category.name }) { place ->
-                                PlaceSuggestionCard(
-                                    place = place,
-                                    onClick = {
-                                        viewModel.selectPlace(place)
-                                        showCustomForm = true
-                                    }
+                            // Only show "Clear" if there is data in the form
+                            if (title.isNotEmpty() || description.isNotEmpty() || location.isNotEmpty() || time.isNotEmpty() || photoUrl.isNotEmpty()) {
+                                Text(
+                                    text = "Clear",
+                                    color = DeepSea3,
+                                    fontSize = 14.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    modifier = Modifier
+                                        .clip(RoundedCornerShape(8.dp))
+                                        .clickable { viewModel.clearForm() }
+                                        .padding(horizontal = 8.dp, vertical = 4.dp)
                                 )
                             }
                         }
+
+                        EventTextField(title, { viewModel.onTitleChange(it) }, "Title", Icons.Default.Title)
+                        EventTextField(description, { viewModel.onDescriptionChange(it) }, "Event Details", Icons.Default.Description, singleLine = false)
+                        EventTextField(location, { viewModel.onLocationChange(it) }, "Address", Icons.Default.Map)
+                        EventTextField(time, { viewModel.onTimeChange(it) }, "Proposed Time", Icons.Default.Schedule)
+
+                        // Upload Box
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(120.dp)
+                                .clip(RoundedCornerShape(12.dp))
+                                .background(DeepSea1.copy(alpha = 0.5f))
+                                .border(1.dp, DeepSea3, RoundedCornerShape(12.dp))
+                                .clickable { imagePicker.launch("image/*") },
+                            contentAlignment = Alignment.Center
+                        ) {
+                            if (photoUrl.isEmpty()) {
+                                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                                    Icon(Icons.Default.CloudUpload, null, tint = DeepSea5.copy(0.4f), modifier = Modifier.size(32.dp))
+                                    Spacer(modifier = Modifier.height(4.dp))
+                                    Text("Add Event Photo", color = DeepSea5.copy(0.4f), fontSize = 12.sp)
+                                }
+                            } else {
+                                AsyncImage(
+                                    model = photoUrl,
+                                    contentDescription = null,
+                                    modifier = Modifier.fillMaxSize(),
+                                    contentScale = ContentScale.Crop
+                                )
+                            }
+                        }
+
+                        Button(
+                            onClick = { viewModel.createEvent { onEventCreated() } },
+                            modifier = Modifier.fillMaxWidth().height(56.dp),
+                            shape = RoundedCornerShape(12.dp),
+                            colors = ButtonDefaults.buttonColors(containerColor = DeepSea3)
+                        ) {
+                            if (isCreating) CircularProgressIndicator(color = DeepSea5, modifier = Modifier.size(20.dp))
+                            else Text("Propose Event", color = DeepSea5, fontWeight = FontWeight.Bold, fontSize = 16.sp)
+                        }
+                    }
+                }
+            }
+
+            // Toggle Button
+            item {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 16.dp)
+                        .clip(RoundedCornerShape(12.dp))
+                        .background(DeepSea2)
+                        .clickable {
+                            val isOpening = !showCustomForm
+                            showCustomForm = isOpening
+                            if (isOpening) {
+                                viewModel.clearForm()
+                                coroutineScope.launch {
+                                    delay(50)
+                                    listState.animateScrollToItem(1)
+                                }
+                            }
+                        }
+                        .padding(16.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Icon(
+                        imageVector = if (showCustomForm) Icons.Default.RemoveCircle else Icons.Default.AddCircle,
+                        contentDescription = null,
+                        tint = DeepSea5,
+                        modifier = Modifier.size(24.dp)
+                    )
+                    Spacer(modifier = Modifier.width(16.dp))
+                    Text(
+                        text = if (showCustomForm) "Hide Details" else "Create Custom Activity",
+                        color = DeepSea5,
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 16.sp
+                    )
+                }
+            }
+
+            // Yelp Results
+            val grouped = placeSuggestions.groupBy { it.category }
+            grouped.forEach { (cat, places) ->
+                item {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 16.dp),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(cat.uppercase(), color = DeepSea5.copy(0.4f), fontSize = 11.sp, fontWeight = FontWeight.Black)
+
+                        if (places.size > 1) {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Text("Swipe", color = DeepSea5.copy(0.3f), fontSize = 10.sp, fontWeight = FontWeight.Medium)
+                                Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, contentDescription = null, tint = DeepSea5.copy(0.3f), modifier = Modifier.size(14.dp))
+                            }
+                        }
+                    }
+
+                    Spacer(modifier = Modifier.height(8.dp))
+
+                    LazyRow(
+                        contentPadding = PaddingValues(horizontal = 16.dp),
+                        horizontalArrangement = Arrangement.spacedBy(12.dp)
+                    ) {
+                        items(places) { place ->
+                            PlaceSuggestionCard(place) {
+                                viewModel.selectPlace(place)
+                                showCustomForm = true
+                                coroutineScope.launch {
+                                    delay(50)
+                                    listState.animateScrollToItem(1)
+                                }
+                            }
+                        }
                     }
                 }
             }
@@ -271,90 +287,42 @@ fun CreateEventPage(
     }
 }
 
+// Helpers
 @Composable
 fun PlaceSuggestionCard(place: PlaceSuggestion, onClick: () -> Unit) {
-    Column(
-        modifier = Modifier
-            .width(160.dp)
-            .clip(RoundedCornerShape(16.dp))
-            .background(DeepSea2)
-            .clickable { onClick() }
-            .padding(bottom = 12.dp)
+    Card(
+        modifier = Modifier.width(160.dp).clickable { onClick() },
+        colors = CardDefaults.cardColors(containerColor = DeepSea2),
+        shape = RoundedCornerShape(16.dp)
     ) {
-        // Image Section
-        Box(
-            modifier = Modifier
-                .fillMaxWidth()
-                .aspectRatio(1.1f)
-                .clip(RoundedCornerShape(12.dp))
-        ) {
-            if (place.photoUrl.isNotEmpty()) {
-                AsyncImage(
-                    model = place.photoUrl,
-                    contentDescription = null,
-                    contentScale = ContentScale.Crop,
-                    modifier = Modifier.fillMaxSize()
-                )
-            } else {
-                Box(modifier = Modifier.fillMaxSize().background(DeepSea3))
+        Column {
+            AsyncImage(model = place.photoUrl, contentDescription = null, modifier = Modifier.fillMaxWidth().height(110.dp), contentScale = ContentScale.Crop)
+            Column(modifier = Modifier.padding(12.dp)) {
+                Text(place.name, color = DeepSea5, fontWeight = FontWeight.Bold, fontSize = 14.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                Text(place.interest, color = DeepSea3, fontSize = 11.sp, fontWeight = FontWeight.Medium)
+                Text(place.address, color = DeepSea5.copy(0.4f), fontSize = 10.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
             }
-        }
-
-        // Description
-        Column(
-            modifier = Modifier
-                .padding(horizontal = 12.dp, vertical = 8.dp)
-        ) {
-            Text(
-                text = place.name,
-                color = DeepSea5,
-                fontWeight = FontWeight.Bold,
-                fontSize = 14.sp,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis
-            )
-
-            val displayAddress = place.address.split(",").firstOrNull() ?: ""
-            Text(
-                text = displayAddress.ifEmpty { "Tap to see details" },
-                color = DeepSea5.copy(alpha = 0.5f),
-                fontSize = 11.sp,
-                maxLines = 1
-            )
         }
     }
 }
 
 @Composable
-fun EventTextField(
-    value: String,
-    onValueChange: (String) -> Unit,
-    label: String,
-    icon: ImageVector,
-    singleLine: Boolean = true,
-    minLines: Int = 1
-) {
+fun EventTextField(value: String, onValueChange: (String) -> Unit, label: String, icon: androidx.compose.ui.graphics.vector.ImageVector, singleLine: Boolean = true) {
     OutlinedTextField(
         value = value,
         onValueChange = onValueChange,
-        label = { Text(label, color = DeepSea5.copy(alpha = 0.7f)) },
-        leadingIcon = {
-            Icon(
-                imageVector = icon,
-                contentDescription = label,
-                tint = DeepSea5
-            )
-        },
-        singleLine = singleLine,
-        minLines = minLines,
+        label = { Text(label, color = DeepSea5.copy(0.5f), fontSize = 12.sp) },
+        leadingIcon = { Icon(icon, contentDescription = null, tint = DeepSea5) },
         modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(12.dp),
+        singleLine = singleLine,
         colors = OutlinedTextFieldDefaults.colors(
-            focusedBorderColor = DeepSea5,
+            focusedBorderColor = DeepSea3,
             unfocusedBorderColor = DeepSea3,
             focusedTextColor = DeepSea5,
             unfocusedTextColor = DeepSea5,
-            cursorColor = DeepSea5
+            focusedContainerColor = DeepSea1.copy(alpha = 0.5f),
+            unfocusedContainerColor = DeepSea1.copy(alpha = 0.5f)
         )
     )
 }
