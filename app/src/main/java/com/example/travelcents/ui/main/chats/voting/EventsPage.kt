@@ -47,12 +47,12 @@ fun EventsPage(
     // State for Deletion
     var eventToDelete by remember { mutableStateOf<Event?>(null) }
 
-    // State for Bottom Sheet (Full Details)
+    // State for Bottom Sheet
     var selectedEventForDetails by remember { mutableStateOf<Event?>(null) }
     val sheetState = rememberModalBottomSheetState()
     var showSheet by remember { mutableStateOf(false) }
 
-    // 1. Full Details Bottom Sheet
+    // Full Details Bottom Sheet
     if (showSheet && selectedEventForDetails != null) {
         ModalBottomSheet(
             onDismissRequest = { showSheet = false },
@@ -86,7 +86,7 @@ fun EventsPage(
         }
     }
 
-    // 2. Delete Confirmation Dialog
+    // Delete Event Dialog
     eventToDelete?.let { event ->
         AlertDialog(
             onDismissRequest = { eventToDelete = null },
@@ -162,6 +162,7 @@ fun EventsPage(
     }
 }
 
+// Helpers
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun EventCard(
@@ -204,7 +205,6 @@ fun EventCard(
 
                     Spacer(modifier = Modifier.height(8.dp))
 
-                    // FIXED ALIGNMENT BOX
                     Box(modifier = Modifier.fillMaxWidth()) {
                         Column(modifier = Modifier.align(Alignment.BottomStart), verticalArrangement = Arrangement.spacedBy(0.dp)) {
                             Row(verticalAlignment = Alignment.CenterVertically) {
