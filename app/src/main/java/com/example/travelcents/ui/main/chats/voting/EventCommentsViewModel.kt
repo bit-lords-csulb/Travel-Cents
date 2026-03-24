@@ -19,17 +19,17 @@ class EventCommentsViewModel(
 ) : ViewModel() {
 
     private val auth = Firebase.auth
-    private val db   = Firebase.firestore
+    private val db = Firebase.firestore
 
     val currentUid: String get() = auth.currentUser?.uid ?: ""
 
-    private val _comments    = MutableStateFlow<List<EventComment>>(emptyList())
+    private val _comments = MutableStateFlow<List<EventComment>>(emptyList())
     val comments: StateFlow<List<EventComment>> = _comments.asStateFlow()
 
     private val _commentText = MutableStateFlow("")
     val commentText: StateFlow<String> = _commentText.asStateFlow()
 
-    private val _senderName  = MutableStateFlow("")
+    private val _senderName = MutableStateFlow("")
     private var listener: ListenerRegistration? = null
 
     init {
@@ -42,7 +42,7 @@ class EventCommentsViewModel(
         db.collection("users").document(currentUid).get()
             .addOnSuccessListener { doc ->
                 val first = doc.getString("firstName") ?: ""
-                val last  = doc.getString("lastName")  ?: ""
+                val last = doc.getString("lastName") ?: ""
                 _senderName.value = "$first $last".trim().ifBlank { "Unknown" }
             }
     }
@@ -66,7 +66,9 @@ class EventCommentsViewModel(
             }
     }
 
-    fun onCommentTextChange(text: String) { _commentText.value = text }
+    fun onCommentTextChange(text: String) {
+        _commentText.value = text
+    }
 
     fun sendComment() {
         val text = _commentText.value.trim()
@@ -76,10 +78,10 @@ class EventCommentsViewModel(
             .collection("events").document(eventId)
 
         val comment = hashMapOf(
-            "text"       to text,
-            "senderId"   to currentUid,
+            "text" to text,
+            "senderId" to currentUid,
             "senderName" to _senderName.value,
-            "timestamp"  to FieldValue.serverTimestamp()
+            "timestamp" to FieldValue.serverTimestamp()
         )
 
         db.runBatch { batch ->
@@ -94,7 +96,8 @@ class EventCommentsViewModel(
         listener?.remove()
     }
 
-    class Factory(private val groupId: String, private val eventId: String) : ViewModelProvider.Factory {
+    class Factory(private val groupId: String, private val eventId: String) :
+        ViewModelProvider.Factory {
         @Suppress("UNCHECKED_CAST")
         override fun <T : ViewModel> create(modelClass: Class<T>): T =
             EventCommentsViewModel(groupId, eventId) as T

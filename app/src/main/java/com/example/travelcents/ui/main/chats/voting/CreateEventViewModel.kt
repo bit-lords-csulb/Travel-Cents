@@ -63,7 +63,10 @@ class CreateEventViewModel(private val groupId: String) : ViewModel() {
     val isCreating = _isCreating.asStateFlow()
 
     private var creatorName = ""
-    init { fetchCreatorName() }
+
+    init {
+        fetchCreatorName()
+    }
 
     private fun fetchCreatorName() {
         val uid = auth.currentUser?.uid ?: return
@@ -72,13 +75,28 @@ class CreateEventViewModel(private val groupId: String) : ViewModel() {
         }
     }
 
-    fun onTitleChange(v: String) { _title.value = v }
-    fun onDescriptionChange(v: String) { _description.value = v }
-    fun onLocationChange(v: String) { _location.value = v }
-    fun onTimeChange(v: String) { _time.value = v }
+    fun onTitleChange(v: String) {
+        _title.value = v
+    }
 
-    fun handleLocalImage(uri: Uri) { _photoUrl.value = uri.toString() }
+    fun onDescriptionChange(v: String) {
+        _description.value = v
+    }
 
+    fun onLocationChange(v: String) {
+        _location.value = v
+    }
+
+    fun onTimeChange(v: String) {
+        _time.value = v
+    }
+
+    fun handleLocalImage(uri: Uri) {
+        _photoUrl.value = uri.toString()
+    }
+
+    // Uses Yelp API to search for places based on a query and city
+    // Returns a list of PlaceSuggestion objects
     fun loadPlaces(query: String, city: String) {
         if (city.isBlank()) return
         _isLoadingPlaces.value = true
@@ -97,37 +115,78 @@ class CreateEventViewModel(private val groupId: String) : ViewModel() {
                     for (i in 0 until it.length()) {
                         val b = it.getJSONObject(i)
                         val loc = b.optJSONObject("location")
-                        results.add(PlaceSuggestion(
-                            fsqId = b.optString("id"),
-                            name = b.optString("name"),
-                            interest = "${b.optJSONArray("categories")?.optJSONObject(0)?.optString("title")} • ${b.optDouble("rating")} ⭐",
-                            address = loc?.optString("address1", "") ?: "",
-                            category = b.optJSONArray("categories")?.optJSONObject(0)?.optString("title") ?: "Activity",
-                            photoUrl = b.optString("image_url")
-                        ))
+                        results.add(
+                            PlaceSuggestion(
+                                fsqId = b.optString("id"),
+                                name = b.optString("name"),
+                                interest = "${
+                                    b.optJSONArray("categories")?.optJSONObject(0)
+                                        ?.optString("title")
+                                } • ${b.optDouble("rating")} ⭐",
+                                address = loc?.optString("address1", "") ?: "",
+                                category = b.optJSONArray("categories")?.optJSONObject(0)
+                                    ?.optString("title") ?: "Activity",
+                                photoUrl = b.optString("image_url")
+                            )
+                        )
                     }
                 }
                 _placeSuggestions.value = results
-            } catch (e: Exception) { Log.e("YELP", "${e.message}") }
-            finally { _isLoadingPlaces.value = false }
+            } catch (e: Exception) {
+                Log.e("YELP", "${e.message}")
+            } finally {
+                _isLoadingPlaces.value = false
+            }
         }
     }
 
+    // Called when a user selects a place from the suggestions
+    // Updates the form fields with the selected place's data
+    // Fetches a more detailed description from Wikipedia
     fun selectPlace(place: PlaceSuggestion) {
         _title.value = place.name
         _location.value = place.address
         _photoUrl.value = place.photoUrl
-        _description.value = "Fetching factual history..."
+        _time.value = ""
+
+        _description.value = "Fetching details..."
+
         viewModelScope.launch {
             try {
-                val response = client.get("https://en.wikipedia.org/api/rest_v1/page/summary/${place.name.replace(" ", "_")}")
+                val wikiTerm = place.name.replace(" ", "_")
+                val response =
+                    client.get("https://en.wikipedia.org/api/rest_v1/page/summary/$wikiTerm")
+
                 if (response.status.value == 200) {
-                    _description.value = JSONObject(response.bodyAsText()).optString("extract")
-                } else { _description.value = "A popular ${place.category} spot." }
-            } catch (_: Exception) { _description.value = "Let's visit ${place.name}!" }
+                    val extract = JSONObject(response.bodyAsText()).optString("extract")
+
+                    // Ensure the wiki text isn't empty or a generic "Did you mean?"
+                    if (extract.isNotBlank() && !extract.contains("may refer to:")) {
+                        _description.value = extract
+                    } else {
+                        _description.value = buildFallbackDescription(place)
+                    }
+                } else {
+                    _description.value = buildFallbackDescription(place)
+                }
+            } catch (_: Exception) {
+                _description.value = buildFallbackDescription(place)
+            }
         }
     }
 
+    // Fallback description if Wikipedia API fails
+    // Generates a clean, dynamic sentence using the data we already have from Yelp
+    private fun buildFallbackDescription(place: PlaceSuggestion): String {
+        // Check if your 'interest' string contains the star emoji to imply it has a rating
+        val ratingPrefix = if (place.interest.contains("⭐")) "highly-rated " else ""
+        val safeCategory = place.category.ifBlank { "destination" }.lowercase()
+        val safeAddress = place.address.ifBlank { "the area" }
+
+        return "${place.name} is a $ratingPrefix$safeCategory located at $safeAddress. Lets check it out!"
+    }
+
+    // Creates an event in the database with the current form data
     fun createEvent(onSuccess: () -> Unit) {
         val uid = auth.currentUser?.uid ?: return
         _isCreating.value = true
@@ -155,6 +214,7 @@ class CreateEventViewModel(private val groupId: String) : ViewModel() {
 
     @Suppress("UNCHECKED_CAST")
     class Factory(private val groupId: String) : ViewModelProvider.Factory {
-        override fun <T : ViewModel> create(modelClass: Class<T>): T = CreateEventViewModel(groupId) as T
+        override fun <T : ViewModel> create(modelClass: Class<T>): T =
+            CreateEventViewModel(groupId) as T
     }
 }

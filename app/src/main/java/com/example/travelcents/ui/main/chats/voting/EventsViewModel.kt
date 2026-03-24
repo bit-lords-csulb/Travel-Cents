@@ -16,7 +16,7 @@ import kotlinx.coroutines.flow.asStateFlow
 class EventsViewModel(val groupId: String) : ViewModel() {
 
     private val auth = Firebase.auth
-    private val db   = Firebase.firestore
+    private val db = Firebase.firestore
 
     val currentUid: String get() = auth.currentUser?.uid ?: ""
 
@@ -28,7 +28,9 @@ class EventsViewModel(val groupId: String) : ViewModel() {
 
     private var eventsListener: ListenerRegistration? = null
 
-    init { startListening() }
+    init {
+        startListening()
+    }
 
     private fun startListening() {
         if (groupId.isEmpty()) return
@@ -40,21 +42,23 @@ class EventsViewModel(val groupId: String) : ViewModel() {
                 _isLoading.value = false
                 if (error != null || snapshot == null) return@addSnapshotListener
                 _events.value = snapshot.documents.mapNotNull { doc ->
-                    val upvotes   = (doc.get("upvotes")   as? List<*>)?.filterIsInstance<String>() ?: emptyList()
-                    val downvotes = (doc.get("downvotes") as? List<*>)?.filterIsInstance<String>() ?: emptyList()
+                    val upvotes =
+                        (doc.get("upvotes") as? List<*>)?.filterIsInstance<String>() ?: emptyList()
+                    val downvotes = (doc.get("downvotes") as? List<*>)?.filterIsInstance<String>()
+                        ?: emptyList()
                     Event(
-                        id            = doc.id,
-                        title         = doc.getString("title")         ?: "",
-                        description   = doc.getString("description")   ?: "",
-                        location      = doc.getString("location")      ?: "",
-                        time          = doc.getString("time")          ?: "",
-                        createdBy     = doc.getString("createdBy")     ?: "",
+                        id = doc.id,
+                        title = doc.getString("title") ?: "",
+                        description = doc.getString("description") ?: "",
+                        location = doc.getString("location") ?: "",
+                        time = doc.getString("time") ?: "",
+                        createdBy = doc.getString("createdBy") ?: "",
                         createdByName = doc.getString("createdByName") ?: "",
-                        createdAt     = doc.getTimestamp("createdAt"),
-                        upvotes       = upvotes,
-                        downvotes     = downvotes,
-                        photoUrl      = doc.getString("photoUrl") ?: "",
-                        commentCount  = (doc.getLong("commentCount") ?: 0L).toInt()
+                        createdAt = doc.getTimestamp("createdAt"),
+                        upvotes = upvotes,
+                        downvotes = downvotes,
+                        photoUrl = doc.getString("photoUrl") ?: "",
+                        commentCount = (doc.getLong("commentCount") ?: 0L).toInt()
                     )
                 }
             }
@@ -70,7 +74,7 @@ class EventsViewModel(val groupId: String) : ViewModel() {
             // Add upvote and remove any downvote
             ref.update(
                 mapOf(
-                    "upvotes"   to FieldValue.arrayUnion(currentUid),
+                    "upvotes" to FieldValue.arrayUnion(currentUid),
                     "downvotes" to FieldValue.arrayRemove(currentUid)
                 )
             )
@@ -88,7 +92,7 @@ class EventsViewModel(val groupId: String) : ViewModel() {
             ref.update(
                 mapOf(
                     "downvotes" to FieldValue.arrayUnion(currentUid),
-                    "upvotes"   to FieldValue.arrayRemove(currentUid)
+                    "upvotes" to FieldValue.arrayRemove(currentUid)
                 )
             )
         }
