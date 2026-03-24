@@ -1,5 +1,6 @@
 package com.example.travelcents.ui.main.chats.voting
 
+import android.graphics.Paint
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
@@ -37,9 +38,9 @@ fun EventCommentsPage(
         factory = EventCommentsViewModel.Factory(groupId, event.id)
     )
 ) {
-    val comments    by viewModel.comments.collectAsState()
+    val comments by viewModel.comments.collectAsState()
     val commentText by viewModel.commentText.collectAsState()
-    val listState   = rememberLazyListState()
+    val listState = rememberLazyListState()
 
     LaunchedEffect(comments.size) {
         if (comments.isNotEmpty()) listState.animateScrollToItem(comments.size - 1)
@@ -56,36 +57,37 @@ fun EventCommentsPage(
                 .fillMaxWidth()
                 .clip(RoundedCornerShape(bottomStart = 24.dp, bottomEnd = 24.dp))
                 .background(DeepSea2)
-                .padding(top = 48.dp, start = 20.dp, end = 20.dp, bottom = 20.dp)
+                .padding(top = 48.dp, bottom = 20.dp)
         ) {
-            Column(modifier = Modifier.fillMaxWidth()) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Box(
-                        modifier = Modifier
-                            .size(40.dp)
-                            .clip(CircleShape)
-                            .background(DeepSea3)
-                            .clickable { onBackClick() },
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Icon(
-                            imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                            contentDescription = "Back",
-                            tint = DeepSea5,
-                            modifier = Modifier.size(20.dp)
-                        )
-                    }
-                    Spacer(modifier = Modifier.width(12.dp))
-                    Column {
-                        Text("Comments", fontSize = 22.sp, fontWeight = FontWeight.Bold, color = DeepSea5)
-                        Text(
-                            text = event.title.uppercase(),
-                            fontSize = 11.sp,
-                            color = DeepSea5.copy(alpha = 0.5f),
-                            letterSpacing = 1.sp
-                        )
-                    }
-                }
+            // Back button
+            IconButton(
+                onClick = {
+                    onBackClick()
+                },
+                modifier = Modifier
+                    .align(Alignment.CenterStart)
+                    .padding(start = 8.dp)
+            ) {
+                Icon(Icons.AutoMirrored.Filled.ArrowBack, "Back", tint = DeepSea5)
+            }
+
+            // Comments Title
+            Column(
+                modifier = Modifier.align(Alignment.Center),
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
+                Text(
+                    text = "Comments",
+                    fontSize = 20.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = DeepSea5
+                )
+                Text(
+                    text = event.title.uppercase(),
+                    fontSize = 10.sp,
+                    color = DeepSea5.copy(alpha = 0.5f),
+                    letterSpacing = 1.sp
+                )
             }
         }
 
@@ -116,17 +118,19 @@ fun EventCommentsPage(
             TextField(
                 value = commentText,
                 onValueChange = { viewModel.onCommentTextChange(it) },
-                modifier = Modifier.weight(1f).clip(RoundedCornerShape(28.dp)),
+                modifier = Modifier
+                    .weight(1f)
+                    .clip(RoundedCornerShape(28.dp)),
                 placeholder = { Text("Add a comment...", color = DeepSea5.copy(alpha = 0.4f)) },
                 singleLine = true,
                 colors = TextFieldDefaults.colors(
-                    focusedContainerColor   = DeepSea3,
+                    focusedContainerColor = DeepSea3,
                     unfocusedContainerColor = DeepSea3,
-                    focusedIndicatorColor   = Color.Transparent,
+                    focusedIndicatorColor = Color.Transparent,
                     unfocusedIndicatorColor = Color.Transparent,
-                    cursorColor             = DeepSea5,
-                    focusedTextColor        = DeepSea5,
-                    unfocusedTextColor      = DeepSea5
+                    cursorColor = DeepSea5,
+                    focusedTextColor = DeepSea5,
+                    unfocusedTextColor = DeepSea5
                 )
             )
             Spacer(modifier = Modifier.width(10.dp))
@@ -149,6 +153,7 @@ fun EventCommentsPage(
     }
 }
 
+// Helpers
 @Composable
 fun CommentBubble(comment: EventComment, isMe: Boolean) {
     Row(
@@ -190,7 +195,7 @@ fun CommentBubble(comment: EventComment, isMe: Boolean) {
                         RoundedCornerShape(
                             topStart = 18.dp, topEnd = 18.dp,
                             bottomStart = if (isMe) 18.dp else 4.dp,
-                            bottomEnd   = if (isMe) 4.dp else 18.dp
+                            bottomEnd = if (isMe) 4.dp else 18.dp
                         )
                     )
                     .background(if (isMe) DeepSea3 else DeepSea2)

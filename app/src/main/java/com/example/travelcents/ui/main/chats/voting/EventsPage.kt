@@ -66,12 +66,27 @@ fun EventsPage(
                     .padding(horizontal = 24.dp)
                     .padding(bottom = 64.dp)
             ) {
-                Text(selectedEventForDetails!!.title, fontSize = 24.sp, fontWeight = FontWeight.Bold, color = DeepSea5)
+                Text(
+                    selectedEventForDetails!!.title,
+                    fontSize = 24.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = DeepSea5
+                )
                 Spacer(modifier = Modifier.height(8.dp))
 
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    Icon(Icons.Default.LocationOn, null, tint = DeepSea5.copy(alpha = 0.4f), modifier = Modifier.size(14.dp))
-                    Text(selectedEventForDetails!!.location, color = DeepSea5.copy(alpha = 0.6f), fontSize = 13.sp, modifier = Modifier.padding(start = 4.dp))
+                    Icon(
+                        Icons.Default.LocationOn,
+                        null,
+                        tint = DeepSea5.copy(alpha = 0.4f),
+                        modifier = Modifier.size(14.dp)
+                    )
+                    Text(
+                        selectedEventForDetails!!.location,
+                        color = DeepSea5.copy(alpha = 0.6f),
+                        fontSize = 13.sp,
+                        modifier = Modifier.padding(start = 4.dp)
+                    )
                 }
 
                 Spacer(modifier = Modifier.height(16.dp))
@@ -106,7 +121,9 @@ fun EventsPage(
         )
     }
 
-    Column(modifier = Modifier.fillMaxSize().background(DeepSea1)) {
+    Column(modifier = Modifier
+        .fillMaxSize()
+        .background(DeepSea1)) {
         // Header
         Box(
             modifier = Modifier
@@ -115,17 +132,55 @@ fun EventsPage(
                 .background(DeepSea2)
                 .padding(top = 48.dp, bottom = 20.dp)
         ) {
-            Column(modifier = Modifier.align(Alignment.Center), horizontalAlignment = Alignment.CenterHorizontally) {
-                Text("${group.name} Trip Ideas", fontSize = 20.sp, fontWeight = FontWeight.Bold, color = DeepSea5)
-                Text("PROPOSED EVENTS", fontSize = 10.sp, fontWeight = FontWeight.SemiBold, color = DeepSea5.copy(alpha = 0.5f), letterSpacing = 1.sp)
+            Column(
+                modifier = Modifier.align(Alignment.Center),
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
+                Text(
+                    "${group.name} Trip Ideas",
+                    fontSize = 20.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = DeepSea5
+                )
+                Text(
+                    "PROPOSED EVENTS",
+                    fontSize = 10.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    color = DeepSea5.copy(alpha = 0.5f),
+                    letterSpacing = 1.sp
+                )
             }
 
-            IconButton(onClick = onBackClick, modifier = Modifier.padding(start = 8.dp).size(48.dp).align(Alignment.CenterStart)) {
-                Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back", tint = DeepSea5, modifier = Modifier.size(28.dp))
+            IconButton(
+                onClick = onBackClick,
+                modifier = Modifier
+                    .padding(start = 8.dp)
+                    .size(48.dp)
+                    .align(Alignment.CenterStart)
+            ) {
+                Icon(
+                    Icons.AutoMirrored.Filled.ArrowBack,
+                    contentDescription = "Back",
+                    tint = DeepSea5,
+                    modifier = Modifier.size(28.dp)
+                )
             }
 
-            IconButton(onClick = onNewEvent, modifier = Modifier.padding(end = 12.dp).size(48.dp).clip(CircleShape).background(DeepSea3).align(Alignment.CenterEnd)) {
-                Icon(Icons.Default.Add, contentDescription = "Add", tint = DeepSea5, modifier = Modifier.size(28.dp))
+            IconButton(
+                onClick = onNewEvent,
+                modifier = Modifier
+                    .padding(end = 12.dp)
+                    .size(48.dp)
+                    .clip(CircleShape)
+                    .background(DeepSea3)
+                    .align(Alignment.CenterEnd)
+            ) {
+                Icon(
+                    Icons.Default.Add,
+                    contentDescription = "Add",
+                    tint = DeepSea5,
+                    modifier = Modifier.size(28.dp)
+                )
             }
         }
 
@@ -137,7 +192,9 @@ fun EventsPage(
             }
         } else {
             LazyColumn(
-                modifier = Modifier.fillMaxSize().padding(horizontal = 16.dp),
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(horizontal = 16.dp),
                 verticalArrangement = Arrangement.spacedBy(12.dp),
                 contentPadding = PaddingValues(bottom = 24.dp)
             ) {
@@ -179,16 +236,27 @@ fun EventCard(
     val hasDownvoted = event.downvotes.contains(currentUid)
 
     Card(
-        modifier = Modifier.fillMaxWidth().combinedClickable(onClick = onClick, onLongClick = onLongPress),
+        modifier = Modifier
+            .fillMaxWidth()
+            .combinedClickable(onClick = onClick, onLongClick = onLongPress),
         colors = CardDefaults.cardColors(containerColor = DeepSea2),
         shape = RoundedCornerShape(20.dp)
     ) {
         Column {
-            Box(modifier = Modifier.fillMaxWidth().height(150.dp)) {
+            Box(modifier = Modifier
+                .fillMaxWidth()
+                .height(150.dp)) {
                 if (event.photoUrl.isNotEmpty()) {
-                    AsyncImage(model = event.photoUrl, contentDescription = null, contentScale = ContentScale.Crop, modifier = Modifier.fillMaxSize())
+                    AsyncImage(
+                        model = event.photoUrl,
+                        contentDescription = null,
+                        contentScale = ContentScale.Crop,
+                        modifier = Modifier.fillMaxSize()
+                    )
                 } else {
-                    Box(modifier = Modifier.fillMaxSize().background(DeepSea3))
+                    Box(modifier = Modifier
+                        .fillMaxSize()
+                        .background(DeepSea3))
                 }
                 UserOverlayTag(event.createdByName)
             }
@@ -198,33 +266,83 @@ fun EventCard(
                 Spacer(modifier = Modifier.width(16.dp))
 
                 Column(modifier = Modifier.weight(1f)) {
-                    Text(text = event.title, color = DeepSea5, fontWeight = FontWeight.Bold, fontSize = 17.sp)
+                    Text(
+                        text = event.title,
+                        color = DeepSea5,
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 17.sp
+                    )
                     if (event.description.isNotBlank()) {
-                        Text(text = event.description, color = DeepSea5.copy(alpha = 0.6f), fontSize = 12.sp, maxLines = 2, lineHeight = 16.sp)
+                        Text(
+                            text = event.description,
+                            color = DeepSea5.copy(alpha = 0.6f),
+                            fontSize = 12.sp,
+                            maxLines = 2,
+                            lineHeight = 16.sp
+                        )
                     }
 
                     Spacer(modifier = Modifier.height(8.dp))
 
                     Box(modifier = Modifier.fillMaxWidth()) {
-                        Column(modifier = Modifier.align(Alignment.BottomStart), verticalArrangement = Arrangement.spacedBy(0.dp)) {
+                        Column(
+                            modifier = Modifier.align(Alignment.BottomStart),
+                            verticalArrangement = Arrangement.spacedBy(0.dp)
+                        ) {
                             Row(verticalAlignment = Alignment.CenterVertically) {
-                                Icon(Icons.Default.LocationOn, null, tint = DeepSea5.copy(alpha = 0.4f), modifier = Modifier.size(13.dp))
-                                Text(text = event.location, color = DeepSea5.copy(alpha = 0.4f), fontSize = 11.sp, modifier = Modifier.padding(start = 4.dp))
+                                Icon(
+                                    Icons.Default.LocationOn,
+                                    null,
+                                    tint = DeepSea5.copy(alpha = 0.4f),
+                                    modifier = Modifier.size(13.dp)
+                                )
+                                Text(
+                                    text = event.location,
+                                    color = DeepSea5.copy(alpha = 0.4f),
+                                    fontSize = 11.sp,
+                                    modifier = Modifier.padding(start = 4.dp)
+                                )
                             }
                             Row(verticalAlignment = Alignment.CenterVertically) {
-                                Icon(Icons.Default.Schedule, null, tint = DeepSea5.copy(alpha = 0.4f), modifier = Modifier.size(13.dp))
-                                Text(text = event.time, color = DeepSea5.copy(alpha = 0.4f), fontSize = 11.sp, modifier = Modifier.padding(start = 4.dp))
+                                Icon(
+                                    Icons.Default.Schedule,
+                                    null,
+                                    tint = DeepSea5.copy(alpha = 0.4f),
+                                    modifier = Modifier.size(13.dp)
+                                )
+                                Text(
+                                    text = event.time,
+                                    color = DeepSea5.copy(alpha = 0.4f),
+                                    fontSize = 11.sp,
+                                    modifier = Modifier.padding(start = 4.dp)
+                                )
                             }
                         }
 
                         Surface(
-                            modifier = Modifier.align(Alignment.BottomEnd).clip(RoundedCornerShape(10.dp)).clickable { onCommentClick() },
+                            modifier = Modifier
+                                .align(Alignment.BottomEnd)
+                                .clip(RoundedCornerShape(10.dp))
+                                .clickable { onCommentClick() },
                             color = DeepSea3.copy(alpha = 0.6f)
                         ) {
-                            Row(modifier = Modifier.padding(horizontal = 8.dp, vertical = 6.dp), verticalAlignment = Alignment.CenterVertically) {
-                                Icon(imageVector = Icons.Outlined.ChatBubbleOutline, contentDescription = null, tint = DeepSea5, modifier = Modifier.size(16.dp))
+                            Row(
+                                modifier = Modifier.padding(horizontal = 8.dp, vertical = 6.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Outlined.ChatBubbleOutline,
+                                    contentDescription = null,
+                                    tint = DeepSea5,
+                                    modifier = Modifier.size(16.dp)
+                                )
                                 Spacer(modifier = Modifier.width(6.dp))
-                                Text(text = "${event.commentCount}", color = DeepSea5, fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                                Text(
+                                    text = "${event.commentCount}",
+                                    color = DeepSea5,
+                                    fontSize = 12.sp,
+                                    fontWeight = FontWeight.Bold
+                                )
                             }
                         }
                     }
@@ -237,28 +355,78 @@ fun EventCard(
 @Composable
 fun UserOverlayTag(name: String) {
     Row(
-        modifier = Modifier.padding(12.dp).clip(CircleShape).background(Color.Black.copy(alpha = 0.6f)).padding(horizontal = 10.dp, vertical = 6.dp),
+        modifier = Modifier
+            .padding(12.dp)
+            .clip(CircleShape)
+            .background(Color.Black.copy(alpha = 0.6f))
+            .padding(horizontal = 10.dp, vertical = 6.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        Box(modifier = Modifier.size(18.dp).clip(CircleShape).background(Color.Gray))
+        Box(modifier = Modifier
+            .size(18.dp)
+            .clip(CircleShape)
+            .background(Color.Gray))
         Spacer(modifier = Modifier.width(8.dp))
-        Text(name.split(" ").first(), color = Color.White, fontSize = 12.sp, fontWeight = FontWeight.Medium)
+        Text(
+            name.split(" ").first(),
+            color = Color.White,
+            fontSize = 12.sp,
+            fontWeight = FontWeight.Medium
+        )
     }
 }
 
 @Composable
-fun VotingSideBar(score: Int, upvoted: Boolean, downvoted: Boolean, onUp: () -> Unit, onDown: () -> Unit) {
+fun VotingSideBar(
+    score: Int,
+    upvoted: Boolean,
+    downvoted: Boolean,
+    onUp: () -> Unit,
+    onDown: () -> Unit
+) {
     Column(
-        modifier = Modifier.width(40.dp).clip(RoundedCornerShape(12.dp)).background(DeepSea3).padding(vertical = 4.dp),
+        modifier = Modifier
+            .width(40.dp)
+            .clip(RoundedCornerShape(12.dp))
+            .background(DeepSea3)
+            .padding(vertical = 4.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center
     ) {
-        Box(modifier = Modifier.size(32.dp).clip(CircleShape).clickable { onUp() }, contentAlignment = Alignment.Center) {
-            Icon(Icons.Default.KeyboardArrowUp, null, tint = if (upvoted) Color(0xFF81C784) else DeepSea5.copy(alpha = 0.4f), modifier = Modifier.size(24.dp))
+        Box(
+            modifier = Modifier
+                .size(32.dp)
+                .clip(CircleShape)
+                .clickable { onUp() },
+            contentAlignment = Alignment.Center
+        ) {
+            Icon(
+                Icons.Default.KeyboardArrowUp,
+                null,
+                tint = if (upvoted) Color(0xFF81C784) else DeepSea5.copy(alpha = 0.4f),
+                modifier = Modifier.size(24.dp)
+            )
         }
-        Text(text = "$score", color = DeepSea5, fontWeight = FontWeight.ExtraBold, fontSize = 15.sp, modifier = Modifier.padding(vertical = 2.dp))
-        Box(modifier = Modifier.size(32.dp).clip(CircleShape).clickable { onDown() }, contentAlignment = Alignment.Center) {
-            Icon(Icons.Default.KeyboardArrowDown, null, tint = if (downvoted) Color(0xFFE57373) else DeepSea5.copy(alpha = 0.4f), modifier = Modifier.size(24.dp))
+        Text(
+            text = "$score",
+            color = DeepSea5,
+            fontWeight = FontWeight.ExtraBold,
+            fontSize = 15.sp,
+            modifier = Modifier.padding(vertical = 2.dp)
+        )
+        Box(
+            modifier = Modifier
+                .size(32.dp)
+                .clip(CircleShape)
+                .clickable { onDown() },
+            contentAlignment = Alignment.Center
+        ) {
+            Icon(
+                Icons.Default.KeyboardArrowDown,
+                null,
+                tint = if (downvoted) Color(0xFFE57373) else DeepSea5.copy(alpha = 0.4f),
+                modifier = Modifier.size(24.dp)
+            )
         }
     }
 }
