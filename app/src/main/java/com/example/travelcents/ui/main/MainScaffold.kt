@@ -73,7 +73,7 @@ private data class BottomNavItem(
 )
 
 @Composable
-fun MainScaffold(modifier: Modifier = Modifier) {
+fun MainScaffold(modifier: Modifier = Modifier, onLogout: () -> Unit = {}) {
     val newTripViewModel: NewTripViewModel = viewModel()
     val navController = rememberNavController()
     val navBackStackEntry by navController.currentBackStackEntryAsState()
@@ -143,7 +143,12 @@ fun MainScaffold(modifier: Modifier = Modifier) {
                 }
                 composable(MainRoutes.Home) { HomePage(modifier = Modifier.fillMaxSize()) }
                 composable(MainRoutes.Chats) { ChatsScreen(modifier = Modifier.fillMaxSize()) }
-                composable(MainRoutes.Settings) { SettingsPage(modifier = Modifier.fillMaxSize()) }
+                composable(MainRoutes.Settings) { 
+                    SettingsPage(
+                        modifier = Modifier.fillMaxSize(),
+                        onLoggedOut = onLogout
+                    ) 
+                }
                 composable(MainRoutes.AiTripChat) {
                     AiTripChatPage(
                         modifier = Modifier.fillMaxSize(),

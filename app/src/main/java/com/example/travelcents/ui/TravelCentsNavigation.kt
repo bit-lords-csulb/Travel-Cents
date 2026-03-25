@@ -25,7 +25,14 @@ fun TravelCentsNavigation(modifier: Modifier = Modifier, authViewModel: AuthView
         }
 
         composable("home") {
-            MainScaffold(modifier = modifier)
+            MainScaffold(
+                modifier = modifier,
+                onLogout = {
+                    navController.navigate("login") {
+                        popUpTo("home") { inclusive = true }
+                    }
+                }
+            )
         }
 
         composable("forgot_password") {
