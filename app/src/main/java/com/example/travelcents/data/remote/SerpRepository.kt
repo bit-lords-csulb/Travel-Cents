@@ -1,11 +1,11 @@
 package com.example.travelcents.data.remote
 
-import com.example.travelcents.BuildConfig
 import com.example.travelcents.data.model.Itinerary
 import com.example.travelcents.data.model.SerpFlightLeg
 import com.example.travelcents.data.model.SerpHotelProperty
 import com.example.travelcents.data.model.TravelEvent
 import com.example.travelcents.data.model.TravelRequest
+import com.example.travelcents.BuildConfig
 import okhttp3.OkHttpClient
 import okhttp3.logging.HttpLoggingInterceptor
 import retrofit2.Retrofit
