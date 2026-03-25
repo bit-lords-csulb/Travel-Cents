@@ -1,11 +1,11 @@
 package com.example.travelcents.data.remote
 
-import com.example.travelcents.BuildConfig
 import com.example.travelcents.data.model.GroqMessage
 import com.example.travelcents.data.model.GroqRequest
 import com.example.travelcents.data.model.Itinerary
 import com.example.travelcents.data.model.TravelEvent
 import com.example.travelcents.data.model.TravelRequest
+import com.example.travelcents.BuildConfig
 import com.google.gson.Gson
 import com.google.gson.JsonObject
 import com.google.gson.reflect.TypeToken

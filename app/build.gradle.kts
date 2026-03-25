@@ -17,7 +17,7 @@ android {
 
     defaultConfig {
         applicationId = "com.example.travelcents"
-        minSdk = 24
+        minSdk = 26
         targetSdk = 35
         versionCode = 1
         versionName = "1.0"
@@ -31,6 +31,10 @@ android {
         buildConfigField(
             "String", "SERP_API_KEY",
             "\"${localProperties.getProperty("SERP_API_KEY") ?: ""}\""
+        )
+        buildConfigField(
+            "String", "YELP_API_KEY",
+            "\"${localProperties.getProperty("YELP_API_KEY") ?: ""}\""
         )
     }
 
@@ -85,6 +89,12 @@ dependencies {
     implementation(libs.androidx.compose.foundation.layout)
     implementation(libs.androidx.lifecycle.runtime.compose)
     implementation("io.coil-kt:coil-compose:2.7.0")
+
+    // Ktor Networking
+    implementation("io.ktor:ktor-client-core:3.0.1")
+    implementation("io.ktor:ktor-client-android:3.0.1")
+    implementation("io.ktor:ktor-client-content-negotiation:3.0.1")
+    implementation("io.ktor:ktor-serialization-kotlinx-json:3.0.1")
 
     implementation(libs.androidx.material3)
     implementation(libs.androidx.lifecycle.viewmodel.ktx)

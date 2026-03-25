@@ -1,9 +1,9 @@
 package com.example.travelcents.data
 
-import com.example.travelcents.ui.main.chats.chat.DirectChatPreview
+import com.example.travelcents.data.model.DirectChatPreview
 import com.example.travelcents.ui.main.chats.friends.Friend
-import com.example.travelcents.ui.main.chats.chat.Group
-import com.example.travelcents.ui.main.chats.chat.Message
+import com.example.travelcents.data.model.Group
+import com.example.travelcents.data.model.Message
 import com.google.firebase.Timestamp
 import com.google.firebase.firestore.FieldPath
 import com.google.firebase.firestore.FieldValue

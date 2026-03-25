@@ -1,9 +1,9 @@
 package com.example.travelcents.ui.main
 
+import com.example.travelcents.BuildConfig
 import androidx.compose.runtime.mutableStateListOf
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.example.travelcents.BuildConfig
 import com.example.travelcents.data.ChatMessage
 import com.example.travelcents.data.GroqApi
 import com.example.travelcents.data.GroqMessage
