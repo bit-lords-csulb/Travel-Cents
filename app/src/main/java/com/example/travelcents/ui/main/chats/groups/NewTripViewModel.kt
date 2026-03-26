@@ -1,9 +1,10 @@
-package com.example.travelcents.ui.main.chats
+package com.example.travelcents.ui.main.chats.groups
 
+import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.travelcents.data.FirestoreRepository
-import com.example.travelcents.ui.main.chats.chat.Group
+import com.example.travelcents.data.model.Group
 import com.example.travelcents.ui.main.chats.friends.Friend
 import com.google.firebase.Firebase
 import com.google.firebase.auth.auth
@@ -35,7 +36,10 @@ class NewTripViewModel(
     private val _isCreating = MutableStateFlow(false)
     val isCreating: StateFlow<Boolean> = _isCreating.asStateFlow()
 
-    val filteredFriends: StateFlow<List<Friend>> = combine(_allFriends, _friendSearch) { friends, query ->
+    val filteredFriends: StateFlow<List<Friend>> = combine(
+        _allFriends,
+        _friendSearch
+    ) { friends, query ->
         if (query.isBlank()) {
             emptyList()
         } else {
@@ -46,7 +50,7 @@ class NewTripViewModel(
         }
     }.stateIn(
         scope = viewModelScope,
-        started = SharingStarted.WhileSubscribed(5000),
+        started = SharingStarted.Companion.WhileSubscribed(5000),
         initialValue = emptyList()
     )
 
@@ -58,7 +62,7 @@ class NewTripViewModel(
         if (currentUid.isEmpty()) return
         repository.fetchFriends(currentUid) { friends ->
             _allFriends.value = friends
-            android.util.Log.d("NewTripVM", "Loaded ${friends.size} friends: $friends")
+            Log.d("NewTripVM", "Loaded ${friends.size} friends: $friends")
         }
     }
 
