@@ -157,4 +157,22 @@ class AuthViewModel : ViewModel() {
         }
         return true
     }
+    // Log in user with Google ID Token
+    fun logInWithGoogle(idToken: String) {
+        viewModelScope.launch {
+            _isLoading.value = true
+            _errorMessage.value = null
+
+            val result = authModel.signInWithGoogle(idToken)
+
+            _isLoading.value = false
+            result.fold(
+                onSuccess = { _isLoggedIn.value = true },
+                onFailure = { error ->
+                    _errorMessage.value = "Google Login failed. Please try again."
+                }
+            )
+        }
+    }
 }
+
