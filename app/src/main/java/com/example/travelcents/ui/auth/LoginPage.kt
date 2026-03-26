@@ -363,9 +363,8 @@ fun GoogleSignInButton(authViewModel: AuthViewModel) {
                         val googleIdTokenCredential = GoogleIdTokenCredential.createFrom(credential.data)
                         val idToken = googleIdTokenCredential.idToken
 
-                        // We will pass this to AuthViewModel in Step 3!
                         Log.d("GoogleAuth", "Got ID Token: $idToken")
-                        // authViewModel.logInWithGoogle(idToken)
+                        authViewModel.logInWithGoogle(idToken)
                     }
                 } catch (e: GetCredentialException) {
                     Log.e("GoogleAuth", "Google Sign-In failed", e)
