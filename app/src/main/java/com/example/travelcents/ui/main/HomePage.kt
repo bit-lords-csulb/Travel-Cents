@@ -37,7 +37,7 @@ import androidx.compose.material.icons.filled.FlightTakeoff
 import androidx.compose.material.icons.filled.Hotel
 import androidx.compose.material.icons.filled.MoreHoriz
 import androidx.compose.material.icons.filled.Notifications
-import androidx.compose.material.icons.filled.OpenInNew
+import androidx.compose.material.icons.automirrored.filled.OpenInNew
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.SwapVert
 import androidx.compose.material3.Card
@@ -79,12 +79,10 @@ import com.example.travelcents.ui.theme.DeepSea4
 import com.example.travelcents.ui.theme.DeepSea5
 import java.time.LocalDate
 import java.time.format.DateTimeFormatter
-import java.time.format.TextStyle as DateTextStyle
 import java.time.temporal.ChronoUnit
-import java.util.Locale
 import kotlin.math.abs
 
-// Accent colours that mirror the HTML template's primary palette
+// Accent colors that mirror the HTML template's primary palette
 private val Primary = Color(0xFF64B5F6)
 private val PrimaryDim = Color(0xFF54A7E7)
 private val SurfaceBright = Color(0xFF243447)
@@ -968,7 +966,7 @@ private fun DocumentsWidget() {
                 contentAlignment = Alignment.Center
             ) {
                 Icon(
-                    imageVector = Icons.Default.OpenInNew,
+                    imageVector = Icons.AutoMirrored.Filled.OpenInNew,
                     contentDescription = null,
                     tint = Color.White,
                     modifier = Modifier.size(18.dp)
@@ -976,19 +974,4 @@ private fun DocumentsWidget() {
             }
         }
     }
-}
-
-// ─────────────────────────────────────────────────────────────
-// Helpers
-// ─────────────────────────────────────────────────────────────
-
-private fun Int.ordinalSuffix(): String {
-    val suffix = when {
-        this in 11..13 -> "th"
-        this % 10 == 1 -> "st"
-        this % 10 == 2 -> "nd"
-        this % 10 == 3 -> "rd"
-        else -> "th"
-    }
-    return "$this$suffix"
 }
