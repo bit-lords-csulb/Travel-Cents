@@ -162,6 +162,7 @@ fun LoginPage(modifier: Modifier = Modifier, navController: NavController, authV
                 authViewModel.clearError()
             },
             placeholder = { Text("email or username", color = Color.Gray, fontSize = 14.sp) },
+            singleLine = true,
             modifier = Modifier
                 .fillMaxWidth()
                 .height(50.dp)
@@ -172,6 +173,14 @@ fun LoginPage(modifier: Modifier = Modifier, navController: NavController, authV
                             focusManager.moveFocus(
                                 if (event.isShiftPressed) FocusDirection.Previous else FocusDirection.Next
                             )
+                            true
+                        }
+                        event.key == Key.Enter && event.type == KeyEventType.KeyDown -> {
+                            if (email.isNotBlank() && password.isNotBlank()) {
+                                authViewModel.logIn(email, password)
+                            } else {
+                                passwordFocusRequester.requestFocus()
+                            }
                             true
                         }
                         else -> false
@@ -207,6 +216,7 @@ fun LoginPage(modifier: Modifier = Modifier, navController: NavController, authV
             },
             placeholder = { Text("enter password", color = Color.Gray, fontSize = 14.sp) },
             visualTransformation = PasswordVisualTransformation(),
+            singleLine = true,
             modifier = Modifier
                 .fillMaxWidth()
                 .height(50.dp)
