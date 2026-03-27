@@ -1,56 +1,69 @@
 package com.example.travelcents.ui.main
 
+import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.aspectRatio
+import androidx.compose.foundation.layout.IntrinsicSize
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Bookmark
+import androidx.compose.material.icons.filled.ChevronRight
 import androidx.compose.material.icons.filled.Description
+import androidx.compose.material.icons.filled.Flight
+import androidx.compose.material.icons.filled.FlightTakeoff
+import androidx.compose.material.icons.filled.Hotel
+import androidx.compose.material.icons.filled.MoreHoriz
+import androidx.compose.material.icons.filled.Notifications
+import androidx.compose.material.icons.filled.OpenInNew
+import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.SwapVert
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DropdownMenuItem
-import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.ExposedDropdownMenuAnchorType
-import androidx.compose.material3.ExposedDropdownMenuBox
-import androidx.compose.material3.ExposedDropdownMenuDefaults
+import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
-import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
@@ -71,6 +84,11 @@ import java.time.temporal.ChronoUnit
 import java.util.Locale
 import kotlin.math.abs
 
+// Accent colours that mirror the HTML template's primary palette
+private val Primary = Color(0xFF64B5F6)
+private val PrimaryDim = Color(0xFF54A7E7)
+private val SurfaceBright = Color(0xFF243447)
+
 // ─────────────────────────────────────────────────────────────
 // Entry point
 // ─────────────────────────────────────────────────────────────
@@ -88,45 +106,27 @@ fun HomePage(
             .fillMaxSize()
             .background(DeepSea1)
             .verticalScroll(rememberScrollState())
-            .padding(16.dp)
     ) {
-        // ── Header ──────────────────────────────────────────
-        Text(
-            text = "My Trips",
-            color = Color.White,
-            fontSize = 26.sp,
-            fontWeight = FontWeight.Bold
-        )
-        Spacer(modifier = Modifier.height(16.dp))
+        HomeHeader()
 
-        // ── Trips carousel ──────────────────────────────────
+        Spacer(modifier = Modifier.height(4.dp))
+
         TripsCarousel(
             trips = homeUiState.trips,
             tripImages = homeUiState.tripImages,
             isLoading = homeUiState.isLoading
         )
 
-        Spacer(modifier = Modifier.height(16.dp))
+        Spacer(modifier = Modifier.height(24.dp))
 
-        // ── 2 × 2 widget grid ───────────────────────────────
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(12.dp)
+        Column(
+            modifier = Modifier.padding(horizontal = 16.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
-            // Left column
-            Column(
-                modifier = Modifier.weight(1f),
-                verticalArrangement = Arrangement.spacedBy(12.dp)
-            ) {
-                SavedPlacesWidget()
-                TripStatusWidget()
-            }
-            // Right column
-            Column(
-                modifier = Modifier.weight(1f),
-                verticalArrangement = Arrangement.spacedBy(12.dp)
-            ) {
-                CompactCurrencyWidget(
+            Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                SavedPlacesWidget(modifier = Modifier.weight(1f).aspectRatio(1f))
+                CurrencyWidget(
+                    modifier = Modifier.weight(1f).aspectRatio(1f),
                     amount = currencyViewModel.amount,
                     fromCurrency = currencyViewModel.fromCurrency,
                     toCurrency = currencyViewModel.toCurrency,
@@ -140,11 +140,70 @@ fun HomePage(
                     onToCurrencyChange = currencyViewModel::onToCurrencyChange,
                     onSwap = currencyViewModel::swap
                 )
-                YourDocumentsWidget()
             }
+
+            TripStatusWidget(trip = homeUiState.trips.firstOrNull())
+
+            DocumentsWidget()
         }
 
-        Spacer(modifier = Modifier.height(16.dp))
+        Spacer(modifier = Modifier.height(24.dp))
+    }
+}
+
+// ─────────────────────────────────────────────────────────────
+// Header
+// ─────────────────────────────────────────────────────────────
+
+@Composable
+private fun HomeHeader() {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 16.dp, vertical = 16.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.SpaceBetween
+    ) {
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            Box(
+                modifier = Modifier
+                    .size(40.dp)
+                    .clip(CircleShape)
+                    .background(DeepSea2)
+                    .border(1.5.dp, Primary.copy(alpha = 0.3f), CircleShape),
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(
+                    imageVector = Icons.Default.Person,
+                    contentDescription = "Profile",
+                    tint = DeepSea4,
+                    modifier = Modifier.size(22.dp)
+                )
+            }
+            Text(
+                text = "My Trips",
+                color = Primary,
+                fontSize = 24.sp,
+                fontWeight = FontWeight.Bold
+            )
+        }
+        Box(
+            modifier = Modifier
+                .size(40.dp)
+                .clip(CircleShape)
+                .clickable { },
+            contentAlignment = Alignment.Center
+        ) {
+            Icon(
+                imageVector = Icons.Default.Notifications,
+                contentDescription = "Notifications",
+                tint = Primary,
+                modifier = Modifier.size(24.dp)
+            )
+        }
     }
 }
 
@@ -158,50 +217,57 @@ private fun TripsCarousel(
     tripImages: Map<String, String>,
     isLoading: Boolean
 ) {
-    when {
-        isLoading -> CarouselPlaceholder {
-            CircularProgressIndicator(color = DeepSea4, strokeWidth = 2.dp)
-        }
+    Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
+        when {
+            isLoading -> CarouselPlaceholder {
+                CircularProgressIndicator(color = DeepSea4, strokeWidth = 2.dp)
+            }
 
-        trips.isEmpty() -> CarouselPlaceholder {
-            Text(
-                text = "No trips yet. Create one from New Trip.",
-                color = DeepSea4,
-                fontSize = 13.sp
-            )
-        }
+            trips.isEmpty() -> CarouselPlaceholder {
+                Text(
+                    text = "No trips yet. Create one from New Trip.",
+                    color = DeepSea4,
+                    fontSize = 13.sp
+                )
+            }
 
-        else -> {
-            val pagerState = rememberPagerState(pageCount = { trips.size })
-            Column {
+            else -> {
+                val pagerState = rememberPagerState(pageCount = { trips.size })
+
                 HorizontalPager(
                     state = pagerState,
-                    contentPadding = PaddingValues(end = 32.dp),
+                    contentPadding = PaddingValues(end = 48.dp),
                     pageSpacing = 12.dp,
                     modifier = Modifier.fillMaxWidth()
                 ) { page ->
                     TripCard(
                         trip = trips[page],
-                        imageUrl = tripImages[trips[page].destination]
+                        imageUrl = tripImages[trips[page].destination],
+                        isCurrent = page == pagerState.currentPage
                     )
                 }
 
-                Spacer(modifier = Modifier.height(10.dp))
-
-                // Dot indicator
+                // Pill-dot pager indicator
                 Row(
                     modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.Center
+                    horizontalArrangement = Arrangement.Center,
+                    verticalAlignment = Alignment.CenterVertically
                 ) {
                     repeat(trips.size) { index ->
-                        val selected = pagerState.currentPage == index
+                        val isSelected = pagerState.currentPage == index
+                        val indicatorWidth by animateDpAsState(
+                            targetValue = if (isSelected) 24.dp else 6.dp,
+                            label = "indicator_$index"
+                        )
                         Box(
                             modifier = Modifier
                                 .padding(horizontal = 3.dp)
-                                .size(if (selected) 8.dp else 5.dp)
+                                .height(6.dp)
+                                .width(indicatorWidth)
+                                .clip(CircleShape)
                                 .background(
-                                    color = if (selected) Color.White else DeepSea4,
-                                    shape = CircleShape
+                                    if (isSelected) Primary
+                                    else DeepSea3
                                 )
                         )
                     }
@@ -216,8 +282,9 @@ private fun CarouselPlaceholder(content: @Composable () -> Unit) {
     Box(
         modifier = Modifier
             .fillMaxWidth()
-            .height(220.dp)
-            .clip(RoundedCornerShape(16.dp))
+            .padding(horizontal = 16.dp)
+            .aspectRatio(4f / 5f)
+            .clip(RoundedCornerShape(24.dp))
             .background(DeepSea2),
         contentAlignment = Alignment.Center
     ) {
@@ -226,27 +293,22 @@ private fun CarouselPlaceholder(content: @Composable () -> Unit) {
 }
 
 @Composable
-private fun TripCard(trip: Itinerary, imageUrl: String?) {
+private fun TripCard(trip: Itinerary, imageUrl: String?, isCurrent: Boolean) {
     val today = LocalDate.now()
     val countdownDays: Long? = runCatching {
         val fmt = DateTimeFormatter.ofPattern("yyyy-MM-dd")
         ChronoUnit.DAYS.between(today, LocalDate.parse(trip.dateFrom, fmt))
     }.getOrNull()
 
-    val dateRange = formatDateRange(trip.dateFrom, trip.dateTo)
-    val flightLine = trip.destinationIata
-        .takeIf { it.isNotBlank() }
-        ?.let { "Flight to $it" }
-
-    // Use Wikipedia image if available, fall back to picsum placeholder
     val imageSeed = abs(trip.destination.hashCode() % 1000)
-    val resolvedImageUrl = imageUrl ?: "https://picsum.photos/seed/$imageSeed/400/250"
+    val resolvedImageUrl = imageUrl ?: "https://picsum.photos/seed/$imageSeed/400/500"
 
     Box(
         modifier = Modifier
             .fillMaxWidth()
-            .height(220.dp)
-            .clip(RoundedCornerShape(16.dp))
+            .aspectRatio(4f / 5f)
+            .clip(RoundedCornerShape(24.dp))
+            .alpha(if (isCurrent) 1f else 0.6f)
     ) {
         AsyncImage(
             model = resolvedImageUrl,
@@ -255,80 +317,216 @@ private fun TripCard(trip: Itinerary, imageUrl: String?) {
             modifier = Modifier.fillMaxSize()
         )
 
-        // Gradient scrim for text legibility
+        // Gradient scrim
         Box(
             modifier = Modifier
                 .fillMaxSize()
                 .background(
                     Brush.verticalGradient(
-                        colors = listOf(Color.Transparent, Color(0xD0000000)),
-                        startY = 60f
+                        colors = listOf(Color.Transparent, Color(0xE6000000)),
+                        startY = 80f
                     )
                 )
         )
 
+        // Countdown badge (top-right frosted pill)
+        if (countdownDays != null && countdownDays >= 0) {
+            Box(
+                modifier = Modifier
+                    .align(Alignment.TopEnd)
+                    .padding(14.dp)
+                    .background(Color.White.copy(alpha = 0.15f), RoundedCornerShape(50.dp))
+                    .border(0.5.dp, Color.White.copy(alpha = 0.2f), RoundedCornerShape(50.dp))
+                    .padding(horizontal = 12.dp, vertical = 5.dp)
+            ) {
+                Text(
+                    text = "Countdown $countdownDays days",
+                    color = Color.White,
+                    fontSize = 9.sp,
+                    fontWeight = FontWeight.Bold,
+                    letterSpacing = 0.8.sp
+                )
+            }
+        }
+
+        // Trip name + flight info (bottom-left)
         Column(
             modifier = Modifier
                 .align(Alignment.BottomStart)
-                .padding(16.dp)
+                .padding(20.dp)
         ) {
             Text(
                 text = trip.tripName,
                 color = Color.White,
-                fontSize = 18.sp,
-                fontWeight = FontWeight.Bold
+                fontSize = 28.sp,
+                fontWeight = FontWeight.ExtraBold,
+                lineHeight = 32.sp
             )
-            if (dateRange.isNotBlank()) {
-                Text(
-                    text = dateRange,
-                    color = Color.White.copy(alpha = 0.85f),
-                    fontSize = 13.sp
-                )
+            Spacer(modifier = Modifier.height(6.dp))
+            val flightLine = when {
+                trip.originIata.isNotBlank() && trip.destinationIata.isNotBlank() ->
+                    "${trip.originIata} → ${trip.destinationIata}"
+                trip.destinationIata.isNotBlank() -> "Flight to ${trip.destinationIata}"
+                else -> null
             }
             if (flightLine != null) {
-                Text(
-                    text = flightLine,
-                    color = Color.White.copy(alpha = 0.75f),
-                    fontSize = 12.sp
-                )
-            }
-            if (countdownDays != null && countdownDays >= 0) {
-                Text(
-                    text = "Countdown $countdownDays days",
-                    color = Color.White.copy(alpha = 0.75f),
-                    fontSize = 12.sp
-                )
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.FlightTakeoff,
+                        contentDescription = null,
+                        tint = DeepSea4,
+                        modifier = Modifier.size(14.dp)
+                    )
+                    Text(
+                        text = flightLine,
+                        color = DeepSea4,
+                        fontSize = 13.sp,
+                        fontWeight = FontWeight.Medium
+                    )
+                }
             }
         }
     }
 }
 
-private fun formatDateRange(dateFrom: String, dateTo: String): String = runCatching {
-    val fmt = DateTimeFormatter.ofPattern("yyyy-MM-dd")
-    val from = LocalDate.parse(dateFrom, fmt)
-    val to = LocalDate.parse(dateTo, fmt)
-    val month = from.month.getDisplayName(DateTextStyle.FULL, Locale.US)
-    "$month ${from.dayOfMonth.ordinalSuffix()} - ${to.dayOfMonth.ordinalSuffix()}"
-}.getOrDefault("")
+// ─────────────────────────────────────────────────────────────
+// Saved Places Widget
+// ─────────────────────────────────────────────────────────────
 
-private fun Int.ordinalSuffix(): String {
-    val suffix = when {
-        this in 11..13 -> "th"
-        this % 10 == 1 -> "st"
-        this % 10 == 2 -> "nd"
-        this % 10 == 3 -> "rd"
-        else -> "th"
+@Composable
+private fun SavedPlacesWidget(modifier: Modifier = Modifier) {
+    Card(
+        modifier = modifier,
+        shape = RoundedCornerShape(24.dp),
+        colors = CardDefaults.cardColors(containerColor = DeepSea2)
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(14.dp)
+        ) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.Top
+            ) {
+                Text(
+                    text = "Saved Places",
+                    color = DeepSea5,
+                    fontSize = 14.sp,
+                    fontWeight = FontWeight.Bold
+                )
+                Icon(
+                    imageVector = Icons.Default.Bookmark,
+                    contentDescription = null,
+                    tint = Primary,
+                    modifier = Modifier.size(20.dp)
+                )
+            }
+            Spacer(modifier = Modifier.height(10.dp))
+            // 2 × 2 photo grid
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .weight(1f),
+                horizontalArrangement = Arrangement.spacedBy(6.dp)
+            ) {
+                Column(
+                    modifier = Modifier
+                        .weight(1f)
+                        .fillMaxHeight(),
+                    verticalArrangement = Arrangement.spacedBy(6.dp)
+                ) {
+                    AsyncImage(
+                        model = "https://picsum.photos/seed/paris/100/100",
+                        contentDescription = "Paris",
+                        contentScale = ContentScale.Crop,
+                        modifier = Modifier
+                            .weight(1f)
+                            .fillMaxWidth()
+                            .clip(RoundedCornerShape(10.dp))
+                    )
+                    AsyncImage(
+                        model = "https://picsum.photos/seed/cairo/100/100",
+                        contentDescription = "Cairo",
+                        contentScale = ContentScale.Crop,
+                        modifier = Modifier
+                            .weight(1f)
+                            .fillMaxWidth()
+                            .clip(RoundedCornerShape(10.dp))
+                    )
+                }
+                Column(
+                    modifier = Modifier
+                        .weight(1f)
+                        .fillMaxHeight(),
+                    verticalArrangement = Arrangement.spacedBy(6.dp)
+                ) {
+                    AsyncImage(
+                        model = "https://picsum.photos/seed/agra/100/100",
+                        contentDescription = "Agra",
+                        contentScale = ContentScale.Crop,
+                        modifier = Modifier
+                            .weight(1f)
+                            .fillMaxWidth()
+                            .clip(RoundedCornerShape(10.dp))
+                    )
+                    Box(
+                        modifier = Modifier
+                            .weight(1f)
+                            .fillMaxWidth()
+                            .background(SurfaceBright, RoundedCornerShape(10.dp)),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text(
+                            text = "+12",
+                            color = Primary,
+                            fontSize = 13.sp,
+                            fontWeight = FontWeight.Bold
+                        )
+                    }
+                }
+            }
+        }
     }
-    return "$this$suffix"
 }
 
 // ─────────────────────────────────────────────────────────────
-// Compact Currency Widget
+// Currency Widget
 // ─────────────────────────────────────────────────────────────
 
-@OptIn(ExperimentalMaterial3Api::class)
+private fun currencySymbol(code: String) = when (code) {
+    "USD" -> "$"; "CAD" -> "CA$"; "AUD" -> "A$"; "NZD" -> "NZ$"
+    "SGD" -> "S$"; "HKD" -> "HK$"; "MXN" -> "MX$"
+    "EUR" -> "€"
+    "GBP" -> "£"
+    "JPY" -> "¥"; "CNY" -> "¥"
+    "KRW" -> "₩"
+    "INR" -> "₹"
+    "BRL" -> "R$"
+    "TRY" -> "₺"
+    "ILS" -> "₪"
+    "PHP" -> "₱"
+    "THB" -> "฿"
+    "PLN" -> "zł"
+    "ZAR" -> "R"
+    "IDR" -> "Rp"
+    "MYR" -> "RM"
+    "CHF" -> "Fr"
+    "SEK" -> "kr"; "NOK" -> "kr"; "DKK" -> "kr"; "ISK" -> "kr"
+    "HUF" -> "Ft"
+    "CZK" -> "Kč"
+    "RON" -> "lei"
+    "BGN" -> "лв"
+    else -> ""
+}
+
 @Composable
-private fun CompactCurrencyWidget(
+private fun CurrencyWidget(
+    modifier: Modifier = Modifier,
     amount: String,
     fromCurrency: String,
     toCurrency: String,
@@ -343,251 +541,454 @@ private fun CompactCurrencyWidget(
     onSwap: () -> Unit
 ) {
     Card(
-        modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(14.dp),
+        modifier = modifier,
+        shape = RoundedCornerShape(24.dp),
         colors = CardDefaults.cardColors(containerColor = DeepSea2)
     ) {
-        Column(modifier = Modifier.padding(12.dp)) {
-            Text(
-                text = "CURRENCY CONVERSION",
-                color = DeepSea4,
-                fontSize = 9.sp,
-                fontWeight = FontWeight.Bold,
-                letterSpacing = 0.8.sp
-            )
-            Spacer(modifier = Modifier.height(8.dp))
-
-            // From row
+        Column(modifier = Modifier.fillMaxSize().padding(14.dp)) {
+            // Header
             Row(
                 modifier = Modifier.fillMaxWidth(),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(6.dp)
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.Top
             ) {
-                OutlinedTextField(
-                    value = amount,
-                    onValueChange = onAmountChange,
-                    modifier = Modifier.weight(1f),
-                    singleLine = true,
-                    textStyle = TextStyle(fontSize = 13.sp),
-                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
-                    colors = compactTextFieldColors()
+                Text(
+                    text = "Currency",
+                    color = DeepSea5,
+                    fontSize = 14.sp,
+                    fontWeight = FontWeight.Bold
                 )
-                CompactCurrencyDropdown(
-                    selected = fromCurrency,
-                    currencies = currencies,
-                    recentCurrencies = recentCurrencies,
-                    onSelect = onFromCurrencyChange
-                )
-            }
-
-            // Swap button
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(vertical = 4.dp),
-                contentAlignment = Alignment.Center
-            ) {
                 IconButton(
                     onClick = onSwap,
-                    modifier = Modifier
-                        .size(28.dp)
-                        .background(DeepSea3, CircleShape)
+                    modifier = Modifier.size(20.dp)
                 ) {
                     Icon(
                         imageVector = Icons.Default.SwapVert,
                         contentDescription = "Swap currencies",
-                        tint = DeepSea5,
-                        modifier = Modifier.size(16.dp)
+                        tint = Primary,
+                        modifier = Modifier.size(18.dp)
                     )
                 }
             }
 
-            // To row
+            Spacer(modifier = Modifier.weight(1f))
+
+            // FROM row
             Row(
-                modifier = Modifier.fillMaxWidth(),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .background(SurfaceBright, RoundedCornerShape(14.dp))
+                    .padding(horizontal = 12.dp, vertical = 10.dp),
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(6.dp)
             ) {
+                CurrencyCodeDropdown(
+                    selected = fromCurrency,
+                    currencies = currencies,
+                    recentCurrencies = recentCurrencies,
+                    labelColor = DeepSea4,
+                    onSelect = onFromCurrencyChange
+                )
                 Box(
                     modifier = Modifier
-                        .weight(1f)
-                        .height(46.dp)
-                        .background(DeepSea1, RoundedCornerShape(4.dp))
-                        .border(1.dp, DeepSea3, RoundedCornerShape(4.dp))
-                        .padding(horizontal = 10.dp),
-                    contentAlignment = Alignment.CenterStart
-                ) {
-                    when {
-                        isLoading -> CircularProgressIndicator(
-                            modifier = Modifier.size(14.dp),
-                            color = DeepSea4,
-                            strokeWidth = 2.dp
-                        )
-                        error != null -> Text("—", color = Color(0xFFFF6B6B), fontSize = 12.sp)
-                        result != null -> Text(
-                            text = "%.2f".format(result),
-                            color = DeepSea5,
-                            fontSize = 13.sp,
-                            fontWeight = FontWeight.Medium
-                        )
-                        else -> Text("—", color = DeepSea4, fontSize = 13.sp)
-                    }
+                        .height(14.dp)
+                        .width(1.dp)
+                        .background(DeepSea4.copy(alpha = 0.3f))
+                )
+                Spacer(modifier = Modifier.weight(1f))
+                val fromSymbol = currencySymbol(fromCurrency)
+                if (fromSymbol.isNotEmpty()) {
+                    Text(
+                        text = fromSymbol,
+                        color = DeepSea4,
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.Medium
+                    )
                 }
-                CompactCurrencyDropdown(
+                // Box(IntrinsicSize.Min) makes the field shrink to its text width
+                Box(modifier = Modifier.width(IntrinsicSize.Min).widthIn(min = 24.dp, max = 80.dp)) {
+                    BasicTextField(
+                        value = amount,
+                        onValueChange = onAmountChange,
+                        singleLine = true,
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+                        textStyle = TextStyle(
+                            color = DeepSea5,
+                            fontSize = 17.sp,
+                            fontWeight = FontWeight.Bold,
+                            textAlign = TextAlign.End
+                        ),
+                        cursorBrush = SolidColor(Primary),
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                }
+            }
+
+            Spacer(modifier = Modifier.height(8.dp))
+
+            // TO row
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .background(Primary.copy(alpha = 0.1f), RoundedCornerShape(14.dp))
+                    .border(1.dp, Primary.copy(alpha = 0.25f), RoundedCornerShape(14.dp))
+                    .padding(horizontal = 12.dp, vertical = 10.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(6.dp)
+            ) {
+                CurrencyCodeDropdown(
                     selected = toCurrency,
                     currencies = currencies,
                     recentCurrencies = recentCurrencies,
+                    labelColor = Primary,
                     onSelect = onToCurrencyChange
                 )
+                Box(
+                    modifier = Modifier
+                        .height(14.dp)
+                        .width(1.dp)
+                        .background(Primary.copy(alpha = 0.3f))
+                )
+                Spacer(modifier = Modifier.weight(1f))
+                val toSymbol = currencySymbol(toCurrency)
+                when {
+                    isLoading -> CircularProgressIndicator(
+                        modifier = Modifier.size(16.dp),
+                        color = Primary,
+                        strokeWidth = 2.dp
+                    )
+                    error != null -> Text(
+                        text = "—",
+                        color = Color(0xFFFF6B6B),
+                        fontSize = 17.sp,
+                        fontWeight = FontWeight.Bold
+                    )
+                    result != null -> {
+                        if (toSymbol.isNotEmpty()) {
+                            Text(
+                                text = toSymbol,
+                                color = Primary.copy(alpha = 0.7f),
+                                fontSize = 12.sp,
+                                fontWeight = FontWeight.Medium
+                            )
+                        }
+                        Text(
+                            text = "%.2f".format(result),
+                            color = Primary,
+                            fontSize = 17.sp,
+                            fontWeight = FontWeight.Bold
+                        )
+                    }
+                    else -> Text(
+                        text = "—",
+                        color = Primary.copy(alpha = 0.5f),
+                        fontSize = 17.sp,
+                        fontWeight = FontWeight.Bold
+                    )
+                }
             }
         }
     }
 }
 
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun CompactCurrencyDropdown(
+private fun CurrencyCodeDropdown(
     selected: String,
     currencies: List<String>,
     recentCurrencies: List<String>,
+    labelColor: Color,
     onSelect: (String) -> Unit
 ) {
     var expanded by remember { mutableStateOf(false) }
-    var searchQuery by remember { mutableStateOf("") }
-    LaunchedEffect(expanded) { if (!expanded) searchQuery = "" }
 
-    val filtered = remember(searchQuery, currencies) {
-        if (searchQuery.isBlank()) currencies
-        else currencies.filter { it.contains(searchQuery, ignoreCase = true) }
-    }
-
-    ExposedDropdownMenuBox(expanded = expanded, onExpandedChange = { expanded = it }) {
-        OutlinedTextField(
-            value = if (expanded) searchQuery else selected,
-            onValueChange = { searchQuery = it },
-            singleLine = true,
-            placeholder = {
-                if (expanded) Text("Search...", color = DeepSea4, fontSize = 10.sp)
-            },
-            trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = expanded) },
+    Box {
+        Text(
+            text = selected,
+            color = labelColor,
+            fontSize = 10.sp,
+            fontWeight = FontWeight.Bold,
+            letterSpacing = 0.6.sp,
+            maxLines = 1,
             modifier = Modifier
-                .width(80.dp)
-                .menuAnchor(ExposedDropdownMenuAnchorType.PrimaryEditable, true),
-            textStyle = TextStyle(fontSize = 11.sp),
-            colors = compactTextFieldColors()
+                .widthIn(min = 28.dp)
+                .clickable { expanded = true }
         )
-
-        ExposedDropdownMenu(
+        DropdownMenu(
             expanded = expanded,
             onDismissRequest = { expanded = false },
             modifier = Modifier.height(200.dp),
             containerColor = DeepSea2
         ) {
-            if (searchQuery.isBlank() && recentCurrencies.isNotEmpty()) {
+            if (recentCurrencies.isNotEmpty()) {
                 recentCurrencies.forEach { currency ->
                     DropdownMenuItem(
                         text = { Text(currency, color = DeepSea5, fontSize = 11.sp) },
                         onClick = { onSelect(currency); expanded = false },
-                        contentPadding = PaddingValues(horizontal = 10.dp, vertical = 2.dp)
+                        contentPadding = PaddingValues(horizontal = 12.dp, vertical = 2.dp)
                     )
                 }
                 HorizontalDivider(color = DeepSea4.copy(alpha = 0.2f))
             }
-            filtered.forEach { currency ->
+            currencies.forEach { currency ->
                 DropdownMenuItem(
                     text = { Text(currency, color = DeepSea5, fontSize = 11.sp) },
                     onClick = { onSelect(currency); expanded = false },
-                    contentPadding = PaddingValues(horizontal = 10.dp, vertical = 2.dp)
+                    contentPadding = PaddingValues(horizontal = 12.dp, vertical = 2.dp)
                 )
             }
         }
     }
 }
 
-@OptIn(ExperimentalMaterial3Api::class)
-@Composable
-private fun compactTextFieldColors() = OutlinedTextFieldDefaults.colors(
-    focusedTextColor = DeepSea5,
-    unfocusedTextColor = DeepSea5,
-    focusedBorderColor = DeepSea3,
-    unfocusedBorderColor = DeepSea3,
-    cursorColor = DeepSea5,
-    focusedContainerColor = DeepSea1,
-    unfocusedContainerColor = DeepSea1,
-    focusedTrailingIconColor = DeepSea4,
-    unfocusedTrailingIconColor = DeepSea4
-)
-
 // ─────────────────────────────────────────────────────────────
-// Stub Widgets
+// Trip Status Widget
 // ─────────────────────────────────────────────────────────────
 
 @Composable
-private fun SavedPlacesWidget() {
+private fun TripStatusWidget(trip: Itinerary?) {
     Card(
         modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(14.dp),
-        colors = CardDefaults.cardColors(containerColor = DeepSea2)
-    ) {
-        Column(modifier = Modifier.padding(12.dp)) {
-            Text(
-                text = "Saved Places",
-                color = Color.White,
-                fontSize = 13.sp,
-                fontWeight = FontWeight.SemiBold
-            )
-            Spacer(modifier = Modifier.height(6.dp))
-            Text(text = "Coming soon", color = DeepSea4, fontSize = 11.sp)
-        }
-    }
-}
-
-@Composable
-private fun TripStatusWidget() {
-    Card(
-        modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(14.dp),
-        colors = CardDefaults.cardColors(containerColor = DeepSea2)
-    ) {
-        Column(modifier = Modifier.padding(12.dp)) {
-            Text(
-                text = "Trip Status",
-                color = Color.White,
-                fontSize = 13.sp,
-                fontWeight = FontWeight.SemiBold
-            )
-            Spacer(modifier = Modifier.height(6.dp))
-            Text(text = "Live updates for flights", color = DeepSea4, fontSize = 11.sp)
-        }
-    }
-}
-
-@Composable
-private fun YourDocumentsWidget() {
-    Card(
-        modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(14.dp),
+        shape = RoundedCornerShape(24.dp),
         colors = CardDefaults.cardColors(containerColor = DeepSea2)
     ) {
         Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(12.dp),
-            horizontalAlignment = Alignment.CenterHorizontally
+            modifier = Modifier.padding(20.dp),
+            verticalArrangement = Arrangement.spacedBy(20.dp)
         ) {
-            Icon(
-                imageVector = Icons.Default.Description,
-                contentDescription = "Documents",
-                tint = DeepSea4,
-                modifier = Modifier.size(32.dp)
-            )
-            Spacer(modifier = Modifier.height(6.dp))
-            Text(
-                text = "Your Documents",
-                color = Color.White,
-                fontSize = 13.sp,
-                fontWeight = FontWeight.SemiBold
-            )
+            // Status row
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .size(8.dp)
+                            .background(Color(0xFF4ADE80), CircleShape)
+                    )
+                    Text(
+                        text = "STATUS: ON TIME",
+                        color = DeepSea4,
+                        fontSize = 9.sp,
+                        fontWeight = FontWeight.Bold,
+                        letterSpacing = 0.8.sp
+                    )
+                }
+                Icon(
+                    imageVector = Icons.Default.MoreHoriz,
+                    contentDescription = null,
+                    tint = DeepSea4,
+                    modifier = Modifier.size(20.dp)
+                )
+            }
+
+            // Flight route
+            if (trip != null) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 8.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    // Origin
+                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                        Text(
+                            text = trip.originIata.ifBlank { "—" },
+                            color = DeepSea5,
+                            fontSize = 24.sp,
+                            fontWeight = FontWeight.ExtraBold
+                        )
+                        Text(
+                            text = trip.origin.take(12).uppercase(),
+                            color = DeepSea4,
+                            fontSize = 8.sp,
+                            fontWeight = FontWeight.Bold,
+                            letterSpacing = 0.5.sp
+                        )
+                    }
+
+                    // Flight line with plane icon
+                    Box(
+                        modifier = Modifier
+                            .weight(1f)
+                            .padding(horizontal = 12.dp),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        HorizontalDivider(color = DeepSea3, thickness = 1.dp)
+                        Box(
+                            modifier = Modifier
+                                .background(DeepSea2)
+                                .padding(horizontal = 4.dp),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Flight,
+                                contentDescription = null,
+                                tint = Primary,
+                                modifier = Modifier.size(18.dp)
+                            )
+                        }
+                    }
+
+                    // Destination
+                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                        Text(
+                            text = trip.destinationIata.ifBlank { "—" },
+                            color = DeepSea5,
+                            fontSize = 24.sp,
+                            fontWeight = FontWeight.ExtraBold
+                        )
+                        Text(
+                            text = trip.destination.take(12).uppercase(),
+                            color = DeepSea4,
+                            fontSize = 8.sp,
+                            fontWeight = FontWeight.Bold,
+                            letterSpacing = 0.5.sp
+                        )
+                    }
+                }
+
+                // Destination info card
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .background(SurfaceBright, RoundedCornerShape(14.dp))
+                        .padding(12.dp),
+                    horizontalArrangement = Arrangement.spacedBy(12.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .size(40.dp)
+                            .background(Primary.copy(alpha = 0.2f), RoundedCornerShape(10.dp)),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Hotel,
+                            contentDescription = null,
+                            tint = Primary,
+                            modifier = Modifier.size(20.dp)
+                        )
+                    }
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                            text = "DESTINATION",
+                            color = DeepSea4,
+                            fontSize = 8.sp,
+                            fontWeight = FontWeight.Bold,
+                            letterSpacing = 0.6.sp
+                        )
+                        Text(
+                            text = trip.destination,
+                            color = DeepSea5,
+                            fontSize = 13.sp,
+                            fontWeight = FontWeight.Bold
+                        )
+                    }
+                    Icon(
+                        imageVector = Icons.Default.ChevronRight,
+                        contentDescription = null,
+                        tint = DeepSea4,
+                        modifier = Modifier.size(20.dp)
+                    )
+                }
+            } else {
+                Text(
+                    text = "No upcoming trips",
+                    color = DeepSea4,
+                    fontSize = 13.sp
+                )
+            }
         }
     }
+}
+
+// ─────────────────────────────────────────────────────────────
+// Documents Widget
+// ─────────────────────────────────────────────────────────────
+
+@Composable
+private fun DocumentsWidget() {
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(24.dp))
+            .background(
+                Brush.horizontalGradient(listOf(Primary, PrimaryDim))
+            )
+            .clickable { }
+            .padding(20.dp)
+    ) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Row(
+                horizontalArrangement = Arrangement.spacedBy(14.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Box(
+                    modifier = Modifier
+                        .size(52.dp)
+                        .background(Color.White.copy(alpha = 0.2f), RoundedCornerShape(14.dp)),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Description,
+                        contentDescription = null,
+                        tint = Color.White,
+                        modifier = Modifier.size(28.dp)
+                    )
+                }
+                Column {
+                    Text(
+                        text = "Your Documents",
+                        color = Color(0xFF00253D),
+                        fontSize = 18.sp,
+                        fontWeight = FontWeight.Bold
+                    )
+                    Text(
+                        text = "Tickets, Passports & Visas",
+                        color = Color(0xFF00253D).copy(alpha = 0.75f),
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.Medium
+                    )
+                }
+            }
+            Box(
+                modifier = Modifier
+                    .size(36.dp)
+                    .background(Color.White.copy(alpha = 0.2f), CircleShape),
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(
+                    imageVector = Icons.Default.OpenInNew,
+                    contentDescription = null,
+                    tint = Color.White,
+                    modifier = Modifier.size(18.dp)
+                )
+            }
+        }
+    }
+}
+
+// ─────────────────────────────────────────────────────────────
+// Helpers
+// ─────────────────────────────────────────────────────────────
+
+private fun Int.ordinalSuffix(): String {
+    val suffix = when {
+        this in 11..13 -> "th"
+        this % 10 == 1 -> "st"
+        this % 10 == 2 -> "nd"
+        this % 10 == 3 -> "rd"
+        else -> "th"
+    }
+    return "$this$suffix"
 }
