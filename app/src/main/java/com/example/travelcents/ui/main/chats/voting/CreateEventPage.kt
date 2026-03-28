@@ -48,6 +48,7 @@ fun CreateEventPage(
     val title by viewModel.title.collectAsState()
     val description by viewModel.description.collectAsState()
     val location by viewModel.location.collectAsState()
+    val date by viewModel.date.collectAsState()
     val time by viewModel.time.collectAsState()
     val photoUrl by viewModel.photoUrl.collectAsState()
 
@@ -59,6 +60,8 @@ fun CreateEventPage(
     var businessQuery by remember { mutableStateOf("") }
     var cityQuery by remember { mutableStateOf("") }
 
+    var showDatePicker by remember { mutableStateOf(false) }
+    val datePickerState = rememberDatePickerState()
     var isPickingTime by remember { mutableStateOf(false) }
 
     val listState = rememberLazyListState()
@@ -70,11 +73,74 @@ fun CreateEventPage(
         uri?.let { viewModel.handleLocalImage(it) }
     }
 
-    //
     BackHandler {
         viewModel.clearForm()
         viewModel.clearSuggestions()
         onBackClick()
+    }
+
+    // Date Picker Calendar
+    if (showDatePicker) {
+
+        val initialMillis = remember {
+            if (date.isNotBlank()) {
+                try {
+                    val sdf = java.text.SimpleDateFormat("MMM dd, yyyy", java.util.Locale.getDefault())
+                    sdf.timeZone = java.util.TimeZone.getTimeZone("UTC")
+                    sdf.parse(date)?.time
+                } catch (e: Exception) {
+                    System.currentTimeMillis()
+                }
+            } else {
+                System.currentTimeMillis() // Default to today
+            }
+        }
+
+        val datePickerState = rememberDatePickerState(
+            initialSelectedDateMillis = initialMillis,
+            initialDisplayedMonthMillis = initialMillis
+        )
+
+        DatePickerDialog(
+            onDismissRequest = { showDatePicker = false },
+            colors = DatePickerDefaults.colors(containerColor = DeepSea2),
+            confirmButton = {
+                TextButton(onClick = {
+                    datePickerState.selectedDateMillis?.let { millis ->
+                        val calendar = java.util.Calendar.getInstance(java.util.TimeZone.getTimeZone("UTC"))
+                        calendar.timeInMillis = millis
+                        val formattedDate = java.text.SimpleDateFormat("MMM dd, yyyy", java.util.Locale.getDefault()).format(calendar.time)
+                        viewModel.onDateChange(formattedDate)
+                    }
+                    showDatePicker = false
+                }) { Text("OK", color = DeepSea5) }
+            },
+            dismissButton = {
+                TextButton(onClick = { showDatePicker = false }) { Text("Cancel", color = DeepSea5.copy(alpha = 0.6f)) }
+            }
+        ) {
+            DatePicker(
+                state = datePickerState,
+                showModeToggle = false,
+                colors = DatePickerDefaults.colors(
+                    containerColor = DeepSea2,
+                    titleContentColor = DeepSea5.copy(alpha = 0.7f),
+                    headlineContentColor = DeepSea5,
+                    weekdayContentColor = DeepSea5.copy(alpha = 0.7f),
+                    subheadContentColor = DeepSea5,
+                    yearContentColor = DeepSea5,
+                    currentYearContentColor = DeepSea4,
+                    selectedYearContentColor = DeepSea1,
+                    selectedYearContainerColor = DeepSea4,
+                    dayContentColor = DeepSea5,
+                    disabledDayContentColor = DeepSea5.copy(alpha = 0.3f),
+                    selectedDayContentColor = DeepSea1,
+                    selectedDayContainerColor = DeepSea4,
+                    todayContentColor = DeepSea4,
+                    todayDateBorderColor = DeepSea4
+                )
+            )
+        }
     }
 
     Column(modifier = Modifier
@@ -220,6 +286,14 @@ fun CreateEventPage(
                             { viewModel.onLocationChange(it) },
                             "Address",
                             Icons.Default.Map
+                        )
+                        EventTextField(
+                            value = date,
+                            onValueChange = {},
+                            label = "Proposed Date",
+                            icon = Icons.Default.CalendarToday,
+                            modifier = Modifier.clickable { showDatePicker = true },
+                            enabled = false
                         )
                         EventTextField(
                             value = time,

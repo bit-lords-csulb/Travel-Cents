@@ -7,6 +7,7 @@ data class Event(
     val title: String = "",
     val description: String = "",
     val location: String = "",
+    val date: String = "",
     val time: String = "",
     val photoUrl: String = "",
     val createdBy: String = "",
@@ -14,7 +15,8 @@ data class Event(
     val createdAt: Timestamp? = null,
     val upvotes: List<String> = emptyList(),
     val downvotes: List<String> = emptyList(),
-    val commentCount: Int = 0
+    val commentCount: Int = 0,
+    val isWon: Boolean = false
 )
 
 data class EventComment(

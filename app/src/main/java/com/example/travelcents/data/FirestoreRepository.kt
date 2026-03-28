@@ -25,8 +25,7 @@ class FirestoreRepository {
             }
     }
 
-    // ── Friends ───────────────────────────────────────────────────────────────
-
+    // Friends
     fun searchUsersByUsername(query: String, excludeUid: String, onResult: (List<Friend>) -> Unit) {
         db.collection("users")
             .whereEqualTo("username", query.trim().lowercase())
@@ -183,20 +182,23 @@ class FirestoreRepository {
                 onUpdate(groups)
             }
     }
-
     fun createGroup(
         name: String,
         members: List<String>,
         destinationEmoji: String,
+        linkedTripId: String = "",
+        linkedTripOwnerId: String = "",
         onSuccess: (String) -> Unit,
         onFailure: () -> Unit
     ) {
         val data = hashMapOf(
-            "name"            to name,
-            "members"         to members,
-            "lastMessage"     to "",
-            "lastMessageTime" to Timestamp.now(),
-            "groupImageUrl"   to destinationEmoji
+            "name"              to name,
+            "members"           to members,
+            "lastMessage"       to "",
+            "lastMessageTime"   to Timestamp.now(),
+            "groupImageUrl"     to destinationEmoji,
+            "linkedTripId"      to linkedTripId,
+            "linkedTripOwnerId" to linkedTripOwnerId
         )
         db.collection("groups").add(data)
             .addOnSuccessListener { onSuccess(it.id) }
