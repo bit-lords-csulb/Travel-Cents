@@ -47,6 +47,9 @@ class CreateEventViewModel(private val groupId: String) : ViewModel() {
     private val _location = MutableStateFlow("")
     val location = _location.asStateFlow()
 
+    private val _date = MutableStateFlow("")
+    val date = _date.asStateFlow()
+
     private val _time = MutableStateFlow("")
     val time = _time.asStateFlow()
 
@@ -85,6 +88,10 @@ class CreateEventViewModel(private val groupId: String) : ViewModel() {
 
     fun onLocationChange(v: String) {
         _location.value = v
+    }
+
+    fun onDateChange(v: String) {
+        _date.value = v
     }
 
     fun onTimeChange(v: String) {
@@ -147,6 +154,7 @@ class CreateEventViewModel(private val groupId: String) : ViewModel() {
         _title.value = place.name
         _location.value = place.address
         _photoUrl.value = place.photoUrl
+        _date.value = ""
         _time.value = ""
 
         _description.value = "Fetching details..."
@@ -191,11 +199,19 @@ class CreateEventViewModel(private val groupId: String) : ViewModel() {
         val uid = auth.currentUser?.uid ?: return
         _isCreating.value = true
         val data = hashMapOf(
-            "title" to _title.value, "description" to _description.value,
-            "location" to _location.value, "photoUrl" to _photoUrl.value,
-            "createdBy" to uid, "createdByName" to creatorName,
-            "createdAt" to FieldValue.serverTimestamp(), "upvotes" to emptyList<String>(),
-            "downvotes" to emptyList<String>(), "commentCount" to 0
+            "title" to _title.value,
+            "description" to _description.value,
+            "location" to _location.value,
+            "date" to _date.value,
+            "time" to _time.value,
+            "photoUrl" to _photoUrl.value,
+            "createdBy" to uid,
+            "createdByName" to creatorName,
+            "createdAt" to FieldValue.serverTimestamp(),
+            "upvotes" to emptyList<String>(),
+            "downvotes" to emptyList<String>(),
+            "commentCount" to 0,
+            "isWon" to false
         )
         db.collection("groups").document(groupId).collection("events").add(data)
             .addOnSuccessListener { _isCreating.value = false; onSuccess() }
@@ -204,6 +220,8 @@ class CreateEventViewModel(private val groupId: String) : ViewModel() {
     fun clearForm() {
         _title.value = ""
         _description.value = ""
+        _date.value = ""
+        _time.value = ""
         _location.value = ""
         _photoUrl.value = ""
     }
