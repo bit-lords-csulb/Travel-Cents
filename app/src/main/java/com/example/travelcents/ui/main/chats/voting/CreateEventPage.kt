@@ -88,20 +88,22 @@ fun CreateEventPage(
         val initialMillis = remember {
             if (date.isNotBlank()) {
                 try {
-                    val sdf = java.text.SimpleDateFormat("yyyy-MM-dd", java.util.Locale.getDefault())
+                    val sdf =
+                        java.text.SimpleDateFormat("yyyy-MM-dd", java.util.Locale.getDefault())
                     sdf.timeZone = java.util.TimeZone.getTimeZone("UTC")
                     sdf.parse(date)?.time
                 } catch (e: Exception) {
-                    System.currentTimeMillis()
+                    val cal = java.util.Calendar.getInstance(java.util.TimeZone.getTimeZone("UTC"))
+                    cal.timeInMillis
                 }
             } else {
-                System.currentTimeMillis()
+                val cal = java.util.Calendar.getInstance(java.util.TimeZone.getTimeZone("UTC"))
+                cal.timeInMillis
             }
         }
 
         val datePickerState = rememberDatePickerState(
-            initialSelectedDateMillis = initialMillis,
-            initialDisplayedMonthMillis = initialMillis
+            initialSelectedDateMillis = initialMillis, initialDisplayedMonthMillis = initialMillis
         )
 
         DatePickerDialog(
@@ -110,9 +112,11 @@ fun CreateEventPage(
             confirmButton = {
                 TextButton(onClick = {
                     datePickerState.selectedDateMillis?.let { millis ->
-                        val calendar = java.util.Calendar.getInstance(java.util.TimeZone.getTimeZone("UTC"))
+                        val calendar =
+                            java.util.Calendar.getInstance(java.util.TimeZone.getTimeZone("UTC"))
                         calendar.timeInMillis = millis
-                        val sdf = java.text.SimpleDateFormat("yyyy-MM-dd", java.util.Locale.getDefault())
+                        val sdf =
+                            java.text.SimpleDateFormat("yyyy-MM-dd", java.util.Locale.getDefault())
                         sdf.timeZone = java.util.TimeZone.getTimeZone("UTC")
                         val formattedDate = sdf.format(calendar.time)
                         viewModel.onDateChange(formattedDate)
@@ -121,13 +125,14 @@ fun CreateEventPage(
                 }) { Text("OK", color = DeepSea5) }
             },
             dismissButton = {
-                TextButton(onClick = { showDatePicker = false }) { Text("Cancel", color = DeepSea5.copy(alpha = 0.6f)) }
-            }
-        ) {
+                TextButton(onClick = { showDatePicker = false }) {
+                    Text(
+                        "Cancel", color = DeepSea5.copy(alpha = 0.6f)
+                    )
+                }
+            }) {
             DatePicker(
-                state = datePickerState,
-                showModeToggle = false,
-                colors = DatePickerDefaults.colors(
+                state = datePickerState, showModeToggle = false, colors = DatePickerDefaults.colors(
                     containerColor = DeepSea2,
                     titleContentColor = DeepSea5.copy(alpha = 0.7f),
                     headlineContentColor = DeepSea5,
@@ -148,9 +153,11 @@ fun CreateEventPage(
         }
     }
 
-    Column(modifier = Modifier
-        .fillMaxSize()
-        .background(DeepSea1)) {
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(DeepSea1)
+    ) {
         // Header
         Box(
             modifier = Modifier
@@ -170,8 +177,7 @@ fun CreateEventPage(
                     Icons.AutoMirrored.Filled.ArrowBack,
                     contentDescription = "Back",
                     tint = DeepSea5,
-                    modifier = Modifier
-                        .size(28.dp)
+                    modifier = Modifier.size(28.dp)
                 )
             }
 
@@ -207,10 +213,7 @@ fun CreateEventPage(
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Box(modifier = Modifier.weight(1f)) {
                             EventTextField(
-                                cityQuery,
-                                { cityQuery = it },
-                                "Where to?",
-                                Icons.Default.LocationOn
+                                cityQuery, { cityQuery = it }, "Where to?", Icons.Default.LocationOn
                             )
                         }
                         Spacer(modifier = Modifier.width(8.dp))
@@ -222,8 +225,7 @@ fun CreateEventPage(
                                 .background(DeepSea3)
                         ) {
                             if (isLoadingPlaces) CircularProgressIndicator(
-                                color = DeepSea5,
-                                modifier = Modifier.size(24.dp)
+                                color = DeepSea5, modifier = Modifier.size(24.dp)
                             )
                             else Icon(Icons.Default.TravelExplore, null, tint = DeepSea5)
                         }
@@ -241,8 +243,7 @@ fun CreateEventPage(
                             .clip(RoundedCornerShape(16.dp))
                             .background(DeepSea2)
                             .border(1.dp, DeepSea3.copy(alpha = 0.3f), RoundedCornerShape(16.dp))
-                            .padding(20.dp),
-                        verticalArrangement = Arrangement.spacedBy(16.dp)
+                            .padding(20.dp), verticalArrangement = Arrangement.spacedBy(16.dp)
                     ) {
 
                         Row(
@@ -266,16 +267,12 @@ fun CreateEventPage(
                                     modifier = Modifier
                                         .clip(RoundedCornerShape(8.dp))
                                         .clickable { viewModel.clearForm() }
-                                        .padding(horizontal = 8.dp, vertical = 4.dp)
-                                )
+                                        .padding(horizontal = 8.dp, vertical = 4.dp))
                             }
                         }
 
                         EventTextField(
-                            title,
-                            { viewModel.onTitleChange(it) },
-                            "Title",
-                            Icons.Default.Title
+                            title, { viewModel.onTitleChange(it) }, "Title", Icons.Default.Title
                         )
                         EventTextField(
                             description,
@@ -308,12 +305,13 @@ fun CreateEventPage(
                                 modifier = Modifier
                                     .weight(1f)
                                     .clickable {
-                                        if (isPickingTime && isSettingStartTime) isPickingTime = false
-                                        else {
-                                            isSettingStartTime = true; isPickingTime = true
+                                        if (isPickingTime && isSettingStartTime) {
+                                            isPickingTime = false
+                                        } else {
+                                            isSettingStartTime = true
+                                            isPickingTime = true
                                         }
-                                    }
-                            ) {
+                                    }) {
                                 EventTextField(
                                     value = startTime,
                                     onValueChange = {},
@@ -326,12 +324,13 @@ fun CreateEventPage(
                                 modifier = Modifier
                                     .weight(1f)
                                     .clickable {
-                                        if (isPickingTime && !isSettingStartTime) isPickingTime = false
-                                        else {
-                                            isSettingStartTime = false; isPickingTime = true
+                                        if (isPickingTime && !isSettingStartTime) {
+                                            isPickingTime = false
+                                        } else {
+                                            isSettingStartTime = false
+                                            isPickingTime = true
                                         }
-                                    }
-                            ) {
+                                    }) {
                                 EventTextField(
                                     value = endTime,
                                     onValueChange = {},
@@ -360,7 +359,9 @@ fun CreateEventPage(
                                 ) {
                                     Text(
                                         text = if (isSettingStartTime) "SETTING START TIME" else "SETTING END TIME",
-                                        color = if (isSettingStartTime) DeepSea4 else Color(0xFFBB86FC),
+                                        color = if (isSettingStartTime) DeepSea4 else Color(
+                                            0xFFBB86FC
+                                        ),
                                         fontWeight = FontWeight.Black,
                                         fontSize = 11.sp,
                                         letterSpacing = 1.sp
@@ -371,8 +372,7 @@ fun CreateEventPage(
                                         color = DeepSea5,
                                         fontSize = 12.sp,
                                         fontWeight = FontWeight.Bold,
-                                        modifier = Modifier.clickable { isPickingTime = false }
-                                    )
+                                        modifier = Modifier.clickable { isPickingTime = false })
                                 }
 
                                 DeepSeaTimePicker(onTimeSelected = {
@@ -427,8 +427,7 @@ fun CreateEventPage(
                             colors = ButtonDefaults.buttonColors(containerColor = DeepSea3)
                         ) {
                             if (isCreating) CircularProgressIndicator(
-                                color = DeepSea5,
-                                modifier = Modifier.size(20.dp)
+                                color = DeepSea5, modifier = Modifier.size(20.dp)
                             )
                             else Text(
                                 "Propose Event",
@@ -459,9 +458,7 @@ fun CreateEventPage(
                                 }
                             }
                         }
-                        .padding(16.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
+                        .padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
                     Icon(
                         imageVector = if (showCustomForm) Icons.Default.RemoveCircle else Icons.Default.AddCircle,
                         contentDescription = null,
@@ -669,15 +666,11 @@ fun DeepSeaTimePicker(
 
         Row(verticalAlignment = Alignment.CenterVertically) {
             InfiniteWheelPickerColumn(
-                items = hours,
-                state = hourState,
-                modifier = Modifier.weight(1f)
+                items = hours, state = hourState, modifier = Modifier.weight(1f)
             )
             Text(":", color = DeepSea5, fontWeight = FontWeight.Bold)
             InfiniteWheelPickerColumn(
-                items = minutes,
-                state = minuteState,
-                modifier = Modifier.weight(1f)
+                items = minutes, state = minuteState, modifier = Modifier.weight(1f)
             )
 
             WheelPickerColumn(items = amPm, state = amPmState, modifier = Modifier.weight(1f))
@@ -687,9 +680,7 @@ fun DeepSeaTimePicker(
 
 @Composable
 fun InfiniteWheelPickerColumn(
-    items: List<String>,
-    state: PagerState,
-    modifier: Modifier = Modifier
+    items: List<String>, state: PagerState, modifier: Modifier = Modifier
 ) {
     VerticalPager(
         state = state,
@@ -700,8 +691,7 @@ fun InfiniteWheelPickerColumn(
         val isSelected = (state.currentPage % items.size) == index
 
         Box(
-            modifier = Modifier.fillMaxSize(),
-            contentAlignment = Alignment.Center
+            modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center
         ) {
             Text(
                 text = items[index],
@@ -715,9 +705,7 @@ fun InfiniteWheelPickerColumn(
 
 @Composable
 fun WheelPickerColumn(
-    items: List<String>,
-    state: PagerState,
-    modifier: Modifier = Modifier
+    items: List<String>, state: PagerState, modifier: Modifier = Modifier
 ) {
     VerticalPager(
         state = state,
@@ -727,8 +715,7 @@ fun WheelPickerColumn(
         val isSelected = state.currentPage == page
 
         Box(
-            modifier = Modifier.fillMaxSize(),
-            contentAlignment = Alignment.Center
+            modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center
         ) {
             Text(
                 text = items[page],
