@@ -17,6 +17,7 @@ import io.ktor.client.request.*
 import io.ktor.client.statement.*
 import io.ktor.serialization.kotlinx.json.*
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import kotlinx.serialization.json.Json
@@ -50,8 +51,11 @@ class CreateEventViewModel(private val groupId: String) : ViewModel() {
     private val _date = MutableStateFlow("")
     val date = _date.asStateFlow()
 
-    private val _time = MutableStateFlow("")
-    val time = _time.asStateFlow()
+    private val _startTime = MutableStateFlow("")
+    val startTime: StateFlow<String> = _startTime.asStateFlow()
+
+    private val _endTime = MutableStateFlow("")
+    val endTime: StateFlow<String> = _endTime.asStateFlow()
 
     private val _photoUrl = MutableStateFlow("")
     val photoUrl = _photoUrl.asStateFlow()
@@ -94,8 +98,12 @@ class CreateEventViewModel(private val groupId: String) : ViewModel() {
         _date.value = v
     }
 
-    fun onTimeChange(v: String) {
-        _time.value = v
+    fun onStartTimeChange(time: String) {
+        _startTime.value = time
+    }
+
+    fun onEndTimeChange(time: String) {
+        _endTime.value = time
     }
 
     fun handleLocalImage(uri: Uri) {
@@ -155,7 +163,8 @@ class CreateEventViewModel(private val groupId: String) : ViewModel() {
         _location.value = place.address
         _photoUrl.value = place.photoUrl
         _date.value = ""
-        _time.value = ""
+        _startTime.value = ""
+        _endTime.value = ""
 
         _description.value = "Fetching details..."
 
@@ -203,7 +212,9 @@ class CreateEventViewModel(private val groupId: String) : ViewModel() {
             "description" to _description.value,
             "location" to _location.value,
             "date" to _date.value,
-            "time" to _time.value,
+            "time" to _startTime.value,
+            "startTime" to _startTime.value,
+            "endTime" to _endTime.value,
             "photoUrl" to _photoUrl.value,
             "createdBy" to uid,
             "createdByName" to creatorName,
@@ -221,7 +232,8 @@ class CreateEventViewModel(private val groupId: String) : ViewModel() {
         _title.value = ""
         _description.value = ""
         _date.value = ""
-        _time.value = ""
+        _startTime.value = ""
+        _endTime.value = ""
         _location.value = ""
         _photoUrl.value = ""
     }

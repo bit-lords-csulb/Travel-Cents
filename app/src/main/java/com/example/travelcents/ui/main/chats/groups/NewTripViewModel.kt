@@ -78,7 +78,7 @@ class NewTripViewModel(
                         id = doc.id,
                         tripName = doc.getString("tripName") ?: "Unnamed Trip",
                         destination = destinationString,
-                        emoji = getEmojiForDestination(destinationString) // <--- USE THE HELPER HERE
+                        emoji = getEmojiForDestination(destinationString)
                     )
                 }
                 _userTrips.value = trips

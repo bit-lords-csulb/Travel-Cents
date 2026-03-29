@@ -21,6 +21,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
@@ -83,6 +84,7 @@ fun EventsPage(
                 )
                 Spacer(modifier = Modifier.height(8.dp))
 
+                // Location Row
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Icon(
                         Icons.Default.LocationOn,
@@ -92,6 +94,37 @@ fun EventsPage(
                     )
                     Text(
                         selectedEventForDetails!!.location,
+                        color = DeepSea5.copy(alpha = 0.6f),
+                        fontSize = 13.sp,
+                        modifier = Modifier.padding(start = 4.dp)
+                    )
+                }
+
+                Spacer(modifier = Modifier.height(8.dp))
+
+                // Date and Time row
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Icon(
+                        Icons.Default.Schedule,
+                        null,
+                        tint = DeepSea5.copy(alpha = 0.4f),
+                        modifier = Modifier.size(14.dp)
+                    )
+
+                    val timeRange = if (selectedEventForDetails!!.startTime.isNotBlank() && selectedEventForDetails!!.endTime.isNotBlank()) {
+                        "${selectedEventForDetails!!.startTime} - ${selectedEventForDetails!!.endTime}"
+                    } else {
+                        selectedEventForDetails!!.startTime.ifBlank { selectedEventForDetails!!.time }
+                    }
+
+                    val fullDateTime = if (selectedEventForDetails!!.date.isNotBlank()) {
+                        "${selectedEventForDetails!!.date}  •  $timeRange"
+                    } else {
+                        timeRange
+                    }
+
+                    Text(
+                        text = fullDateTime,
                         color = DeepSea5.copy(alpha = 0.6f),
                         fontSize = 13.sp,
                         modifier = Modifier.padding(start = 4.dp)
@@ -110,10 +143,8 @@ fun EventsPage(
                 Spacer(modifier = Modifier.height(32.dp))
 
                 // Add to Itinerary button
-                // Check if the user is the trip owner (or if no trip is linked yet)
                 val isTripOwner = group.linkedTripOwnerId.isEmpty() || group.linkedTripOwnerId == viewModel.currentUid
 
-                // ONLY show the button if it's in the Proposed Events tab AND the user is the OWNER
                 if (selectedTab == 0 && isTripOwner) {
                     Button(
                         onClick = {
@@ -360,8 +391,9 @@ fun EventCard(
                     Box(modifier = Modifier.fillMaxWidth()) {
                         Column(
                             modifier = Modifier.align(Alignment.BottomStart),
-                            verticalArrangement = Arrangement.spacedBy(0.dp)
+                            verticalArrangement = Arrangement.spacedBy(2.dp)
                         ) {
+                            // Location Row
                             Row(verticalAlignment = Alignment.CenterVertically) {
                                 Icon(
                                     Icons.Default.LocationOn,
@@ -373,9 +405,13 @@ fun EventCard(
                                     text = event.location,
                                     color = DeepSea5.copy(alpha = 0.4f),
                                     fontSize = 11.sp,
-                                    modifier = Modifier.padding(start = 4.dp)
+                                    modifier = Modifier.padding(start = 4.dp),
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis
                                 )
                             }
+
+                            // Date, Start Time, End Time
                             Row(verticalAlignment = Alignment.CenterVertically) {
                                 Icon(
                                     Icons.Default.Schedule,
@@ -383,11 +419,28 @@ fun EventCard(
                                     tint = DeepSea5.copy(alpha = 0.4f),
                                     modifier = Modifier.size(13.dp)
                                 )
+
+                                val timeText = when {
+                                    event.startTime.isNotBlank() && event.endTime.isNotBlank() -> {
+                                        "${event.startTime} - ${event.endTime}"
+                                    }
+                                    event.startTime.isNotBlank() -> event.startTime
+                                    else -> event.time
+                                }
+
+                                val finalDisplay = if (event.date.isNotBlank()) {
+                                    "${event.date}  •  $timeText"
+                                } else {
+                                    timeText
+                                }
+
                                 Text(
-                                    text = event.time,
+                                    text = finalDisplay,
                                     color = DeepSea5.copy(alpha = 0.4f),
                                     fontSize = 11.sp,
-                                    modifier = Modifier.padding(start = 4.dp)
+                                    modifier = Modifier.padding(start = 4.dp),
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis
                                 )
                             }
                         }
