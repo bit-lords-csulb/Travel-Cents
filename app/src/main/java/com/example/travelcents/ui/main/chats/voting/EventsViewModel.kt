@@ -142,11 +142,17 @@ class EventsViewModel(val group: Group) : ViewModel() {
         }
     }
     fun markEventAsWon(event: Event, onComplete: () -> Unit = {}) {
-        // If there is no linked trip, just mark it won in the group chat and stop
+        val currentUid = Firebase.auth.currentUser?.uid ?: return
+
         if (group.linkedTripId.isEmpty() || group.linkedTripOwnerId.isEmpty()) {
             db.collection("groups").document(groupId).collection("events").document(event.id)
                 .update("isWon", true)
                 .addOnSuccessListener { onComplete() }
+            return
+        }
+
+        if (group.linkedTripOwnerId != currentUid) {
+            Log.e("EventsViewModel", "Unauthorized: User $currentUid is not the owner of trip ${group.linkedTripId}")
             return
         }
 
