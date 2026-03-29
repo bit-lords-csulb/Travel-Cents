@@ -108,8 +108,8 @@ class EventsViewModel(val group: Group) : ViewModel() {
     }
 
     fun deleteEvent(event: Event, onComplete: () -> Unit = {}) {
-        // Only the creator can delete it
-        if (currentUid != event.createdBy) return
+        // Only the creator or the trip owner can delete it
+        if (currentUid != event.createdBy && currentUid != group.linkedTripOwnerId) return
 
         val groupEventRef = db.collection("groups").document(groupId)
             .collection("events").document(event.id)

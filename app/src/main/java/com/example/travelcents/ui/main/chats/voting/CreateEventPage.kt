@@ -88,7 +88,7 @@ fun CreateEventPage(
         val initialMillis = remember {
             if (date.isNotBlank()) {
                 try {
-                    val sdf = java.text.SimpleDateFormat("MMM dd, yyyy", java.util.Locale.getDefault())
+                    val sdf = java.text.SimpleDateFormat("yyyy-MM-dd", java.util.Locale.getDefault())
                     sdf.timeZone = java.util.TimeZone.getTimeZone("UTC")
                     sdf.parse(date)?.time
                 } catch (e: Exception) {
@@ -112,7 +112,9 @@ fun CreateEventPage(
                     datePickerState.selectedDateMillis?.let { millis ->
                         val calendar = java.util.Calendar.getInstance(java.util.TimeZone.getTimeZone("UTC"))
                         calendar.timeInMillis = millis
-                        val formattedDate = java.text.SimpleDateFormat("yyyy-MM-dd", java.util.Locale.getDefault()).format(calendar.time)
+                        val sdf = java.text.SimpleDateFormat("yyyy-MM-dd", java.util.Locale.getDefault())
+                        sdf.timeZone = java.util.TimeZone.getTimeZone("UTC")
+                        val formattedDate = sdf.format(calendar.time)
                         viewModel.onDateChange(formattedDate)
                     }
                     showDatePicker = false
