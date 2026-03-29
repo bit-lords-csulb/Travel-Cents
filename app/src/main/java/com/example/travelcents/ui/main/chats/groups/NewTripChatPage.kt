@@ -227,21 +227,21 @@ fun NewTripChatPage(
 // Helper Text Field
 @Composable
 fun LabeledTextField(
-    modifier: Modifier = Modifier,
     label: String,
     value: String,
     onValueChange: (String) -> Unit,
     placeholder: String = "",
-    singleLine: Boolean = true
+    singleLine: Boolean = true,
+    modifier: Modifier = Modifier
 ) {
-    Column {
+    Column(modifier = modifier) {
         Text(label, color = DeepSea5, fontWeight = FontWeight.Bold, fontSize = 14.sp)
         Spacer(modifier = Modifier.height(8.dp))
         TextField(
             value = value,
             onValueChange = onValueChange,
             placeholder = { Text(placeholder, color = DeepSea5.copy(alpha = 0.5f)) },
-            modifier = modifier.fillMaxWidth().clip(RoundedCornerShape(16.dp)),
+            modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(16.dp)),
             singleLine = singleLine,
             colors = TextFieldDefaults.colors(
                 focusedContainerColor = DeepSea3,

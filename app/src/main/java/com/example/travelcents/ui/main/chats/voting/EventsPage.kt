@@ -299,7 +299,10 @@ fun EventsPage(
                             onDownvote = { viewModel.downvote(event) },
                             onCommentClick = { onEventClick(event) },
                             onLongPress = {
-                                eventToDelete = event.takeIf { it.createdBy == viewModel.currentUid }
+                                eventToDelete = event.takeIf {
+                                    it.createdBy == viewModel.currentUid ||
+                                            group.linkedTripOwnerId == viewModel.currentUid
+                                }
                             }
                         )
                     }
