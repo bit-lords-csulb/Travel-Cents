@@ -241,6 +241,11 @@ class CreateEventViewModel(private val groupId: String) : ViewModel() {
         _placeSuggestions.value = emptyList()
     }
 
+    override fun onCleared() {
+        super.onCleared()
+        client.close()
+    }
+
     @Suppress("UNCHECKED_CAST")
     class Factory(private val groupId: String) : ViewModelProvider.Factory {
         override fun <T : ViewModel> create(modelClass: Class<T>): T =

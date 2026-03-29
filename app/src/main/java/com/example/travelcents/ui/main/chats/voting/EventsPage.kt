@@ -45,6 +45,10 @@ fun EventsPage(
     val events by viewModel.events.collectAsState()
     val isLoading by viewModel.isLoading.collectAsState()
 
+    LaunchedEffect(group) {
+        viewModel.updateGroup(group)
+    }
+
     // Tab State
     var selectedTab by remember { mutableIntStateOf(0) }
     val tabs = listOf("Proposed Events", "Added to Itinerary")
@@ -86,38 +90,43 @@ fun EventsPage(
                 Spacer(modifier = Modifier.height(8.dp))
 
                 // Location Row
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Icon(
-                        Icons.Default.LocationOn,
-                        null,
-                        tint = DeepSea5.copy(alpha = 0.4f),
-                        modifier = Modifier.size(14.dp)
-                    )
-                    Text(
-                        event.location,
-                        color = DeepSea5.copy(alpha = 0.6f),
-                        fontSize = 13.sp,
-                        modifier = Modifier.padding(start = 4.dp)
-                    )
+                if (event.location.isNotBlank()) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Icon(
+                            Icons.Default.LocationOn,
+                            null,
+                            tint = DeepSea5.copy(alpha = 0.4f),
+                            modifier = Modifier.size(14.dp)
+                        )
+                        Text(
+                            event.location,
+                            color = DeepSea5.copy(alpha = 0.6f),
+                            fontSize = 13.sp,
+                            modifier = Modifier.padding(start = 4.dp)
+                        )
+                    }
                 }
 
                 Spacer(modifier = Modifier.height(8.dp))
 
                 // Date and Time row
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Icon(
-                        Icons.Default.Schedule,
-                        null,
-                        tint = DeepSea5.copy(alpha = 0.4f),
-                        modifier = Modifier.size(14.dp)
-                    )
+                val dateTimeDisplay = formatEventDateTime(event)
+                if (dateTimeDisplay.isNotBlank()) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Icon(
+                            Icons.Default.Schedule,
+                            null,
+                            tint = DeepSea5.copy(alpha = 0.4f),
+                            modifier = Modifier.size(14.dp)
+                        )
 
-                    Text(
-                        text = formatEventDateTime(event),
-                        color = DeepSea5.copy(alpha = 0.6f),
-                        fontSize = 13.sp,
-                        modifier = Modifier.padding(start = 4.dp)
-                    )
+                        Text(
+                            text = dateTimeDisplay,
+                            color = DeepSea5.copy(alpha = 0.6f),
+                            fontSize = 13.sp,
+                            modifier = Modifier.padding(start = 4.dp)
+                        )
+                    }
                 }
 
                 Spacer(modifier = Modifier.height(16.dp))
@@ -132,7 +141,8 @@ fun EventsPage(
                 Spacer(modifier = Modifier.height(32.dp))
 
                 // Add to Itinerary button
-                val isTripOwner = group.linkedTripOwnerId.isEmpty() || group.linkedTripOwnerId == viewModel.currentUid
+                val isTripOwner =
+                    group.linkedTripOwnerId.isEmpty() || group.linkedTripOwnerId == viewModel.currentUid
 
                 if (selectedTab == 0 && isTripOwner) {
                     Button(
@@ -153,7 +163,12 @@ fun EventsPage(
                             modifier = Modifier.size(20.dp)
                         )
                         Spacer(modifier = Modifier.width(8.dp))
-                        Text("Add to Itinerary", color = DeepSea1, fontWeight = FontWeight.Bold, fontSize = 16.sp)
+                        Text(
+                            "Add to Itinerary",
+                            color = DeepSea1,
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 16.sp
+                        )
                     }
                 }
             }
@@ -180,9 +195,11 @@ fun EventsPage(
         )
     }
 
-    Column(modifier = Modifier
-        .fillMaxSize()
-        .background(DeepSea1)) {
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(DeepSea1)
+    ) {
 
         // Header
         Box(
@@ -203,7 +220,11 @@ fun EventsPage(
                             .size(48.dp)
                             .align(Alignment.CenterStart)
                     ) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back", tint = DeepSea5)
+                        Icon(
+                            Icons.AutoMirrored.Filled.ArrowBack,
+                            contentDescription = "Back",
+                            tint = DeepSea5
+                        )
                     }
 
                     Column(
@@ -337,9 +358,11 @@ fun EventCard(
         shape = RoundedCornerShape(20.dp)
     ) {
         Column {
-            Box(modifier = Modifier
-                .fillMaxWidth()
-                .height(150.dp)) {
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(150.dp)
+            ) {
                 if (event.photoUrl.isNotEmpty()) {
                     AsyncImage(
                         model = event.photoUrl,
@@ -348,9 +371,11 @@ fun EventCard(
                         modifier = Modifier.fillMaxSize()
                     )
                 } else {
-                    Box(modifier = Modifier
-                        .fillMaxSize()
-                        .background(DeepSea3))
+                    Box(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .background(DeepSea3)
+                    )
                 }
                 UserOverlayTag(event.createdByName)
             }
@@ -386,42 +411,45 @@ fun EventCard(
                             verticalArrangement = Arrangement.spacedBy(2.dp)
                         ) {
                             // Location Row
-                            Row(verticalAlignment = Alignment.CenterVertically) {
-                                Icon(
-                                    Icons.Default.LocationOn,
-                                    null,
-                                    tint = DeepSea5.copy(alpha = 0.4f),
-                                    modifier = Modifier.size(13.dp)
-                                )
-                                Text(
-                                    text = event.location,
-                                    color = DeepSea5.copy(alpha = 0.4f),
-                                    fontSize = 11.sp,
-                                    modifier = Modifier.padding(start = 4.dp),
-                                    maxLines = 1,
-                                    overflow = TextOverflow.Ellipsis
-                                )
+                            if (event.location.isNotBlank()) {
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    Icon(
+                                        Icons.Default.LocationOn,
+                                        null,
+                                        tint = DeepSea5.copy(alpha = 0.4f),
+                                        modifier = Modifier.size(13.dp)
+                                    )
+                                    Text(
+                                        text = event.location,
+                                        color = DeepSea5.copy(alpha = 0.4f),
+                                        fontSize = 11.sp,
+                                        modifier = Modifier.padding(start = 4.dp),
+                                        maxLines = 1,
+                                        overflow = TextOverflow.Ellipsis
+                                    )
+                                }
                             }
 
                             // Date, Start Time, End Time
-                            Row(verticalAlignment = Alignment.CenterVertically) {
-                                Icon(
-                                    Icons.Default.Schedule,
-                                    null,
-                                    tint = DeepSea5.copy(alpha = 0.4f),
-                                    modifier = Modifier.size(13.dp)
-                                )
+                            val finalDisplay = formatEventDateTime(event)
+                            if (finalDisplay.isNotBlank()) {
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    Icon(
+                                        Icons.Default.Schedule,
+                                        null,
+                                        tint = DeepSea5.copy(alpha = 0.4f),
+                                        modifier = Modifier.size(13.dp)
+                                    )
 
-                                val finalDisplay = formatEventDateTime(event)
-
-                                Text(
-                                    text = finalDisplay,
-                                    color = DeepSea5.copy(alpha = 0.4f),
-                                    fontSize = 11.sp,
-                                    modifier = Modifier.padding(start = 4.dp),
-                                    maxLines = 1,
-                                    overflow = TextOverflow.Ellipsis
-                                )
+                                    Text(
+                                        text = finalDisplay,
+                                        color = DeepSea5.copy(alpha = 0.4f),
+                                        fontSize = 11.sp,
+                                        modifier = Modifier.padding(start = 4.dp),
+                                        maxLines = 1,
+                                        overflow = TextOverflow.Ellipsis
+                                    )
+                                }
                             }
                         }
 
@@ -464,6 +492,7 @@ fun formatEventDateTime(event: Event): String {
         event.startTime.isNotBlank() && event.endTime.isNotBlank() -> {
             "${event.startTime} - ${event.endTime}"
         }
+
         event.startTime.isNotBlank() -> event.startTime
         else -> event.time.ifBlank { "" }
     }
@@ -485,10 +514,12 @@ fun UserOverlayTag(name: String) {
             .padding(horizontal = 10.dp, vertical = 6.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        Box(modifier = Modifier
-            .size(18.dp)
-            .clip(CircleShape)
-            .background(Color.Gray))
+        Box(
+            modifier = Modifier
+                .size(18.dp)
+                .clip(CircleShape)
+                .background(Color.Gray)
+        )
         Spacer(modifier = Modifier.width(8.dp))
         Text(
             name.split(" ").first(),

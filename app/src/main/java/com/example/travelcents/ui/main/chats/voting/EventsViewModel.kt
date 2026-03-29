@@ -15,10 +15,17 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 
-class EventsViewModel(val group: Group) : ViewModel() {
+class EventsViewModel(initialGroup: Group) : ViewModel() {
 
     private val auth = Firebase.auth
     private val db = Firebase.firestore
+
+    private var _group = initialGroup
+    val group: Group get() = _group
+
+    fun updateGroup(newGroup: Group) {
+        _group = newGroup
+    }
 
     val currentUid: String get() = auth.currentUser?.uid ?: ""
     val groupId: String get() = group.id
@@ -50,8 +57,10 @@ class EventsViewModel(val group: Group) : ViewModel() {
                 if (snapshot == null) return@addSnapshotListener
 
                 val fetchedEvents = snapshot.documents.mapNotNull { doc ->
-                    val upvotes = (doc.get("upvotes") as? List<*>)?.filterIsInstance<String>() ?: emptyList()
-                    val downvotes = (doc.get("downvotes") as? List<*>)?.filterIsInstance<String>() ?: emptyList()
+                    val upvotes =
+                        (doc.get("upvotes") as? List<*>)?.filterIsInstance<String>() ?: emptyList()
+                    val downvotes = (doc.get("downvotes") as? List<*>)?.filterIsInstance<String>()
+                        ?: emptyList()
 
                     Event(
                         id = doc.id,
@@ -73,7 +82,8 @@ class EventsViewModel(val group: Group) : ViewModel() {
                     )
                 }
                 // Sort locally by actual voting score (Upvotes - Downvotes)
-                _events.value = fetchedEvents.sortedByDescending { it.upvotes.size - it.downvotes.size }
+                _events.value =
+                    fetchedEvents.sortedByDescending { it.upvotes.size - it.downvotes.size }
             }
     }
 
@@ -139,8 +149,10 @@ class EventsViewModel(val group: Group) : ViewModel() {
             onComplete()
         }.addOnFailureListener { e ->
             Log.e("EventsViewModel", "Error deleting event: ", e)
+            onComplete()
         }
     }
+
     fun markEventAsWon(event: Event, onComplete: () -> Unit = {}) {
         val currentUid = Firebase.auth.currentUser?.uid ?: return
 
@@ -148,11 +160,18 @@ class EventsViewModel(val group: Group) : ViewModel() {
             db.collection("groups").document(groupId).collection("events").document(event.id)
                 .update("isWon", true)
                 .addOnSuccessListener { onComplete() }
+                .addOnFailureListener { e ->
+                    Log.e("EventsViewModel", "Error marking event as won: ", e)
+                    onComplete()
+                }
             return
         }
 
         if (group.linkedTripOwnerId != currentUid) {
-            Log.e("EventsViewModel", "Unauthorized: User $currentUid is not the owner of trip ${group.linkedTripId}")
+            Log.e(
+                "EventsViewModel",
+                "Unauthorized: User $currentUid is not the owner of trip ${group.linkedTripId}"
+            )
             return
         }
 
@@ -179,6 +198,7 @@ class EventsViewModel(val group: Group) : ViewModel() {
             onComplete()
         }.addOnFailureListener { e ->
             Log.e("EventsViewModel", "Error adding event to itinerary: ", e)
+            onComplete()
         }
     }
 
