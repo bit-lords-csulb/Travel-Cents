@@ -93,7 +93,9 @@ class NewTripViewModel(
     fun onDescriptionChange(desc: String) { _description.value = desc }
 
     fun selectFriend(friend: Friend) {
-        if (_selectedFriends.value.none { it.uid == friend.uid }) _selectedFriends.value += friend
+        _selectedFriends.update { current ->
+            if (current.none { it.uid == friend.uid }) current + friend else current
+        }
         _friendSearch.value = ""
     }
 
