@@ -9,6 +9,8 @@ data class Event(
     val location: String = "",
     val date: String = "",
     val time: String = "",
+    val startTime: String = "",
+    val endTime: String = "",
     val photoUrl: String = "",
     val createdBy: String = "",
     val createdByName: String = "",

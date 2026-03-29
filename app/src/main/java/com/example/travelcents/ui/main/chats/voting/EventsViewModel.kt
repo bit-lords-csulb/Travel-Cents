@@ -40,11 +40,9 @@ class EventsViewModel(val group: Group) : ViewModel() {
         eventsListener = db.collection("groups")
             .document(groupId)
             .collection("events")
-            // REMOVED .orderBy() because Firestore crashes when ordering by Arrays
             .addSnapshotListener { snapshot, error ->
                 _isLoading.value = false
 
-                // Add a log so we don't silently swallow future errors
                 if (error != null) {
                     Log.e("EventsViewModel", "Error fetching events: ", error)
                     return@addSnapshotListener
@@ -60,8 +58,10 @@ class EventsViewModel(val group: Group) : ViewModel() {
                         title = doc.getString("title") ?: "",
                         description = doc.getString("description") ?: "",
                         location = doc.getString("location") ?: "",
-                        date = doc.getString("date") ?: "", // Ensures the new Date field is pulled!
+                        date = doc.getString("date") ?: "",
                         time = doc.getString("time") ?: "",
+                        startTime = doc.getString("startTime") ?: doc.getString("time") ?: "",
+                        endTime = doc.getString("endTime") ?: "",
                         createdBy = doc.getString("createdBy") ?: "",
                         createdByName = doc.getString("createdByName") ?: "",
                         createdAt = doc.getTimestamp("createdAt"),
@@ -72,7 +72,7 @@ class EventsViewModel(val group: Group) : ViewModel() {
                         isWon = doc.getBoolean("isWon") ?: false
                     )
                 }
-                // Sort locally in Kotlin by actual voting score (Upvotes - Downvotes)
+                // Sort locally by actual voting score (Upvotes - Downvotes)
                 _events.value = fetchedEvents.sortedByDescending { it.upvotes.size - it.downvotes.size }
             }
     }

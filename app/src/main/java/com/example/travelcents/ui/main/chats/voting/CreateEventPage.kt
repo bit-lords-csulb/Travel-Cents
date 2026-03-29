@@ -26,6 +26,7 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -49,7 +50,8 @@ fun CreateEventPage(
     val description by viewModel.description.collectAsState()
     val location by viewModel.location.collectAsState()
     val date by viewModel.date.collectAsState()
-    val time by viewModel.time.collectAsState()
+    val startTime by viewModel.startTime.collectAsState()
+    val endTime by viewModel.endTime.collectAsState()
     val photoUrl by viewModel.photoUrl.collectAsState()
 
     val placeSuggestions by viewModel.placeSuggestions.collectAsState()
@@ -61,8 +63,9 @@ fun CreateEventPage(
     var cityQuery by remember { mutableStateOf("") }
 
     var showDatePicker by remember { mutableStateOf(false) }
-    val datePickerState = rememberDatePickerState()
+
     var isPickingTime by remember { mutableStateOf(false) }
+    var isSettingStartTime by remember { mutableStateOf(true) }
 
     val listState = rememberLazyListState()
     val coroutineScope = rememberCoroutineScope()
@@ -92,7 +95,7 @@ fun CreateEventPage(
                     System.currentTimeMillis()
                 }
             } else {
-                System.currentTimeMillis() // Default to today
+                System.currentTimeMillis()
             }
         }
 
@@ -109,7 +112,7 @@ fun CreateEventPage(
                     datePickerState.selectedDateMillis?.let { millis ->
                         val calendar = java.util.Calendar.getInstance(java.util.TimeZone.getTimeZone("UTC"))
                         calendar.timeInMillis = millis
-                        val formattedDate = java.text.SimpleDateFormat("MMM dd, yyyy", java.util.Locale.getDefault()).format(calendar.time)
+                        val formattedDate = java.text.SimpleDateFormat("yyyy-MM-dd", java.util.Locale.getDefault()).format(calendar.time)
                         viewModel.onDateChange(formattedDate)
                     }
                     showDatePicker = false
@@ -154,7 +157,6 @@ fun CreateEventPage(
                 .background(DeepSea2)
                 .padding(top = 48.dp, bottom = 20.dp)
         ) {
-            // Back Button
             IconButton(
                 onClick = onBackClick,
                 modifier = Modifier
@@ -171,7 +173,6 @@ fun CreateEventPage(
                 )
             }
 
-            // New Event Title
             Column(
                 modifier = Modifier.align(Alignment.Center),
                 horizontalAlignment = Alignment.CenterHorizontally
@@ -254,7 +255,7 @@ fun CreateEventPage(
                                 fontSize = 16.sp
                             )
 
-                            if (title.isNotEmpty() || description.isNotEmpty() || location.isNotEmpty() || time.isNotEmpty() || photoUrl.isNotEmpty()) {
+                            if (title.isNotEmpty() || description.isNotEmpty() || location.isNotEmpty() || startTime.isNotEmpty() || endTime.isNotEmpty() || photoUrl.isNotEmpty()) {
                                 Text(
                                     text = "Clear",
                                     color = DeepSea3,
@@ -295,17 +296,77 @@ fun CreateEventPage(
                             modifier = Modifier.clickable { showDatePicker = true },
                             enabled = false
                         )
-                        EventTextField(
-                            value = time,
-                            onValueChange = {},
-                            label = "Proposed Time",
-                            icon = Icons.Default.Schedule,
-                            modifier = Modifier.clickable { isPickingTime = !isPickingTime },
-                            enabled = false
-                        )
+
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(16.dp)
+                        ) {
+                            Box(modifier = Modifier.weight(1f)) {
+                                EventTextField(
+                                    value = startTime,
+                                    onValueChange = {},
+                                    label = "Start Time",
+                                    icon = Icons.Default.Schedule,
+                                    modifier = Modifier.clickable {
+                                        if (isPickingTime && isSettingStartTime) isPickingTime = false
+                                        else { isSettingStartTime = true; isPickingTime = true }
+                                    },
+                                    enabled = false
+                                )
+                            }
+                            Box(modifier = Modifier.weight(1f)) {
+                                EventTextField(
+                                    value = endTime,
+                                    onValueChange = {},
+                                    label = "End Time",
+                                    icon = Icons.Default.Schedule,
+                                    modifier = Modifier.clickable {
+                                        if (isPickingTime && !isSettingStartTime) isPickingTime = false
+                                        else { isSettingStartTime = false; isPickingTime = true }
+                                    },
+                                    enabled = false
+                                )
+                            }
+                        }
 
                         AnimatedVisibility(visible = isPickingTime) {
-                            DeepSeaTimePicker(onTimeSelected = { viewModel.onTimeChange(it) })
+                            Column(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(top = 8.dp)
+                                    .clip(RoundedCornerShape(12.dp))
+                                    .background(DeepSea2)
+                                    .border(1.dp, DeepSea3, RoundedCornerShape(12.dp))
+                            ) {
+                                Row(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .padding(horizontal = 16.dp, vertical = 12.dp),
+                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Text(
+                                        text = if (isSettingStartTime) "SETTING START TIME" else "SETTING END TIME",
+                                        color = if (isSettingStartTime) DeepSea4 else Color(0xFFBB86FC),
+                                        fontWeight = FontWeight.Black,
+                                        fontSize = 11.sp,
+                                        letterSpacing = 1.sp
+                                    )
+
+                                    Text(
+                                        "Done",
+                                        color = DeepSea5,
+                                        fontSize = 12.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        modifier = Modifier.clickable { isPickingTime = false }
+                                    )
+                                }
+
+                                DeepSeaTimePicker(onTimeSelected = {
+                                    if (isSettingStartTime) viewModel.onStartTimeChange(it)
+                                    else viewModel.onEndTimeChange(it)
+                                })
+                            }
                         }
 
                         // Upload Box
@@ -367,7 +428,6 @@ fun CreateEventPage(
                 }
             }
 
-            // Toggle Button
             item {
                 Row(
                     modifier = Modifier
@@ -545,7 +605,6 @@ fun EventTextField(
     )
 }
 
-
 @Composable
 fun DeepSeaTimePicker(
     onTimeSelected: (String) -> Unit
@@ -557,14 +616,8 @@ fun DeepSeaTimePicker(
 
     val totalPageCount = 10000
 
-    // LANDING ON 12:00
-    // 5003 % 12 = 11 (The index for "12")
     val hourState = rememberPagerState(initialPage = 5003) { totalPageCount }
-
-    // 5040 % 60 = 0 (The index for "00")
     val minuteState = rememberPagerState(initialPage = 5040) { totalPageCount }
-
-    // Start on PM (Index 1) or AM (Index 0)
     val amPmState = rememberPagerState(initialPage = 0) { amPm.size }
 
     LaunchedEffect(hourState.currentPage, minuteState.currentPage, amPmState.currentPage) {
@@ -573,7 +626,7 @@ fun DeepSeaTimePicker(
         val ap = amPm[amPmState.currentPage % amPm.size]
         onTimeSelected("$h:$m $ap")
     }
-    // Haptic feedback on scroll
+
     LaunchedEffect(hourState.currentPage) {
         haptic.performHapticFeedback(androidx.compose.ui.hapticfeedback.HapticFeedbackType.TextHandleMove)
     }
@@ -630,7 +683,6 @@ fun InfiniteWheelPickerColumn(
         modifier = modifier.height(120.dp),
         contentPadding = PaddingValues(vertical = 40.dp)
     ) { page ->
-        // Map the infinite page index
         val index = page % items.size
         val isSelected = (state.currentPage % items.size) == index
 
@@ -659,7 +711,6 @@ fun WheelPickerColumn(
         modifier = modifier.height(120.dp),
         contentPadding = PaddingValues(vertical = 40.dp)
     ) { page ->
-        // Calculate how far the item is from the center to scale it
         val isSelected = state.currentPage == page
 
         Box(
