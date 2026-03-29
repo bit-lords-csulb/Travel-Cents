@@ -170,7 +170,7 @@ class CreateEventViewModel(private val groupId: String) : ViewModel() {
 
         viewModelScope.launch {
             try {
-                val wikiTerm = place.name.replace(" ", "_")
+                val wikiTerm = java.net.URLEncoder.encode(place.name.replace(" ", "_"), "UTF-8")
                 val response =
                     client.get("https://en.wikipedia.org/api/rest_v1/page/summary/$wikiTerm")
 
@@ -212,7 +212,6 @@ class CreateEventViewModel(private val groupId: String) : ViewModel() {
             "description" to _description.value,
             "location" to _location.value,
             "date" to _date.value,
-            "time" to _startTime.value,
             "startTime" to _startTime.value,
             "endTime" to _endTime.value,
             "photoUrl" to _photoUrl.value,

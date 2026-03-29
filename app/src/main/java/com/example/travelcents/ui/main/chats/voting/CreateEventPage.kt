@@ -290,42 +290,53 @@ fun CreateEventPage(
                             "Address",
                             Icons.Default.Map
                         )
-                        EventTextField(
-                            value = date,
-                            onValueChange = {},
-                            label = "Proposed Date",
-                            icon = Icons.Default.CalendarToday,
-                            modifier = Modifier.clickable { showDatePicker = true },
-                            enabled = false
-                        )
+                        Box(modifier = Modifier.clickable { showDatePicker = true }) {
+                            EventTextField(
+                                value = date,
+                                onValueChange = {},
+                                label = "Proposed Date",
+                                icon = Icons.Default.CalendarToday,
+                                enabled = false
+                            )
+                        }
 
                         Row(
                             modifier = Modifier.fillMaxWidth(),
                             horizontalArrangement = Arrangement.spacedBy(16.dp)
                         ) {
-                            Box(modifier = Modifier.weight(1f)) {
+                            Box(
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .clickable {
+                                        if (isPickingTime && isSettingStartTime) isPickingTime = false
+                                        else {
+                                            isSettingStartTime = true; isPickingTime = true
+                                        }
+                                    }
+                            ) {
                                 EventTextField(
                                     value = startTime,
                                     onValueChange = {},
                                     label = "Start Time",
                                     icon = Icons.Default.Schedule,
-                                    modifier = Modifier.clickable {
-                                        if (isPickingTime && isSettingStartTime) isPickingTime = false
-                                        else { isSettingStartTime = true; isPickingTime = true }
-                                    },
                                     enabled = false
                                 )
                             }
-                            Box(modifier = Modifier.weight(1f)) {
+                            Box(
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .clickable {
+                                        if (isPickingTime && !isSettingStartTime) isPickingTime = false
+                                        else {
+                                            isSettingStartTime = false; isPickingTime = true
+                                        }
+                                    }
+                            ) {
                                 EventTextField(
                                     value = endTime,
                                     onValueChange = {},
                                     label = "End Time",
                                     icon = Icons.Default.Schedule,
-                                    modifier = Modifier.clickable {
-                                        if (isPickingTime && !isSettingStartTime) isPickingTime = false
-                                        else { isSettingStartTime = false; isPickingTime = true }
-                                    },
                                     enabled = false
                                 )
                             }

@@ -64,6 +64,7 @@ fun EventsPage(
 
     // Full Details Bottom Sheet
     if (showSheet && selectedEventForDetails != null) {
+        val event = selectedEventForDetails!!
         ModalBottomSheet(
             onDismissRequest = { showSheet = false },
             sheetState = sheetState,
@@ -77,7 +78,7 @@ fun EventsPage(
                     .padding(bottom = 48.dp)
             ) {
                 Text(
-                    selectedEventForDetails!!.title,
+                    event.title,
                     fontSize = 24.sp,
                     fontWeight = FontWeight.Bold,
                     color = DeepSea5
@@ -93,7 +94,7 @@ fun EventsPage(
                         modifier = Modifier.size(14.dp)
                     )
                     Text(
-                        selectedEventForDetails!!.location,
+                        event.location,
                         color = DeepSea5.copy(alpha = 0.6f),
                         fontSize = 13.sp,
                         modifier = Modifier.padding(start = 4.dp)
@@ -111,20 +112,8 @@ fun EventsPage(
                         modifier = Modifier.size(14.dp)
                     )
 
-                    val timeRange = if (selectedEventForDetails!!.startTime.isNotBlank() && selectedEventForDetails!!.endTime.isNotBlank()) {
-                        "${selectedEventForDetails!!.startTime} - ${selectedEventForDetails!!.endTime}"
-                    } else {
-                        selectedEventForDetails!!.startTime.ifBlank { selectedEventForDetails!!.time }
-                    }
-
-                    val fullDateTime = if (selectedEventForDetails!!.date.isNotBlank()) {
-                        "${selectedEventForDetails!!.date}  •  $timeRange"
-                    } else {
-                        timeRange
-                    }
-
                     Text(
-                        text = fullDateTime,
+                        text = formatEventDateTime(event),
                         color = DeepSea5.copy(alpha = 0.6f),
                         fontSize = 13.sp,
                         modifier = Modifier.padding(start = 4.dp)
@@ -134,7 +123,7 @@ fun EventsPage(
                 Spacer(modifier = Modifier.height(16.dp))
 
                 Text(
-                    text = selectedEventForDetails!!.description,
+                    text = event.description,
                     fontSize = 16.sp,
                     lineHeight = 24.sp,
                     color = DeepSea5.copy(alpha = 0.8f)
@@ -148,7 +137,7 @@ fun EventsPage(
                 if (selectedTab == 0 && isTripOwner) {
                     Button(
                         onClick = {
-                            viewModel.markEventAsWon(selectedEventForDetails!!)
+                            viewModel.markEventAsWon(event)
                             showSheet = false
                         },
                         modifier = Modifier
@@ -420,19 +409,7 @@ fun EventCard(
                                     modifier = Modifier.size(13.dp)
                                 )
 
-                                val timeText = when {
-                                    event.startTime.isNotBlank() && event.endTime.isNotBlank() -> {
-                                        "${event.startTime} - ${event.endTime}"
-                                    }
-                                    event.startTime.isNotBlank() -> event.startTime
-                                    else -> event.time
-                                }
-
-                                val finalDisplay = if (event.date.isNotBlank()) {
-                                    "${event.date}  •  $timeText"
-                                } else {
-                                    timeText
-                                }
+                                val finalDisplay = formatEventDateTime(event)
 
                                 Text(
                                     text = finalDisplay,
@@ -475,6 +452,23 @@ fun EventCard(
                 }
             }
         }
+    }
+}
+
+// Helpers
+fun formatEventDateTime(event: Event): String {
+    val timeText = when {
+        event.startTime.isNotBlank() && event.endTime.isNotBlank() -> {
+            "${event.startTime} - ${event.endTime}"
+        }
+        event.startTime.isNotBlank() -> event.startTime
+        else -> event.time.ifBlank { "" }
+    }
+
+    return if (event.date.isNotBlank()) {
+        if (timeText.isNotBlank()) "${event.date}  •  $timeText" else event.date
+    } else {
+        timeText
     }
 }
 
