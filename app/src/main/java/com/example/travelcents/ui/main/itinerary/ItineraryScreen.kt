@@ -26,6 +26,7 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.LaunchedEffect
 import com.example.travelcents.ui.auth.AuthViewModel
+import com.example.travelcents.ui.main.CurrentPage
 import com.example.travelcents.ui.theme.DeepSea1
 import com.google.firebase.auth.FirebaseAuth
 import java.time.LocalDate

@@ -144,7 +144,7 @@ fun TripStep5InterestsPage(
         LazyVerticalGrid(
             columns = GridCells.Fixed(2),
             modifier = Modifier.weight(1f),
-            contentPadding = PaddingValues(horizontal = 16.dp, top = 16.dp, bottom = 8.dp),
+            contentPadding = PaddingValues(start = 16.dp, top = 16.dp, end = 16.dp, bottom = 8.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp),
             horizontalArrangement = Arrangement.spacedBy(12.dp)
         ) {
