@@ -135,7 +135,7 @@ fun TripStep1DestinationPage(
         LazyVerticalGrid(
             columns = GridCells.Fixed(2),
             modifier = Modifier.weight(1f),
-            contentPadding = PaddingValues(horizontal = 16.dp, top = 20.dp, bottom = 12.dp),
+            contentPadding = PaddingValues(start = 16.dp, top = 20.dp, end = 16.dp, bottom = 12.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp),
             horizontalArrangement = Arrangement.spacedBy(12.dp)
         ) {

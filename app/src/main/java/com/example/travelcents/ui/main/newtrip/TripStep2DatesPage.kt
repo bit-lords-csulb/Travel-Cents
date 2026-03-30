@@ -299,7 +299,8 @@ fun TripStep2DatesPage(
                                         isEnd = isEnd,
                                         isInRange = isInRange,
                                         hasRange = hasRange,
-                                        onClick = { onDayClick(day) }
+                                        onClick = { onDayClick(day) },
+                                        modifier = Modifier.weight(1f)
                                     )
                                 }
                             }
@@ -452,13 +453,13 @@ private fun S2DayCell(
     isEnd: Boolean,
     isInRange: Boolean,
     hasRange: Boolean,
-    onClick: () -> Unit
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier
 ) {
     val rangeColor = S2Blue.copy(alpha = 0.2f)
 
     Box(
-        modifier = Modifier
-            .weight(1f)
+        modifier = modifier
             .height(40.dp)
             .clickable { onClick() }
     ) {
