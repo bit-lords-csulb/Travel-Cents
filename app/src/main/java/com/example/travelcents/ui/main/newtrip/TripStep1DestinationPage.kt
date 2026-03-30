@@ -22,6 +22,7 @@ import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.filled.ArrowForward
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.Button
@@ -261,7 +262,13 @@ fun TripStep1DestinationPage(
                 ),
                 shape = RoundedCornerShape(16.dp)
             ) {
-                Text(text = "Continue", fontSize = 16.sp, fontWeight = FontWeight.Bold)
+                Row(
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(text = "Continue to Dates", fontSize = 16.sp, fontWeight = FontWeight.Bold)
+                    Icon(Icons.AutoMirrored.Filled.ArrowForward, null, modifier = Modifier.size(18.dp))
+                }
             }
         }
     }

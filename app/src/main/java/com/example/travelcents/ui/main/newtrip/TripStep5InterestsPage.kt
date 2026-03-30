@@ -23,7 +23,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.filled.AutoAwesome
+import androidx.compose.material.icons.automirrored.filled.ArrowForward
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material3.Button
@@ -244,8 +244,8 @@ fun TripStep5InterestsPage(
                     horizontalArrangement = Arrangement.spacedBy(8.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Text("Plan My Trip", fontSize = 16.sp, fontWeight = FontWeight.Bold)
-                    Icon(Icons.Default.AutoAwesome, null, modifier = Modifier.size(18.dp))
+                    Text("Continue to Generate", fontSize = 16.sp, fontWeight = FontWeight.Bold)
+                    Icon(Icons.AutoMirrored.Filled.ArrowForward, null, modifier = Modifier.size(18.dp))
                 }
             }
         }

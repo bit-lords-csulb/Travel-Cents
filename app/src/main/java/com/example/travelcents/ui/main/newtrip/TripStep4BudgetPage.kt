@@ -294,7 +294,7 @@ fun TripStep4BudgetPage(
                     horizontalArrangement = Arrangement.spacedBy(8.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Text("Continue", fontSize = 15.sp, fontWeight = FontWeight.ExtraBold)
+                    Text("Continue to Interests", fontSize = 15.sp, fontWeight = FontWeight.ExtraBold)
                     Icon(Icons.AutoMirrored.Filled.ArrowForward, null, modifier = Modifier.size(18.dp))
                 }
             }

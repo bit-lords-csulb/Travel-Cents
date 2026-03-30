@@ -238,7 +238,7 @@ fun TripStep3TravelersPage(
                     horizontalArrangement = Arrangement.spacedBy(8.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Text("Next", fontSize = 16.sp, fontWeight = FontWeight.Bold)
+                    Text("Continue to Budget", fontSize = 16.sp, fontWeight = FontWeight.Bold)
                     Icon(Icons.AutoMirrored.Filled.ArrowForward, null, modifier = Modifier.size(18.dp))
                 }
             }
