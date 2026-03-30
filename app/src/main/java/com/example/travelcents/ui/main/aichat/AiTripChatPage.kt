@@ -1,4 +1,4 @@
-package com.example.travelcents.ui.main
+package com.example.travelcents.ui.main.aichat
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable

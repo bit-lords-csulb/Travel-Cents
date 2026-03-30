@@ -1,4 +1,4 @@
-package com.example.travelcents.ui.main
+package com.example.travelcents.ui.main.newtrip
 
 import android.app.DatePickerDialog
 import androidx.compose.foundation.background
