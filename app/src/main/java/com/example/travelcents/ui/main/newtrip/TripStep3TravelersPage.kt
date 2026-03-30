@@ -63,6 +63,7 @@ fun TripStep3TravelersPage(
     modifier: Modifier = Modifier,
     viewModel: NewTripViewModel,
     onBackClick: () -> Unit,
+    onCloseClick: () -> Unit,
     onContinueClick: () -> Unit
 ) {
     var hasChildren by remember { mutableStateOf(viewModel.children > 0) }
@@ -86,7 +87,7 @@ fun TripStep3TravelersPage(
                     }
                     Text("Step 3 of 5", fontSize = 17.sp, fontWeight = FontWeight.Bold, color = DeepSea5)
                 }
-                IconButton(onClick = onBackClick) {
+                IconButton(onClick = onCloseClick) {
                     Icon(Icons.Default.Close, "Close", tint = S3Blue)
                 }
             }

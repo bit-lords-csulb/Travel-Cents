@@ -71,6 +71,7 @@ fun TripStep4BudgetPage(
     modifier: Modifier = Modifier,
     viewModel: NewTripViewModel,
     onBackClick: () -> Unit,
+    onCloseClick: () -> Unit,
     onSaveDraftClick: () -> Unit,
     onContinueClick: () -> Unit
 ) {
@@ -105,7 +106,7 @@ fun TripStep4BudgetPage(
                     }
                     Text("Step 4 of 5", fontSize = 17.sp, fontWeight = FontWeight.Bold, color = DeepSea5)
                 }
-                IconButton(onClick = onBackClick) {
+                IconButton(onClick = onCloseClick) {
                     Icon(Icons.Default.Close, "Close", tint = S4Blue)
                 }
             }
