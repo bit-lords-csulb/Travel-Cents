@@ -1,5 +1,11 @@
 package com.example.travelcents.ui.main.newtrip
 
+import android.Manifest
+import android.content.Context
+import android.content.pm.PackageManager
+import android.location.Geocoder
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -19,32 +25,46 @@ import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.GridItemSpan
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.automirrored.filled.ArrowForward
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.LocationOn
+import androidx.compose.material.icons.filled.MyLocation
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.MenuDefaults
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextField
 import androidx.compose.material3.TextFieldDefaults
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.core.content.ContextCompat
 import coil.compose.AsyncImage
 import com.example.travelcents.ui.theme.DeepSea1
 import com.example.travelcents.ui.theme.DeepSea5
+import com.google.android.gms.location.LocationServices
+import java.util.Locale
 
 private val S1Blue = Color(0xFF64B5F6)
 private val S1ContainerHigh = Color(0xFF0B203D)
@@ -89,6 +109,20 @@ fun TripStep1DestinationPage(
     onCloseClick: () -> Unit,
     onContinueClick: () -> Unit
 ) {
+    val context = LocalContext.current
+    var isExpanded by remember { mutableStateOf(false) }
+
+    val fusedLocationClient = remember { LocationServices.getFusedLocationProviderClient(context) }
+    val permissionLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.RequestPermission()
+    ) { isGranted ->
+        if (isGranted) {
+            getCurrentLocation(context, fusedLocationClient) { city ->
+                viewModel.origin = city
+            }
+        }
+    }
+
     Column(
         modifier = modifier
             .fillMaxSize()
@@ -166,7 +200,7 @@ fun TripStep1DestinationPage(
                     )
                     Spacer(modifier = Modifier.height(6.dp))
                     Text(
-                        text = "Choose your dream destination — TravelCents will handle the rest.",
+                        text = "Choose your destination, TravelCents will handle the rest.",
                         fontSize = 14.sp,
                         color = S1OnSurfaceVariant,
                         lineHeight = 20.sp
@@ -174,29 +208,98 @@ fun TripStep1DestinationPage(
                 }
             }
 
-            // Search field
+            // Destination search field with autocomplete
+            item(span = { GridItemSpan(2) }) {
+                Box {
+                    TextField(
+                        value = viewModel.destination,
+                        onValueChange = { 
+                            viewModel.updateDestination(it)
+                            isExpanded = viewModel.filteredDestinations.isNotEmpty()
+                        },
+                        placeholder = {
+                            Text(
+                                "Search for a destination...",
+                                color = S1OnSurfaceVariant.copy(alpha = 0.5f),
+                                fontSize = 16.sp
+                            )
+                        },
+                        leadingIcon = {
+                            Icon(
+                                Icons.Default.Search,
+                                contentDescription = null,
+                                tint = S1Blue,
+                                modifier = Modifier.size(22.dp)
+                            )
+                        },
+                        modifier = Modifier.fillMaxWidth(),
+                        singleLine = true,
+                        shape = RoundedCornerShape(16.dp),
+                        colors = TextFieldDefaults.colors(
+                            focusedTextColor = DeepSea5,
+                            unfocusedTextColor = DeepSea5,
+                            cursorColor = S1Blue,
+                            focusedContainerColor = S1SurfaceBright,
+                            unfocusedContainerColor = S1SurfaceBright,
+                            focusedIndicatorColor = Color.Transparent,
+                            unfocusedIndicatorColor = Color.Transparent
+                        )
+                    )
+
+                    DropdownMenu(
+                        expanded = isExpanded,
+                        onDismissRequest = { isExpanded = false },
+                        modifier = Modifier
+                            .fillMaxWidth(0.9f)
+                            .background(S1SurfaceBright)
+                            .border(1.dp, S1Blue.copy(alpha = 0.2f), RoundedCornerShape(8.dp)),
+                        offset = androidx.compose.ui.unit.DpOffset(0.dp, 4.dp)
+                    ) {
+                        viewModel.filteredDestinations.forEach { suggestion ->
+                            DropdownMenuItem(
+                                text = { Text(suggestion, color = DeepSea5) },
+                                onClick = {
+                                    viewModel.destination = suggestion
+                                    isExpanded = false
+                                },
+                                colors = MenuDefaults.itemColors(
+                                    textColor = DeepSea5
+                                )
+                            )
+                        }
+                    }
+                }
+            }
+
+            // Origin field moved here
             item(span = { GridItemSpan(2) }) {
                 TextField(
-                    value = viewModel.destination,
-                    onValueChange = { viewModel.destination = it },
+                    value = viewModel.origin,
+                    onValueChange = { viewModel.origin = it },
                     placeholder = {
                         Text(
-                            "Search for a destination...",
+                            "Departing from... (e.g. Los Angeles, CA)",
                             color = S1OnSurfaceVariant.copy(alpha = 0.5f),
-                            fontSize = 16.sp
+                            fontSize = 14.sp
                         )
                     },
-                    leadingIcon = {
-                        Icon(
-                            Icons.Default.Search,
-                            contentDescription = null,
-                            tint = S1Blue,
-                            modifier = Modifier.size(22.dp)
-                        )
-                    },
+                    label = { Text("Origin", color = S1OnSurfaceVariant, fontSize = 12.sp) },
                     modifier = Modifier.fillMaxWidth(),
                     singleLine = true,
                     shape = RoundedCornerShape(16.dp),
+                    trailingIcon = {
+                        IconButton(onClick = {
+                            if (ContextCompat.checkSelfPermission(context, Manifest.permission.ACCESS_COARSE_LOCATION) == PackageManager.PERMISSION_GRANTED) {
+                                getCurrentLocation(context, fusedLocationClient) { city ->
+                                    viewModel.origin = city
+                                }
+                            } else {
+                                permissionLauncher.launch(Manifest.permission.ACCESS_COARSE_LOCATION)
+                            }
+                        }) {
+                            Icon(Icons.Default.MyLocation, "GPS", tint = S1Blue)
+                        }
+                    },
                     colors = TextFieldDefaults.colors(
                         focusedTextColor = DeepSea5,
                         unfocusedTextColor = DeepSea5,
@@ -204,7 +307,9 @@ fun TripStep1DestinationPage(
                         focusedContainerColor = S1SurfaceBright,
                         unfocusedContainerColor = S1SurfaceBright,
                         focusedIndicatorColor = Color.Transparent,
-                        unfocusedIndicatorColor = Color.Transparent
+                        unfocusedIndicatorColor = Color.Transparent,
+                        focusedLabelColor = S1Blue,
+                        unfocusedLabelColor = S1OnSurfaceVariant
                     )
                 )
             }
@@ -227,13 +332,24 @@ fun TripStep1DestinationPage(
                 }
             }
 
+            // Check if selected/typed destination matches a popular card
+            val matchedPopular = popularDestinations.find { it.name.contains(viewModel.destination, ignoreCase = true) && viewModel.destination.isNotBlank() }
+            val isCustom = viewModel.destination.isNotBlank() && matchedPopular == null
+
             // Destination cards
             items(popularDestinations) { dest ->
                 DestinationCard(
                     destination = dest,
-                    isSelected = viewModel.destination == dest.name,
+                    isSelected = viewModel.destination.contains(dest.name, ignoreCase = true) && viewModel.destination.isNotBlank(),
                     onClick = { viewModel.destination = dest.name }
                 )
+            }
+
+            // Fallback card for unknown destination
+            if (isCustom) {
+                item(span = { GridItemSpan(1) }) {
+                    CustomDestinationCard(name = viewModel.destination)
+                }
             }
 
             item(span = { GridItemSpan(2) }) {
@@ -253,7 +369,7 @@ fun TripStep1DestinationPage(
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(52.dp),
-                enabled = viewModel.destination.isNotBlank(),
+                enabled = viewModel.destination.isNotBlank() && viewModel.origin.isNotBlank(),
                 colors = ButtonDefaults.buttonColors(
                     containerColor = S1Blue,
                     contentColor = Color(0xFF001627),
@@ -262,14 +378,70 @@ fun TripStep1DestinationPage(
                 ),
                 shape = RoundedCornerShape(16.dp)
             ) {
-                Row(
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Text(text = "Continue to Dates", fontSize = 16.sp, fontWeight = FontWeight.Bold)
-                    Icon(Icons.AutoMirrored.Filled.ArrowForward, null, modifier = Modifier.size(18.dp))
+                Text(text = "Continue", fontSize = 16.sp, fontWeight = FontWeight.Bold)
+            }
+        }
+    }
+}
+
+private fun getCurrentLocation(context: Context, fusedLocationClient: com.google.android.gms.location.FusedLocationProviderClient, onCityFound: (String) -> Unit) {
+    try {
+        fusedLocationClient.lastLocation.addOnSuccessListener { location ->
+            if (location != null) {
+                val geocoder = Geocoder(context, Locale.getDefault())
+                val addresses = geocoder.getFromLocation(location.latitude, location.longitude, 1)
+                if (!addresses.isNullOrEmpty()) {
+                    val city = addresses[0].locality
+                    val state = addresses[0].adminArea
+                    if (city != null) {
+                        onCityFound(if (state != null) "$city, $state" else city)
+                    }
                 }
             }
+        }
+    } catch (e: Exception) {
+        // Handle case where permission was revoked
+    }
+}
+
+@Composable
+private fun CustomDestinationCard(name: String) {
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .aspectRatio(4f / 5f)
+            .clip(RoundedCornerShape(16.dp))
+            .background(S1ContainerHigh)
+            .border(2.dp, S1Blue, RoundedCornerShape(16.dp))
+    ) {
+        Column(
+            modifier = Modifier.fillMaxSize(),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.Center
+        ) {
+            Box(
+                modifier = Modifier
+                    .size(48.dp)
+                    .background(S1Blue.copy(alpha = 0.2f), CircleShape),
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(Icons.Default.LocationOn, null, tint = S1Blue, modifier = Modifier.size(28.dp))
+            }
+            Spacer(Modifier.height(12.dp))
+            Text(
+                text = name,
+                fontSize = 18.sp,
+                fontWeight = FontWeight.Bold,
+                color = DeepSea5,
+                modifier = Modifier.padding(horizontal = 8.dp),
+                maxLines = 2,
+                textAlign = TextAlign.Center
+            )
+            Text(
+                text = "Custom destination",
+                fontSize = 10.sp,
+                color = S1OnSurfaceVariant
+            )
         }
     }
 }

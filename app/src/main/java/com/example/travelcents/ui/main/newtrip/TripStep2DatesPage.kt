@@ -188,29 +188,6 @@ fun TripStep2DatesPage(
             )
             Spacer(Modifier.height(20.dp))
 
-            // Origin field
-            TextField(
-                value = viewModel.origin,
-                onValueChange = { viewModel.origin = it },
-                placeholder = { Text("Departing from... (e.g. Los Angeles, CA)", color = S2OnSurfaceVariant.copy(alpha = 0.5f), fontSize = 14.sp) },
-                label = { Text("Origin", color = S2OnSurfaceVariant, fontSize = 12.sp) },
-                modifier = Modifier.fillMaxWidth(),
-                singleLine = true,
-                shape = RoundedCornerShape(16.dp),
-                colors = TextFieldDefaults.colors(
-                    focusedTextColor = DeepSea5,
-                    unfocusedTextColor = DeepSea5,
-                    cursorColor = S2Blue,
-                    focusedContainerColor = S2SurfaceBright,
-                    unfocusedContainerColor = S2SurfaceBright,
-                    focusedIndicatorColor = Color.Transparent,
-                    unfocusedIndicatorColor = Color.Transparent,
-                    focusedLabelColor = S2Blue,
-                    unfocusedLabelColor = S2OnSurfaceVariant
-                )
-            )
-            Spacer(Modifier.height(20.dp))
-
             // Calendar card
             Box(
                 modifier = Modifier

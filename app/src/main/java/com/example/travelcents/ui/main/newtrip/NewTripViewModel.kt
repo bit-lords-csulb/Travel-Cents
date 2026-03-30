@@ -36,6 +36,49 @@ class NewTripViewModel : ViewModel() {
     var interests by mutableStateOf(emptyList<String>())
     var specialRequests by mutableStateOf("")
 
+    // Autocomplete
+    private val allDestinations = listOf(
+        "Paris, France", "Tokyo, Japan", "Bali, Indonesia", "New York, USA", "London, UK", "Dubai, UAE",
+        "Rome, Italy", "Barcelona, Spain", "Amsterdam, Netherlands", "Singapore", "Bangkok, Thailand",
+        "Seoul, South Korea", "Sydney, Australia", "Hong Kong", "Istanbul, Turkey", "Prague, Czech Republic",
+        "Lisbon, Portugal", "Vienna, Austria", "Berlin, Germany", "Madrid, Spain", "Toronto, Canada",
+        "Los Angeles, USA", "Chicago, USA", "San Francisco, USA", "Miami, USA", "Las Vegas, USA",
+        "Vancouver, Canada", "Montreal, Canada", "Mexico City, Mexico", "Cancun, Mexico", "Rio de Janeiro, Brazil",
+        "Buenos Aires, Argentina", "Santiago, Chile", "Lima, Peru", "Bogota, Colombia", "Cape Town, South Africa",
+        "Johannesburg, South Africa", "Marrakech, Morocco", "Cairo, Egypt", "Nairobi, Kenya", "Dubai, UAE",
+        "Abu Dhabi, UAE", "Doha, Qatar", "Mumbai, India", "New Delhi, India", "Bangalore, India",
+        "Shanghai, China", "Beijing, China", "Guangzhou, China", "Taipei, Taiwan", "Osaka, Japan",
+        "Kyoto, Japan", "Melbourne, Australia", "Auckland, New Zealand", "Athens, Greece", "Venice, Italy",
+        "Florence, Italy", "Milan, Italy", "Munich, Germany", "Frankfurt, Germany", "Zurich, Switzerland",
+        "Geneva, Switzerland", "Brussels, Belgium", "Dublin, Ireland", "Edinburgh, UK", "Stockholm, Sweden",
+        "Oslo, Norway", "Copenhagen, Denmark", "Helsinki, Finland", "Warsaw, Poland", "Budapest, Hungary",
+        "Prague, Czech Republic", "Bucharest, Romania", "Sofia, Bulgaria", "Belgrade, Serbia", "Zagreb, Croatia",
+        "Ljubljana, Slovenia", "Bratislava, Slovakia", "Tallinn, Estonia", "Riga, Latvia", "Vilnius, Lithuania",
+        "Moscow, Russia", "Saint Petersburg, Russia", "Kiev, Ukraine", "Minsk, Belarus", "Tashkent, Uzbekistan",
+        "Almaty, Kazakhstan", "Baku, Azerbaijan", "Tbilisi, Georgia", "Yerevan, Armenia", "Tehran, Iran",
+        "Baghdad, Iraq", "Riyadh, Saudi Arabia", "Jeddah, Saudi Arabia", "Kuwait City, Kuwait", "Muscat, Oman",
+        "Manama, Bahrain", "Beirut, Lebanon", "Amman, Jordan", "Damascus, Syria", "Tel Aviv, Israel",
+        "Jerusalem, Israel", "Karachi, Pakistan", "Lahore, Pakistan", "Dhaka, Bangladesh", "Colombo, Sri Lanka",
+        "Kathmandu, Nepal", "Male, Maldives", "Hanoi, Vietnam", "Ho Chi Minh City, Vietnam", "Phnom Penh, Cambodia",
+        "Vientiane, Laos", "Yangon, Myanmar", "Kuala Lumpur, Malaysia", "Jakarta, Indonesia", "Manila, Philippines",
+        "Sydney, Australia", "Perth, Australia", "Brisbane, Australia", "Adelaide, Australia", "Canberra, Australia",
+        "Wellington, New Zealand", "Christchurch, New Zealand", "Port Moresby, Papua New Guinea", "Suva, Fiji",
+        "Honolulu, USA", "Anchorage, USA", "Seattle, USA", "Portland, USA", "Denver, USA", "Phoenix, USA",
+        "Dallas, USA", "Houston, USA", "Atlanta, USA", "Boston, USA", "Philadelphia, USA", "Washington D.C., USA"
+    ).sorted()
+
+    var filteredDestinations by mutableStateOf(emptyList<String>())
+        private set
+
+    fun updateDestination(input: String) {
+        destination = input
+        filteredDestinations = if (input.length >= 2) {
+            allDestinations.filter { it.contains(input, ignoreCase = true) }.take(5)
+        } else {
+            emptyList()
+        }
+    }
+
     private val _uiState = MutableStateFlow<TripUiState>(TripUiState.Idle)
     val uiState: StateFlow<TripUiState> = _uiState.asStateFlow()
 
