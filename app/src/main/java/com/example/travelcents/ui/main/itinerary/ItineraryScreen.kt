@@ -1,4 +1,4 @@
-package com.example.travelcents.ui.main
+package com.example.travelcents.ui.main.itinerary
 
 import android.annotation.SuppressLint
 import androidx.compose.foundation.background

@@ -1,4 +1,4 @@
-package com.example.travelcents.ui.main
+package com.example.travelcents.ui.main.aichat
 
 import com.example.travelcents.BuildConfig
 import androidx.compose.runtime.mutableStateListOf

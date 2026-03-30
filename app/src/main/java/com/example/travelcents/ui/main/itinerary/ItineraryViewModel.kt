@@ -1,4 +1,4 @@
-package com.example.travelcents.ui.main
+package com.example.travelcents.ui.main.itinerary
 
 import android.util.Log
 import androidx.lifecycle.ViewModel

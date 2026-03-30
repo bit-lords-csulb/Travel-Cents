@@ -39,8 +39,19 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
-import com.example.travelcents.ui.itinerary.EditPlanScreen
+import com.example.travelcents.ui.main.aichat.AiTripChatPage
 import com.example.travelcents.ui.main.chats.chat.ChatsScreen
+import com.example.travelcents.ui.main.itinerary.EditPlanScreen
+import com.example.travelcents.ui.main.itinerary.ItineraryScreen
+import com.example.travelcents.ui.main.itinerary.ItineraryViewModel
+import com.example.travelcents.ui.main.newtrip.NewTripLandingPage
+import com.example.travelcents.ui.main.newtrip.NewTripPage
+import com.example.travelcents.ui.main.newtrip.NewTripViewModel
+import com.example.travelcents.ui.main.newtrip.TripStep1DestinationPage
+import com.example.travelcents.ui.main.newtrip.TripStep2DatesPage
+import com.example.travelcents.ui.main.newtrip.TripStep3TravelersPage
+import com.example.travelcents.ui.main.newtrip.TripStep4BudgetPage
+import com.example.travelcents.ui.main.newtrip.TripStep5InterestsPage
 import com.example.travelcents.ui.theme.DeepSea1
 import com.example.travelcents.ui.theme.DeepSea2
 import com.example.travelcents.ui.theme.DeepSea3
@@ -50,6 +61,12 @@ import com.example.travelcents.ui.theme.DeepSea5
 object MainRoutes {
     const val Current = "current"
     const val NewTrip = "new_trip"
+    const val NewTripStep1 = "new_trip_step1"
+    const val NewTripStep2 = "new_trip_step2"
+    const val NewTripStep3 = "new_trip_step3"
+    const val NewTripStep4 = "new_trip_step4"
+    const val NewTripStep5 = "new_trip_step5"
+    const val NewTripForm = "new_trip_form"
     const val Home = "home"
     const val Chats = "chats"
     const val Settings = "settings"
@@ -135,6 +152,59 @@ fun MainScaffold(modifier: Modifier = Modifier, onLogout: () -> Unit = {}) {
                 }
 
                 composable(MainRoutes.NewTrip) {
+                    NewTripLandingPage(
+                        modifier = Modifier.fillMaxSize(),
+                        onPlanTripClick = { navController.navigate(MainRoutes.NewTripStep1) },
+                        onAiChatClick = { navController.navigate(MainRoutes.AiTripChat) },
+                        onBackClick = { navController.navigate(MainRoutes.Home) }
+                    )
+                }
+                composable(MainRoutes.NewTripStep1) {
+                    TripStep1DestinationPage(
+                        modifier = Modifier.fillMaxSize(),
+                        viewModel = newTripViewModel,
+                        onBackClick = { navController.popBackStack() },
+                        onContinueClick = { navController.navigate(MainRoutes.NewTripStep2) }
+                    )
+                }
+                composable(MainRoutes.NewTripStep2) {
+                    TripStep2DatesPage(
+                        modifier = Modifier.fillMaxSize(),
+                        viewModel = newTripViewModel,
+                        onBackClick = { navController.popBackStack() },
+                        onContinueClick = { navController.navigate(MainRoutes.NewTripStep3) }
+                    )
+                }
+                composable(MainRoutes.NewTripStep3) {
+                    TripStep3TravelersPage(
+                        modifier = Modifier.fillMaxSize(),
+                        viewModel = newTripViewModel,
+                        onBackClick = { navController.popBackStack() },
+                        onContinueClick = { navController.navigate(MainRoutes.NewTripStep4) }
+                    )
+                }
+                composable(MainRoutes.NewTripStep4) {
+                    TripStep4BudgetPage(
+                        modifier = Modifier.fillMaxSize(),
+                        viewModel = newTripViewModel,
+                        onBackClick = { navController.popBackStack() },
+                        onSaveDraftClick = { navController.navigate(MainRoutes.Home) },
+                        onContinueClick = { navController.navigate(MainRoutes.NewTripStep5) }
+                    )
+                }
+                composable(MainRoutes.NewTripStep5) {
+                    TripStep5InterestsPage(
+                        modifier = Modifier.fillMaxSize(),
+                        viewModel = newTripViewModel,
+                        onBackClick = { navController.popBackStack() },
+                        onTripGenerated = {
+                            navController.navigate(MainRoutes.Current) {
+                                popUpTo(MainRoutes.Home) { inclusive = false }
+                            }
+                        }
+                    )
+                }
+                composable(MainRoutes.NewTripForm) {
                     NewTripPage(
                         modifier = Modifier.fillMaxSize(),
                         viewModel = newTripViewModel,
