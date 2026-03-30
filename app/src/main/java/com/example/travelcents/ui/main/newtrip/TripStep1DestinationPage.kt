@@ -85,6 +85,7 @@ fun TripStep1DestinationPage(
     modifier: Modifier = Modifier,
     viewModel: NewTripViewModel,
     onBackClick: () -> Unit,
+    onCloseClick: () -> Unit,
     onContinueClick: () -> Unit
 ) {
     Column(
@@ -109,7 +110,7 @@ fun TripStep1DestinationPage(
                     Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back", tint = S1Blue)
                 }
                 Text("Step 1 of 5", fontSize = 15.sp, fontWeight = FontWeight.Bold, color = DeepSea5)
-                IconButton(onClick = onBackClick) {
+                IconButton(onClick = onCloseClick) {
                     Icon(Icons.Default.Close, contentDescription = "Close", tint = S1Blue)
                 }
             }

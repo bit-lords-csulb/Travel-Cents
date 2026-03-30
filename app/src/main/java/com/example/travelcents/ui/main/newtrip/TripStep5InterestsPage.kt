@@ -79,6 +79,7 @@ fun TripStep5InterestsPage(
     modifier: Modifier = Modifier,
     viewModel: NewTripViewModel,
     onBackClick: () -> Unit,
+    onCloseClick: () -> Unit,
     onTripGenerated: () -> Unit
 ) {
     val uiState by viewModel.uiState.collectAsState()
@@ -111,7 +112,7 @@ fun TripStep5InterestsPage(
                     }
                     Text("Step 5 of 5", fontSize = 17.sp, fontWeight = FontWeight.Bold, color = DeepSea5)
                 }
-                IconButton(onClick = onBackClick) {
+                IconButton(onClick = onCloseClick) {
                     Icon(Icons.Default.Close, "Close", tint = S5Blue)
                 }
             }

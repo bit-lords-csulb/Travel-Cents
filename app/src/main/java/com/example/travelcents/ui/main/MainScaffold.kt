@@ -164,6 +164,7 @@ fun MainScaffold(modifier: Modifier = Modifier, onLogout: () -> Unit = {}) {
                         modifier = Modifier.fillMaxSize(),
                         viewModel = newTripViewModel,
                         onBackClick = { navController.popBackStack() },
+                        onCloseClick = { navController.popBackStack(MainRoutes.NewTrip, false) },
                         onContinueClick = { navController.navigate(MainRoutes.NewTripStep2) }
                     )
                 }
@@ -172,6 +173,7 @@ fun MainScaffold(modifier: Modifier = Modifier, onLogout: () -> Unit = {}) {
                         modifier = Modifier.fillMaxSize(),
                         viewModel = newTripViewModel,
                         onBackClick = { navController.popBackStack() },
+                        onCloseClick = { navController.popBackStack(MainRoutes.NewTrip, false) },
                         onContinueClick = { navController.navigate(MainRoutes.NewTripStep3) }
                     )
                 }
@@ -180,6 +182,7 @@ fun MainScaffold(modifier: Modifier = Modifier, onLogout: () -> Unit = {}) {
                         modifier = Modifier.fillMaxSize(),
                         viewModel = newTripViewModel,
                         onBackClick = { navController.popBackStack() },
+                        onCloseClick = { navController.popBackStack(MainRoutes.NewTrip, false) },
                         onContinueClick = { navController.navigate(MainRoutes.NewTripStep4) }
                     )
                 }
@@ -188,6 +191,7 @@ fun MainScaffold(modifier: Modifier = Modifier, onLogout: () -> Unit = {}) {
                         modifier = Modifier.fillMaxSize(),
                         viewModel = newTripViewModel,
                         onBackClick = { navController.popBackStack() },
+                        onCloseClick = { navController.popBackStack(MainRoutes.NewTrip, false) },
                         onSaveDraftClick = { navController.navigate(MainRoutes.Home) },
                         onContinueClick = { navController.navigate(MainRoutes.NewTripStep5) }
                     )
@@ -197,6 +201,7 @@ fun MainScaffold(modifier: Modifier = Modifier, onLogout: () -> Unit = {}) {
                         modifier = Modifier.fillMaxSize(),
                         viewModel = newTripViewModel,
                         onBackClick = { navController.popBackStack() },
+                        onCloseClick = { navController.popBackStack(MainRoutes.NewTrip, false) },
                         onTripGenerated = {
                             navController.navigate(MainRoutes.Current) {
                                 popUpTo(MainRoutes.Home) { inclusive = false }

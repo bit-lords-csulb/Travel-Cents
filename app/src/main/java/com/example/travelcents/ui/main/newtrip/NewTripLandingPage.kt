@@ -76,7 +76,7 @@ fun NewTripLandingPage(
                     )
                 }
                 Text(
-                    text = "Step 1 of 5",
+                    text = "New Trip Planner",
                     fontSize = 15.sp,
                     fontWeight = FontWeight.Bold,
                     color = DeepSea5
