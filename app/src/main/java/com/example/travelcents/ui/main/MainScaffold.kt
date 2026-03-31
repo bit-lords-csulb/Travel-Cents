@@ -53,7 +53,6 @@ import com.example.travelcents.ui.main.newtrip.TripStep2DatesPage
 import com.example.travelcents.ui.main.newtrip.TripStep3TravelersPage
 import com.example.travelcents.ui.main.newtrip.TripStep4BudgetPage
 import com.example.travelcents.ui.main.newtrip.TripStep5InterestsPage
-import com.example.travelcents.ui.main.newtrip.TripUiState
 import com.example.travelcents.ui.theme.DeepSea1
 import com.example.travelcents.ui.theme.DeepSea2
 import com.example.travelcents.ui.theme.DeepSea3
@@ -234,18 +233,16 @@ fun MainScaffold(modifier: Modifier = Modifier, onLogout: () -> Unit = {}) {
                     )
                 }
                 composable(MainRoutes.FinalPlan) {
-                    val uiState by newTripViewModel.uiState.collectAsState()
-                    val success = uiState as? TripUiState.Success
-                    if (success != null) {
-                        FinalPlanPage(
-                            itinerary = success.itinerary,
-                            events = success.events,
-                            modifier = Modifier.fillMaxSize(),
-                            onBackClick = { navController.navigate(MainRoutes.Current) {
+                    val itineraryViewModel: ItineraryViewModel = viewModel()
+                    FinalPlanPage(
+                        viewModel = itineraryViewModel,
+                        modifier = Modifier.fillMaxSize(),
+                        onBackClick = {
+                            navController.navigate(MainRoutes.Current) {
                                 popUpTo(MainRoutes.Home) { inclusive = false }
-                            }}
-                        )
-                    }
+                            }
+                        }
+                    )
                 }
             }
         }
