@@ -1,8 +1,10 @@
 package com.example.travelcents.ui.main.newtrip
 
 import android.Manifest
+import android.annotation.SuppressLint
 import android.content.Context
 import android.content.pm.PackageManager
+import android.location.Address
 import android.location.Geocoder
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
@@ -59,11 +61,14 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.window.PopupProperties
 import androidx.core.content.ContextCompat
 import coil.compose.AsyncImage
 import com.example.travelcents.ui.theme.DeepSea1
 import com.example.travelcents.ui.theme.DeepSea5
 import com.google.android.gms.location.LocationServices
+import com.google.android.gms.location.Priority
+import com.google.android.gms.tasks.CancellationTokenSource
 import java.util.Locale
 
 private val S1Blue = Color(0xFF64B5F6)
@@ -114,9 +119,11 @@ fun TripStep1DestinationPage(
 
     val fusedLocationClient = remember { LocationServices.getFusedLocationProviderClient(context) }
     val permissionLauncher = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.RequestPermission()
-    ) { isGranted ->
-        if (isGranted) {
+        contract = ActivityResultContracts.RequestMultiplePermissions()
+    ) { permissions ->
+        val hasLocationPermission = permissions[Manifest.permission.ACCESS_FINE_LOCATION] == true ||
+            permissions[Manifest.permission.ACCESS_COARSE_LOCATION] == true
+        if (hasLocationPermission) {
             getCurrentLocation(context, fusedLocationClient) { city ->
                 viewModel.origin = city
             }
@@ -210,20 +217,91 @@ fun TripStep1DestinationPage(
 
             // Destination search field with autocomplete
             item(span = { GridItemSpan(2) }) {
-                Box {
+                Column {
+                    Box {
+                        TextField(
+                            value = viewModel.destination,
+                            onValueChange = {
+                                viewModel.updateDestination(it)
+                                isExpanded = viewModel.filteredDestinations.isNotEmpty()
+                            },
+                            placeholder = {
+                                Text(
+                                    "Search for a destination...",
+                                    color = S1OnSurfaceVariant.copy(alpha = 0.5f),
+                                    fontSize = 16.sp
+                                )
+                            },
+                            label = { Text("Destination", color = S1OnSurfaceVariant, fontSize = 12.sp) },
+                            leadingIcon = {
+                                Icon(
+                                    Icons.Default.Search,
+                                    contentDescription = null,
+                                    tint = S1Blue,
+                                    modifier = Modifier.size(22.dp)
+                                )
+                            },
+                            modifier = Modifier.fillMaxWidth(),
+                            singleLine = true,
+                            shape = RoundedCornerShape(16.dp),
+                            colors = TextFieldDefaults.colors(
+                                focusedTextColor = DeepSea5,
+                                unfocusedTextColor = DeepSea5,
+                                cursorColor = S1Blue,
+                                focusedContainerColor = S1SurfaceBright,
+                                unfocusedContainerColor = S1SurfaceBright,
+                                focusedIndicatorColor = Color.Transparent,
+                                unfocusedIndicatorColor = Color.Transparent,
+                                focusedLabelColor = S1Blue,
+                                unfocusedLabelColor = S1OnSurfaceVariant
+                            )
+                        )
+                        DropdownMenu(
+                            expanded = isExpanded,
+                            onDismissRequest = { isExpanded = false },
+                            properties = PopupProperties(focusable = false),
+                            modifier = Modifier
+                                .fillMaxWidth(0.9f)
+                                .background(S1SurfaceBright)
+                                .border(1.dp, S1Blue.copy(alpha = 0.2f), RoundedCornerShape(8.dp))
+                        ) {
+                            viewModel.filteredDestinations.forEach { suggestion ->
+                                DropdownMenuItem(
+                                    text = { Text(suggestion, color = DeepSea5) },
+                                    onClick = {
+                                        viewModel.destination = suggestion
+                                        isExpanded = false
+                                    },
+                                    colors = MenuDefaults.itemColors(
+                                        textColor = DeepSea5
+                                    )
+                                )
+                            }
+                        }
+                    }
+                    Text(
+                        text = "Enter the city you want to visit.",
+                        fontSize = 11.sp,
+                        color = S1OnSurfaceVariant,
+                        modifier = Modifier.padding(start = 16.dp, top = 4.dp)
+                    )
+                }
+            }
+
+            // Origin field
+            item(span = { GridItemSpan(2) }) {
+                Column {
                     TextField(
-                        value = viewModel.destination,
-                        onValueChange = { 
-                            viewModel.updateDestination(it)
-                            isExpanded = viewModel.filteredDestinations.isNotEmpty()
-                        },
+                        value = viewModel.origin,
+                        onValueChange = { viewModel.origin = it },
                         placeholder = {
                             Text(
-                                "Search for a destination...",
+                                "e.g. Los Angeles, CA",
                                 color = S1OnSurfaceVariant.copy(alpha = 0.5f),
                                 fontSize = 16.sp
                             )
                         },
+                        label = { Text("Origin", color = S1OnSurfaceVariant, fontSize = 12.sp) },
                         leadingIcon = {
                             Icon(
                                 Icons.Default.Search,
@@ -235,6 +313,24 @@ fun TripStep1DestinationPage(
                         modifier = Modifier.fillMaxWidth(),
                         singleLine = true,
                         shape = RoundedCornerShape(16.dp),
+                        trailingIcon = {
+                            IconButton(onClick = {
+                                if (hasLocationPermission(context)) {
+                                    getCurrentLocation(context, fusedLocationClient) { city ->
+                                        viewModel.origin = city
+                                    }
+                                } else {
+                                    permissionLauncher.launch(
+                                        arrayOf(
+                                            Manifest.permission.ACCESS_FINE_LOCATION,
+                                            Manifest.permission.ACCESS_COARSE_LOCATION
+                                        )
+                                    )
+                                }
+                            }) {
+                                Icon(Icons.Default.MyLocation, "GPS", tint = S1Blue)
+                            }
+                        },
                         colors = TextFieldDefaults.colors(
                             focusedTextColor = DeepSea5,
                             unfocusedTextColor = DeepSea5,
@@ -242,76 +338,18 @@ fun TripStep1DestinationPage(
                             focusedContainerColor = S1SurfaceBright,
                             unfocusedContainerColor = S1SurfaceBright,
                             focusedIndicatorColor = Color.Transparent,
-                            unfocusedIndicatorColor = Color.Transparent
+                            unfocusedIndicatorColor = Color.Transparent,
+                            focusedLabelColor = S1Blue,
+                            unfocusedLabelColor = S1OnSurfaceVariant
                         )
                     )
-
-                    DropdownMenu(
-                        expanded = isExpanded,
-                        onDismissRequest = { isExpanded = false },
-                        modifier = Modifier
-                            .fillMaxWidth(0.9f)
-                            .background(S1SurfaceBright)
-                            .border(1.dp, S1Blue.copy(alpha = 0.2f), RoundedCornerShape(8.dp)),
-                        offset = androidx.compose.ui.unit.DpOffset(0.dp, 4.dp)
-                    ) {
-                        viewModel.filteredDestinations.forEach { suggestion ->
-                            DropdownMenuItem(
-                                text = { Text(suggestion, color = DeepSea5) },
-                                onClick = {
-                                    viewModel.destination = suggestion
-                                    isExpanded = false
-                                },
-                                colors = MenuDefaults.itemColors(
-                                    textColor = DeepSea5
-                                )
-                            )
-                        }
-                    }
+                    Text(
+                        text = "Enter the city you're departing from.",
+                        fontSize = 11.sp,
+                        color = S1OnSurfaceVariant,
+                        modifier = Modifier.padding(start = 16.dp, top = 4.dp)
+                    )
                 }
-            }
-
-            // Origin field moved here
-            item(span = { GridItemSpan(2) }) {
-                TextField(
-                    value = viewModel.origin,
-                    onValueChange = { viewModel.origin = it },
-                    placeholder = {
-                        Text(
-                            "Departing from... (e.g. Los Angeles, CA)",
-                            color = S1OnSurfaceVariant.copy(alpha = 0.5f),
-                            fontSize = 14.sp
-                        )
-                    },
-                    label = { Text("Origin", color = S1OnSurfaceVariant, fontSize = 12.sp) },
-                    modifier = Modifier.fillMaxWidth(),
-                    singleLine = true,
-                    shape = RoundedCornerShape(16.dp),
-                    trailingIcon = {
-                        IconButton(onClick = {
-                            if (ContextCompat.checkSelfPermission(context, Manifest.permission.ACCESS_COARSE_LOCATION) == PackageManager.PERMISSION_GRANTED) {
-                                getCurrentLocation(context, fusedLocationClient) { city ->
-                                    viewModel.origin = city
-                                }
-                            } else {
-                                permissionLauncher.launch(Manifest.permission.ACCESS_COARSE_LOCATION)
-                            }
-                        }) {
-                            Icon(Icons.Default.MyLocation, "GPS", tint = S1Blue)
-                        }
-                    },
-                    colors = TextFieldDefaults.colors(
-                        focusedTextColor = DeepSea5,
-                        unfocusedTextColor = DeepSea5,
-                        cursorColor = S1Blue,
-                        focusedContainerColor = S1SurfaceBright,
-                        unfocusedContainerColor = S1SurfaceBright,
-                        focusedIndicatorColor = Color.Transparent,
-                        unfocusedIndicatorColor = Color.Transparent,
-                        focusedLabelColor = S1Blue,
-                        unfocusedLabelColor = S1OnSurfaceVariant
-                    )
-                )
             }
 
             // Popular destinations header
@@ -384,23 +422,73 @@ fun TripStep1DestinationPage(
     }
 }
 
-private fun getCurrentLocation(context: Context, fusedLocationClient: com.google.android.gms.location.FusedLocationProviderClient, onCityFound: (String) -> Unit) {
-    try {
-        fusedLocationClient.lastLocation.addOnSuccessListener { location ->
-            if (location != null) {
-                val geocoder = Geocoder(context, Locale.getDefault())
-                val addresses = geocoder.getFromLocation(location.latitude, location.longitude, 1)
-                if (!addresses.isNullOrEmpty()) {
-                    val city = addresses[0].locality
-                    val state = addresses[0].adminArea
-                    if (city != null) {
-                        onCityFound(if (state != null) "$city, $state" else city)
-                    }
-                }
+private fun hasLocationPermission(context: Context): Boolean {
+    val hasFineLocation = ContextCompat.checkSelfPermission(
+        context,
+        Manifest.permission.ACCESS_FINE_LOCATION
+    ) == PackageManager.PERMISSION_GRANTED
+    val hasCoarseLocation = ContextCompat.checkSelfPermission(
+        context,
+        Manifest.permission.ACCESS_COARSE_LOCATION
+    ) == PackageManager.PERMISSION_GRANTED
+    return hasFineLocation || hasCoarseLocation
+}
+
+@SuppressLint("MissingPermission")
+private fun getCurrentLocation(
+    context: Context,
+    fusedLocationClient: com.google.android.gms.location.FusedLocationProviderClient,
+    onCityFound: (String) -> Unit
+) {
+    if (!hasLocationPermission(context)) return
+
+    fun resolveCity(lat: Double, lon: Double) {
+        val geocoder = Geocoder(context, Locale.getDefault())
+        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.TIRAMISU) {
+            geocoder.getFromLocation(lat, lon, 1) { addresses ->
+                val formatted = addresses.firstOrNull()?.let { formatOriginFromAddress(it) }
+                if (formatted != null) onCityFound(formatted)
+            }
+        } else {
+            @Suppress("DEPRECATION")
+            val addresses = geocoder.getFromLocation(lat, lon, 1)
+            val formatted = addresses?.firstOrNull()?.let { formatOriginFromAddress(it) }
+            if (formatted != null) onCityFound(formatted)
+        }
+    }
+
+    // Use last known location for instant response, only request fresh fix if nothing cached
+    fusedLocationClient.lastLocation.addOnSuccessListener { last ->
+        if (last != null) {
+            resolveCity(last.latitude, last.longitude)
+        } else {
+            fusedLocationClient.getCurrentLocation(
+                Priority.PRIORITY_HIGH_ACCURACY,
+                CancellationTokenSource().token
+            ).addOnSuccessListener { location ->
+                if (location != null) resolveCity(location.latitude, location.longitude)
             }
         }
-    } catch (e: Exception) {
-        // Handle case where permission was revoked
+    }
+}
+
+private fun formatOriginFromAddress(address: Address): String? {
+    val cityLike = listOfNotNull(
+        address.locality,
+        address.subAdminArea,
+        address.adminArea,
+        address.featureName
+    ).firstOrNull { it.isNotBlank() }
+
+    val regionLike = listOfNotNull(
+        address.adminArea,
+        address.countryName
+    ).firstOrNull { it.isNotBlank() && it != cityLike }
+
+    return when {
+        cityLike == null && regionLike == null -> null
+        cityLike != null && regionLike != null -> "$cityLike, $regionLike"
+        else -> cityLike ?: regionLike
     }
 }
 
