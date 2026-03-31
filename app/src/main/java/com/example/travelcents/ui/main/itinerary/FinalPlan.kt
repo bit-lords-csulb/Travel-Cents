@@ -13,6 +13,9 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.ArrowDropDown
 import androidx.compose.material.icons.outlined.AccountCircle
+import androidx.compose.material.icons.outlined.Archive
+import androidx.compose.material.icons.outlined.DeleteOutline
+import androidx.compose.material.icons.outlined.Unarchive
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -107,6 +110,7 @@ fun FinalPlanPage(
 ) {
     val uiState by viewModel.uiState.collectAsState()
     val allTrips by viewModel.allTrips.collectAsState()
+    val archivedTrips by viewModel.archivedTrips.collectAsState()
     val planItems = remember(uiState.events) { buildPlanItems(uiState.events) }
 
     LaunchedEffect(Unit) {
@@ -119,8 +123,12 @@ fun FinalPlanPage(
             FinalPlanTopBar(
                 tripTitle = uiState.tripTitle,
                 allTrips = allTrips,
+                archivedTrips = archivedTrips,
                 currentTripId = uiState.currentTripId,
                 onTripSelect = { tripId -> viewModel.loadTrip(tripId) },
+                onArchiveTrip = { tripId -> viewModel.archiveTrip(tripId) },
+                onRestoreTrip = { tripId -> viewModel.restoreTrip(tripId) },
+                onDeleteTrip = { tripId -> viewModel.deleteTrip(tripId) },
                 onBackClick = onBackClick
             )
         }
@@ -194,11 +202,46 @@ fun FinalPlanPage(
 private fun FinalPlanTopBar(
     tripTitle: String,
     allTrips: List<TripSummary>,
+    archivedTrips: List<TripSummary>,
     currentTripId: String?,
     onTripSelect: (String) -> Unit,
+    onArchiveTrip: (String) -> Unit,
+    onRestoreTrip: (String) -> Unit,
+    onDeleteTrip: (String) -> Unit,
     onBackClick: () -> Unit
 ) {
     var dropdownExpanded by remember { mutableStateOf(false) }
+    var tripToDelete by remember { mutableStateOf<TripSummary?>(null) }
+
+    tripToDelete?.let { trip ->
+        AlertDialog(
+            onDismissRequest = { tripToDelete = null },
+            containerColor = SurfaceContainerHigh,
+            title = {
+                Text("Delete trip?", color = OnSurface, fontWeight = FontWeight.Bold)
+            },
+            text = {
+                Text(
+                    "\"${trip.tripName}\" and all its events will be permanently deleted.",
+                    color = OnSurfaceVariant,
+                    fontSize = 14.sp
+                )
+            },
+            confirmButton = {
+                TextButton(onClick = {
+                    onDeleteTrip(trip.tripId)
+                    tripToDelete = null
+                }) {
+                    Text("Delete", color = ErrorColor, fontWeight = FontWeight.Bold)
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { tripToDelete = null }) {
+                    Text("Cancel", color = OnSurfaceVariant)
+                }
+            }
+        )
+    }
 
     Row(
         modifier = Modifier
@@ -217,11 +260,12 @@ private fun FinalPlanTopBar(
         }
 
         // Trip picker — center of the top bar
+        val hasMultiple = allTrips.size > 1 || archivedTrips.isNotEmpty()
         Box(contentAlignment = Alignment.TopCenter) {
             Row(
                 modifier = Modifier
                     .clip(RoundedCornerShape(8.dp))
-                    .clickable(enabled = allTrips.size > 1) { dropdownExpanded = true }
+                    .clickable(enabled = hasMultiple) { dropdownExpanded = true }
                     .padding(horizontal = 12.dp, vertical = 10.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
@@ -234,7 +278,7 @@ private fun FinalPlanTopBar(
                     overflow = TextOverflow.Ellipsis,
                     modifier = Modifier.widthIn(max = 200.dp)
                 )
-                if (allTrips.size > 1) {
+                if (hasMultiple) {
                     Icon(
                         imageVector = Icons.Default.ArrowDropDown,
                         contentDescription = "Switch trip",
@@ -269,6 +313,38 @@ private fun FinalPlanTopBar(
                                 }
                             }
                         },
+                        trailingIcon = {
+                            Row {
+                                IconButton(
+                                    onClick = {
+                                        dropdownExpanded = false
+                                        onArchiveTrip(trip.tripId)
+                                    },
+                                    modifier = Modifier.size(32.dp)
+                                ) {
+                                    Icon(
+                                        Icons.Outlined.Archive,
+                                        contentDescription = "Archive",
+                                        tint = OnSurfaceVariant,
+                                        modifier = Modifier.size(18.dp)
+                                    )
+                                }
+                                IconButton(
+                                    onClick = {
+                                        dropdownExpanded = false
+                                        tripToDelete = trip
+                                    },
+                                    modifier = Modifier.size(32.dp)
+                                ) {
+                                    Icon(
+                                        Icons.Outlined.DeleteOutline,
+                                        contentDescription = "Delete",
+                                        tint = ErrorColor.copy(alpha = 0.7f),
+                                        modifier = Modifier.size(18.dp)
+                                    )
+                                }
+                            }
+                        },
                         onClick = {
                             dropdownExpanded = false
                             if (!isSelected) onTripSelect(trip.tripId)
@@ -277,6 +353,76 @@ private fun FinalPlanTopBar(
                             if (isSelected) PrimaryBlue.copy(alpha = 0.08f) else Color.Transparent
                         )
                     )
+                }
+
+                if (archivedTrips.isNotEmpty()) {
+                    HorizontalDivider(
+                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 4.dp),
+                        color = OutlineVariant.copy(alpha = 0.4f)
+                    )
+                    Box(modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp)) {
+                        Text(
+                            text = "ARCHIVED",
+                            color = OnSurfaceVariant.copy(alpha = 0.6f),
+                            fontSize = 10.sp,
+                            fontWeight = FontWeight.Bold,
+                            letterSpacing = 2.sp
+                        )
+                    }
+                    archivedTrips.forEach { trip ->
+                        DropdownMenuItem(
+                            text = {
+                                Column(modifier = Modifier.padding(vertical = 4.dp)) {
+                                    Text(
+                                        text = trip.tripName,
+                                        color = OnSurfaceVariant,
+                                        fontSize = 14.sp,
+                                        fontWeight = FontWeight.Medium
+                                    )
+                                    if (trip.destination.isNotEmpty()) {
+                                        Text(
+                                            text = "${trip.destination}  •  ${trip.dateFrom}",
+                                            color = OnSurfaceVariant.copy(alpha = 0.6f),
+                                            fontSize = 11.sp
+                                        )
+                                    }
+                                }
+                            },
+                            trailingIcon = {
+                                Row {
+                                    IconButton(
+                                        onClick = {
+                                            dropdownExpanded = false
+                                            onRestoreTrip(trip.tripId)
+                                        },
+                                        modifier = Modifier.size(32.dp)
+                                    ) {
+                                        Icon(
+                                            Icons.Outlined.Unarchive,
+                                            contentDescription = "Restore",
+                                            tint = PrimaryBlue.copy(alpha = 0.8f),
+                                            modifier = Modifier.size(18.dp)
+                                        )
+                                    }
+                                    IconButton(
+                                        onClick = {
+                                            dropdownExpanded = false
+                                            tripToDelete = trip
+                                        },
+                                        modifier = Modifier.size(32.dp)
+                                    ) {
+                                        Icon(
+                                            Icons.Outlined.DeleteOutline,
+                                            contentDescription = "Delete",
+                                            tint = ErrorColor.copy(alpha = 0.7f),
+                                            modifier = Modifier.size(18.dp)
+                                        )
+                                    }
+                                }
+                            },
+                            onClick = {}
+                        )
+                    }
                 }
             }
         }
