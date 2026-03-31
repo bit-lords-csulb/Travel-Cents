@@ -42,6 +42,7 @@ import androidx.navigation.navArgument
 import com.example.travelcents.ui.main.aichat.AiTripChatPage
 import com.example.travelcents.ui.main.chats.chat.ChatsScreen
 import com.example.travelcents.ui.main.itinerary.EditPlanScreen
+import com.example.travelcents.ui.main.itinerary.FinalPlanPage
 import com.example.travelcents.ui.main.itinerary.ItineraryScreen
 import com.example.travelcents.ui.main.itinerary.ItineraryViewModel
 import com.example.travelcents.ui.main.newtrip.NewTripLandingPage
@@ -52,6 +53,7 @@ import com.example.travelcents.ui.main.newtrip.TripStep2DatesPage
 import com.example.travelcents.ui.main.newtrip.TripStep3TravelersPage
 import com.example.travelcents.ui.main.newtrip.TripStep4BudgetPage
 import com.example.travelcents.ui.main.newtrip.TripStep5InterestsPage
+import com.example.travelcents.ui.main.newtrip.TripUiState
 import com.example.travelcents.ui.theme.DeepSea1
 import com.example.travelcents.ui.theme.DeepSea2
 import com.example.travelcents.ui.theme.DeepSea3
@@ -73,6 +75,7 @@ object MainRoutes {
 
     const val EditPlan = "edit_plan/{tripId}/{eventId}"
     const val AiTripChat = "ai_trip_chat"
+    const val FinalPlan = "final_plan"
 }
 
 private val bottomNavRoutes = setOf(
@@ -203,7 +206,7 @@ fun MainScaffold(modifier: Modifier = Modifier, onLogout: () -> Unit = {}) {
                         onBackClick = { navController.popBackStack() },
                         onCloseClick = { navController.popBackStack(MainRoutes.NewTrip, false) },
                         onTripGenerated = {
-                            navController.navigate(MainRoutes.Current) {
+                            navController.navigate(MainRoutes.FinalPlan) {
                                 popUpTo(MainRoutes.Home) { inclusive = false }
                             }
                         }
@@ -229,6 +232,20 @@ fun MainScaffold(modifier: Modifier = Modifier, onLogout: () -> Unit = {}) {
                         modifier = Modifier.fillMaxSize(),
                         onBackClick = { navController.popBackStack() }
                     )
+                }
+                composable(MainRoutes.FinalPlan) {
+                    val uiState by newTripViewModel.uiState.collectAsState()
+                    val success = uiState as? TripUiState.Success
+                    if (success != null) {
+                        FinalPlanPage(
+                            itinerary = success.itinerary,
+                            events = success.events,
+                            modifier = Modifier.fillMaxSize(),
+                            onBackClick = { navController.navigate(MainRoutes.Current) {
+                                popUpTo(MainRoutes.Home) { inclusive = false }
+                            }}
+                        )
+                    }
                 }
             }
         }
