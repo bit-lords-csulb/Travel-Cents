@@ -20,6 +20,16 @@ import kotlinx.coroutines.async
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.tasks.await
 
+enum class GenerationStep {
+    IDLE,
+    CRAFTING_ITINERARY,
+    SEARCHING_FLIGHTS,
+    FINDING_HOTELS,
+    PLANNING_ACTIVITIES,
+    SAVING,
+    COMPLETE
+}
+
 class NewTripViewModel : ViewModel() {
 
     // Form fields
@@ -82,6 +92,8 @@ class NewTripViewModel : ViewModel() {
 
     private val _uiState = MutableStateFlow<TripUiState>(TripUiState.Idle)
     val uiState: StateFlow<TripUiState> = _uiState.asStateFlow()
+    private val _generationStep = MutableStateFlow(GenerationStep.IDLE)
+    val generationStep: StateFlow<GenerationStep> = _generationStep.asStateFlow()
 
     fun generateTrip() {
         val uid = FirebaseAuth.getInstance().currentUser?.uid
@@ -116,6 +128,7 @@ class NewTripViewModel : ViewModel() {
         viewModelScope.launch {
             try {
                 // Step 1: generate itinerary metadata (includes IATA codes)
+                _generationStep.value = GenerationStep.CRAFTING_ITINERARY
                 _uiState.value = TripUiState.Loading(GROQ_ITINERARY_MESSAGES.random())
                 val itinerary = GroqRepository.generateItinerary(request)
 
@@ -125,8 +138,10 @@ class NewTripViewModel : ViewModel() {
                 else 0.0
 
                 // Step 3: Fetch flights + hotels in parallel (hotels filtered by budget)
+                _generationStep.value = GenerationStep.SEARCHING_FLIGHTS
                 _uiState.value = TripUiState.Loading(SERP_FLIGHTS_MESSAGES.random())
                 val flightsDeferred = async { SerpRepository.searchFlights(request, itinerary) }
+                _generationStep.value = GenerationStep.FINDING_HOTELS
                 _uiState.value = TripUiState.Loading(SERP_HOTELS_MESSAGES.random())
                 val hotelsDeferred = async { SerpRepository.searchHotels(request, itinerary, hotelBudgetPerNight) }
                 val realFlights = flightsDeferred.await()
@@ -139,16 +154,20 @@ class NewTripViewModel : ViewModel() {
                 val remainingBudget = if (budget > 0) maxOf(0.0, budget - flightPrice - hotelTotal) else 0.0
 
                 // Step 5: Groq generates full daily schedule with budget context
+                _generationStep.value = GenerationStep.PLANNING_ACTIVITIES
                 _uiState.value = TripUiState.Loading(GROQ_EVENTS_MESSAGES.random())
                 val aiEvents = GroqRepository.generateEvents(itinerary, request, realFlights, realHotels, remainingBudget)
 
                 val allEvents = realFlights + realHotels + aiEvents
                 val linkedItinerary = itinerary.copy(eventIds = allEvents.map { it.eventId })
 
+                _generationStep.value = GenerationStep.SAVING
                 _uiState.value = TripUiState.Loading(FIRESTORE_MESSAGES.random())
                 saveToFirestore(uid, linkedItinerary, allEvents)
+                _generationStep.value = GenerationStep.COMPLETE
                 _uiState.value = TripUiState.Success(linkedItinerary, allEvents)
             } catch (e: Exception) {
+                _generationStep.value = GenerationStep.IDLE
                 _uiState.value = TripUiState.Error(e.message ?: "Failed to generate trip.")
             }
         }
@@ -175,6 +194,7 @@ class NewTripViewModel : ViewModel() {
 
     fun resetState() {
         _uiState.value = TripUiState.Idle
+        _generationStep.value = GenerationStep.IDLE
     }
 
     fun toggleDietary(item: String) {
