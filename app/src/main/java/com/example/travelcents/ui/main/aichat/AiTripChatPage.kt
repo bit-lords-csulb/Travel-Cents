@@ -10,6 +10,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -23,6 +24,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.Send
+import androidx.compose.material.icons.outlined.AutoAwesome
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -39,6 +41,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -49,6 +52,8 @@ import com.example.travelcents.ui.theme.DeepSea2
 import com.example.travelcents.ui.theme.DeepSea3
 import com.example.travelcents.ui.theme.DeepSea4
 import com.example.travelcents.ui.theme.DeepSea5
+
+private val ChatBlue = Color(0xFF64B5F6)
 
 @Composable
 fun AiTripChatPage(
@@ -72,41 +77,52 @@ fun AiTripChatPage(
             .background(DeepSea1)
     ) {
         // Header
-        Box(
-            modifier = Modifier
-                .fillMaxWidth()
-                .clip(RoundedCornerShape(bottomStart = 24.dp, bottomEnd = 24.dp))
-                .background(DeepSea2)
-                .padding(top = 48.dp, bottom = 16.dp, start = 4.dp, end = 16.dp)
-        ) {
+        Column(modifier = Modifier.fillMaxWidth().background(Color(0xFF010E24))) {
             Row(
-                verticalAlignment = Alignment.CenterVertically,
-                modifier = Modifier.fillMaxWidth()
+                modifier = Modifier.fillMaxWidth().padding(horizontal = 8.dp, vertical = 4.dp),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
             ) {
-                IconButton(onClick = onBackClick) {
-                    Icon(
-                        Icons.AutoMirrored.Filled.ArrowBack,
-                        contentDescription = "Back",
-                        tint = DeepSea5
-                    )
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    IconButton(onClick = onBackClick) {
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back", tint = ChatBlue)
+                    }
+                    Column {
+                        Text("AI Travel Assistant", fontSize = 15.sp, fontWeight = FontWeight.Bold, color = DeepSea5)
+                        Text(
+                            "Describe your dream trip in your own words",
+                            fontSize = 11.sp,
+                            color = DeepSea5.copy(alpha = 0.5f)
+                        )
+                    }
                 }
-
-                Spacer(modifier = Modifier.width(4.dp))
-
-                Column(modifier = Modifier.weight(1f)) {
-                    Text(
-                        text = "AI Travel Assistant",
-                        color = DeepSea5,
-                        fontWeight = FontWeight.Bold,
-                        fontSize = 16.sp
-                    )
-                    Text(
-                        text = "Describe your dream trip in your own words",
-                        color = DeepSea5.copy(alpha = 0.5f),
-                        fontSize = 12.sp
+                // Right side: small AI icon badge
+                Box(
+                    modifier = Modifier
+                        .size(32.dp)
+                        .background(ChatBlue.copy(alpha = 0.12f), CircleShape)
+                        .padding(end = 8.dp),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(
+                        Icons.Outlined.AutoAwesome,
+                        contentDescription = null,
+                        tint = ChatBlue,
+                        modifier = Modifier.size(18.dp)
                     )
                 }
             }
+            // Accent line at bottom of header (same as wizard steps)
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(2.dp)
+                    .background(
+                        Brush.horizontalGradient(
+                            listOf(ChatBlue, ChatBlue.copy(alpha = 0.4f))
+                        )
+                    )
+            )
         }
 
         // Messages
