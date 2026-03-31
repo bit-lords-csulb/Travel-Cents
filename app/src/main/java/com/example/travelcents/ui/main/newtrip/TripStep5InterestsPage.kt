@@ -3,6 +3,7 @@ package com.example.travelcents.ui.main.newtrip
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -19,6 +20,7 @@ import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.GridItemSpan
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -26,16 +28,22 @@ import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.ArrowForward
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextField
+import androidx.compose.material3.TextFieldDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -71,7 +79,39 @@ private val interestItems = listOf(
     InterestItem("shopping", "Shopping",
         "https://lh3.googleusercontent.com/aida-public/AB6AXuDYTIgmOdI9DpaNeAQRshjgYQKlb6JRdcFy58XrdTnyxaOEQqe2q3g-s2wV8J0fs-BMEZUcXL1YjIsaqDGvBfJZw82CfByB9oy3JQizBJsGo7MZhOhuqA5Hlz_d1OuqC3lKrwTvoHmXzn5adzChryMq2xGUcUaa1UGDWOoD-XkMy97IVcWGjjmLz2yTLYByavPzAFBu6NWLXr1XD_Y-9z9QR5wHqIpE6zz5Pew3LH_STDg4e-9sGm9w2Ns0v4SG_wqSKBWM9FmwdtwL"),
     InterestItem("history", "History",
-        "https://lh3.googleusercontent.com/aida-public/AB6AXuAt_wFi8zqCK5bIaoyBXCIqd2MDwUD5GJ3vpozasWYNSw3oVjojCiyA_8kXpL-sokF0fKh1Bg4Vir7zumxPEz3o4Io2xuISt46u8jtCASVAY3baRFNzkquvdvFeXY1uG6Z7X4sI22B3g6Nu4bFJlL1Qrc5Ot5aJBhwk5fMtvlqIr6_EDlajdCRD7YP4Q4stGE1v9Sgau_ZbvtytF5hqTvnsL6Y9o8y1fDxE4Ew2rbC08nHEtIQnj6RlMgokBomoo5upsZs4aomJkqgb")
+        "https://lh3.googleusercontent.com/aida-public/AB6AXuAt_wFi8zqCK5bIaoyBXCIqd2MDwUD5GJ3vpozasWYNSw3oVjojCiyA_8kXpL-sokF0fKh1Bg4Vir7zumxPEz3o4Io2xuISt46u8jtCASVAY3baRFNzkquvdvFeXY1uG6Z7X4sI22B3g6Nu4bFJlL1Qrc5Ot5aJBhwk5fMtvlqIr6_EDlajdCRD7YP4Q4stGE1v9Sgau_ZbvtytF5hqTvnsL6Y9o8y1fDxE4Ew2rbC08nHEtIQnj6RlMgokBomoo5upsZs4aomJkqgb"),
+    InterestItem("architecture", "Architecture", "https://loremflickr.com/400/300/architecture"),
+    InterestItem("photography", "Photography", "https://loremflickr.com/400/300/photography"),
+    InterestItem("wellness", "Wellness & Spa", "https://loremflickr.com/400/300/spa,wellness"),
+    InterestItem("hiking", "Hiking", "https://loremflickr.com/400/300/hiking"),
+    InterestItem("watersports", "Water Sports", "https://loremflickr.com/400/300/watersports"),
+    InterestItem("wildlife", "Wildlife & Safaris", "https://loremflickr.com/400/300/wildlife,safari"),
+    InterestItem("music", "Music & Festivals", "https://loremflickr.com/400/300/festival,music"),
+    InterestItem("art", "Art Galleries", "https://loremflickr.com/400/300/art,gallery"),
+    InterestItem("markets", "Local Markets", "https://loremflickr.com/400/300/market,local"),
+    InterestItem("themeparks", "Theme Parks", "https://loremflickr.com/400/300/themepark"),
+    InterestItem("roadtrips", "Road Trips", "https://loremflickr.com/400/300/roadtrip"),
+    InterestItem("skiing", "Skiing & Snow", "https://loremflickr.com/400/300/skiing,snow"),
+    InterestItem("volunteering", "Volunteering", "https://loremflickr.com/400/300/volunteer")
+)
+
+private val interestVocabulary = listOf(
+    "Surfing", "Diving", "Snorkeling", "Cycling", "Yoga", "Meditation", "Cooking Classes",
+    "Wine Tasting", "Beer Tours", "Street Food", "Karaoke", "Camping", "Rock Climbing",
+    "Paragliding", "Bungee Jumping", "Hot Air Balloon", "Cruises", "River Rafting",
+    "Horse Riding", "Ziplining", "Kayaking", "Paddleboarding", "Fishing", "Hunting",
+    "Birdwatching", "Stargazing", "Casino", "Golf", "Tennis", "Bowling",
+    "Escape Rooms", "Comedy Shows", "Theater", "Opera", "Ballet", "Jazz Clubs",
+    "Antique Markets", "Flea Markets", "Outlet Shopping", "Luxury Shopping",
+    "Spa Days", "Massage", "Hot Springs", "Sauna", "CrossFit", "Marathon",
+    "Triathlon", "Skateboarding", "BMX", "Motocross", "Go-Karting", "F1 Racing",
+    "Safari Drives", "Whale Watching", "Dolphin Watching", "Turtle Watching",
+    "Volcano Hiking", "Glacier Hiking", "Desert Safari", "Jungle Trek",
+    "City Walking Tours", "Ghost Tours", "Food Tours", "Pub Crawls",
+    "Language Classes", "Dance Classes", "Pottery", "Painting", "Photography Tours",
+    "Film Locations", "Sports Events", "Concerts", "Street Art Tours",
+    "Architecture Tours", "Religious Sites", "Temples", "Monasteries",
+    "Battlefield Tours", "Cold War Sites", "Catacombs", "Underground Cities"
 )
 
 @Composable
@@ -85,6 +125,8 @@ fun TripStep5InterestsPage(
     val uiState by viewModel.uiState.collectAsState()
     val isLoading = uiState is TripUiState.Loading
     val errorMessage = (uiState as? TripUiState.Error)?.message
+    var searchQuery by remember { mutableStateOf("") }
+    var customInterests by remember { mutableStateOf(listOf<String>()) }
 
     // Navigate to Current when trip is generated
     LaunchedEffect(uiState) {
@@ -142,6 +184,12 @@ fun TripStep5InterestsPage(
         }
 
         // Grid content
+        val filteredItems = if (searchQuery.length >= 2) {
+            interestItems.filter {
+                it.label.contains(searchQuery, ignoreCase = true) || it.key.contains(searchQuery, ignoreCase = true)
+            }
+        } else interestItems
+
         LazyVerticalGrid(
             columns = GridCells.Fixed(2),
             modifier = Modifier.weight(1f),
@@ -188,6 +236,96 @@ fun TripStep5InterestsPage(
                 }
             }
 
+            // Search Bar
+            item(span = { GridItemSpan(2) }) {
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    TextField(
+                        value = searchQuery,
+                        onValueChange = { searchQuery = it },
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clip(RoundedCornerShape(12.dp))
+                            .background(S5ContainerHigh),
+                        placeholder = { Text("Search interests...", color = S5OnSurfaceVariant) },
+                        leadingIcon = { Icon(Icons.Default.Search, null, tint = S5OnSurfaceVariant) },
+                        colors = TextFieldDefaults.colors(
+                            focusedContainerColor = Color.Transparent,
+                            unfocusedContainerColor = Color.Transparent,
+                            disabledContainerColor = Color.Transparent,
+                            focusedIndicatorColor = Color.Transparent,
+                            unfocusedIndicatorColor = Color.Transparent,
+                            cursorColor = S5Blue
+                        ),
+                        singleLine = true
+                    )
+
+                    val showAddChip = searchQuery.length >= 2 &&
+                            filteredItems.isEmpty() &&
+                            customInterests.none { it.equals(searchQuery, ignoreCase = true) }
+
+                    if (showAddChip) {
+                        Box(
+                            modifier = Modifier
+                                .border(1.dp, S5Blue.copy(0.5f), RoundedCornerShape(999.dp))
+                                .clickable {
+                                    val key = searchQuery.lowercase().replace(" ", "_")
+                                    if (key !in customInterests) {
+                                        customInterests = customInterests + searchQuery
+                                        viewModel.toggleInterest(key)
+                                    }
+                                    searchQuery = ""
+                                }
+                                .padding(horizontal = 12.dp, vertical = 6.dp)
+                        ) {
+                            Text("+ Add '$searchQuery'", color = S5Blue, fontSize = 12.sp)
+                        }
+                    }
+                }
+            }
+
+            // Custom interests
+            if (customInterests.isNotEmpty()) {
+                item(span = { GridItemSpan(2) }) {
+                    Column {
+                        Text(
+                            "YOUR INTERESTS",
+                            fontSize = 10.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = S5OnSurfaceVariant,
+                            letterSpacing = 1.5.sp
+                        )
+                        Spacer(Modifier.height(8.dp))
+                        Row(
+                            modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            customInterests.forEach { interest ->
+                                Row(
+                                    modifier = Modifier
+                                        .background(S5Blue.copy(alpha = 0.15f), RoundedCornerShape(999.dp))
+                                        .border(1.dp, S5Blue.copy(alpha = 0.4f), RoundedCornerShape(999.dp))
+                                        .padding(horizontal = 12.dp, vertical = 6.dp),
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(4.dp)
+                                ) {
+                                    Text(interest, color = S5Blue, fontSize = 12.sp)
+                                    Icon(
+                                        Icons.Default.Close,
+                                        null,
+                                        modifier = Modifier.size(14.dp).clickable {
+                                            val key = interest.lowercase().replace(" ", "_")
+                                            customInterests = customInterests.filter { it != interest }
+                                            viewModel.toggleInterest(key)
+                                        },
+                                        tint = S5Blue
+                                    )
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+
             // Error message
             if (errorMessage != null) {
                 item(span = { GridItemSpan(2) }) {
@@ -204,7 +342,7 @@ fun TripStep5InterestsPage(
             }
 
             // Interest cards
-            items(interestItems) { item ->
+            items(filteredItems) { item ->
                 val selected = item.key in viewModel.interests
                 S5InterestCard(
                     item = item,
