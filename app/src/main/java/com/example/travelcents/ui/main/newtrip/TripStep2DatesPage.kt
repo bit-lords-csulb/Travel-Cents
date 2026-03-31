@@ -15,6 +15,9 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.lazy.grid.GridCells
+import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
+import androidx.compose.foundation.lazy.grid.itemsIndexed
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -26,15 +29,17 @@ import androidx.compose.material.icons.filled.CalendarToday
 import androidx.compose.material.icons.filled.ChevronLeft
 import androidx.compose.material.icons.filled.ChevronRight
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.KeyboardArrowDown
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextField
-import androidx.compose.material3.TextFieldDefaults
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -92,10 +97,11 @@ fun TripStep2DatesPage(
     onContinueClick: () -> Unit
 ) {
     val now = remember { Calendar.getInstance() }
-    var displayYear by remember { mutableStateOf(now.get(Calendar.YEAR)) }
-    var displayMonth by remember { mutableStateOf(now.get(Calendar.MONTH)) }
+    var displayYear by remember { mutableIntStateOf(now.get(Calendar.YEAR)) }
+    var displayMonth by remember { mutableIntStateOf(now.get(Calendar.MONTH)) }
     var startDate by remember { mutableStateOf(viewModel.dateFrom.toCalDate()) }
     var endDate by remember { mutableStateOf(viewModel.dateTo.toCalDate()) }
+    var showMonthYearPicker by remember { mutableStateOf(false) }
 
     fun syncDates() {
         viewModel.dateFrom = startDate?.toYMD() ?: ""
@@ -203,12 +209,27 @@ fun TripStep2DatesPage(
                         horizontalArrangement = Arrangement.SpaceBetween,
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Text(
-                            "${monthNames[displayMonth]} $displayYear",
-                            fontSize = 17.sp,
-                            fontWeight = FontWeight.Bold,
-                            color = DeepSea5
-                        )
+                        Row(
+                            modifier = Modifier
+                                .clip(RoundedCornerShape(8.dp))
+                                .clickable { showMonthYearPicker = true }
+                                .padding(horizontal = 8.dp, vertical = 4.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(4.dp)
+                        ) {
+                            Text(
+                                "${monthNames[displayMonth]} $displayYear",
+                                fontSize = 17.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = DeepSea5
+                            )
+                            Icon(
+                                Icons.Default.KeyboardArrowDown,
+                                contentDescription = "Pick month/year",
+                                tint = S2Blue,
+                                modifier = Modifier.size(18.dp)
+                            )
+                        }
                         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                             Box(
                                 modifier = Modifier
@@ -351,6 +372,20 @@ fun TripStep2DatesPage(
             Spacer(Modifier.height(16.dp))
         }
 
+        // Month/year picker dialog
+        if (showMonthYearPicker) {
+            S2MonthYearPickerDialog(
+                currentMonth = displayMonth,
+                currentYear = displayYear,
+                onConfirm = { month, year ->
+                    displayMonth = month
+                    displayYear = year
+                    showMonthYearPicker = false
+                },
+                onDismiss = { showMonthYearPicker = false }
+            )
+        }
+
         // Continue button
         Box(
             modifier = Modifier
@@ -489,4 +524,80 @@ private fun S2DayCell(
             )
         }
     }
+}
+
+@Composable
+private fun S2MonthYearPickerDialog(
+    currentMonth: Int,
+    currentYear: Int,
+    onConfirm: (month: Int, year: Int) -> Unit,
+    onDismiss: () -> Unit
+) {
+    var pickerMonth by remember { mutableIntStateOf(currentMonth) }
+    var pickerYear by remember { mutableIntStateOf(currentYear) }
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        containerColor = Color(0xFF0B203D),
+        shape = RoundedCornerShape(20.dp),
+        title = {
+            // Year selector row
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                IconButton(onClick = { pickerYear-- }) {
+                    Icon(Icons.Default.ChevronLeft, null, tint = S2Blue)
+                }
+                Text(
+                    pickerYear.toString(),
+                    fontSize = 20.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = Color.White
+                )
+                IconButton(onClick = { pickerYear++ }) {
+                    Icon(Icons.Default.ChevronRight, null, tint = S2Blue)
+                }
+            }
+        },
+        text = {
+            // 3×4 month grid
+            LazyVerticalGrid(
+                columns = GridCells.Fixed(3),
+                verticalArrangement = Arrangement.spacedBy(8.dp),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                modifier = Modifier.height(200.dp)
+            ) {
+                itemsIndexed(shortMonthNames) { index, name ->
+                    val selected = index == pickerMonth
+                    Box(
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(10.dp))
+                            .background(if (selected) S2Blue else Color(0xFF152C4E))
+                            .clickable { pickerMonth = index }
+                            .padding(vertical = 10.dp),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text(
+                            name,
+                            fontSize = 13.sp,
+                            fontWeight = if (selected) FontWeight.Bold else FontWeight.Normal,
+                            color = if (selected) Color(0xFF001627) else Color(0xFF9EABC8)
+                        )
+                    }
+                }
+            }
+        },
+        confirmButton = {
+            TextButton(onClick = { onConfirm(pickerMonth, pickerYear) }) {
+                Text("Done", color = S2Blue, fontWeight = FontWeight.Bold)
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text("Cancel", color = Color(0xFF9EABC8))
+            }
+        }
+    )
 }

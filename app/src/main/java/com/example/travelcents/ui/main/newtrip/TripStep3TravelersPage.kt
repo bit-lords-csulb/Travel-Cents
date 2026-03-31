@@ -67,7 +67,7 @@ fun TripStep3TravelersPage(
     onContinueClick: () -> Unit
 ) {
     var hasChildren by remember { mutableStateOf(viewModel.children > 0) }
-    var hasPets by remember { mutableStateOf(false) }
+    var hasPets by remember { mutableStateOf(viewModel.pets > 0) }
 
     Column(
         modifier = modifier
@@ -162,19 +162,27 @@ fun TripStep3TravelersPage(
                     // Count display
                     Column(horizontalAlignment = Alignment.CenterHorizontally) {
                         Text(
-                            text = viewModel.adults.toString(),
+                            text = (viewModel.adults + viewModel.children).toString(),
                             fontSize = 72.sp,
                             fontWeight = FontWeight.ExtraBold,
                             color = DeepSea5,
                             lineHeight = 72.sp
                         )
                         Text(
-                            "GUESTS",
+                            "TRAVELERS",
                             fontSize = 10.sp,
                             fontWeight = FontWeight.Bold,
                             color = S3OnSurfaceVariant,
                             letterSpacing = 2.sp
                         )
+                        if (viewModel.pets > 0) {
+                            Spacer(Modifier.height(4.dp))
+                            Text(
+                                "+ ${viewModel.pets} pet${if (viewModel.pets != 1) "s" else ""}",
+                                fontSize = 12.sp,
+                                color = S3OnSurfaceVariant
+                            )
+                        }
                     }
 
                     // Plus button
@@ -193,7 +201,7 @@ fun TripStep3TravelersPage(
 
             Spacer(Modifier.height(24.dp))
 
-            // Children toggle
+            // Children toggle + stepper
             S3ToggleRow(
                 icon = Icons.Default.ChildCare,
                 title = "Children",
@@ -204,16 +212,37 @@ fun TripStep3TravelersPage(
                     viewModel.children = if (it) 1 else 0
                 }
             )
+            if (hasChildren) {
+                Spacer(Modifier.height(8.dp))
+                S3InlineStepper(
+                    count = viewModel.children,
+                    onDecrement = { if (viewModel.children > 1) viewModel.children-- },
+                    onIncrement = { viewModel.children++ },
+                    label = "children"
+                )
+            }
             Spacer(Modifier.height(12.dp))
 
-            // Pets toggle (UI only)
+            // Pets toggle + stepper
             S3ToggleRow(
                 icon = Icons.Default.Pets,
                 title = "Pets",
-                subtitle = "Service animals",
+                subtitle = "Not counted in travelers",
                 checked = hasPets,
-                onCheckedChange = { hasPets = it }
+                onCheckedChange = {
+                    hasPets = it
+                    viewModel.pets = if (it) 1 else 0
+                }
             )
+            if (hasPets) {
+                Spacer(Modifier.height(8.dp))
+                S3InlineStepper(
+                    count = viewModel.pets,
+                    onDecrement = { if (viewModel.pets > 1) viewModel.pets-- },
+                    onIncrement = { viewModel.pets++ },
+                    label = "pets"
+                )
+            }
 
             Spacer(Modifier.height(16.dp))
         }
@@ -283,6 +312,64 @@ private fun S3ProgressWidget(stepsComplete: Int) {
                             .background(if (i < stepsComplete) S3Blue else S3ContainerHighest)
                     )
                 }
+            }
+        }
+    }
+}
+
+@Composable
+private fun S3InlineStepper(
+    count: Int,
+    onDecrement: () -> Unit,
+    onIncrement: () -> Unit,
+    label: String
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(16.dp))
+            .background(S3ContainerLow)
+            .padding(horizontal = 20.dp, vertical = 12.dp),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Text(
+            "$count $label",
+            fontSize = 15.sp,
+            fontWeight = FontWeight.Bold,
+            color = DeepSea5
+        )
+        Row(
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Box(
+                modifier = Modifier
+                    .size(36.dp)
+                    .clip(RoundedCornerShape(10.dp))
+                    .background(S3SurfaceBright)
+                    .clickable { onDecrement() },
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(Icons.Default.Remove, null, tint = S3Blue, modifier = Modifier.size(18.dp))
+            }
+            Text(
+                count.toString(),
+                fontSize = 18.sp,
+                fontWeight = FontWeight.ExtraBold,
+                color = DeepSea5,
+                modifier = Modifier.width(28.dp),
+                textAlign = TextAlign.Center
+            )
+            Box(
+                modifier = Modifier
+                    .size(36.dp)
+                    .clip(RoundedCornerShape(10.dp))
+                    .background(S3Blue)
+                    .clickable { onIncrement() },
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(Icons.Default.Add, null, tint = Color(0xFF001627), modifier = Modifier.size(18.dp))
             }
         }
     }

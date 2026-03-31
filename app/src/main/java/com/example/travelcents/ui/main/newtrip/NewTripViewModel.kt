@@ -29,6 +29,7 @@ class NewTripViewModel : ViewModel() {
     var dateTo by mutableStateOf("")
     var adults by mutableIntStateOf(1)
     var children by mutableIntStateOf(0)
+    var pets by mutableIntStateOf(0)
     var travelStyle by mutableStateOf("comfort")
     var currency by mutableStateOf("USD")
     var budgetTotal by mutableStateOf("")

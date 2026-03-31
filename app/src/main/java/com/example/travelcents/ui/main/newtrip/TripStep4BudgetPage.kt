@@ -28,12 +28,16 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.Slider
 import androidx.compose.material3.SliderDefaults
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextField
+import androidx.compose.material3.TextFieldDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -42,6 +46,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -60,6 +65,10 @@ private val S4OnSurfaceVariant = Color(0xFF9EABC8)
 private const val S4BudgetMin = 500
 private const val S4BudgetMax = 20000
 
+s// Round to nearest $50 increment within the allowed range
+private fun snapTo50(value: Int): Int =
+    (((value - S4BudgetMin + 25) / 50) * 50 + S4BudgetMin).coerceIn(S4BudgetMin, S4BudgetMax)
+
 private fun budgetToTier(budget: Int): Triple<String, String, Color> = when {
     budget <= 3000 -> Triple("Budget", "Hostels, street food, public transport", Color(0xFF66BB6A))
     budget <= 8000 -> Triple("Comfort", "3-star hotels, local restaurants, mix of transport", S4Blue)
@@ -75,16 +84,14 @@ fun TripStep4BudgetPage(
     onSaveDraftClick: () -> Unit,
     onContinueClick: () -> Unit
 ) {
-    val initialBudget = viewModel.budgetTotal.toIntOrNull() ?: 5000
-    var sliderPos by remember {
-        mutableFloatStateOf(((initialBudget - S4BudgetMin).toFloat() / (S4BudgetMax - S4BudgetMin)).coerceIn(0f, 1f))
-    }
-    val budget = (S4BudgetMin + sliderPos * (S4BudgetMax - S4BudgetMin)).toInt()
-    val (tierName, tierDesc, tierColor) = budgetToTier(budget)
-    val formatted = NumberFormat.getNumberInstance(Locale.US).format(budget)
+    val initialBudget = snapTo50(viewModel.budgetTotal.toIntOrNull() ?: 5000)
+    var budgetInt by remember { mutableIntStateOf(initialBudget) }
+    var textInput by remember { mutableStateOf(initialBudget.toString()) }
+    val (tierName, tierDesc, tierColor) = budgetToTier(budgetInt)
+    val formatted = NumberFormat.getNumberInstance(Locale.US).format(budgetInt)
 
     // Sync to ViewModel
-    viewModel.budgetTotal = budget.toString()
+    viewModel.budgetTotal = budgetInt.toString()
     viewModel.currency = "USD"
     viewModel.travelStyle = tierName.lowercase()
 
@@ -183,13 +190,44 @@ fun TripStep4BudgetPage(
                     }
                     Spacer(Modifier.height(24.dp))
 
-                    // Large price
+                    // Large price display
                     Text(
                         "$$formatted",
                         fontSize = 52.sp,
                         fontWeight = FontWeight.Black,
                         color = DeepSea5,
                         letterSpacing = (-2).sp
+                    )
+                    Spacer(Modifier.height(8.dp))
+
+                    // Editable budget text input
+                    TextField(
+                        value = textInput,
+                        onValueChange = { input ->
+                            val digits = input.filter { it.isDigit() }
+                            textInput = digits
+                            val parsed = digits.toIntOrNull()
+                            if (parsed != null && parsed >= S4BudgetMin) {
+                                budgetInt = snapTo50(parsed.coerceIn(S4BudgetMin, S4BudgetMax))
+                            }
+                        },
+                        prefix = { Text("$", color = S4OnSurfaceVariant, fontSize = 16.sp) },
+                        placeholder = { Text("Enter amount", color = S4OnSurfaceVariant.copy(alpha = 0.5f)) },
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                        singleLine = true,
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(12.dp),
+                        colors = TextFieldDefaults.colors(
+                            focusedTextColor = DeepSea5,
+                            unfocusedTextColor = DeepSea5,
+                            cursorColor = S4Blue,
+                            focusedContainerColor = S4ContainerHighest,
+                            unfocusedContainerColor = S4ContainerHighest,
+                            focusedIndicatorColor = Color.Transparent,
+                            unfocusedIndicatorColor = Color.Transparent,
+                            focusedLabelColor = S4Blue,
+                            unfocusedLabelColor = S4OnSurfaceVariant
+                        )
                     )
                     Spacer(Modifier.height(12.dp))
 
@@ -210,10 +248,15 @@ fun TripStep4BudgetPage(
                     }
                     Spacer(Modifier.height(28.dp))
 
-                    // Slider
+                    // Slider with $50 increments ($500–$20,000)
                     Slider(
-                        value = sliderPos,
-                        onValueChange = { sliderPos = it },
+                        value = budgetInt.toFloat(),
+                        onValueChange = { value ->
+                            budgetInt = snapTo50(value.toInt())
+                            textInput = budgetInt.toString()
+                        },
+                        valueRange = S4BudgetMin.toFloat()..S4BudgetMax.toFloat(),
+                        steps = 389,
                         modifier = Modifier.fillMaxWidth(),
                         colors = SliderDefaults.colors(
                             thumbColor = Color.White,
