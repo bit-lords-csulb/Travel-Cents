@@ -30,10 +30,19 @@ data class EditablePlan(
     val existingDetails: Map<String, String> = emptyMap()
 )
 
+data class TripSummary(
+    val tripId: String,
+    val tripName: String,
+    val destination: String,
+    val dateFrom: String,
+    val dateTo: String
+)
+
 data class CurrentTripUiState(
     val isLoading: Boolean = true,
     val currentTripId: String? = null,
     val tripTitle: String = "Loading Trip...",
+    val destination: String = "",
     val dateFrom: String = "",
     val dateTo: String = "",
     val events: List<TravelEvent> = emptyList(),
@@ -55,6 +64,9 @@ class ItineraryViewModel : ViewModel() {
 
     private val _uiState = MutableStateFlow(CurrentTripUiState())
     val uiState: StateFlow<CurrentTripUiState> = _uiState.asStateFlow()
+
+    private val _allTrips = MutableStateFlow<List<TripSummary>>(emptyList())
+    val allTrips: StateFlow<List<TripSummary>> = _allTrips.asStateFlow()
 
     private val db = FirebaseFirestore.getInstance()
     private val auth = FirebaseAuth.getInstance()
@@ -127,6 +139,7 @@ class ItineraryViewModel : ViewModel() {
                 isLoading = false,
                 currentTripId = document.id,
                 tripTitle = _tripTitle.value,
+                destination = document.getString("destination") ?: "",
                 dateFrom = document.getString("dateFrom") ?: "",
                 dateTo = document.getString("dateTo") ?: "",
                 infoMessage = null,
@@ -135,6 +148,28 @@ class ItineraryViewModel : ViewModel() {
         }
 
         listenToEvents(uid, document.id)
+    }
+
+    private fun fetchAllTrips(uid: String) {
+        db.collection("users").document(uid)
+            .collection("trips")
+            .orderBy("createdAt", Query.Direction.DESCENDING)
+            .get()
+            .addOnSuccessListener { snapshot ->
+                _allTrips.value = snapshot.documents.mapNotNull { doc ->
+                    val tripName = doc.getString("tripName") ?: return@mapNotNull null
+                    TripSummary(
+                        tripId = doc.id,
+                        tripName = tripName,
+                        destination = doc.getString("destination") ?: "",
+                        dateFrom = doc.getString("dateFrom") ?: "",
+                        dateTo = doc.getString("dateTo") ?: ""
+                    )
+                }
+            }
+            .addOnFailureListener { e ->
+                Log.e("ItineraryViewModel", "Failed to fetch trip list", e)
+            }
     }
 
     private fun listenToEvents(uid: String, tripId: String) {
@@ -309,6 +344,8 @@ class ItineraryViewModel : ViewModel() {
 
         resetTripState(isLoading = true)
         Log.d("ItineraryViewModel", "UID found: $uid. Fetching trip: ${tripId ?: "Latest"}")
+
+        fetchAllTrips(uid)
 
         if (tripId != null) {
             fetchTrip(uid, tripId)

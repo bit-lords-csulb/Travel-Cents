@@ -11,10 +11,10 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.ArrowDropDown
 import androidx.compose.material.icons.outlined.AccountCircle
 import androidx.compose.material3.*
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.remember
+import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -28,8 +28,8 @@ import androidx.compose.ui.tooling.preview.Devices
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.lifecycle.viewmodel.compose.viewModel
 import coil.compose.AsyncImage
-import com.example.travelcents.data.model.Itinerary
 import com.example.travelcents.data.model.TravelEvent
 import com.example.travelcents.ui.theme.TravelCentsTheme
 import java.text.SimpleDateFormat
@@ -101,35 +101,89 @@ private fun buildPlanItems(events: List<TravelEvent>): List<FinalPlanItem> {
 
 @Composable
 fun FinalPlanPage(
-    itinerary: Itinerary,
-    events: List<TravelEvent>,
+    viewModel: ItineraryViewModel,
     modifier: Modifier = Modifier,
     onBackClick: () -> Unit = {}
 ) {
-    val planItems = remember(events) { buildPlanItems(events) }
+    val uiState by viewModel.uiState.collectAsState()
+    val allTrips by viewModel.allTrips.collectAsState()
+    val planItems = remember(uiState.events) { buildPlanItems(uiState.events) }
+
+    LaunchedEffect(Unit) {
+        viewModel.loadTrip()
+    }
 
     Scaffold(
         containerColor = BackgroundColor,
-        topBar = { FinalPlanTopBar(onBackClick = onBackClick) }
+        topBar = {
+            FinalPlanTopBar(
+                tripTitle = uiState.tripTitle,
+                allTrips = allTrips,
+                currentTripId = uiState.currentTripId,
+                onTripSelect = { tripId -> viewModel.loadTrip(tripId) },
+                onBackClick = onBackClick
+            )
+        }
     ) { paddingValues ->
-        LazyColumn(
-            modifier = modifier
-                .fillMaxSize()
-                .padding(paddingValues)
-                .padding(horizontal = 24.dp),
-            contentPadding = PaddingValues(bottom = 32.dp)
-        ) {
-            item {
-                Spacer(modifier = Modifier.height(24.dp))
-                ProgressWidget(destination = itinerary.destination)
-                Spacer(modifier = Modifier.height(32.dp))
+        when {
+            uiState.isLoading -> {
+                Box(
+                    modifier = modifier.fillMaxSize().padding(paddingValues),
+                    contentAlignment = Alignment.Center
+                ) {
+                    CircularProgressIndicator(color = PrimaryBlue)
+                }
             }
 
-            items(planItems) { item ->
-                when (item) {
-                    is FinalPlanItem.Header -> DayHeader(item.date)
-                    is FinalPlanItem.EventItem -> TimelineEventCard(item.event, item.isLastEvent)
-                    is FinalPlanItem.DaySpacer -> Spacer(modifier = Modifier.height(16.dp))
+            uiState.errorMessage != null -> {
+                Box(
+                    modifier = modifier.fillMaxSize().padding(paddingValues),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text(
+                        text = uiState.errorMessage ?: "An error occurred.",
+                        color = ErrorColor,
+                        fontSize = 14.sp,
+                        modifier = Modifier.padding(horizontal = 32.dp)
+                    )
+                }
+            }
+
+            uiState.infoMessage != null && uiState.events.isEmpty() -> {
+                Box(
+                    modifier = modifier.fillMaxSize().padding(paddingValues),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text(
+                        text = uiState.infoMessage ?: "",
+                        color = OnSurfaceVariant,
+                        fontSize = 14.sp,
+                        modifier = Modifier.padding(horizontal = 32.dp)
+                    )
+                }
+            }
+
+            else -> {
+                LazyColumn(
+                    modifier = modifier
+                        .fillMaxSize()
+                        .padding(paddingValues)
+                        .padding(horizontal = 24.dp),
+                    contentPadding = PaddingValues(bottom = 32.dp)
+                ) {
+                    item {
+                        Spacer(modifier = Modifier.height(24.dp))
+                        ProgressWidget(destination = uiState.destination)
+                        Spacer(modifier = Modifier.height(32.dp))
+                    }
+
+                    items(planItems) { item ->
+                        when (item) {
+                            is FinalPlanItem.Header -> DayHeader(item.date)
+                            is FinalPlanItem.EventItem -> TimelineEventCard(item.event, item.isLastEvent)
+                            is FinalPlanItem.DaySpacer -> Spacer(modifier = Modifier.height(16.dp))
+                        }
+                    }
                 }
             }
         }
@@ -137,35 +191,103 @@ fun FinalPlanPage(
 }
 
 @Composable
-private fun FinalPlanTopBar(onBackClick: () -> Unit) {
+private fun FinalPlanTopBar(
+    tripTitle: String,
+    allTrips: List<TripSummary>,
+    currentTripId: String?,
+    onTripSelect: (String) -> Unit,
+    onBackClick: () -> Unit
+) {
+    var dropdownExpanded by remember { mutableStateOf(false) }
+
     Row(
         modifier = Modifier
             .fillMaxWidth()
             .background(Color(0xFF02132B))
-            .padding(horizontal = 24.dp, vertical = 16.dp),
+            .padding(horizontal = 8.dp, vertical = 4.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.SpaceBetween
     ) {
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            IconButton(onClick = onBackClick) {
-                Icon(
-                    imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                    contentDescription = "Back",
-                    tint = PrimaryBlue
-                )
-            }
-            Text(
-                text = "Your Itinerary",
-                color = OnSurface,
-                fontSize = 18.sp,
-                fontWeight = FontWeight.ExtraBold
+        IconButton(onClick = onBackClick) {
+            Icon(
+                imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+                contentDescription = "Back",
+                tint = PrimaryBlue
             )
         }
+
+        // Trip picker — center of the top bar
+        Box(contentAlignment = Alignment.TopCenter) {
+            Row(
+                modifier = Modifier
+                    .clip(RoundedCornerShape(8.dp))
+                    .clickable(enabled = allTrips.size > 1) { dropdownExpanded = true }
+                    .padding(horizontal = 12.dp, vertical = 10.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = tripTitle,
+                    color = OnSurface,
+                    fontSize = 16.sp,
+                    fontWeight = FontWeight.ExtraBold,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.widthIn(max = 200.dp)
+                )
+                if (allTrips.size > 1) {
+                    Icon(
+                        imageVector = Icons.Default.ArrowDropDown,
+                        contentDescription = "Switch trip",
+                        tint = PrimaryBlue,
+                        modifier = Modifier.size(20.dp)
+                    )
+                }
+            }
+
+            DropdownMenu(
+                expanded = dropdownExpanded,
+                onDismissRequest = { dropdownExpanded = false },
+                modifier = Modifier.background(Color(0xFF0B203D))
+            ) {
+                allTrips.forEach { trip ->
+                    val isSelected = trip.tripId == currentTripId
+                    DropdownMenuItem(
+                        text = {
+                            Column(modifier = Modifier.padding(vertical = 4.dp)) {
+                                Text(
+                                    text = trip.tripName,
+                                    color = if (isSelected) PrimaryBlue else OnSurface,
+                                    fontSize = 14.sp,
+                                    fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium
+                                )
+                                if (trip.destination.isNotEmpty()) {
+                                    Text(
+                                        text = "${trip.destination}  •  ${trip.dateFrom}",
+                                        color = OnSurfaceVariant,
+                                        fontSize = 11.sp
+                                    )
+                                }
+                            }
+                        },
+                        onClick = {
+                            dropdownExpanded = false
+                            if (!isSelected) onTripSelect(trip.tripId)
+                        },
+                        modifier = Modifier.background(
+                            if (isSelected) PrimaryBlue.copy(alpha = 0.08f) else Color.Transparent
+                        )
+                    )
+                }
+            }
+        }
+
         Icon(
             imageVector = Icons.Outlined.AccountCircle,
             contentDescription = "Profile",
             tint = OnSurfaceVariant,
-            modifier = Modifier.size(40.dp)
+            modifier = Modifier
+                .padding(end = 8.dp)
+                .size(36.dp)
         )
     }
 }
@@ -230,8 +352,13 @@ private fun ProgressWidget(destination: String) {
 
             Spacer(modifier = Modifier.height(16.dp))
 
+            val label = if (destination.isNotEmpty()) {
+                "All systems go. Your $destination journey is fully mapped."
+            } else {
+                "All systems go. Your journey is fully mapped."
+            }
             Text(
-                text = "All systems go. Your $destination journey is fully mapped.",
+                text = label,
                 color = OnSurfaceVariant,
                 fontSize = 14.sp,
                 fontWeight = FontWeight.Medium
@@ -341,7 +468,6 @@ private fun TimelineEventCard(event: TravelEvent, isLast: Boolean) {
                         contentScale = ContentScale.Crop
                     )
                 } else {
-                    // Placeholder when no image is available
                     Box(
                         modifier = Modifier
                             .weight(1f)
@@ -423,41 +549,7 @@ private fun TimelineEventCard(event: TravelEvent, isLast: Boolean) {
 @Composable
 fun FinalPlanPreview() {
     TravelCentsTheme(dynamicColor = false) {
-        val sampleItinerary = Itinerary(
-            itineraryId = "preview",
-            userId = "user",
-            tripName = "Tokyo Adventure",
-            destination = "Tokyo",
-            origin = "Los Angeles",
-            dateFrom = "2025-05-01",
-            dateTo = "2025-05-03",
-            durationDays = 3,
-            currency = "USD",
-            travelStyle = "comfort",
-            adults = 2,
-            children = 0,
-            createdAt = "",
-            status = "active",
-            eventIds = emptyList()
-        )
-        val sampleEvents = listOf(
-            TravelEvent(
-                "1", "flight", "preview", date = "2025-05-01", startTime = "10:30 AM",
-                details = mapOf("title" to "Flight to Tokyo", "notes" to "NH802 | Seat 4A (Business Class). Departure from LAX Terminal B.")
-            ),
-            TravelEvent(
-                "2", "hotel", "preview", date = "2025-05-02", startTime = "03:00 PM",
-                details = mapOf("title" to "Park Hyatt Check-in", "notes" to "Shinjuku Park Tower. Reservation #TYO-9821-X.")
-            ),
-            TravelEvent(
-                "3", "restaurant", "preview", date = "2025-05-02", startTime = "08:30 PM",
-                details = mapOf("title" to "Sukiyabashi Jiro", "notes" to "Omakase Experience. Ginza. Formal attire required.")
-            ),
-            TravelEvent(
-                "4", "activity", "preview", date = "2025-05-03", startTime = "09:00 AM",
-                details = mapOf("title" to "Senso-ji Temple Visit", "notes" to "Asakusa. Private guide at Kaminarimon Gate.")
-            )
-        )
-        FinalPlanPage(itinerary = sampleItinerary, events = sampleEvents)
+        // Preview uses a standalone ViewModel — loadTrip() won't fire without Firebase
+        FinalPlanPage(viewModel = viewModel())
     }
 }
