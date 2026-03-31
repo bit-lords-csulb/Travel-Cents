@@ -616,15 +616,3 @@ fun RegionalInputItem(label: String, value: String) {
         HorizontalDivider(color = DeepSea3, thickness = 1.dp)
     }
 }
-
-@Composable
-fun PlaceholderContent(text: String) {
-    Box(
-        modifier = Modifier
-            .fillMaxWidth()
-            .height(200.dp),
-        contentAlignment = Alignment.Center
-    ) {
-        Text(text = text, color = DeepSea4, fontSize = 16.sp)
-    }
-}
