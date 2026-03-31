@@ -47,7 +47,6 @@ import com.example.travelcents.ui.main.itinerary.FinalPlanPage
 import com.example.travelcents.ui.main.itinerary.ItineraryScreen
 import com.example.travelcents.ui.main.itinerary.ItineraryViewModel
 import com.example.travelcents.ui.main.newtrip.NewTripLandingPage
-import com.example.travelcents.ui.main.newtrip.NewTripPage
 import com.example.travelcents.ui.main.newtrip.NewTripViewModel
 import com.example.travelcents.ui.main.newtrip.TripGeneratingPage
 import com.example.travelcents.ui.main.newtrip.TripStep1DestinationPage
@@ -69,7 +68,6 @@ object MainRoutes {
     const val NewTripStep3 = "new_trip_step3"
     const val NewTripStep4 = "new_trip_step4"
     const val NewTripStep5 = "new_trip_step5"
-    const val NewTripForm = "new_trip_form"
     const val TripGenerating = "trip_generating"
     const val Home = "home"
     const val Chats = "chats"
@@ -226,13 +224,6 @@ fun MainScaffold(modifier: Modifier = Modifier, onLogout: () -> Unit = {}) {
                                 popUpTo(MainRoutes.Home) { inclusive = false }
                             }
                         }
-                    )
-                }
-                composable(MainRoutes.NewTripForm) {
-                    NewTripPage(
-                        modifier = Modifier.fillMaxSize(),
-                        viewModel = newTripViewModel,
-                        onChatClick = { navController.navigate(MainRoutes.AiTripChat) }
                     )
                 }
                 composable(MainRoutes.Home) { HomePage(modifier = Modifier.fillMaxSize()) }

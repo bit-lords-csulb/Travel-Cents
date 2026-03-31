@@ -27,12 +27,13 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.Slider
 import androidx.compose.material3.SliderDefaults
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextField
-import androidx.compose.material3.TextFieldDefaults
+import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.ui.text.TextStyle
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
@@ -51,8 +52,6 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.travelcents.ui.theme.DeepSea1
 import com.example.travelcents.ui.theme.DeepSea5
-import java.text.NumberFormat
-import java.util.Locale
 
 private val S4Blue = Color(0xFF64B5F6)
 private val S4PrimaryContainer = Color(0xFF54A7E7)
@@ -87,7 +86,6 @@ fun TripStep4BudgetPage(
     var budgetInt by remember { mutableIntStateOf(initialBudget) }
     var textInput by remember { mutableStateOf(initialBudget.toString()) }
     val (tierName, tierDesc, tierColor) = budgetToTier(budgetInt)
-    val formatted = NumberFormat.getNumberInstance(Locale.US).format(budgetInt)
 
     // Sync to ViewModel
     viewModel.budgetTotal = budgetInt.toString()
@@ -189,18 +187,8 @@ fun TripStep4BudgetPage(
                     }
                     Spacer(Modifier.height(24.dp))
 
-                    // Large price display
-                    Text(
-                        "$$formatted",
-                        fontSize = 52.sp,
-                        fontWeight = FontWeight.Black,
-                        color = DeepSea5,
-                        letterSpacing = (-2).sp
-                    )
-                    Spacer(Modifier.height(8.dp))
-
-                    // Editable budget text input
-                    TextField(
+                    // Large price — tap to edit directly
+                    BasicTextField(
                         value = textInput,
                         onValueChange = { input ->
                             val digits = input.filter { it.isDigit() }
@@ -210,23 +198,33 @@ fun TripStep4BudgetPage(
                                 budgetInt = snapTo50(parsed.coerceIn(S4BudgetMin, S4BudgetMax))
                             }
                         },
-                        prefix = { Text("$", color = S4OnSurfaceVariant, fontSize = 16.sp) },
-                        placeholder = { Text("Enter amount", color = S4OnSurfaceVariant.copy(alpha = 0.5f)) },
+                        textStyle = TextStyle(
+                            fontSize = 52.sp,
+                            fontWeight = FontWeight.Black,
+                            color = DeepSea5,
+                            letterSpacing = (-2).sp,
+                            textAlign = TextAlign.Center
+                        ),
                         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                         singleLine = true,
+                        cursorBrush = SolidColor(S4Blue),
                         modifier = Modifier.fillMaxWidth(),
-                        shape = RoundedCornerShape(12.dp),
-                        colors = TextFieldDefaults.colors(
-                            focusedTextColor = DeepSea5,
-                            unfocusedTextColor = DeepSea5,
-                            cursorColor = S4Blue,
-                            focusedContainerColor = S4ContainerHighest,
-                            unfocusedContainerColor = S4ContainerHighest,
-                            focusedIndicatorColor = Color.Transparent,
-                            unfocusedIndicatorColor = Color.Transparent,
-                            focusedLabelColor = S4Blue,
-                            unfocusedLabelColor = S4OnSurfaceVariant
-                        )
+                        decorationBox = { innerTextField ->
+                            Row(
+                                horizontalArrangement = Arrangement.Center,
+                                verticalAlignment = Alignment.CenterVertically,
+                                modifier = Modifier.fillMaxWidth()
+                            ) {
+                                Text(
+                                    "$",
+                                    fontSize = 52.sp,
+                                    fontWeight = FontWeight.Black,
+                                    color = DeepSea5,
+                                    letterSpacing = (-2).sp
+                                )
+                                innerTextField()
+                            }
+                        }
                     )
                     Spacer(Modifier.height(12.dp))
 
