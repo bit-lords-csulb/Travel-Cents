@@ -94,9 +94,11 @@ private data class BottomNavItem(
 @Composable
 fun MainScaffold(modifier: Modifier = Modifier, onLogout: () -> Unit = {}) {
     val newTripViewModel: NewTripViewModel = viewModel()
+    val sharedItineraryViewModel: ItineraryViewModel = viewModel()
     val navController = rememberNavController()
     val navBackStackEntry by navController.currentBackStackEntryAsState()
     val currentRoute = navBackStackEntry?.destination?.route ?: MainRoutes.Home
+    val itineraryUiState by sharedItineraryViewModel.uiState.collectAsState()
 
     val items = listOf(
         BottomNavItem(MainRoutes.Current, "CURRENT", Icons.Outlined.CalendarToday),
@@ -118,18 +120,15 @@ fun MainScaffold(modifier: Modifier = Modifier, onLogout: () -> Unit = {}) {
                 modifier = Modifier.fillMaxSize()
             ) {
                 composable(MainRoutes.Current) {
-                    val itineraryViewModel: ItineraryViewModel = viewModel()
-                    val uiState by itineraryViewModel.uiState.collectAsState()
-
                     ItineraryScreen(
-                        viewModel = itineraryViewModel,
+                        viewModel = sharedItineraryViewModel,
                         onEditEventClick = { clickedEventId ->
-                            uiState.currentTripId?.let { tripId ->
+                            itineraryUiState.currentTripId?.let { tripId ->
                                 navController.navigate("edit_plan/$tripId/$clickedEventId")
                             }
                         },
                         onAddEventClick = {
-                            uiState.currentTripId?.let { tripId ->
+                            itineraryUiState.currentTripId?.let { tripId ->
                                 navController.navigate("edit_plan/$tripId/new")
                             }
                         }
@@ -158,7 +157,10 @@ fun MainScaffold(modifier: Modifier = Modifier, onLogout: () -> Unit = {}) {
                         modifier = Modifier.fillMaxSize(),
                         onPlanTripClick = { navController.navigate(MainRoutes.NewTripStep1) },
                         onAiChatClick = { navController.navigate(MainRoutes.AiTripChat) },
-                        onBackClick = { navController.navigate(MainRoutes.Home) }
+                        onBackClick = { navController.navigate(MainRoutes.Home) },
+                        onViewLastTripClick = if (itineraryUiState.currentTripId != null) {
+                            { navController.navigate(MainRoutes.FinalPlan) }
+                        } else null
                     )
                 }
                 composable(MainRoutes.NewTripStep1) {
@@ -233,9 +235,8 @@ fun MainScaffold(modifier: Modifier = Modifier, onLogout: () -> Unit = {}) {
                     )
                 }
                 composable(MainRoutes.FinalPlan) {
-                    val itineraryViewModel: ItineraryViewModel = viewModel()
                     FinalPlanPage(
-                        viewModel = itineraryViewModel,
+                        viewModel = sharedItineraryViewModel,
                         modifier = Modifier.fillMaxSize(),
                         onBackClick = {
                             navController.navigate(MainRoutes.Current) {

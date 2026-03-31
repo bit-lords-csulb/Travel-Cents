@@ -13,7 +13,6 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -65,7 +64,7 @@ private val S4OnSurfaceVariant = Color(0xFF9EABC8)
 private const val S4BudgetMin = 500
 private const val S4BudgetMax = 20000
 
-s// Round to nearest $50 increment within the allowed range
+// Round to nearest $50 increment within the allowed range
 private fun snapTo50(value: Int): Int =
     (((value - S4BudgetMin + 25) / 50) * 50 + S4BudgetMin).coerceIn(S4BudgetMin, S4BudgetMax)
 
@@ -292,6 +291,7 @@ fun TripStep4BudgetPage(
                         .background(tierColor.copy(alpha = 0.15f), CircleShape),
                     contentAlignment = Alignment.Center
                 ) {
+                    @Suppress("DEPRECATION")
                     Icon(Icons.Default.TrendingUp, null, tint = tierColor, modifier = Modifier.size(20.dp))
                 }
                 Column {
