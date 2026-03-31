@@ -22,9 +22,9 @@ An AI-powered travel planning Android app built with Jetpack Compose and Kotlin.
 
 - Android Studio Hedgehog or newer.
 - Android device or emulator (API 24+).
-- A [Groq API key](https://console_groq_com/keys) (free).
+- A Groq API key (free).
 - A [SerpAPI key](https://serpapi.com/) for live flight and hotel prices.
-- A [Yelp Fusion API key](https://docs_developer_yelp_com/docs/fusion-intro) for activity suggestions.
+- A Yelp Fusion API key for activity suggestions.
 - A Firebase project with **Authentication** (email/password) and **Firestore** enabled.
 
 ### Setup
