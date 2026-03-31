@@ -181,7 +181,6 @@ fun FinalPlanPage(
                 ) {
                     item {
                         Spacer(modifier = Modifier.height(24.dp))
-                        ProgressWidget(destination = uiState.destination)
                         Spacer(modifier = Modifier.height(32.dp))
                     }
 
@@ -437,82 +436,6 @@ private fun FinalPlanTopBar(
         )
     }
 }
-
-@Composable
-private fun ProgressWidget(destination: String) {
-    Card(
-        modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(12.dp),
-        colors = CardDefaults.cardColors(containerColor = SurfaceContainerHigh),
-        elevation = CardDefaults.cardElevation(defaultElevation = 8.dp)
-    ) {
-        Column(modifier = Modifier.padding(24.dp)) {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.Bottom
-            ) {
-                Column {
-                    Text(
-                        text = "STATUS",
-                        color = OnSurfaceVariant,
-                        fontSize = 10.sp,
-                        fontWeight = FontWeight.Bold,
-                        letterSpacing = 2.sp
-                    )
-                    Text(
-                        text = "Your Progress",
-                        color = OnSurface,
-                        fontSize = 20.sp,
-                        fontWeight = FontWeight.Bold
-                    )
-                }
-                Text(
-                    text = "100%",
-                    color = PrimaryBlue,
-                    fontSize = 30.sp,
-                    fontWeight = FontWeight.ExtraBold
-                )
-            }
-
-            Spacer(modifier = Modifier.height(16.dp))
-
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(6.dp)
-                    .background(Color(0xFF152C4E), CircleShape)
-            ) {
-                Box(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .fillMaxHeight()
-                        .background(
-                            brush = Brush.horizontalGradient(
-                                colors = listOf(PrimaryBlue, Color(0xFF54A7E7))
-                            ),
-                            shape = CircleShape
-                        )
-                )
-            }
-
-            Spacer(modifier = Modifier.height(16.dp))
-
-            val label = if (destination.isNotEmpty()) {
-                "All systems go. Your $destination journey is fully mapped."
-            } else {
-                "All systems go. Your journey is fully mapped."
-            }
-            Text(
-                text = label,
-                color = OnSurfaceVariant,
-                fontSize = 14.sp,
-                fontWeight = FontWeight.Medium
-            )
-        }
-    }
-}
-
 @Composable
 private fun DayHeader(date: String) {
     Row(
