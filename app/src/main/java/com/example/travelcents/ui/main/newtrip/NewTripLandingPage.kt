@@ -23,6 +23,7 @@ import androidx.compose.material.icons.outlined.CalendarToday
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -51,7 +52,8 @@ fun NewTripLandingPage(
     modifier: Modifier = Modifier,
     onPlanTripClick: () -> Unit,
     onAiChatClick: () -> Unit,
-    onBackClick: () -> Unit
+    onBackClick: () -> Unit,
+    onViewLastTripClick: (() -> Unit)? = null
 ) {
     Column(
         modifier = modifier
@@ -156,6 +158,25 @@ fun NewTripLandingPage(
                 letterSpacing = 2.sp,
                 fontWeight = FontWeight.SemiBold
             )
+
+            if (onViewLastTripClick != null) {
+                Spacer(modifier = Modifier.height(20.dp))
+                TextButton(onClick = onViewLastTripClick) {
+                    Text(
+                        text = "View last trip",
+                        fontSize = 13.sp,
+                        color = LandingOnSurfaceVariant.copy(alpha = 0.7f),
+                        fontWeight = FontWeight.Medium
+                    )
+                    Spacer(modifier = Modifier.size(4.dp))
+                    Icon(
+                        Icons.AutoMirrored.Filled.ArrowForward,
+                        contentDescription = null,
+                        tint = LandingOnSurfaceVariant.copy(alpha = 0.7f),
+                        modifier = Modifier.size(14.dp)
+                    )
+                }
+            }
         }
     }
 }
