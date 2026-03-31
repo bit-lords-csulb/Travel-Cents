@@ -15,13 +15,10 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.ArrowForward
-import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.outlined.AutoAwesome
 import androidx.compose.material.icons.outlined.CalendarToday
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -52,7 +49,6 @@ fun NewTripLandingPage(
     modifier: Modifier = Modifier,
     onPlanTripClick: () -> Unit,
     onAiChatClick: () -> Unit,
-    onBackClick: () -> Unit,
     onViewLastTripClick: (() -> Unit)? = null
 ) {
     Column(
@@ -61,36 +57,19 @@ fun NewTripLandingPage(
             .background(DeepSea1)
     ) {
         // Top app bar
-        Row(
+        Box(
             modifier = Modifier
                 .fillMaxWidth()
                 .background(Color(0xFF010E24))
-                .padding(horizontal = 8.dp, vertical = 4.dp),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically
+                .padding(horizontal = 8.dp, vertical = 12.dp),
+            contentAlignment = Alignment.Center
         ) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                IconButton(onClick = onBackClick) {
-                    Icon(
-                        Icons.AutoMirrored.Filled.ArrowBack,
-                        contentDescription = "Back",
-                        tint = LandingPrimaryBlue
-                    )
-                }
-                Text(
-                    text = "New Trip Planner",
-                    fontSize = 15.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = DeepSea5
-                )
-            }
-            IconButton(onClick = onBackClick) {
-                Icon(
-                    Icons.Default.Close,
-                    contentDescription = "Close",
-                    tint = LandingPrimaryBlue
-                )
-            }
+            Text(
+                text = "New Trip Planner",
+                fontSize = 15.sp,
+                fontWeight = FontWeight.Bold,
+                color = DeepSea5
+            )
         }
 
         // Main content centered vertically

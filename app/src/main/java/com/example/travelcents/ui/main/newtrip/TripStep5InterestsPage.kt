@@ -31,7 +31,6 @@ import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
-import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.Text
@@ -123,18 +122,9 @@ fun TripStep5InterestsPage(
     onTripGenerated: () -> Unit
 ) {
     val uiState by viewModel.uiState.collectAsState()
-    val isLoading = uiState is TripUiState.Loading
     val errorMessage = (uiState as? TripUiState.Error)?.message
     var searchQuery by remember { mutableStateOf("") }
     var customInterests by remember { mutableStateOf(listOf<String>()) }
-
-    // Navigate to Current when trip is generated
-    LaunchedEffect(uiState) {
-        if (uiState is TripUiState.Success) {
-            viewModel.resetState()
-            onTripGenerated()
-        }
-    }
 
     Column(
         modifier = modifier
@@ -163,24 +153,6 @@ fun TripStep5InterestsPage(
                 modifier = Modifier.fillMaxWidth().height(3.dp)
                     .background(Brush.horizontalGradient(listOf(S5Blue, S5PrimaryContainer)))
             )
-        }
-
-        // Loading overlay
-        if (isLoading) {
-            val msg = (uiState as TripUiState.Loading).statusMessage
-            Box(
-                modifier = Modifier.fillMaxSize(),
-                contentAlignment = Alignment.Center
-            ) {
-                Column(
-                    horizontalAlignment = Alignment.CenterHorizontally,
-                    verticalArrangement = Arrangement.spacedBy(16.dp)
-                ) {
-                    CircularProgressIndicator(color = S5Blue, modifier = Modifier.size(48.dp))
-                    Text(msg, color = S5OnSurfaceVariant, fontSize = 14.sp)
-                }
-            }
-            return@Column
         }
 
         // Grid content
@@ -367,6 +339,7 @@ fun TripStep5InterestsPage(
                 onClick = {
                     if (viewModel.origin.isBlank()) viewModel.origin = "Not specified"
                     viewModel.generateTrip()
+                    onTripGenerated()
                 },
                 modifier = Modifier.fillMaxWidth().height(56.dp),
                 enabled = viewModel.interests.isNotEmpty(),

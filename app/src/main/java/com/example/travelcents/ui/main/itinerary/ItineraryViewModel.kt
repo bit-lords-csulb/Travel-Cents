@@ -68,6 +68,9 @@ class ItineraryViewModel : ViewModel() {
     private val _allTrips = MutableStateFlow<List<TripSummary>>(emptyList())
     val allTrips: StateFlow<List<TripSummary>> = _allTrips.asStateFlow()
 
+    private val _archivedTrips = MutableStateFlow<List<TripSummary>>(emptyList())
+    val archivedTrips: StateFlow<List<TripSummary>> = _archivedTrips.asStateFlow()
+
     private val db = FirebaseFirestore.getInstance()
     private val auth = FirebaseAuth.getInstance()
     private var eventsListener: ListenerRegistration? = null
@@ -156,20 +159,80 @@ class ItineraryViewModel : ViewModel() {
             .orderBy("createdAt", Query.Direction.DESCENDING)
             .get()
             .addOnSuccessListener { snapshot ->
-                _allTrips.value = snapshot.documents.mapNotNull { doc ->
-                    val tripName = doc.getString("tripName") ?: return@mapNotNull null
-                    TripSummary(
+                val active = mutableListOf<TripSummary>()
+                val archived = mutableListOf<TripSummary>()
+                snapshot.documents.forEach { doc ->
+                    val tripName = doc.getString("tripName") ?: return@forEach
+                    val summary = TripSummary(
                         tripId = doc.id,
                         tripName = tripName,
                         destination = doc.getString("destination") ?: "",
                         dateFrom = doc.getString("dateFrom") ?: "",
                         dateTo = doc.getString("dateTo") ?: ""
                     )
+                    if (doc.getString("status") == "archived") archived.add(summary)
+                    else active.add(summary)
                 }
+                _allTrips.value = active
+                _archivedTrips.value = archived
             }
             .addOnFailureListener { e ->
                 Log.e("ItineraryViewModel", "Failed to fetch trip list", e)
             }
+    }
+
+    fun archiveTrip(tripId: String) {
+        val uid = auth.currentUser?.uid ?: return
+        viewModelScope.launch {
+            try {
+                db.collection("users").document(uid)
+                    .collection("trips").document(tripId)
+                    .update("status", "archived")
+                    .await()
+                if (_uiState.value.currentTripId == tripId) loadTrip()
+                else fetchAllTrips(uid)
+            } catch (e: Exception) {
+                _uiState.update { it.copy(errorMessage = e.message ?: "Failed to archive trip.") }
+            }
+        }
+    }
+
+    fun restoreTrip(tripId: String) {
+        val uid = auth.currentUser?.uid ?: return
+        viewModelScope.launch {
+            try {
+                db.collection("users").document(uid)
+                    .collection("trips").document(tripId)
+                    .update("status", "active")
+                    .await()
+                fetchAllTrips(uid)
+            } catch (e: Exception) {
+                _uiState.update { it.copy(errorMessage = e.message ?: "Failed to restore trip.") }
+            }
+        }
+    }
+
+    fun deleteTrip(tripId: String) {
+        val uid = auth.currentUser?.uid ?: return
+        viewModelScope.launch {
+            try {
+                val eventsRef = db.collection("users").document(uid)
+                    .collection("trips").document(tripId).collection("events")
+                val events = eventsRef.get().await()
+                if (!events.isEmpty) {
+                    val batch = db.batch()
+                    events.documents.forEach { batch.delete(it.reference) }
+                    batch.commit().await()
+                }
+                db.collection("users").document(uid)
+                    .collection("trips").document(tripId)
+                    .delete().await()
+                if (_uiState.value.currentTripId == tripId) loadTrip()
+                else fetchAllTrips(uid)
+            } catch (e: Exception) {
+                _uiState.update { it.copy(errorMessage = e.message ?: "Failed to delete trip.") }
+            }
+        }
     }
 
     private fun listenToEvents(uid: String, tripId: String) {

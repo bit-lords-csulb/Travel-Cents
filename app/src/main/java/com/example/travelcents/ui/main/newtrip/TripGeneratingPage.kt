@@ -93,7 +93,12 @@ fun TripGeneratingPage(
             generationSteps.forEach { (step, label) ->
                 val isDone = currentStep.ordinal > step.ordinal || currentStep == GenerationStep.COMPLETE
                 val isActive = currentStep == step
-                StepCard(label = label, isDone = isDone, isActive = isActive)
+                AnimatedVisibility(
+                    visible = currentStep.ordinal >= step.ordinal,
+                    enter = fadeIn() + expandVertically()
+                ) {
+                    StepCard(label = label, isDone = isDone, isActive = isActive)
+                }
             }
         }
 

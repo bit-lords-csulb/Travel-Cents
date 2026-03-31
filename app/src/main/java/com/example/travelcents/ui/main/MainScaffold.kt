@@ -159,7 +159,6 @@ fun MainScaffold(modifier: Modifier = Modifier, onLogout: () -> Unit = {}) {
                         modifier = Modifier.fillMaxSize(),
                         onPlanTripClick = { navController.navigate(MainRoutes.NewTripStep1) },
                         onAiChatClick = { navController.navigate(MainRoutes.AiTripChat) },
-                        onBackClick = { navController.navigate(MainRoutes.Home) },
                         onViewLastTripClick = if (itineraryUiState.currentTripId != null) {
                             { navController.navigate(MainRoutes.FinalPlan) }
                         } else null
