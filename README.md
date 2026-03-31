@@ -6,13 +6,13 @@ An AI-powered travel planning Android app built with Jetpack Compose and Kotlin.
 
 ## What It Does
 
-- **Generate a full trip itinerary** — fill out a form and the app calls Groq AI to produce a day-by-day schedule with flights, hotels, restaurants, and activities
-- **Chat with an AI travel assistant** — conversational planning powered by Groq
-- **View and edit your itinerary** — type-specific event cards grouped by day, with inline edit/delete
-- **Group chats** — real-time messaging with friends in a trip group
-- **Direct messages** — 1-on-1 chat with any friend
-- **Friends system** — search users, send/accept friend requests
-- **Group event voting** — propose activities for a group trip, upvote/downvote, and comment on each suggestion
+- **Generate a full trip itinerary** — fill out a form and the app calls Groq AI to produce a day-by-day schedule with flights, hotels, restaurants, and activities.
+- **Chat with an AI travel assistant** — conversational planning powered by Groq.
+- **View and edit your itinerary** — type-specific event cards grouped by day, with inline edit/delete and a sleek timeline view.
+- **Group chats** — real-time messaging with friends in a trip group.
+- **Direct messages** — 1-on-1 chat with any friend.
+- **Friends system** — search users, send/accept friend requests.
+- **Group event voting** — propose activities for a group trip, upvote/downvote, and comment on each suggestion.
 
 ---
 
@@ -20,12 +20,12 @@ An AI-powered travel planning Android app built with Jetpack Compose and Kotlin.
 
 ### Prerequisites
 
-- Android Studio Hedgehog or newer
-- Android device or emulator (API 24+)
-- A [Groq API key](https://console.groq.com/keys) (free)
-- A [SerpAPI key](https://serpapi.com/) for live flight and hotel prices
-- A [Yelp Fusion API key](https://docs.developer.yelp.com/docs/fusion-intro) for activity suggestions
-- A Firebase project with **Authentication** (email/password) and **Firestore** enabled
+- Android Studio Hedgehog or newer.
+- Android device or emulator (API 24+).
+- A [Groq API key](https://console_groq_com/keys) (free).
+- A [SerpAPI key](https://serpapi.com/) for live flight and hotel prices.
+- A [Yelp Fusion API key](https://docs_developer_yelp_com/docs/fusion-intro) for activity suggestions.
+- A Firebase project with **Authentication** (email/password) and **Firestore** enabled.
 
 ### Setup
 
@@ -42,8 +42,8 @@ An AI-powered travel planning Android app built with Jetpack Compose and Kotlin.
    ```
 
 3. Add your Firebase config:
-   - Download `google-services.json` from your Firebase console
-   - Place it in `app/`
+   - Download `google-services.json` from your Firebase console.
+   - Place it in `app/`.
 
 4. Open in Android Studio, let Gradle sync, then **Run**.
 
@@ -52,40 +52,41 @@ An AI-powered travel planning Android app built with Jetpack Compose and Kotlin.
 ## Features
 
 ### Authentication
-- Email/password sign-up and login
-- Username lookup via Firestore on login
-- Input validation, loading states, error messages
+- Email/password sign-up and login.
+- Username lookup via Firestore on login.
+- Input validation, loading states, and error messages.
 
 ### Trip Planning
-- Form: origin, destination, dates, adults/children, travel style, budget + currency, dietary preferences, interests, special requests
+- Form: origin, destination, dates, adults/children, travel style, budget + currency, dietary preferences, interests, special requests.
 - Two-call Groq pipeline:
-  1. Generates trip metadata (name, dates, duration)
-  2. Generates full event list (flights, hotels, restaurants, activities)
-- SerpAPI enriches results with real flight and hotel pricing
-- Saves itinerary + all events to Firestore
+  1. Generates trip metadata (name, dates, duration).
+  2. Generates full event list (flights, hotels, restaurants, activities).
+- SerpAPI enriches results with real flight and hotel pricing.
+- Saves itinerary + all events to Firestore.
 
 ### Itinerary Viewer & Editor
-- Events grouped by date with day headers
-- Four event card types: **Flight** (pink), **Hotel** (cyan), **Restaurant** (yellow), **Activity** (purple)
-- Real-time Firestore listener
-- Inline edit, add, and delete events
+- Events grouped by date with day headers.
+- Four event card types: **Flight**, **Hotel**, **Restaurant**, and **Activity**.
+- Real-time Firestore listener.
+- Inline edit, add, and delete events.
+- **Final Plan** view for a polished, read-only or shareable summary of the trip.
 
 ### AI Chat
-- Conversational travel assistant (Groq)
-- Full multi-turn chat history
-- Typing indicator
+- Conversational travel assistant (Groq).
+- Full multi-turn chat history.
+- Typing indicator for a more responsive feel.
 
 ### Social & Chats
-- **Group chat** — create trip groups, real-time messaging, last message preview
-- **Direct messages** — 1-on-1 chat with friends
-- **Friends** — search users, send/accept/reject friend requests, view pending requests
+- **Group chat** — create trip groups, real-time messaging, last message preview.
+- **Direct messages** — 1-on-1 chat with friends.
+- **Friends** — search users, send/accept/reject friend requests, view pending requests.
 
 ### Group Event Voting
-- Propose activities for a group trip with a title, description, location, time, and photo
-- Yelp API autocomplete for place search; Wikipedia fallback for descriptions
-- Upvote / downvote each proposal; vote count displayed live
-- Comment threads on each proposed event
-- Creator can delete their own proposals
+- Propose activities for a group trip with a title, description, location, time, and photo.
+- Yelp API autocomplete for place search; Wikipedia fallback for descriptions.
+- Upvote / downvote each proposal; vote count displayed live.
+- Comment threads on each proposed event.
+- Creator can delete their own proposals.
 
 ---
 
@@ -116,48 +117,39 @@ An AI-powered travel planning Android app built with Jetpack Compose and Kotlin.
 ```
 Travel-Cents/
 ├── app/
-│   ├── build.gradle.kts
-│   ├── google-services.json
+│   ├── google-services.json             # Firebase configuration file
 │   └── src/
-│       ├── androidTest/java/com/example/travelcents/    # ExampleInstrumentedTest
-│       ├── test/java/com/example/travelcents/           # ExampleUnitTest
-│       └── main/
-│           ├── AndroidManifest.xml
-│           ├── java/com/example/travelcents/
-│           │   ├── MainActivity.kt
-│           │   ├── data/
-│           │   │   ├── AuthModel.kt
-│           │   │   ├── ChatMessage.kt
-│           │   │   ├── FirestoreRepository.kt
-│           │   │   ├── GroqApi.kt
-│           │   │   ├── MockItineraryData.kt
-│           │   │   ├── Trip.kt / TripEvent.kt
-│           │   │   ├── model/                          # itinerary, chat, group, request, and API DTO models
-│           │   │   └── remote/                         # Groq + Serp services, repositories, and cache
-│           │   └── ui/
-│           │       ├── TravelCentsNavigation.kt        # login/signup/home navigation entry
-│           │       ├── auth/                           # LoginPage, SignUpPage, ForgotPassword, AuthViewModel
-│           │       ├── theme/                          # app colors, typography, Material theme
-│           │       └── main/
-│           │           ├── MainScaffold.kt             # bottom nav shell + nested NavHost
-│           │           ├── CurrentPage.kt
-│           │           ├── HomePage.kt
-│           │           ├── SettingsPage.kt
-│           │           ├── aichat/                     # AiTripChatPage, ChatViewModel
-│           │           ├── itinerary/                  # ItineraryScreen, EditPlanScreen, SharedTripHeader, ViewModels
-│           │           ├── newtrip/                    # landing page, 5-step flow, form page, NewTripViewModel
-│           │           └── chats/
-│           │               ├── chat/                   # chats list, group/direct chat pages, related ViewModels
-│           │               ├── friends/                # add friends, requests, friends list, related ViewModels
-│           │               ├── groups/                 # NewTripChatPage, group trip chat ViewModel
-│           │               └── voting/                 # event proposals, comments, creation flow, related ViewModels
-│           └── res/                                    # themes, strings, launcher assets, backup/data rules
-├── gradle/
-│   ├── libs.versions.toml
-│   └── wrapper/
-├── build.gradle.kts
-├── settings.gradle.kts
-├── gradle.properties
-├── gradlew / gradlew.bat
-└── README.md
+│       ├── main/
+│       │   ├── AndroidManifest.xml      # App manifest
+│       │   ├── java/com/example/travelcents/
+│       │   │   ├── MainActivity.kt      # Entry point activity
+│       │   │   ├── data/                # Data layer: Repositories, APIs, and Core Models
+│       │   │   │   ├── model/           # DTOs and internal data structures (Itinerary, TravelEvent, etc.)
+│       │   │   │   ├── remote/          # API services (Groq, Serp) and their respective repositories
+│       │   │   │   ├── AuthModel.kt     # Data structures for user authentication
+│       │   │   │   ├── ChatMessage.kt   # Model for chat messages
+│       │   │   │   ├── FirestoreRepository.kt # Central hub for Firebase Firestore operations
+│       │   │   │   ├── GroqApi.kt       # Interface for Groq AI endpoints
+│       │   │   │   ├── Trip.kt          # Main Trip data class
+│       │   │   │   └── TripEvent.kt     # Model for individual trip events
+│       │   │   └── ui/                  # UI layer: Composables and ViewModels
+│       │   │       ├── auth/            # Authentication flow (Login, SignUp, ForgotPassword)
+│       │   │       ├── theme/           # App styling (Colors, Typography, Shapes)
+│       │   │       ├── main/            # Core application features post-login
+│       │   │       │   ├── aichat/      # AI assistant chat interface and logic
+│       │   │       │   ├── chats/       # Social hub (Direct messages, Group chats, Friends, Voting)
+│       │   │       │   │   ├── chat/    # Individual and list-view chat screens
+│       │   │       │   │   ├── friends/ # Friend management (Add, Requests, List)
+│       │   │       │   │   ├── groups/  # Group-specific trip chat views
+│       │   │       │   │   └── voting/  # Group event proposal and voting system
+│       │   │       │   ├── itinerary/   # Itinerary management (View, Edit, Final Plan)
+│       │   │       │   ├── newtrip/     # Multi-step trip creation wizard
+│       │   │       │   ├── CurrentPage.kt  # Root for main content navigation
+│       │   │       │   ├── HomePage.kt     # User dashboard with trip summaries
+│       │   │       │   ├── MainScaffold.kt # Main layout shell with bottom navigation
+│       │   │       │   └── SettingsPage.kt # User settings and profile options
+│       │   │       └── TravelCentsNavigation.kt # Top-level app navigation graph
+│       │   └── res/                     # Resources (drawables, layouts, values)
+│       └── test/                        # Unit tests
+└── build.gradle.kts                     # Project-level build configuration
 ```
