@@ -56,13 +56,6 @@ import com.example.travelcents.ui.theme.DeepSea1
 import com.example.travelcents.ui.theme.DeepSea5
 import java.util.Calendar
 
-private val S2Blue = Color(0xFF64B5F6)
-private val S2ContainerHigh = Color(0xFF0B203D)
-private val S2ContainerHighest = Color(0xFF102645)
-private val S2ContainerLow = Color(0xFF02132B)
-private val S2SurfaceBright = Color(0xFF152C4E)
-private val S2OnSurfaceVariant = Color(0xFF9EABC8)
-private val S2SecondaryContainer = Color(0xFF3A485B)
 
 private data class CalDate(val year: Int, val month: Int, val day: Int) : Comparable<CalDate> {
     override fun compareTo(other: CalDate) =
@@ -148,18 +141,18 @@ fun TripStep2DatesPage(
             ) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     IconButton(onClick = onBackClick) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, "Back", tint = S2Blue)
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, "Back", tint = TripWizardColors.Blue)
                     }
                     Text("Step 2 of 5", fontSize = 17.sp, fontWeight = FontWeight.Bold, color = DeepSea5)
                 }
                 IconButton(onClick = onCloseClick) {
-                    Icon(Icons.Default.Close, "Close", tint = S2Blue)
+                    Icon(Icons.Default.Close, "Close", tint = TripWizardColors.Blue)
                 }
             }
-            Box(modifier = Modifier.fillMaxWidth().height(3.dp).background(S2ContainerHigh)) {
+            Box(modifier = Modifier.fillMaxWidth().height(3.dp).background(TripWizardColors.ContainerHigh)) {
                 Box(
                     modifier = Modifier.fillMaxWidth(0.4f).height(3.dp)
-                        .background(Brush.horizontalGradient(listOf(S2Blue, S2Blue.copy(alpha = 0.7f))))
+                        .background(Brush.horizontalGradient(listOf(TripWizardColors.Blue, TripWizardColors.Blue.copy(alpha = 0.7f))))
                 )
             }
         }
@@ -189,7 +182,7 @@ fun TripStep2DatesPage(
             Text(
                 text = "Select your dates and TravelCents will optimize your daily schedule.",
                 fontSize = 14.sp,
-                color = S2OnSurfaceVariant,
+                color = TripWizardColors.OnSurfaceVariant,
                 lineHeight = 20.sp
             )
             Spacer(Modifier.height(20.dp))
@@ -199,7 +192,7 @@ fun TripStep2DatesPage(
                 modifier = Modifier
                     .fillMaxWidth()
                     .clip(RoundedCornerShape(16.dp))
-                    .background(S2ContainerLow)
+                    .background(TripWizardColors.ContainerLow)
                     .padding(20.dp)
             ) {
                 Column {
@@ -226,7 +219,7 @@ fun TripStep2DatesPage(
                             Icon(
                                 Icons.Default.KeyboardArrowDown,
                                 contentDescription = "Pick month/year",
-                                tint = S2Blue,
+                                tint = TripWizardColors.Blue,
                                 modifier = Modifier.size(18.dp)
                             )
                         }
@@ -234,20 +227,20 @@ fun TripStep2DatesPage(
                             Box(
                                 modifier = Modifier
                                     .size(32.dp)
-                                    .background(S2ContainerHighest, RoundedCornerShape(8.dp))
+                                    .background(TripWizardColors.ContainerHighest, RoundedCornerShape(8.dp))
                                     .clickable { prevMonth() },
                                 contentAlignment = Alignment.Center
                             ) {
-                                Icon(Icons.Default.ChevronLeft, null, tint = S2Blue, modifier = Modifier.size(20.dp))
+                                Icon(Icons.Default.ChevronLeft, null, tint = TripWizardColors.Blue, modifier = Modifier.size(20.dp))
                             }
                             Box(
                                 modifier = Modifier
                                     .size(32.dp)
-                                    .background(S2ContainerHighest, RoundedCornerShape(8.dp))
+                                    .background(TripWizardColors.ContainerHighest, RoundedCornerShape(8.dp))
                                     .clickable { nextMonth() },
                                 contentAlignment = Alignment.Center
                             ) {
-                                Icon(Icons.Default.ChevronRight, null, tint = S2Blue, modifier = Modifier.size(20.dp))
+                                Icon(Icons.Default.ChevronRight, null, tint = TripWizardColors.Blue, modifier = Modifier.size(20.dp))
                             }
                         }
                     }
@@ -262,7 +255,7 @@ fun TripStep2DatesPage(
                                 textAlign = TextAlign.Center,
                                 fontSize = 9.sp,
                                 fontWeight = FontWeight.Bold,
-                                color = S2OnSurfaceVariant.copy(alpha = 0.6f),
+                                color = TripWizardColors.OnSurfaceVariant.copy(alpha = 0.6f),
                                 letterSpacing = 1.sp
                             )
                         }
@@ -315,8 +308,8 @@ fun TripStep2DatesPage(
                     modifier = Modifier
                         .fillMaxWidth()
                         .clip(RoundedCornerShape(16.dp))
-                        .background(S2SecondaryContainer.copy(alpha = 0.3f))
-                        .border(1.dp, S2ContainerHighest.copy(alpha = 0.1f), RoundedCornerShape(16.dp))
+                        .background(TripWizardColors.SecondaryContainer.copy(alpha = 0.3f))
+                        .border(1.dp, TripWizardColors.ContainerHighest.copy(alpha = 0.1f), RoundedCornerShape(16.dp))
                         .padding(16.dp),
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically
@@ -328,17 +321,17 @@ fun TripStep2DatesPage(
                         Box(
                             modifier = Modifier
                                 .size(40.dp)
-                                .background(S2Blue.copy(alpha = 0.15f), CircleShape),
+                                .background(TripWizardColors.Blue.copy(alpha = 0.15f), CircleShape),
                             contentAlignment = Alignment.Center
                         ) {
-                            Icon(Icons.Default.CalendarToday, null, tint = S2Blue, modifier = Modifier.size(18.dp))
+                            Icon(Icons.Default.CalendarToday, null, tint = TripWizardColors.Blue, modifier = Modifier.size(18.dp))
                         }
                         Column {
                             Text(
                                 "SELECTED DURATION",
                                 fontSize = 9.sp,
                                 fontWeight = FontWeight.Bold,
-                                color = S2OnSurfaceVariant,
+                                color = TripWizardColors.OnSurfaceVariant,
                                 letterSpacing = 1.sp
                             )
                             Spacer(Modifier.height(2.dp))
@@ -357,7 +350,7 @@ fun TripStep2DatesPage(
                     }
                     Text(
                         "Clear",
-                        color = S2Blue,
+                        color = TripWizardColors.Blue,
                         fontSize = 10.sp,
                         fontWeight = FontWeight.Bold,
                         modifier = Modifier
@@ -398,9 +391,9 @@ fun TripStep2DatesPage(
                 modifier = Modifier.fillMaxWidth().height(52.dp),
                 enabled = startDate != null && endDate != null,
                 colors = ButtonDefaults.buttonColors(
-                    containerColor = S2Blue,
+                    containerColor = TripWizardColors.Blue,
                     contentColor = Color(0xFF001627),
-                    disabledContainerColor = S2Blue.copy(alpha = 0.25f),
+                    disabledContainerColor = TripWizardColors.Blue.copy(alpha = 0.25f),
                     disabledContentColor = DeepSea5.copy(alpha = 0.3f)
                 ),
                 shape = RoundedCornerShape(16.dp)
@@ -423,7 +416,7 @@ private fun S2ProgressWidget(stepsComplete: Int) {
         modifier = Modifier
             .fillMaxWidth()
             .clip(RoundedCornerShape(16.dp))
-            .background(S2ContainerHigh.copy(alpha = 0.5f))
+            .background(TripWizardColors.ContainerHigh.copy(alpha = 0.5f))
             .border(1.dp, Color.White.copy(alpha = 0.05f), RoundedCornerShape(16.dp))
             .padding(16.dp)
     ) {
@@ -433,14 +426,14 @@ private fun S2ProgressWidget(stepsComplete: Int) {
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Text("YOUR PROGRESS", fontSize = 10.sp, fontWeight = FontWeight.Bold, color = S2OnSurfaceVariant, letterSpacing = 1.5.sp)
+                Text("YOUR PROGRESS", fontSize = 10.sp, fontWeight = FontWeight.Bold, color = TripWizardColors.OnSurfaceVariant, letterSpacing = 1.5.sp)
                 Box(
                     modifier = Modifier
-                        .background(S2Blue.copy(alpha = 0.2f), RoundedCornerShape(12.dp))
-                        .border(1.dp, S2Blue.copy(alpha = 0.2f), RoundedCornerShape(12.dp))
+                        .background(TripWizardColors.Blue.copy(alpha = 0.2f), RoundedCornerShape(12.dp))
+                        .border(1.dp, TripWizardColors.Blue.copy(alpha = 0.2f), RoundedCornerShape(12.dp))
                         .padding(horizontal = 14.dp, vertical = 6.dp)
                 ) {
-                    Text("${stepsComplete * 20}%", fontSize = 14.sp, fontWeight = FontWeight.Bold, color = S2Blue)
+                    Text("${stepsComplete * 20}%", fontSize = 14.sp, fontWeight = FontWeight.Bold, color = TripWizardColors.Blue)
                 }
             }
             Spacer(Modifier.height(12.dp))
@@ -451,7 +444,7 @@ private fun S2ProgressWidget(stepsComplete: Int) {
                             .weight(1f)
                             .height(6.dp)
                             .clip(RoundedCornerShape(3.dp))
-                            .background(if (i < stepsComplete) S2Blue else S2ContainerHighest)
+                            .background(if (i < stepsComplete) TripWizardColors.Blue else TripWizardColors.ContainerHighest)
                     )
                 }
             }
@@ -469,7 +462,7 @@ private fun S2DayCell(
     onClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
-    val rangeColor = S2Blue.copy(alpha = 0.2f)
+    val rangeColor = TripWizardColors.Blue.copy(alpha = 0.2f)
 
     Box(
         modifier = modifier
@@ -506,7 +499,7 @@ private fun S2DayCell(
                 .align(Alignment.Center)
                 .then(
                     if (isStart || isEnd)
-                        Modifier.background(S2Blue, CircleShape)
+                        Modifier.background(TripWizardColors.Blue, CircleShape)
                     else Modifier
                 ),
             contentAlignment = Alignment.Center
@@ -548,7 +541,7 @@ private fun S2MonthYearPickerDialog(
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 IconButton(onClick = { pickerYear-- }) {
-                    Icon(Icons.Default.ChevronLeft, null, tint = S2Blue)
+                    Icon(Icons.Default.ChevronLeft, null, tint = TripWizardColors.Blue)
                 }
                 Text(
                     pickerYear.toString(),
@@ -557,7 +550,7 @@ private fun S2MonthYearPickerDialog(
                     color = Color.White
                 )
                 IconButton(onClick = { pickerYear++ }) {
-                    Icon(Icons.Default.ChevronRight, null, tint = S2Blue)
+                    Icon(Icons.Default.ChevronRight, null, tint = TripWizardColors.Blue)
                 }
             }
         },
@@ -574,7 +567,7 @@ private fun S2MonthYearPickerDialog(
                     Box(
                         modifier = Modifier
                             .clip(RoundedCornerShape(10.dp))
-                            .background(if (selected) S2Blue else Color(0xFF152C4E))
+                            .background(if (selected) TripWizardColors.Blue else Color(0xFF152C4E))
                             .clickable { pickerMonth = index }
                             .padding(vertical = 10.dp),
                         contentAlignment = Alignment.Center
@@ -591,7 +584,7 @@ private fun S2MonthYearPickerDialog(
         },
         confirmButton = {
             TextButton(onClick = { onConfirm(pickerMonth, pickerYear) }) {
-                Text("Done", color = S2Blue, fontWeight = FontWeight.Bold)
+                Text("Done", color = TripWizardColors.Blue, fontWeight = FontWeight.Bold)
             }
         },
         dismissButton = {

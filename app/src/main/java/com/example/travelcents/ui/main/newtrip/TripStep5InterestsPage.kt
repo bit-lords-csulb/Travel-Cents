@@ -56,12 +56,6 @@ import coil.compose.AsyncImage
 import com.example.travelcents.ui.theme.DeepSea1
 import com.example.travelcents.ui.theme.DeepSea5
 
-private val S5Blue = Color(0xFF64B5F6)
-private val S5PrimaryContainer = Color(0xFF54A7E7)
-private val S5ContainerHigh = Color(0xFF0B203D)
-private val S5ContainerHighest = Color(0xFF102645)
-private val S5OnSurfaceVariant = Color(0xFF9EABC8)
-
 private data class InterestItem(val key: String, val label: String, val imageUrl: String)
 
 private val interestItems = listOf(
@@ -140,18 +134,18 @@ fun TripStep5InterestsPage(
             ) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     IconButton(onClick = onBackClick) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, "Back", tint = S5Blue)
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, "Back", tint = TripWizardColors.Blue)
                     }
                     Text("Step 5 of 5", fontSize = 17.sp, fontWeight = FontWeight.Bold, color = DeepSea5)
                 }
                 IconButton(onClick = onCloseClick) {
-                    Icon(Icons.Default.Close, "Close", tint = S5Blue)
+                    Icon(Icons.Default.Close, "Close", tint = TripWizardColors.Blue)
                 }
             }
             // Full progress bar (100%)
             Box(
                 modifier = Modifier.fillMaxWidth().height(3.dp)
-                    .background(Brush.horizontalGradient(listOf(S5Blue, S5PrimaryContainer)))
+                    .background(Brush.horizontalGradient(listOf(TripWizardColors.Blue, TripWizardColors.PrimaryContainer)))
             )
         }
 
@@ -181,7 +175,7 @@ fun TripStep5InterestsPage(
                         "PERSONALIZATION",
                         fontSize = 10.sp,
                         fontWeight = FontWeight.Bold,
-                        color = S5OnSurfaceVariant,
+                        color = TripWizardColors.OnSurfaceVariant,
                         letterSpacing = 1.5.sp
                     )
                     Spacer(Modifier.height(6.dp))
@@ -201,9 +195,9 @@ fun TripStep5InterestsPage(
                         Text(
                             "${viewModel.interests.size} selected",
                             fontSize = 12.sp,
-                            color = if (viewModel.interests.size >= 1) S5Blue else S5OnSurfaceVariant
+                            color = if (viewModel.interests.size >= 1) TripWizardColors.Blue else TripWizardColors.OnSurfaceVariant
                         )
-                        Text("Select at least 1", fontSize = 12.sp, color = S5OnSurfaceVariant)
+                        Text("Select at least 1", fontSize = 12.sp, color = TripWizardColors.OnSurfaceVariant)
                     }
                 }
             }
@@ -217,16 +211,16 @@ fun TripStep5InterestsPage(
                         modifier = Modifier
                             .fillMaxWidth()
                             .clip(RoundedCornerShape(12.dp))
-                            .background(S5ContainerHigh),
-                        placeholder = { Text("Search interests...", color = S5OnSurfaceVariant) },
-                        leadingIcon = { Icon(Icons.Default.Search, null, tint = S5OnSurfaceVariant) },
+                            .background(TripWizardColors.ContainerHigh),
+                        placeholder = { Text("Search interests...", color = TripWizardColors.OnSurfaceVariant) },
+                        leadingIcon = { Icon(Icons.Default.Search, null, tint = TripWizardColors.OnSurfaceVariant) },
                         colors = TextFieldDefaults.colors(
                             focusedContainerColor = Color.Transparent,
                             unfocusedContainerColor = Color.Transparent,
                             disabledContainerColor = Color.Transparent,
                             focusedIndicatorColor = Color.Transparent,
                             unfocusedIndicatorColor = Color.Transparent,
-                            cursorColor = S5Blue
+                            cursorColor = TripWizardColors.Blue
                         ),
                         singleLine = true
                     )
@@ -238,7 +232,7 @@ fun TripStep5InterestsPage(
                     if (showAddChip) {
                         Box(
                             modifier = Modifier
-                                .border(1.dp, S5Blue.copy(0.5f), RoundedCornerShape(999.dp))
+                                .border(1.dp, TripWizardColors.Blue.copy(0.5f), RoundedCornerShape(999.dp))
                                 .clickable {
                                     val key = searchQuery.lowercase().replace(" ", "_")
                                     if (key !in customInterests) {
@@ -249,7 +243,7 @@ fun TripStep5InterestsPage(
                                 }
                                 .padding(horizontal = 12.dp, vertical = 6.dp)
                         ) {
-                            Text("+ Add '$searchQuery'", color = S5Blue, fontSize = 12.sp)
+                            Text("+ Add '$searchQuery'", color = TripWizardColors.Blue, fontSize = 12.sp)
                         }
                     }
                 }
@@ -263,7 +257,7 @@ fun TripStep5InterestsPage(
                             "YOUR INTERESTS",
                             fontSize = 10.sp,
                             fontWeight = FontWeight.Bold,
-                            color = S5OnSurfaceVariant,
+                            color = TripWizardColors.OnSurfaceVariant,
                             letterSpacing = 1.5.sp
                         )
                         Spacer(Modifier.height(8.dp))
@@ -274,13 +268,13 @@ fun TripStep5InterestsPage(
                             customInterests.forEach { interest ->
                                 Row(
                                     modifier = Modifier
-                                        .background(S5Blue.copy(alpha = 0.15f), RoundedCornerShape(999.dp))
-                                        .border(1.dp, S5Blue.copy(alpha = 0.4f), RoundedCornerShape(999.dp))
+                                        .background(TripWizardColors.Blue.copy(alpha = 0.15f), RoundedCornerShape(999.dp))
+                                        .border(1.dp, TripWizardColors.Blue.copy(alpha = 0.4f), RoundedCornerShape(999.dp))
                                         .padding(horizontal = 12.dp, vertical = 6.dp),
                                     verticalAlignment = Alignment.CenterVertically,
                                     horizontalArrangement = Arrangement.spacedBy(4.dp)
                                 ) {
-                                    Text(interest, color = S5Blue, fontSize = 12.sp)
+                                    Text(interest, color = TripWizardColors.Blue, fontSize = 12.sp)
                                     Icon(
                                         Icons.Default.Close,
                                         null,
@@ -289,7 +283,7 @@ fun TripStep5InterestsPage(
                                             customInterests = customInterests.filter { it != interest }
                                             viewModel.toggleInterest(key)
                                         },
-                                        tint = S5Blue
+                                        tint = TripWizardColors.Blue
                                     )
                                 }
                             }
@@ -344,9 +338,9 @@ fun TripStep5InterestsPage(
                 modifier = Modifier.fillMaxWidth().height(56.dp),
                 enabled = viewModel.interests.isNotEmpty(),
                 colors = ButtonDefaults.buttonColors(
-                    containerColor = S5Blue,
+                    containerColor = TripWizardColors.Blue,
                     contentColor = Color(0xFF001627),
-                    disabledContainerColor = S5Blue.copy(alpha = 0.25f),
+                    disabledContainerColor = TripWizardColors.Blue.copy(alpha = 0.25f),
                     disabledContentColor = DeepSea5.copy(alpha = 0.3f)
                 ),
                 shape = RoundedCornerShape(999.dp)
@@ -369,7 +363,7 @@ private fun S5ProgressWidget() {
         modifier = Modifier
             .fillMaxWidth()
             .clip(RoundedCornerShape(16.dp))
-            .background(S5ContainerHigh.copy(alpha = 0.5f))
+            .background(TripWizardColors.ContainerHigh.copy(alpha = 0.5f))
             .border(1.dp, Color.White.copy(alpha = 0.05f), RoundedCornerShape(16.dp))
             .padding(12.dp)
     ) {
@@ -379,14 +373,14 @@ private fun S5ProgressWidget() {
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Text("YOUR PROGRESS", fontSize = 10.sp, fontWeight = FontWeight.Bold, color = S5OnSurfaceVariant, letterSpacing = 1.5.sp)
+                Text("YOUR PROGRESS", fontSize = 10.sp, fontWeight = FontWeight.Bold, color = TripWizardColors.OnSurfaceVariant, letterSpacing = 1.5.sp)
                 Box(
                     modifier = Modifier
-                        .background(S5Blue.copy(alpha = 0.2f), RoundedCornerShape(12.dp))
-                        .border(1.dp, S5Blue.copy(alpha = 0.2f), RoundedCornerShape(12.dp))
+                        .background(TripWizardColors.Blue.copy(alpha = 0.2f), RoundedCornerShape(12.dp))
+                        .border(1.dp, TripWizardColors.Blue.copy(alpha = 0.2f), RoundedCornerShape(12.dp))
                         .padding(horizontal = 12.dp, vertical = 4.dp)
                 ) {
-                    Text("100%", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = S5Blue)
+                    Text("100%", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = TripWizardColors.Blue)
                 }
             }
             Spacer(Modifier.height(10.dp))
@@ -397,7 +391,7 @@ private fun S5ProgressWidget() {
                             .weight(1f)
                             .height(4.dp)
                             .clip(RoundedCornerShape(2.dp))
-                            .background(S5Blue)
+                            .background(TripWizardColors.Blue)
                     )
                 }
             }
@@ -416,10 +410,10 @@ private fun S5InterestCard(
             .fillMaxWidth()
             .aspectRatio(4f / 3f)
             .clip(RoundedCornerShape(16.dp))
-            .background(S5ContainerHigh)
+            .background(TripWizardColors.ContainerHigh)
             .then(
                 if (selected)
-                    Modifier.border(2.dp, S5Blue.copy(alpha = 0.6f), RoundedCornerShape(16.dp))
+                    Modifier.border(2.dp, TripWizardColors.Blue.copy(alpha = 0.6f), RoundedCornerShape(16.dp))
                 else Modifier
             )
             .clickable { onClick() }
@@ -445,7 +439,7 @@ private fun S5InterestCard(
         )
         // Selected tint
         if (selected) {
-            Box(modifier = Modifier.fillMaxSize().background(S5Blue.copy(alpha = 0.1f)))
+            Box(modifier = Modifier.fillMaxSize().background(TripWizardColors.Blue.copy(alpha = 0.1f)))
         }
         // Label
         Text(
@@ -464,8 +458,8 @@ private fun S5InterestCard(
                 .padding(8.dp)
                 .size(22.dp)
                 .clip(CircleShape)
-                .background(if (selected) S5Blue else Color.White.copy(alpha = 0.1f))
-                .border(1.5.dp, if (selected) S5Blue else Color.White.copy(alpha = 0.3f), CircleShape),
+                .background(if (selected) TripWizardColors.Blue else Color.White.copy(alpha = 0.1f))
+                .border(1.5.dp, if (selected) TripWizardColors.Blue else Color.White.copy(alpha = 0.3f), CircleShape),
             contentAlignment = Alignment.Center
         ) {
             if (selected) {

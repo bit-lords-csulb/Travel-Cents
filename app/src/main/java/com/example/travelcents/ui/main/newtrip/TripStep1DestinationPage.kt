@@ -71,11 +71,6 @@ import com.google.android.gms.location.Priority
 import com.google.android.gms.tasks.CancellationTokenSource
 import java.util.Locale
 
-private val S1Blue = Color(0xFF64B5F6)
-private val S1ContainerHigh = Color(0xFF0B203D)
-private val S1ContainerHighest = Color(0xFF102645)
-private val S1SurfaceBright = Color(0xFF152C4E)
-private val S1OnSurfaceVariant = Color(0xFF9EABC8)
 
 private data class PopularDestination(val name: String, val tagline: String, val imageUrl: String)
 
@@ -149,11 +144,11 @@ fun TripStep1DestinationPage(
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 IconButton(onClick = onBackClick) {
-                    Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back", tint = S1Blue)
+                    Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back", tint = TripWizardColors.Blue)
                 }
                 Text("Step 1 of 5", fontSize = 15.sp, fontWeight = FontWeight.Bold, color = DeepSea5)
                 IconButton(onClick = onCloseClick) {
-                    Icon(Icons.Default.Close, contentDescription = "Close", tint = S1Blue)
+                    Icon(Icons.Default.Close, contentDescription = "Close", tint = TripWizardColors.Blue)
                 }
             }
             // Thin progress bar at 20%
@@ -161,14 +156,14 @@ fun TripStep1DestinationPage(
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(3.dp)
-                    .background(S1ContainerHigh)
+                    .background(TripWizardColors.ContainerHigh)
             ) {
                 Box(
                     modifier = Modifier
                         .fillMaxWidth(0.2f)
                         .height(3.dp)
                         .background(
-                            Brush.horizontalGradient(listOf(S1Blue, S1Blue.copy(alpha = 0.7f)))
+                            Brush.horizontalGradient(listOf(TripWizardColors.Blue, TripWizardColors.Blue.copy(alpha = 0.7f)))
                         )
                 )
             }
@@ -194,7 +189,7 @@ fun TripStep1DestinationPage(
                         text = "DESTINATION SELECTION",
                         fontSize = 10.sp,
                         fontWeight = FontWeight.Bold,
-                        color = S1Blue,
+                        color = TripWizardColors.Blue,
                         letterSpacing = 1.5.sp
                     )
                     Spacer(modifier = Modifier.height(6.dp))
@@ -209,7 +204,7 @@ fun TripStep1DestinationPage(
                     Text(
                         text = "Choose your destination, TravelCents will handle the rest.",
                         fontSize = 14.sp,
-                        color = S1OnSurfaceVariant,
+                        color = TripWizardColors.OnSurfaceVariant,
                         lineHeight = 20.sp
                     )
                 }
@@ -228,16 +223,16 @@ fun TripStep1DestinationPage(
                             placeholder = {
                                 Text(
                                     "Search for a destination...",
-                                    color = S1OnSurfaceVariant.copy(alpha = 0.5f),
+                                    color = TripWizardColors.OnSurfaceVariant.copy(alpha = 0.5f),
                                     fontSize = 16.sp
                                 )
                             },
-                            label = { Text("Destination", color = S1OnSurfaceVariant, fontSize = 12.sp) },
+                            label = { Text("Destination", color = TripWizardColors.OnSurfaceVariant, fontSize = 12.sp) },
                             leadingIcon = {
                                 Icon(
                                     Icons.Default.Search,
                                     contentDescription = null,
-                                    tint = S1Blue,
+                                    tint = TripWizardColors.Blue,
                                     modifier = Modifier.size(22.dp)
                                 )
                             },
@@ -247,13 +242,13 @@ fun TripStep1DestinationPage(
                             colors = TextFieldDefaults.colors(
                                 focusedTextColor = DeepSea5,
                                 unfocusedTextColor = DeepSea5,
-                                cursorColor = S1Blue,
-                                focusedContainerColor = S1SurfaceBright,
-                                unfocusedContainerColor = S1SurfaceBright,
+                                cursorColor = TripWizardColors.Blue,
+                                focusedContainerColor = TripWizardColors.SurfaceBright,
+                                unfocusedContainerColor = TripWizardColors.SurfaceBright,
                                 focusedIndicatorColor = Color.Transparent,
                                 unfocusedIndicatorColor = Color.Transparent,
-                                focusedLabelColor = S1Blue,
-                                unfocusedLabelColor = S1OnSurfaceVariant
+                                focusedLabelColor = TripWizardColors.Blue,
+                                unfocusedLabelColor = TripWizardColors.OnSurfaceVariant
                             )
                         )
                         DropdownMenu(
@@ -262,8 +257,8 @@ fun TripStep1DestinationPage(
                             properties = PopupProperties(focusable = false),
                             modifier = Modifier
                                 .fillMaxWidth(0.9f)
-                                .background(S1SurfaceBright)
-                                .border(1.dp, S1Blue.copy(alpha = 0.2f), RoundedCornerShape(8.dp))
+                                .background(TripWizardColors.SurfaceBright)
+                                .border(1.dp, TripWizardColors.Blue.copy(alpha = 0.2f), RoundedCornerShape(8.dp))
                         ) {
                             viewModel.filteredDestinations.forEach { suggestion ->
                                 DropdownMenuItem(
@@ -282,7 +277,7 @@ fun TripStep1DestinationPage(
                     Text(
                         text = "Enter the city you want to visit.",
                         fontSize = 11.sp,
-                        color = S1OnSurfaceVariant,
+                        color = TripWizardColors.OnSurfaceVariant,
                         modifier = Modifier.padding(start = 16.dp, top = 4.dp)
                     )
                 }
@@ -297,16 +292,16 @@ fun TripStep1DestinationPage(
                         placeholder = {
                             Text(
                                 "e.g. Los Angeles, CA",
-                                color = S1OnSurfaceVariant.copy(alpha = 0.5f),
+                                color = TripWizardColors.OnSurfaceVariant.copy(alpha = 0.5f),
                                 fontSize = 16.sp
                             )
                         },
-                        label = { Text("Origin", color = S1OnSurfaceVariant, fontSize = 12.sp) },
+                        label = { Text("Origin", color = TripWizardColors.OnSurfaceVariant, fontSize = 12.sp) },
                         leadingIcon = {
                             Icon(
                                 Icons.Default.Search,
                                 contentDescription = null,
-                                tint = S1Blue,
+                                tint = TripWizardColors.Blue,
                                 modifier = Modifier.size(22.dp)
                             )
                         },
@@ -328,25 +323,25 @@ fun TripStep1DestinationPage(
                                     )
                                 }
                             }) {
-                                Icon(Icons.Default.MyLocation, "GPS", tint = S1Blue)
+                                Icon(Icons.Default.MyLocation, "GPS", tint = TripWizardColors.Blue)
                             }
                         },
                         colors = TextFieldDefaults.colors(
                             focusedTextColor = DeepSea5,
                             unfocusedTextColor = DeepSea5,
-                            cursorColor = S1Blue,
-                            focusedContainerColor = S1SurfaceBright,
-                            unfocusedContainerColor = S1SurfaceBright,
+                            cursorColor = TripWizardColors.Blue,
+                            focusedContainerColor = TripWizardColors.SurfaceBright,
+                            unfocusedContainerColor = TripWizardColors.SurfaceBright,
                             focusedIndicatorColor = Color.Transparent,
                             unfocusedIndicatorColor = Color.Transparent,
-                            focusedLabelColor = S1Blue,
-                            unfocusedLabelColor = S1OnSurfaceVariant
+                            focusedLabelColor = TripWizardColors.Blue,
+                            unfocusedLabelColor = TripWizardColors.OnSurfaceVariant
                         )
                     )
                     Text(
                         text = "Enter the city you're departing from.",
                         fontSize = 11.sp,
-                        color = S1OnSurfaceVariant,
+                        color = TripWizardColors.OnSurfaceVariant,
                         modifier = Modifier.padding(start = 16.dp, top = 4.dp)
                     )
                 }
@@ -364,7 +359,7 @@ fun TripStep1DestinationPage(
                     Text(
                         text = "Curated picks for your next adventure",
                         fontSize = 12.sp,
-                        color = S1OnSurfaceVariant,
+                        color = TripWizardColors.OnSurfaceVariant,
                         modifier = Modifier.padding(top = 2.dp)
                     )
                 }
@@ -409,9 +404,9 @@ fun TripStep1DestinationPage(
                     .height(52.dp),
                 enabled = viewModel.destination.isNotBlank() && viewModel.origin.isNotBlank(),
                 colors = ButtonDefaults.buttonColors(
-                    containerColor = S1Blue,
+                    containerColor = TripWizardColors.Blue,
                     contentColor = Color(0xFF001627),
-                    disabledContainerColor = S1Blue.copy(alpha = 0.25f),
+                    disabledContainerColor = TripWizardColors.Blue.copy(alpha = 0.25f),
                     disabledContentColor = DeepSea5.copy(alpha = 0.3f)
                 ),
                 shape = RoundedCornerShape(16.dp)
@@ -499,8 +494,8 @@ private fun CustomDestinationCard(name: String) {
             .fillMaxWidth()
             .aspectRatio(4f / 5f)
             .clip(RoundedCornerShape(16.dp))
-            .background(S1ContainerHigh)
-            .border(2.dp, S1Blue, RoundedCornerShape(16.dp))
+            .background(TripWizardColors.ContainerHigh)
+            .border(2.dp, TripWizardColors.Blue, RoundedCornerShape(16.dp))
     ) {
         Column(
             modifier = Modifier.fillMaxSize(),
@@ -510,10 +505,10 @@ private fun CustomDestinationCard(name: String) {
             Box(
                 modifier = Modifier
                     .size(48.dp)
-                    .background(S1Blue.copy(alpha = 0.2f), CircleShape),
+                    .background(TripWizardColors.Blue.copy(alpha = 0.2f), CircleShape),
                 contentAlignment = Alignment.Center
             ) {
-                Icon(Icons.Default.LocationOn, null, tint = S1Blue, modifier = Modifier.size(28.dp))
+                Icon(Icons.Default.LocationOn, null, tint = TripWizardColors.Blue, modifier = Modifier.size(28.dp))
             }
             Spacer(Modifier.height(12.dp))
             Text(
@@ -528,7 +523,7 @@ private fun CustomDestinationCard(name: String) {
             Text(
                 text = "Custom destination",
                 fontSize = 10.sp,
-                color = S1OnSurfaceVariant
+                color = TripWizardColors.OnSurfaceVariant
             )
         }
     }
@@ -540,7 +535,7 @@ private fun ProgressSummaryWidget() {
         modifier = Modifier
             .fillMaxWidth()
             .clip(RoundedCornerShape(16.dp))
-            .background(S1ContainerHigh.copy(alpha = 0.5f))
+            .background(TripWizardColors.ContainerHigh.copy(alpha = 0.5f))
             .border(1.dp, Color.White.copy(alpha = 0.05f), RoundedCornerShape(16.dp))
             .padding(16.dp)
     ) {
@@ -554,16 +549,16 @@ private fun ProgressSummaryWidget() {
                     text = "YOUR PROGRESS",
                     fontSize = 10.sp,
                     fontWeight = FontWeight.Bold,
-                    color = S1OnSurfaceVariant,
+                    color = TripWizardColors.OnSurfaceVariant,
                     letterSpacing = 1.5.sp
                 )
                 Box(
                     modifier = Modifier
-                        .background(S1Blue.copy(alpha = 0.2f), RoundedCornerShape(12.dp))
-                        .border(1.dp, S1Blue.copy(alpha = 0.2f), RoundedCornerShape(12.dp))
+                        .background(TripWizardColors.Blue.copy(alpha = 0.2f), RoundedCornerShape(12.dp))
+                        .border(1.dp, TripWizardColors.Blue.copy(alpha = 0.2f), RoundedCornerShape(12.dp))
                         .padding(horizontal = 14.dp, vertical = 6.dp)
                 ) {
-                    Text(text = "20%", fontSize = 14.sp, fontWeight = FontWeight.Bold, color = S1Blue)
+                    Text(text = "20%", fontSize = 14.sp, fontWeight = FontWeight.Bold, color = TripWizardColors.Blue)
                 }
             }
             Spacer(modifier = Modifier.height(12.dp))
@@ -577,7 +572,7 @@ private fun ProgressSummaryWidget() {
                             .weight(1f)
                             .height(6.dp)
                             .clip(RoundedCornerShape(3.dp))
-                            .background(if (index == 0) S1Blue else S1ContainerHighest)
+                            .background(if (index == 0) TripWizardColors.Blue else TripWizardColors.ContainerHighest)
                     )
                 }
             }
@@ -596,9 +591,9 @@ private fun DestinationCard(
             .fillMaxWidth()
             .aspectRatio(4f / 5f)
             .clip(RoundedCornerShape(16.dp))
-            .background(S1ContainerHigh)
+            .background(TripWizardColors.ContainerHigh)
             .then(
-                if (isSelected) Modifier.border(2.dp, S1Blue, RoundedCornerShape(16.dp))
+                if (isSelected) Modifier.border(2.dp, TripWizardColors.Blue, RoundedCornerShape(16.dp))
                 else Modifier
             )
             .clickable { onClick() }
@@ -626,7 +621,7 @@ private fun DestinationCard(
             Box(
                 modifier = Modifier
                     .fillMaxSize()
-                    .background(S1Blue.copy(alpha = 0.15f))
+                    .background(TripWizardColors.Blue.copy(alpha = 0.15f))
             )
         }
         // Labels
@@ -644,7 +639,7 @@ private fun DestinationCard(
             Text(
                 text = destination.tagline,
                 fontSize = 10.sp,
-                color = S1OnSurfaceVariant,
+                color = TripWizardColors.OnSurfaceVariant,
                 lineHeight = 14.sp
             )
         }

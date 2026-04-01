@@ -50,13 +50,6 @@ import androidx.compose.ui.unit.sp
 import com.example.travelcents.ui.theme.DeepSea1
 import com.example.travelcents.ui.theme.DeepSea5
 
-private val S3Blue = Color(0xFF64B5F6)
-private val S3ContainerHigh = Color(0xFF0B203D)
-private val S3ContainerHighest = Color(0xFF102645)
-private val S3ContainerLow = Color(0xFF02132B)
-private val S3SurfaceBright = Color(0xFF152C4E)
-private val S3OnSurfaceVariant = Color(0xFF9EABC8)
-private val S3PrimaryContainer = Color(0xFF54A7E7)
 
 @Composable
 fun TripStep3TravelersPage(
@@ -83,18 +76,18 @@ fun TripStep3TravelersPage(
             ) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     IconButton(onClick = onBackClick) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, "Back", tint = S3Blue)
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, "Back", tint = TripWizardColors.Blue)
                     }
                     Text("Step 3 of 5", fontSize = 17.sp, fontWeight = FontWeight.Bold, color = DeepSea5)
                 }
                 IconButton(onClick = onCloseClick) {
-                    Icon(Icons.Default.Close, "Close", tint = S3Blue)
+                    Icon(Icons.Default.Close, "Close", tint = TripWizardColors.Blue)
                 }
             }
-            Box(modifier = Modifier.fillMaxWidth().height(3.dp).background(S3ContainerHigh)) {
+            Box(modifier = Modifier.fillMaxWidth().height(3.dp).background(TripWizardColors.ContainerHigh)) {
                 Box(
                     modifier = Modifier.fillMaxWidth(0.6f).height(3.dp)
-                        .background(Brush.horizontalGradient(listOf(S3Blue, S3Blue.copy(alpha = 0.7f))))
+                        .background(Brush.horizontalGradient(listOf(TripWizardColors.Blue, TripWizardColors.Blue.copy(alpha = 0.7f))))
                 )
             }
         }
@@ -118,7 +111,7 @@ fun TripStep3TravelersPage(
                 text = "TRAVELER DETAILS",
                 fontSize = 10.sp,
                 fontWeight = FontWeight.Bold,
-                color = S3OnSurfaceVariant,
+                color = TripWizardColors.OnSurfaceVariant,
                 letterSpacing = 1.5.sp,
                 textAlign = TextAlign.Center
             )
@@ -138,7 +131,7 @@ fun TripStep3TravelersPage(
                 modifier = Modifier
                     .fillMaxWidth()
                     .clip(RoundedCornerShape(32.dp))
-                    .background(S3ContainerHigh)
+                    .background(TripWizardColors.ContainerHigh)
                     .padding(horizontal = 32.dp, vertical = 28.dp)
             ) {
                 Row(
@@ -151,12 +144,12 @@ fun TripStep3TravelersPage(
                         modifier = Modifier
                             .size(64.dp)
                             .clip(RoundedCornerShape(16.dp))
-                            .background(S3SurfaceBright)
+                            .background(TripWizardColors.SurfaceBright)
                             .border(1.dp, Color(0xFF3B4861).copy(alpha = 0.2f), RoundedCornerShape(16.dp))
                             .clickable { if (viewModel.adults > 1) viewModel.adults-- },
                         contentAlignment = Alignment.Center
                     ) {
-                        Icon(Icons.Default.Remove, null, tint = S3Blue, modifier = Modifier.size(24.dp))
+                        Icon(Icons.Default.Remove, null, tint = TripWizardColors.Blue, modifier = Modifier.size(24.dp))
                     }
 
                     // Count display
@@ -172,7 +165,7 @@ fun TripStep3TravelersPage(
                             "TRAVELERS",
                             fontSize = 10.sp,
                             fontWeight = FontWeight.Bold,
-                            color = S3OnSurfaceVariant,
+                            color = TripWizardColors.OnSurfaceVariant,
                             letterSpacing = 2.sp
                         )
                         if (viewModel.pets > 0) {
@@ -180,7 +173,7 @@ fun TripStep3TravelersPage(
                             Text(
                                 "+ ${viewModel.pets} pet${if (viewModel.pets != 1) "s" else ""}",
                                 fontSize = 12.sp,
-                                color = S3OnSurfaceVariant
+                                color = TripWizardColors.OnSurfaceVariant
                             )
                         }
                     }
@@ -190,7 +183,7 @@ fun TripStep3TravelersPage(
                         modifier = Modifier
                             .size(64.dp)
                             .clip(RoundedCornerShape(16.dp))
-                            .background(S3Blue)
+                            .background(TripWizardColors.Blue)
                             .clickable { viewModel.adults++ },
                         contentAlignment = Alignment.Center
                     ) {
@@ -258,7 +251,7 @@ fun TripStep3TravelersPage(
                 onClick = onContinueClick,
                 modifier = Modifier.fillMaxWidth().height(56.dp),
                 colors = ButtonDefaults.buttonColors(
-                    containerColor = S3Blue,
+                    containerColor = TripWizardColors.Blue,
                     contentColor = Color(0xFF001627)
                 ),
                 shape = RoundedCornerShape(16.dp)
@@ -281,7 +274,7 @@ private fun S3ProgressWidget(stepsComplete: Int) {
         modifier = Modifier
             .fillMaxWidth()
             .clip(RoundedCornerShape(16.dp))
-            .background(S3ContainerHigh.copy(alpha = 0.5f))
+            .background(TripWizardColors.ContainerHigh.copy(alpha = 0.5f))
             .border(1.dp, Color.White.copy(alpha = 0.05f), RoundedCornerShape(16.dp))
             .padding(16.dp)
     ) {
@@ -291,14 +284,14 @@ private fun S3ProgressWidget(stepsComplete: Int) {
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Text("YOUR PROGRESS", fontSize = 10.sp, fontWeight = FontWeight.Bold, color = S3OnSurfaceVariant, letterSpacing = 1.5.sp)
+                Text("YOUR PROGRESS", fontSize = 10.sp, fontWeight = FontWeight.Bold, color = TripWizardColors.OnSurfaceVariant, letterSpacing = 1.5.sp)
                 Box(
                     modifier = Modifier
-                        .background(S3Blue.copy(alpha = 0.2f), RoundedCornerShape(12.dp))
-                        .border(1.dp, S3Blue.copy(alpha = 0.2f), RoundedCornerShape(12.dp))
+                        .background(TripWizardColors.Blue.copy(alpha = 0.2f), RoundedCornerShape(12.dp))
+                        .border(1.dp, TripWizardColors.Blue.copy(alpha = 0.2f), RoundedCornerShape(12.dp))
                         .padding(horizontal = 14.dp, vertical = 6.dp)
                 ) {
-                    Text("${stepsComplete * 20}%", fontSize = 14.sp, fontWeight = FontWeight.Bold, color = S3Blue)
+                    Text("${stepsComplete * 20}%", fontSize = 14.sp, fontWeight = FontWeight.Bold, color = TripWizardColors.Blue)
                 }
             }
             Spacer(Modifier.height(12.dp))
@@ -309,7 +302,7 @@ private fun S3ProgressWidget(stepsComplete: Int) {
                             .weight(1f)
                             .height(6.dp)
                             .clip(RoundedCornerShape(3.dp))
-                            .background(if (i < stepsComplete) S3Blue else S3ContainerHighest)
+                            .background(if (i < stepsComplete) TripWizardColors.Blue else TripWizardColors.ContainerHighest)
                     )
                 }
             }
@@ -328,7 +321,7 @@ private fun S3InlineStepper(
         modifier = Modifier
             .fillMaxWidth()
             .clip(RoundedCornerShape(16.dp))
-            .background(S3ContainerLow)
+            .background(TripWizardColors.ContainerLow)
             .padding(horizontal = 20.dp, vertical = 12.dp),
         horizontalArrangement = Arrangement.SpaceBetween,
         verticalAlignment = Alignment.CenterVertically
@@ -347,11 +340,11 @@ private fun S3InlineStepper(
                 modifier = Modifier
                     .size(36.dp)
                     .clip(RoundedCornerShape(10.dp))
-                    .background(S3SurfaceBright)
+                    .background(TripWizardColors.SurfaceBright)
                     .clickable { onDecrement() },
                 contentAlignment = Alignment.Center
             ) {
-                Icon(Icons.Default.Remove, null, tint = S3Blue, modifier = Modifier.size(18.dp))
+                Icon(Icons.Default.Remove, null, tint = TripWizardColors.Blue, modifier = Modifier.size(18.dp))
             }
             Text(
                 count.toString(),
@@ -365,7 +358,7 @@ private fun S3InlineStepper(
                 modifier = Modifier
                     .size(36.dp)
                     .clip(RoundedCornerShape(10.dp))
-                    .background(S3Blue)
+                    .background(TripWizardColors.Blue)
                     .clickable { onIncrement() },
                 contentAlignment = Alignment.Center
             ) {
@@ -387,7 +380,7 @@ private fun S3ToggleRow(
         modifier = Modifier
             .fillMaxWidth()
             .clip(RoundedCornerShape(24.dp))
-            .background(S3ContainerLow)
+            .background(TripWizardColors.ContainerLow)
             .padding(horizontal = 16.dp, vertical = 12.dp),
         horizontalArrangement = Arrangement.SpaceBetween,
         verticalAlignment = Alignment.CenterVertically
@@ -399,14 +392,14 @@ private fun S3ToggleRow(
             Box(
                 modifier = Modifier
                     .size(40.dp)
-                    .background(S3ContainerHighest, RoundedCornerShape(12.dp)),
+                    .background(TripWizardColors.ContainerHighest, RoundedCornerShape(12.dp)),
                 contentAlignment = Alignment.Center
             ) {
-                Icon(icon, null, tint = S3PrimaryContainer, modifier = Modifier.size(20.dp))
+                Icon(icon, null, tint = TripWizardColors.PrimaryContainer, modifier = Modifier.size(20.dp))
             }
             Column {
                 Text(title, fontSize = 14.sp, fontWeight = FontWeight.Bold, color = DeepSea5)
-                Text(subtitle, fontSize = 10.sp, color = S3OnSurfaceVariant)
+                Text(subtitle, fontSize = 10.sp, color = TripWizardColors.OnSurfaceVariant)
             }
         }
         Switch(
@@ -414,9 +407,9 @@ private fun S3ToggleRow(
             onCheckedChange = onCheckedChange,
             colors = SwitchDefaults.colors(
                 checkedThumbColor = Color(0xFF001627),
-                checkedTrackColor = S3Blue,
-                uncheckedThumbColor = S3OnSurfaceVariant,
-                uncheckedTrackColor = S3ContainerHighest
+                checkedTrackColor = TripWizardColors.Blue,
+                uncheckedThumbColor = TripWizardColors.OnSurfaceVariant,
+                uncheckedTrackColor = TripWizardColors.ContainerHighest
             )
         )
     }

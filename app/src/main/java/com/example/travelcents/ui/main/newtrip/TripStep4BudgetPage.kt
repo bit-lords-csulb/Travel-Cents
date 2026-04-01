@@ -52,12 +52,6 @@ import androidx.compose.ui.unit.sp
 import com.example.travelcents.ui.theme.DeepSea1
 import com.example.travelcents.ui.theme.DeepSea5
 
-private val S4Blue = Color(0xFF64B5F6)
-private val S4PrimaryContainer = Color(0xFF54A7E7)
-private val S4ContainerHigh = Color(0xFF0B203D)
-private val S4ContainerHighest = Color(0xFF102645)
-private val S4SurfaceBright = Color(0xFF152C4E)
-private val S4OnSurfaceVariant = Color(0xFF9EABC8)
 
 private const val S4BudgetMin = 500
 private const val S4BudgetMax = 20000
@@ -68,7 +62,7 @@ private fun snapTo50(value: Int): Int =
 
 private fun budgetToTier(budget: Int): Triple<String, String, Color> = when {
     budget <= 3000 -> Triple("Budget", "Hostels, street food, public transport", Color(0xFF66BB6A))
-    budget <= 8000 -> Triple("Comfort", "3-star hotels, local restaurants, mix of transport", S4Blue)
+    budget <= 8000 -> Triple("Comfort", "3-star hotels, local restaurants, mix of transport", TripWizardColors.Blue)
     else -> Triple("Luxury", "Premium hotels, fine dining, exclusive experiences", Color(0xFFB5A0FF))
 }
 
@@ -104,18 +98,18 @@ fun TripStep4BudgetPage(
             ) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     IconButton(onClick = onBackClick) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, "Back", tint = S4Blue)
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, "Back", tint = TripWizardColors.Blue)
                     }
                     Text("Step 4 of 5", fontSize = 17.sp, fontWeight = FontWeight.Bold, color = DeepSea5)
                 }
                 IconButton(onClick = onCloseClick) {
-                    Icon(Icons.Default.Close, "Close", tint = S4Blue)
+                    Icon(Icons.Default.Close, "Close", tint = TripWizardColors.Blue)
                 }
             }
-            Box(modifier = Modifier.fillMaxWidth().height(3.dp).background(S4ContainerHigh)) {
+            Box(modifier = Modifier.fillMaxWidth().height(3.dp).background(TripWizardColors.ContainerHigh)) {
                 Box(
                     modifier = Modifier.fillMaxWidth(0.8f).height(3.dp)
-                        .background(Brush.horizontalGradient(listOf(S4Blue, S4Blue.copy(alpha = 0.7f))))
+                        .background(Brush.horizontalGradient(listOf(TripWizardColors.Blue, TripWizardColors.Blue.copy(alpha = 0.7f))))
                 )
             }
         }
@@ -147,7 +141,7 @@ fun TripStep4BudgetPage(
             Text(
                 "TravelCents will create the perfect itinerary within your budget",
                 fontSize = 14.sp,
-                color = S4OnSurfaceVariant,
+                color = TripWizardColors.OnSurfaceVariant,
                 textAlign = TextAlign.Center,
                 lineHeight = 20.sp
             )
@@ -160,7 +154,7 @@ fun TripStep4BudgetPage(
                     .clip(RoundedCornerShape(24.dp))
                     .background(
                         Brush.verticalGradient(
-                            listOf(S4ContainerHigh.copy(alpha = 0.6f), Color(0xFF02132B).copy(alpha = 0.4f))
+                            listOf(TripWizardColors.ContainerHigh.copy(alpha = 0.6f), Color(0xFF02132B).copy(alpha = 0.4f))
                         )
                     )
                     .border(1.dp, Color.White.copy(alpha = 0.1f), RoundedCornerShape(24.dp))
@@ -175,13 +169,13 @@ fun TripStep4BudgetPage(
                             .clip(RoundedCornerShape(16.dp))
                             .background(
                                 Brush.linearGradient(
-                                    listOf(S4PrimaryContainer.copy(alpha = 0.3f), S4Blue.copy(alpha = 0.1f))
+                                    listOf(TripWizardColors.PrimaryContainer.copy(alpha = 0.3f), TripWizardColors.Blue.copy(alpha = 0.1f))
                                 )
                             )
-                            .border(1.dp, S4Blue.copy(alpha = 0.2f), RoundedCornerShape(16.dp)),
+                            .border(1.dp, TripWizardColors.Blue.copy(alpha = 0.2f), RoundedCornerShape(16.dp)),
                         contentAlignment = Alignment.Center
                     ) {
-                        Icon(Icons.Default.AttachMoney, null, tint = S4Blue, modifier = Modifier.size(32.dp))
+                        Icon(Icons.Default.AttachMoney, null, tint = TripWizardColors.Blue, modifier = Modifier.size(32.dp))
                     }
                     Spacer(Modifier.height(24.dp))
 
@@ -205,7 +199,7 @@ fun TripStep4BudgetPage(
                         ),
                         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                         singleLine = true,
-                        cursorBrush = SolidColor(S4Blue),
+                        cursorBrush = SolidColor(TripWizardColors.Blue),
                         modifier = Modifier.fillMaxWidth(),
                         decorationBox = { innerTextField ->
                             Row(
@@ -229,7 +223,7 @@ fun TripStep4BudgetPage(
                     // Tier badge
                     Box(
                         modifier = Modifier
-                            .background(S4SurfaceBright, RoundedCornerShape(999.dp))
+                            .background(TripWizardColors.SurfaceBright, RoundedCornerShape(999.dp))
                             .border(1.dp, Color(0xFF3B4861).copy(alpha = 0.3f), RoundedCornerShape(999.dp))
                             .padding(horizontal = 20.dp, vertical = 8.dp)
                     ) {
@@ -255,16 +249,16 @@ fun TripStep4BudgetPage(
                         modifier = Modifier.fillMaxWidth(),
                         colors = SliderDefaults.colors(
                             thumbColor = Color.White,
-                            activeTrackColor = S4Blue,
-                            inactiveTrackColor = S4ContainerHighest
+                            activeTrackColor = TripWizardColors.Blue,
+                            inactiveTrackColor = TripWizardColors.ContainerHighest
                         )
                     )
                     Row(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.SpaceBetween
                     ) {
-                        Text("$500", fontSize = 10.sp, fontWeight = FontWeight.Bold, color = S4OnSurfaceVariant, letterSpacing = 1.sp)
-                        Text("$20,000", fontSize = 10.sp, fontWeight = FontWeight.Bold, color = S4OnSurfaceVariant, letterSpacing = 1.sp)
+                        Text("$500", fontSize = 10.sp, fontWeight = FontWeight.Bold, color = TripWizardColors.OnSurfaceVariant, letterSpacing = 1.sp)
+                        Text("$20,000", fontSize = 10.sp, fontWeight = FontWeight.Bold, color = TripWizardColors.OnSurfaceVariant, letterSpacing = 1.sp)
                     }
                 }
             }
@@ -275,7 +269,7 @@ fun TripStep4BudgetPage(
                 modifier = Modifier
                     .fillMaxWidth()
                     .clip(RoundedCornerShape(16.dp))
-                    .background(S4ContainerHigh.copy(alpha = 0.3f))
+                    .background(TripWizardColors.ContainerHigh.copy(alpha = 0.3f))
                     .border(1.dp, Color.White.copy(alpha = 0.05f), RoundedCornerShape(16.dp))
                     .padding(16.dp),
                 horizontalArrangement = Arrangement.spacedBy(14.dp),
@@ -292,7 +286,7 @@ fun TripStep4BudgetPage(
                 }
                 Column {
                     Text("$tierName Experience", fontSize = 13.sp, fontWeight = FontWeight.Bold, color = DeepSea5)
-                    Text(tierDesc, fontSize = 11.sp, color = S4OnSurfaceVariant, lineHeight = 16.sp)
+                    Text(tierDesc, fontSize = 11.sp, color = TripWizardColors.OnSurfaceVariant, lineHeight = 16.sp)
                 }
             }
             Spacer(Modifier.height(16.dp))
@@ -309,7 +303,7 @@ fun TripStep4BudgetPage(
                 onClick = onContinueClick,
                 modifier = Modifier.fillMaxWidth().height(52.dp),
                 colors = ButtonDefaults.buttonColors(
-                    containerColor = S4Blue,
+                    containerColor = TripWizardColors.Blue,
                     contentColor = Color(0xFF001627)
                 ),
                 shape = RoundedCornerShape(12.dp)
@@ -332,7 +326,7 @@ private fun S4ProgressWidget(stepsComplete: Int) {
         modifier = Modifier
             .fillMaxWidth()
             .clip(RoundedCornerShape(16.dp))
-            .background(S4ContainerHigh.copy(alpha = 0.5f))
+            .background(TripWizardColors.ContainerHigh.copy(alpha = 0.5f))
             .border(1.dp, Color.White.copy(alpha = 0.05f), RoundedCornerShape(16.dp))
             .padding(16.dp)
     ) {
@@ -343,16 +337,16 @@ private fun S4ProgressWidget(stepsComplete: Int) {
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Column {
-                    Text("YOUR PROGRESS", fontSize = 10.sp, fontWeight = FontWeight.Bold, color = S4OnSurfaceVariant, letterSpacing = 1.5.sp)
+                    Text("YOUR PROGRESS", fontSize = 10.sp, fontWeight = FontWeight.Bold, color = TripWizardColors.OnSurfaceVariant, letterSpacing = 1.5.sp)
                     Text("Step $stepsComplete of 5", fontSize = 18.sp, fontWeight = FontWeight.Bold, color = DeepSea5)
                 }
                 Box(
                     modifier = Modifier
-                        .background(S4Blue.copy(alpha = 0.2f), RoundedCornerShape(12.dp))
-                        .border(1.dp, S4Blue.copy(alpha = 0.2f), RoundedCornerShape(12.dp))
+                        .background(TripWizardColors.Blue.copy(alpha = 0.2f), RoundedCornerShape(12.dp))
+                        .border(1.dp, TripWizardColors.Blue.copy(alpha = 0.2f), RoundedCornerShape(12.dp))
                         .padding(horizontal = 14.dp, vertical = 8.dp)
                 ) {
-                    Text("${stepsComplete * 20}%", fontSize = 14.sp, fontWeight = FontWeight.Bold, color = S4Blue)
+                    Text("${stepsComplete * 20}%", fontSize = 14.sp, fontWeight = FontWeight.Bold, color = TripWizardColors.Blue)
                 }
             }
             Spacer(Modifier.height(12.dp))
@@ -363,7 +357,7 @@ private fun S4ProgressWidget(stepsComplete: Int) {
                             .weight(1f)
                             .height(6.dp)
                             .clip(RoundedCornerShape(3.dp))
-                            .background(if (i < stepsComplete) S4Blue else S4ContainerHighest)
+                            .background(if (i < stepsComplete) TripWizardColors.Blue else TripWizardColors.ContainerHighest)
                     )
                 }
             }
