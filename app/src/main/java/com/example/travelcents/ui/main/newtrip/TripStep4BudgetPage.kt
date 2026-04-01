@@ -2,7 +2,6 @@ package com.example.travelcents.ui.main.newtrip
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -79,7 +78,6 @@ fun TripStep4BudgetPage(
     viewModel: NewTripViewModel,
     onBackClick: () -> Unit,
     onCloseClick: () -> Unit,
-    onSaveDraftClick: () -> Unit,
     onContinueClick: () -> Unit
 ) {
     val initialBudget = snapTo50(viewModel.budgetTotal.toIntOrNull() ?: 5000)
@@ -300,31 +298,16 @@ fun TripStep4BudgetPage(
             Spacer(Modifier.height(16.dp))
         }
 
-        // Bottom buttons
-        Row(
+        // Bottom button
+        Box(
             modifier = Modifier
                 .fillMaxWidth()
                 .background(DeepSea1)
-                .padding(horizontal = 16.dp, vertical = 12.dp),
-            horizontalArrangement = Arrangement.spacedBy(12.dp)
+                .padding(horizontal = 16.dp, vertical = 12.dp)
         ) {
-            // Save Draft
-            Box(
-                modifier = Modifier
-                    .weight(1f)
-                    .height(52.dp)
-                    .clip(RoundedCornerShape(12.dp))
-                    .background(S4ContainerHighest)
-                    .clickable { onSaveDraftClick() },
-                contentAlignment = Alignment.Center
-            ) {
-                Text("Save Draft", fontSize = 14.sp, fontWeight = FontWeight.Bold, color = DeepSea5)
-            }
-
-            // Continue
             Button(
                 onClick = onContinueClick,
-                modifier = Modifier.weight(2f).height(52.dp),
+                modifier = Modifier.fillMaxWidth().height(52.dp),
                 colors = ButtonDefaults.buttonColors(
                     containerColor = S4Blue,
                     contentColor = Color(0xFF001627)
