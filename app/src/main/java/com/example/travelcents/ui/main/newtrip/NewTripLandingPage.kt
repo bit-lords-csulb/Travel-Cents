@@ -28,12 +28,14 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.foundation.Image
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import coil.compose.AsyncImage
+import com.example.travelcents.R
 import com.example.travelcents.ui.theme.DeepSea1
 import com.example.travelcents.ui.theme.DeepSea5
 
@@ -103,7 +105,7 @@ fun NewTripLandingPage(
                 title = "Planning a Trip",
                 subtitle = "Guided 5-step concierge process for your next adventure.",
                 actionLabel = "GET STARTED",
-                imageUrl = "https://lh3.googleusercontent.com/aida-public/AB6AXuCn7cYMWvY_CWVGOrK4TLgxHlcHv4iEXw9lXGp1aR1pBAUJL7L0hk-OXnXbhF6nGUPpip6y5exA3UBYeDQ1Zk_gWUVsdXKfmqCwO2E4CGIybQgEsUL0HQpiEfgKulQu5xBII88o3JpYqHSsQhbSwH-JHs2aVLUUQzg9T6CnqAgyp2V-XCE783c5lPfYJI4ZHgXIUnS8CCShme7k0rBStNlF_Xo_POlNLmJa7wmfAX-HzVZoa5K8sjzfG-dJfqfRUhVmZhpNm7Z8t530",
+                imageRes = R.drawable.landing_planning,
                 icon = Icons.Outlined.CalendarToday,
                 accentColor = LandingPrimaryBlue,
                 cardBrush = Brush.linearGradient(
@@ -119,7 +121,7 @@ fun NewTripLandingPage(
                 title = "AI Chatbot",
                 subtitle = "Ask questions or get instant local recommendations via chat.",
                 actionLabel = "OPEN ASSISTANT",
-                imageUrl = "https://lh3.googleusercontent.com/aida-public/AB6AXuDs2VOHAq3-P95Q0mR2wLOrQtPnm8xGwQ7aEA7A3q_WB78LkSincS9S1oJyMeOftxGkPd7Bv-5VcpdQJocQImRM9U4yHwbFIQ64qRC5iq7Oc2xMBGbdQVuYbG31pdeBeYFfhu6vItV9ypR6mjtd-Rn_HfRuAMBAofgdC3yGP-Tjuze35pAfiKgg5tSyavRGQ5L2E4DeTaRnTDJZVxxZ4T9MwxB8T7vZSuKp0rXxQWlVSJXSJ1IDjNg0YbVzrrqsNMCHPxX0FDHsvhWm",
+                imageRes = R.drawable.landing_ai_chat,
                 icon = Icons.Outlined.AutoAwesome,
                 accentColor = LandingTertiaryPurple,
                 cardBrush = Brush.linearGradient(
@@ -165,7 +167,7 @@ private fun LandingOptionCard(
     title: String,
     subtitle: String,
     actionLabel: String,
-    imageUrl: String,
+    imageRes: Int,
     icon: ImageVector,
     accentColor: Color,
     cardBrush: Brush,
@@ -181,8 +183,8 @@ private fun LandingOptionCard(
             .clickable { onClick() }
     ) {
         // Background image at low opacity
-        AsyncImage(
-            model = imageUrl,
+        Image(
+            painter = painterResource(imageRes),
             contentDescription = null,
             contentScale = ContentScale.Crop,
             modifier = Modifier

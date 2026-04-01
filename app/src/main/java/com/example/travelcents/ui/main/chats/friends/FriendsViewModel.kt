@@ -81,24 +81,32 @@ class FriendsViewModel(
             .addSnapshotListener { snapshot, error ->
                 if (error != null || snapshot == null) return@addSnapshotListener
                 val activeFriendIds = snapshot.documents.map { it.id }.toSet()
+
+                // Remove listeners for removed friends
                 val staleIds = userDocListeners.keys - activeFriendIds
                 staleIds.forEach { id -> userDocListeners[id]?.remove(); userDocListeners.remove(id) }
+
                 if (activeFriendIds.isEmpty()) { _friends.value = emptyList(); return@addSnapshotListener }
-                snapshot.documents.forEach { friendDoc ->
-                    val fUid = friendDoc.id
-                    if (userDocListeners.containsKey(fUid)) return@forEach
-                    val reg = db.collection("users").document(fUid)
-                        .addSnapshotListener { userSnap, userError ->
-                            if (userError != null || userSnap == null || !userSnap.exists()) return@addSnapshotListener
-                            val updatedFriend = buildFriend(fUid, userSnap)
+
+                // Batch-fetch all friend user docs in one whereIn query instead of N individual listeners
+                activeFriendIds.chunked(30).forEach { batch ->
+                    db.collection("users")
+                        .whereIn(com.google.firebase.firestore.FieldPath.documentId(), batch)
+                        .get()
+                        .addOnSuccessListener { userDocs ->
+                            val fetched = userDocs.documents.mapNotNull { snap ->
+                                if (!snap.exists()) null else buildFriend(snap.id, snap)
+                            }
                             val current = _friends.value.toMutableList()
-                            val idx = current.indexOfFirst { it.uid == fUid }
-                            if (idx >= 0) current[idx] = updatedFriend else current.add(updatedFriend)
-                            _friends.value = current.sortedBy { it.displayName }
+                            fetched.forEach { updated ->
+                                val idx = current.indexOfFirst { it.uid == updated.uid }
+                                if (idx >= 0) current[idx] = updated else current.add(updated)
+                            }
+                            _friends.value = current
+                                .filter { it.uid in activeFriendIds }
+                                .sortedBy { it.displayName }
                         }
-                    userDocListeners[fUid] = reg
                 }
-                _friends.value = _friends.value.filter { it.uid in activeFriendIds }
             }
     }
 

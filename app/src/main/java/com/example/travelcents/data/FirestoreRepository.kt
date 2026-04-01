@@ -278,6 +278,9 @@ class FirestoreRepository {
             onUpdate(previewMap.values.sortedByDescending { it.lastMessageTime })
         }
 
+        // Extracts per-chat data from a snapshot document without touching the network.
+        data class ChatEntry(val chatId: String, val otherUid: String, val lastMsg: String, val lastTime: com.google.firebase.Timestamp?)
+
         return db.collection("directChats")
             .whereArrayContains("members", myUid)
             .orderBy("lastMessageTime", Query.Direction.DESCENDING)
@@ -287,35 +290,46 @@ class FirestoreRepository {
 
                 if (snapshot.isEmpty) { previewMap.clear(); publish(); return@addSnapshotListener }
 
-                snapshot.documents.forEach { doc ->
-                    val members  = (doc.get("members") as? List<*>)?.filterIsInstance<String>() ?: emptyList()
-                    val otherUid = members.firstOrNull { it != myUid } ?: return@forEach
-                    val lastMsg  = doc.getString("lastMessage") ?: ""
-                    val lastTime = doc.getTimestamp("lastMessageTime")
-                    val chatId   = doc.id
+                // Remove deleted chats
+                val currentIds = snapshot.documents.map { it.id }.toSet()
+                previewMap.keys.retainAll(currentIds)
 
-                    val cachedName = nameCache[otherUid]
-                    if (cachedName != null) {
-                        // Already have the name — update preview immediately
-                        previewMap[chatId] = DirectChatPreview(chatId, otherUid, cachedName, lastMsg, lastTime)
-                        publish()
-                    } else {
-                        // Fetch name then update
-                        db.collection("users").document(otherUid).get()
-                            .addOnSuccessListener { userDoc ->
-                                val first = userDoc.getString("firstName") ?: ""
-                                val last  = userDoc.getString("lastName")  ?: ""
-                                val name  = "$first $last".trim().ifBlank { "Unknown" }
-                                nameCache[otherUid] = name
-                                previewMap[chatId] = DirectChatPreview(chatId, otherUid, name, lastMsg, lastTime)
+                val entries = snapshot.documents.mapNotNull { doc ->
+                    val members  = (doc.get("members") as? List<*>)?.filterIsInstance<String>() ?: return@mapNotNull null
+                    val otherUid = members.firstOrNull { it != myUid } ?: return@mapNotNull null
+                    ChatEntry(doc.id, otherUid, doc.getString("lastMessage") ?: "", doc.getTimestamp("lastMessageTime"))
+                }
+
+                // Publish known names immediately
+                entries.forEach { e ->
+                    nameCache[e.otherUid]?.let { name ->
+                        previewMap[e.chatId] = DirectChatPreview(e.chatId, e.otherUid, name, e.lastMsg, e.lastTime)
+                    }
+                }
+                publish()
+
+                // Batch-fetch any UIDs not yet in the cache (Firestore whereIn limit: 30)
+                val uncachedUids = entries.map { it.otherUid }.distinct().filter { it !in nameCache }
+                if (uncachedUids.isNotEmpty()) {
+                    uncachedUids.chunked(30).forEach { batch ->
+                        db.collection("users")
+                            .whereIn(FieldPath.documentId(), batch)
+                            .get()
+                            .addOnSuccessListener { userDocs ->
+                                userDocs.forEach { userDoc ->
+                                    val first = userDoc.getString("firstName") ?: ""
+                                    val last  = userDoc.getString("lastName")  ?: ""
+                                    nameCache[userDoc.id] = "$first $last".trim().ifBlank { "Unknown" }
+                                }
+                                entries.forEach { e ->
+                                    nameCache[e.otherUid]?.let { name ->
+                                        previewMap[e.chatId] = DirectChatPreview(e.chatId, e.otherUid, name, e.lastMsg, e.lastTime)
+                                    }
+                                }
                                 publish()
                             }
                     }
                 }
-
-                // Remove any chats that were deleted
-                val currentIds = snapshot.documents.map { it.id }.toSet()
-                previewMap.keys.retainAll(currentIds)
             }
     }
 
