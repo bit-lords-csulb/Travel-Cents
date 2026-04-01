@@ -48,44 +48,39 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.foundation.Image
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import coil.compose.AsyncImage
+import com.example.travelcents.R
 import com.example.travelcents.ui.theme.DeepSea1
 import com.example.travelcents.ui.theme.DeepSea5
 
-private data class InterestItem(val key: String, val label: String, val imageUrl: String)
+private data class InterestItem(val key: String, val label: String, val imageRes: Int)
 
 private val interestItems = listOf(
-    InterestItem("culture", "Culture & Museums",
-        "https://lh3.googleusercontent.com/aida-public/AB6AXuBQgG5AV6ZRSd5warjbvwJHDDTnKcftnCkN-mS9PCK67sN-LYchbIgkFscXlPCRpYG2pK5dJoyHxuZHn-JQnIseChKlNYo1Mg5bVxtxfdmxX6b2ufgy8xWst7hBHXeR1knlvnoWOtT9exFCZwM4g_OhcURVrBK01rFbQaYbVbk5hBL0m39PFHp3D7IU9e7kDuu-KddeLPuFg4iMT4IDEbzgca-4bX6X_WWCkNNTgDVcsmh36VJtwH2n-n0ADTnUGdzJwihjDl4rmGRE"),
-    InterestItem("food", "Food & Dining",
-        "https://lh3.googleusercontent.com/aida-public/AB6AXuBMrMnT2Ge9ZSVhIjCopBuHhaOHthQ3aV35al9kAqgeaIJpeCCkjkHodz9_NO0kvJjs8OGQHBq2o4QfM1SxrPRFtloGfvR1FAgzb2yezsFOjAeVSDdQHs0tMvDKHgkzdphr2N9bBfnfse99oyVLD-NBaclTUlAYuUSR2xSOKgozmK7tJX525dU4S8GNxIqryMKF5JeqnWPwxV6HKA8jc23xwt3xBku3fQ0tqSH-VGNycX3bXE3Q-NiYReVXzpzYGB3pOgHmTjKLyEqB"),
-    InterestItem("nature", "Beach & Nature",
-        "https://lh3.googleusercontent.com/aida-public/AB6AXuC6TLVFs3HBW-_MVu9PzqXltSOJeYCzUy1ktJR0qy0n--Jg_c66NfoE10jh1JGM345I6I24WtRctgbPHmXs1EeS8RZ-egJ8yBgKARsS_JFTV0WPtVnD0BlBKRzxTbYr9z08333rVWNaOAzH3UiG2uT-XWW8WXw2bqdNX7zNYxKYappXeL-YFgAfA-DJWooD_iUVt9NhMycAkLGnitJ0_1sn_Hpx7NvjqC8zMMQ-B6qvZlZBCgaVbGoMGzOgT_WEjtrYgbFu1kZF4RqM"),
-    InterestItem("adventure", "Adventure",
-        "https://lh3.googleusercontent.com/aida-public/AB6AXuA_Vr7JpAxTuGSL3ZTQ7Pnb-51_fZwstjzHeOOYKw_NWytPbzATei9XzvuVBkWJqCzLIeZoXNn1KQ2mb0gUPB58tn3YTjkneuam-NQy2-VwagCGkdDWeUH9DBU-BtmdtjH0kfkjrMwxycFOFTxW8SWyCNr-3QFaSfcHLyjgsaWnBU0S54yeStG6e9NrNgUo3PUGoQuq9yFOuG3-ZgnD-uKRpIKOh_TkWqF0k2XjeZwUKWmTlkTdzTnPo-nn12zpRZ-ZOGWE0D84IDDA"),
-    InterestItem("nightlife", "Nightlife",
-        "https://lh3.googleusercontent.com/aida-public/AB6AXuCUvffFNH42K-4EKTd-BDiP4OkmJTXzn8kc_fL8WLSqmNyzZx45-tmX6Lr-lcLsnUcQaOQOAqdY8g0ltkFNG78-hYk6oAchi5j_SJckauYGvf-fpu9JXL0lWQ85aeb7lCmf1RP4M1DgpCVXL_LBBuph3LbMIDUVKRBk0wa4zL66Y3f6nsmmiiAtux5i6SjgmpCtHYpXD6syUs_O1rwinmoXLkSI2Vz8MSigrCTbm9qyaG7JiSq2BTVAQFgSJtD_7x4uv4FC_4_4uItO"),
-    InterestItem("shopping", "Shopping",
-        "https://lh3.googleusercontent.com/aida-public/AB6AXuDYTIgmOdI9DpaNeAQRshjgYQKlb6JRdcFy58XrdTnyxaOEQqe2q3g-s2wV8J0fs-BMEZUcXL1YjIsaqDGvBfJZw82CfByB9oy3JQizBJsGo7MZhOhuqA5Hlz_d1OuqC3lKrwTvoHmXzn5adzChryMq2xGUcUaa1UGDWOoD-XkMy97IVcWGjjmLz2yTLYByavPzAFBu6NWLXr1XD_Y-9z9QR5wHqIpE6zz5Pew3LH_STDg4e-9sGm9w2Ns0v4SG_wqSKBWM9FmwdtwL"),
-    InterestItem("history", "History",
-        "https://lh3.googleusercontent.com/aida-public/AB6AXuAt_wFi8zqCK5bIaoyBXCIqd2MDwUD5GJ3vpozasWYNSw3oVjojCiyA_8kXpL-sokF0fKh1Bg4Vir7zumxPEz3o4Io2xuISt46u8jtCASVAY3baRFNzkquvdvFeXY1uG6Z7X4sI22B3g6Nu4bFJlL1Qrc5Ot5aJBhwk5fMtvlqIr6_EDlajdCRD7YP4Q4stGE1v9Sgau_ZbvtytF5hqTvnsL6Y9o8y1fDxE4Ew2rbC08nHEtIQnj6RlMgokBomoo5upsZs4aomJkqgb"),
-    InterestItem("architecture", "Architecture", "https://loremflickr.com/400/300/architecture"),
-    InterestItem("photography", "Photography", "https://loremflickr.com/400/300/photography"),
-    InterestItem("wellness", "Wellness & Spa", "https://loremflickr.com/400/300/spa,wellness"),
-    InterestItem("hiking", "Hiking", "https://loremflickr.com/400/300/hiking"),
-    InterestItem("watersports", "Water Sports", "https://loremflickr.com/400/300/watersports"),
-    InterestItem("wildlife", "Wildlife & Safaris", "https://loremflickr.com/400/300/wildlife,safari"),
-    InterestItem("music", "Music & Festivals", "https://loremflickr.com/400/300/festival,music"),
-    InterestItem("art", "Art Galleries", "https://loremflickr.com/400/300/art,gallery"),
-    InterestItem("markets", "Local Markets", "https://loremflickr.com/400/300/market,local"),
-    InterestItem("themeparks", "Theme Parks", "https://loremflickr.com/400/300/themepark"),
-    InterestItem("roadtrips", "Road Trips", "https://loremflickr.com/400/300/roadtrip"),
-    InterestItem("skiing", "Skiing & Snow", "https://loremflickr.com/400/300/skiing,snow"),
-    InterestItem("volunteering", "Volunteering", "https://loremflickr.com/400/300/volunteer")
+    InterestItem("culture",      "Culture & Museums",   R.drawable.interest_culture),
+    InterestItem("food",         "Food & Dining",        R.drawable.interest_food),
+    InterestItem("nature",       "Beach & Nature",       R.drawable.interest_nature),
+    InterestItem("adventure",    "Adventure",            R.drawable.interest_adventure),
+    InterestItem("nightlife",    "Nightlife",            R.drawable.interest_nightlife),
+    InterestItem("shopping",     "Shopping",             R.drawable.interest_shopping),
+    InterestItem("history",      "History",              R.drawable.interest_history),
+    InterestItem("architecture", "Architecture",         R.drawable.interest_architecture),
+    InterestItem("photography",  "Photography",          R.drawable.interest_photography),
+    InterestItem("wellness",     "Wellness & Spa",       R.drawable.interest_wellness),
+    InterestItem("hiking",       "Hiking",               R.drawable.interest_hiking),
+    InterestItem("watersports",  "Water Sports",         R.drawable.interest_watersports),
+    InterestItem("wildlife",     "Wildlife & Safaris",   R.drawable.interest_wildlife),
+    InterestItem("music",        "Music & Festivals",    R.drawable.interest_music),
+    InterestItem("art",          "Art Galleries",        R.drawable.interest_art),
+    InterestItem("markets",      "Local Markets",        R.drawable.interest_markets),
+    InterestItem("themeparks",   "Theme Parks",          R.drawable.interest_themeparks),
+    InterestItem("roadtrips",    "Road Trips",           R.drawable.interest_roadtrips),
+    InterestItem("skiing",       "Skiing & Snow",        R.drawable.interest_skiing),
+    InterestItem("volunteering", "Volunteering",         R.drawable.interest_volunteering)
 )
 
 private val interestVocabulary = listOf(
@@ -418,8 +413,8 @@ private fun S5InterestCard(
             )
             .clickable { onClick() }
     ) {
-        AsyncImage(
-            model = item.imageUrl,
+        Image(
+            painter = painterResource(item.imageRes),
             contentDescription = item.label,
             contentScale = ContentScale.Crop,
             modifier = Modifier.fillMaxSize(),

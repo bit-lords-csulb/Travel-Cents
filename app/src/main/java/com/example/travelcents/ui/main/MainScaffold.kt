@@ -98,9 +98,6 @@ fun MainScaffold(modifier: Modifier = Modifier, onLogout: () -> Unit = {}) {
     val sharedItineraryViewModel: ItineraryViewModel = viewModel()
     val navController = rememberNavController()
 
-    LaunchedEffect(Unit) {
-        sharedItineraryViewModel.loadTrip()
-    }
     val navBackStackEntry by navController.currentBackStackEntryAsState()
     val currentRoute = navBackStackEntry?.destination?.route ?: MainRoutes.Home
     val itineraryUiState by sharedItineraryViewModel.uiState.collectAsState()
@@ -125,6 +122,7 @@ fun MainScaffold(modifier: Modifier = Modifier, onLogout: () -> Unit = {}) {
                 modifier = Modifier.fillMaxSize()
             ) {
                 composable(MainRoutes.Current) {
+                    LaunchedEffect(Unit) { sharedItineraryViewModel.loadTrip() }
                     ItineraryScreen(
                         viewModel = sharedItineraryViewModel,
                         onEditEventClick = { clickedEventId ->
@@ -240,6 +238,7 @@ fun MainScaffold(modifier: Modifier = Modifier, onLogout: () -> Unit = {}) {
                     )
                 }
                 composable(MainRoutes.FinalPlan) {
+                    LaunchedEffect(Unit) { sharedItineraryViewModel.loadTrip() }
                     FinalPlanPage(
                         viewModel = sharedItineraryViewModel,
                         modifier = Modifier.fillMaxSize(),

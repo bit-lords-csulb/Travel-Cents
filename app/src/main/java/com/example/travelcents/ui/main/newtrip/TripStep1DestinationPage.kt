@@ -55,15 +55,17 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.foundation.Image
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.PopupProperties
 import androidx.core.content.ContextCompat
-import coil.compose.AsyncImage
+import com.example.travelcents.R
 import com.example.travelcents.ui.theme.DeepSea1
 import com.example.travelcents.ui.theme.DeepSea5
 import com.google.android.gms.location.LocationServices
@@ -72,33 +74,15 @@ import com.google.android.gms.tasks.CancellationTokenSource
 import java.util.Locale
 
 
-private data class PopularDestination(val name: String, val tagline: String, val imageUrl: String)
+private data class PopularDestination(val name: String, val tagline: String, val imageRes: Int)
 
 private val popularDestinations = listOf(
-    PopularDestination(
-        "Paris", "The city of light and romance.",
-        "https://lh3.googleusercontent.com/aida-public/AB6AXuDiCmefTHq1BCrwr3b6njBkFlxiKcEQ0YeBwSddT5WXZyF90wgq5bX5f1PWrSa_gHQqrM4bNWPUFtA8lb1DKNXsvQ4tWvoxOEfBULjVBtTIvmAgfBmwIk6p1tZmGKvLwtqwQPGesRzTX3fWCmXQg_s00Qo_DFJ-QoGfX6XV5HGjEULyFJY_YzMXJ7UsVo4rmAMVWIFBZqPFt16ZT1y-NfuGN_e336jc-H26J_t5PcEwsc2CSpwhNukIXqz_Mfwa4D1AgLqsl7rbiMCQ"
-    ),
-    PopularDestination(
-        "Tokyo", "Futuristic energy meets tradition.",
-        "https://lh3.googleusercontent.com/aida-public/AB6AXuDPB2FwB6hef7979dsv5jlkAbyeYyESpofiu-Z-RINWg0FkeicdccIq7XrVtSDQQFrN0900ARwyjIohqBuIwn2Kyej6j9UpQOBk8IFqxm9r8FvvUnLd9Kovjdfkli5iCS_lqJdFqQ_y_ZIv10oI0vg7pWFj6nFgHrMoGFMkqka415JQrHbK2_hM45pFIiCHVuLvfXnhqFAWqPVD54TpNM-yr3n3k3E9tkDf411TuMRm0R4fROJvllK_6yLsG5oALnKJecakUCWYuYJj"
-    ),
-    PopularDestination(
-        "Bali", "Serene island paradise.",
-        "https://lh3.googleusercontent.com/aida-public/AB6AXuCUq1iWawno-rDroE79eDJY5L79NpluXGbiIs3HE02JwWbCrBIzb37MgRd_XIjScol0hnsx0sTqOX_cQLYcZVD8iO_flmoUVlpyd7Kbn681PFdgDLroIixD1Kq1kw2MnLgxWjhovvBdk8ZDmguhUKB_PdKiuBBPyNDecVxuj7hn3PFUmd7B9ernr-duZdxyPN2TMfo5N3ldbRjlxw6RmFblDviMO1FUC8duOcX1hNBQ8MPI7SldGviYsJiZN7j5s-nshM0867-cW4Dh"
-    ),
-    PopularDestination(
-        "New York", "The city that never sleeps.",
-        "https://lh3.googleusercontent.com/aida-public/AB6AXuDYTIgmOdI9DpaNeAQRshjgYQKlb6JRdcFy58XrdTnyxaOEQqe2q3g-s2wV8J0fs-BMEZUcXL1YjIsaqDGvBfJZw82CfByB9oy3JQizBJsGo7MZhOhuqA5Hlz_d1OuqC3lKrwTvoHmXzn5adzChryMq2xGUcUaa1UGDWOoD-XkMy97IVcWGjjmLz2yTLYByavPzAFBu6NWLXr1XD_Y-9z9QR5wHqIpE6zz5Pew3LH_STDg4e-9sGm9w2Ns0v4SG_wqSKBWM9FmwdtwL"
-    ),
-    PopularDestination(
-        "London", "A blend of history and modernity.",
-        "https://lh3.googleusercontent.com/aida-public/AB6AXuAt_wFi8zqCK5bIaoyBXCIqd2MDwUD5GJ3vpozasWYNSw3oVjojCiyA_8kXpL-sokF0fKh1Bg4Vir7zumxPEz3o4Io2xuISt46u8jtCASVAY3baRFNzkquvdvFeXY1uG6Z7X4sI22B3g6Nu4bFJlL1Qrc5Ot5aJBhwk5fMtvlqIr6_EDlajdCRD7YP4Q4stGE1v9Sgau_ZbvtytF5hqTvnsL6Y9o8y1fDxE4Ew2rbC08nHEtIQnj6RlMgokBomoo5upsZs4aomJkqgb"
-    ),
-    PopularDestination(
-        "Dubai", "Sky-high luxury and desert gold.",
-        "https://lh3.googleusercontent.com/aida-public/AB6AXuAo7ZFFq2eoQpRJGsya7Z9s-TnZS9W2FwvPkUjzLR3NVF7dmED6a2G4UmfEa8XydlV_G0-9BcMtulEyV2tQMN3AVfAeINhUW-1UbtkR7gD4uW-S-J8Mvy8IkVXPVGP7649DCmBxDS8xaxTxHFaxLixTRmpym5rS_qBDRIOMEh9A5DmEZ6z9zNBw0-eHOEN-ZAURd92ot96AC7P9_8QSk6Wlta4DXHs3ShvZjt7Yii05qUjYrEHvljrjWXwghxeNnOY-BqDntHwi0H0h"
-    )
+    PopularDestination("Paris",    "The city of light and romance.",    R.drawable.dest_paris),
+    PopularDestination("Tokyo",    "Futuristic energy meets tradition.", R.drawable.dest_tokyo),
+    PopularDestination("Bali",     "Serene island paradise.",            R.drawable.dest_bali),
+    PopularDestination("New York", "The city that never sleeps.",        R.drawable.dest_new_york),
+    PopularDestination("London",   "A blend of history and modernity.",  R.drawable.dest_london),
+    PopularDestination("Dubai",    "Sky-high luxury and desert gold.",   R.drawable.dest_dubai)
 )
 
 @Composable
@@ -598,8 +582,8 @@ private fun DestinationCard(
             )
             .clickable { onClick() }
     ) {
-        AsyncImage(
-            model = destination.imageUrl,
+        Image(
+            painter = painterResource(destination.imageRes),
             contentDescription = destination.name,
             contentScale = ContentScale.Crop,
             modifier = Modifier.fillMaxSize()
