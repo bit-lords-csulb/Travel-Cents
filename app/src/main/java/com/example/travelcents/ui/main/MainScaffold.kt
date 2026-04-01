@@ -200,7 +200,6 @@ fun MainScaffold(modifier: Modifier = Modifier, onLogout: () -> Unit = {}) {
                         viewModel = newTripViewModel,
                         onBackClick = { navController.popBackStack() },
                         onCloseClick = { navController.popBackStack(MainRoutes.NewTrip, false) },
-                        onSaveDraftClick = { navController.navigate(MainRoutes.Home) },
                         onContinueClick = { navController.navigate(MainRoutes.NewTripStep5) }
                     )
                 }
