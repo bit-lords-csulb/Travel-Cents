@@ -71,7 +71,12 @@ class AuthModel {
         )
         db.collection("users").document(uid)
             .set(userMap)
-            .addOnSuccessListener { onResult(true, null) }
+            .addOnSuccessListener {
+                db.collection("usernames").document(username.trim().lowercase())
+                    .set(mapOf("email" to email))
+                    .addOnSuccessListener { onResult(true, null) }
+                    .addOnFailureListener { e -> onResult(false, e.message) }
+            }
             .addOnFailureListener { e -> onResult(false, e.message) }
     }
 
@@ -88,16 +93,42 @@ class AuthModel {
         return signInWithEmailAndPassword(email, password)
     }
 
-    // Resolve username to email via Firestore
-    private suspend fun lookupEmailByUsername(username: String): Result<String> =
-        suspendCancellableCoroutine { continuation ->
+    // Resolve username to email — checks public usernames collection first,
+    // falls back to authenticated users collection for pre-migration accounts
+    // and writes the missing usernames entry on success.
+    private suspend fun lookupEmailByUsername(username: String): Result<String> {
+        val normalized = username.trim().lowercase()
+
+        // 1. Check the public usernames collection (works unauthenticated)
+        val publicResult = suspendCancellableCoroutine<Result<String>> { continuation ->
+            db.collection("usernames").document(normalized)
+                .get()
+                .addOnSuccessListener { doc ->
+                    val email = doc.getString("email")
+                    if (email != null) {
+                        continuation.resume(Result.success(email))
+                    } else {
+                        continuation.resume(Result.success(""))  // not found, signal fallback
+                    }
+                }
+                .addOnFailureListener { e -> continuation.resume(Result.failure(e)) }
+        }
+
+        publicResult.getOrNull()?.takeIf { it.isNotEmpty() }?.let { return Result.success(it) }
+        if (publicResult.isFailure) return publicResult
+
+        // 2. Fallback: query authenticated users collection (existing accounts pre-migration)
+        return suspendCancellableCoroutine { continuation ->
             db.collection("users")
-                .whereEqualTo("username", username)
+                .whereEqualTo("username", normalized)
                 .limit(1)
                 .get()
                 .addOnSuccessListener { snapshot ->
                     val email = snapshot.documents.firstOrNull()?.getString("email")
                     if (email != null) {
+                        // Self-heal: write the missing usernames entry for next time
+                        db.collection("usernames").document(normalized)
+                            .set(mapOf("email" to email))
                         continuation.resume(Result.success(email))
                     } else {
                         continuation.resume(Result.failure(Exception("No account found with that username.")))
@@ -107,6 +138,7 @@ class AuthModel {
                     continuation.resume(Result.failure(e))
                 }
         }
+    }
 
     // Log In
     suspend fun signInWithEmailAndPassword(
