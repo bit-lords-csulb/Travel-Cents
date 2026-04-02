@@ -40,11 +40,11 @@
 **Problem:** `Choreographer: Skipped 137 frames!` — heavy work on main thread during navigation.
 **Files:** `ChatsViewModel.kt`, `FriendsViewModel.kt`, `ItineraryViewModel.kt`, `MainScaffold.kt`
 
-- [ ] Move Firestore listener setup out of `init{}` blocks — defer to first collection in `viewModelScope.launch`
+- [x] Move Firestore listener setup out of `init{}` blocks — defer to first collection in `viewModelScope.launch`
 - [x] Fix `FriendsViewModel` O(n) nested listeners — batch friend lookups into a single `whereIn` query
 - [x] Fix `FirestoreRepository.listenToDirectChatPreviews()` N+1 problem — batch user name lookups
 - [x] Remove eager `sharedItineraryViewModel.loadTrip()` from `MainScaffold` LaunchedEffect — load only when navigating to trip screen
-- [ ] `ItineraryViewModel.fetchAllTrips()` — add `.whereEqualTo("userId", uid)` server-side filter instead of client-side
+- [x] `ItineraryViewModel.fetchAllTrips()` — add `.whereEqualTo("userId", uid)` server-side filter instead of client-side
 
 ### Task 1.3 — Reduce Logging Overhead
 **Problem:** `HttpLoggingInterceptor.Level.BODY` serializes full request/response bodies in all builds.

@@ -8,6 +8,7 @@ import com.google.firebase.auth.auth
 import com.google.firebase.firestore.DocumentSnapshot
 import com.google.firebase.firestore.ListenerRegistration
 import com.google.firebase.firestore.firestore
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -43,8 +44,10 @@ class FriendsViewModel(
     private var pendingRequestsListener:   ListenerRegistration? = null
 
     init {
-        startListening()
-        startListeningToPendingRequests()
+        viewModelScope.launch {
+            startListening()
+            startListeningToPendingRequests()
+        }
     }
 
     private fun buildFriend(fUid: String, snap: DocumentSnapshot): Friend {

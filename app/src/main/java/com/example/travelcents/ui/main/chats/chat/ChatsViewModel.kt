@@ -8,6 +8,7 @@ import com.example.travelcents.data.model.Group
 import com.google.firebase.Firebase
 import com.google.firebase.auth.auth
 import com.google.firebase.firestore.ListenerRegistration
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -59,7 +60,7 @@ class ChatsViewModel(
     private var groupsListener:      ListenerRegistration? = null
     private var directChatsListener: ListenerRegistration? = null
 
-    init { startListening() }
+    init { viewModelScope.launch { startListening() } }
 
     fun startListening() {
         if (currentUid.isEmpty()) return

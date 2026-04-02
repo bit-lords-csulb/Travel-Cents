@@ -156,6 +156,7 @@ class ItineraryViewModel : ViewModel() {
     private fun fetchAllTrips(uid: String) {
         db.collection("users").document(uid)
             .collection("trips")
+            .whereEqualTo("userId", uid)
             .orderBy("createdAt", Query.Direction.DESCENDING)
             .get()
             .addOnSuccessListener { snapshot ->
