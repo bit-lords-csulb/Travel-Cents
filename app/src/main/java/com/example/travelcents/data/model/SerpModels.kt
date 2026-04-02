@@ -35,7 +35,8 @@ data class SerpFlightLeg(
 
 data class SerpAirport(
     val name: String = "",
-    val id: String = ""
+    val id: String = "",
+    val time: String = ""
 )
 
 data class SerpCarbonEmissions(

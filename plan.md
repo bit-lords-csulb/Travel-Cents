@@ -264,17 +264,92 @@
 
 ### Task 3.8 — API Response Debugging Investigation
 **Problem:** (a) Flights are missing from Day 1 of generated trips. (b) Unclear which event data comes from real API calls vs Groq hallucination. (c) Yelp is not cycling properly. Root cause must be confirmed before fixes are written.
-**Files:** new `debug/test_pipeline.py` (external, not shipped in APK), `NewTripViewModel.kt`, `SerpRepository.kt`, `YelpRepository.kt`, `GroqRepository.kt`
+**Files:** `test.py` (external debugger, root), `enhancement_plan.md`, `NewTripViewModel.kt`, `SerpRepository.kt`, `YelpRepository.kt`, `GroqRepository.kt`, `ImageCacheManager.kt`, `EventOption.kt`, `FinalPlan.kt`, `ExpandedEventCard.kt`
 
-- [ ] **Create `debug/test_pipeline.py`** — a standalone Python script that reproduces the full trip generation pipeline outside Android:
+- [x] **Create `test.py`** — a standalone Python script that reproduces the full trip generation pipeline outside Android:
   - Takes a sample trip request (origin, destination, dates, budget, adults)
-  - Calls SerpAPI flights + hotels with the same params the app uses; pretty-prints full JSON response
-  - Calls Yelp restaurants + activities + events for each day; pretty-prints full JSON response
-  - Calls Groq with the same system prompt the app uses; pretty-prints the structured output
-  - Compares what each API returned against what ends up in Firestore (manual check step)
-- [ ] **Flight missing root cause**: investigate whether `SEARCHING_FLIGHTS` step fires before Groq returns the IATA codes, or whether the IATA codes Groq returns don't match SerpAPI's airport index — log the exact IATA strings used in the flight query
-- [ ] **Groq vs real data labeling**: add a `source` field to every `EventOption` ("groq", "serp", "yelp") visible in debug builds — add a small dev-only label on each card in debug builds showing the source
-- [ ] Once root causes are confirmed, update Tasks 2.4, 3.5, and 3.6 with targeted fixes
+  - Calls Groq with the same system prompt the app uses and records the structured output
+  - Calls SerpAPI flights + hotels with the same params the app uses and records full JSON responses
+  - Calls Yelp restaurants + activities + events in the same order and concurrency pattern as the app
+  - Emits a chronological request/response timeline to Markdown + JSON
+  - Downloads hotel images into a per-run folder and reports image counts + storage location
+- [x] **Flight missing root cause**: confirm whether `SEARCHING_FLIGHTS` runs before Groq returns IATA codes, and log the exact IATA strings used in the flight query
+  - Result: not a sequencing issue. Groq returns before Serp starts, the exact IATA query succeeds (`LAX` → `JFK`), and the Day 1 flight issue is downstream parsing/mapping.
+  - Confirmed parser issue: the live Serp response exposes flight times under `departure_airport.time` / `arrival_airport.time`, while current app models expect `departureTime` / `arrivalTime`. This explains blank flight times even when a valid flight is returned.
+- [x] **Root-cause audit completed** via `enhancement_plan.md`
+  - Confirmed: Groq is only used for itinerary metadata in the current pipeline, not for day-level restaurant/activity generation
+  - Confirmed: Yelp fan-out is too aggressive on long trips and causes many `429` responses
+  - Confirmed: Yelp primaries repeat because each day independently picks `response.businesses.first()`
+  - Confirmed: hotel image downloading dominates generation time
+- [x] **Groq vs real data source tracing at the data layer**
+  - `EventOption.source` already exists and is populated with `"serp"` / `"yelp"` / `"groq"`
+  - The debug pipeline report now makes the provider source explicit in request/response summaries
+- [ ] **Groq vs real data labeling in debug UI**
+  - Add a small debug-only source label on cards / expanded cards so in-app inspection matches the external report
+- [ ] Once root causes are confirmed, implement the targeted fixes below and update Tasks 2.4, 3.5, and 3.6 as those code changes land
+
+#### Task 3.8.1 — Investigation Output Summary
+
+- [x] Latest successful adversarial audit completed against the live pipeline using `test.py` and documented in `enhancement_plan.md`
+- [x] Evidence captured:
+  - 1 Groq call, 2 Serp calls, 33 Yelp calls on a 16-day trip
+  - repeated Yelp restaurant/activity primaries across days
+  - many Yelp `429` failures causing missing day content
+  - Yelp Events returned no usable output in the audited run
+  - hotel image prefetch stage consumed the majority of total runtime
+- [x] Conclusion:
+  - The current pipeline is optimized in some local areas, but it is architecturally over-fetching Yelp and over-downloading hotel images
+
+#### Task 3.8.2 — Order Of Operations To Speed Up Generation
+
+- [ ] **Step 1: Fix correctness before optimization**
+  - Update `SerpRepository.kt` flight parsing to read the actual live response time fields
+  - Validate Day 1 grouping after the parser fix using `test.py`
+- [ ] **Step 2: Reduce Yelp call count**
+  - Replace per-day Yelp restaurant/activity searches in `NewTripViewModel.kt` and `YelpRepository.kt` with pooled searches per trip or per area cluster
+  - Distribute Yelp results locally across day slots instead of asking Yelp the same question once per day
+- [ ] **Step 3: Deduplicate and rank locally**
+  - In `NewTripViewModel.kt`, assign primaries round-robin by business id so no restaurant/activity becomes the primary on multiple days unless the pool is exhausted
+  - Improve hotel selection locally in `SerpRepository.kt` using travel-style-aware ranking instead of “first result wins”
+- [ ] **Step 4: Remove unnecessary critical-path downloads**
+  - Change `ImageCacheManager.kt` and the image download stage in `NewTripViewModel.kt` so generation prefetches only selected hero images
+  - Defer alternative hotel gallery images until expanded view / gallery view
+- [ ] **Step 5: Reduce or remove non-essential model work**
+  - Move deterministic itinerary fields out of `GroqRepository.kt`
+  - Generate locally where possible: `itinerary_id`, `created_at`, `duration_days`, `status`, trip title, and day slot structure
+  - Replace Groq IATA inference later with a deterministic lookup source if coverage is acceptable
+- [ ] **Step 6: Keep the debugger aligned with production**
+  - Update `test.py` whenever pipeline order, request shape, or image strategy changes
+  - Add summary metrics for missing days, provider errors, duplicate primaries, and image-stage time
+
+#### Task 3.8.3 — Concrete File Change Map
+
+- [ ] `app/src/main/java/com/example/travelcents/data/remote/SerpRepository.kt`
+  - Fix flight time parsing against the real Serp response shape
+  - Improve hotel ranking and selected-option choice
+- [ ] `app/src/main/java/com/example/travelcents/ui/main/newtrip/NewTripViewModel.kt`
+  - Replace per-day Yelp fan-out with pooled fetch + local distribution
+  - Deduplicate restaurant/activity primaries across the trip
+  - Reduce the image download work performed in the critical path
+- [ ] `app/src/main/java/com/example/travelcents/data/remote/YelpRepository.kt`
+  - Add pooled search entry points and support bounded concurrency / backoff if per-day fallback is still needed
+  - Preserve richer failure information instead of silently returning `null`
+- [ ] `app/src/main/java/com/example/travelcents/data/ImageCacheManager.kt`
+  - Move from eager full-gallery prefetch to selected-image prefetch + lazy gallery fetch
+  - Add bounded concurrency if multiple downloads are still required
+- [ ] `app/src/main/java/com/example/travelcents/data/remote/GroqRepository.kt`
+  - Reduce the Groq responsibility to only the fields that cannot be generated deterministically
+  - Remove locally derivable metadata from the model call over time
+- [ ] `app/src/main/java/com/example/travelcents/data/model/EventOption.kt`
+  - Keep `source` as the canonical provider marker for debug tooling and UI labels
+- [ ] `app/src/main/java/com/example/travelcents/ui/main/itinerary/FinalPlan.kt`
+  - Add debug-only provider source labels when running debug builds
+- [ ] `app/src/main/java/com/example/travelcents/ui/main/itinerary/ExpandedEventCard.kt`
+  - Add debug-only provider source labels and ensure lazy image/gallery strategy is reflected in the UI
+- [ ] `test.py`
+  - Keep as the external regression harness for request ordering, missing-day detection, provider attribution, and image-stage timing
+- [x] `enhancement_plan.md`
+  - Adversarial audit completed and committed to planning artifacts
 
 ### Task 3.9 — Expanded Card Overlay Fixes
 **Problem:** Expanded card shows a black/opaque screen behind it instead of the dimmed original screen. Also the card lacks the richness expected from the stored Yelp / SerpAPI data.
