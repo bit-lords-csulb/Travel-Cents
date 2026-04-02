@@ -2,6 +2,7 @@ package com.example.travelcents.data.remote
 
 import com.example.travelcents.data.model.EventOption
 import com.example.travelcents.data.model.Itinerary
+import com.example.travelcents.data.model.SerpFlightLeg
 import com.example.travelcents.data.model.SerpFlightOption
 import com.example.travelcents.data.model.SerpHotelProperty
 import com.example.travelcents.data.model.TravelEvent
@@ -64,6 +65,18 @@ object SerpRepository {
         "YYZ" to "YYZ,YTZ",
         "GRU" to "GRU,GIG"
     )
+
+    private fun SerpFlightLeg.departureTimestamp(): String =
+        departureAirport.time.ifBlank { departureTime }
+
+    private fun SerpFlightLeg.arrivalTimestamp(): String =
+        arrivalAirport.time.ifBlank { arrivalTime }
+
+    private fun String.datePart(fallback: String): String =
+        substringBefore(" ", fallback).ifBlank { fallback }
+
+    private fun String.timePart(): String =
+        substringAfter(" ", "").ifBlank { this }
 
     // Returns a single TravelEvent with all flight options as EventOption alternatives.
     // Falls back through metro airport expansions before giving up.
@@ -128,6 +141,8 @@ object SerpRepository {
             val selectedOption = response.bestFlights?.firstOrNull() ?: allOptions.first()
             val firstLeg = selectedOption.flights.firstOrNull()
             val lastLeg = selectedOption.flights.lastOrNull()
+            val departureTimestamp = firstLeg?.departureTimestamp().orEmpty()
+            val arrivalTimestamp = lastLeg?.arrivalTimestamp().orEmpty()
 
             val priceLevel = response.priceInsights?.priceLevel ?: ""
             val eventOptions = allOptions.mapIndexed { idx, option ->
@@ -138,17 +153,21 @@ object SerpRepository {
                 eventId = eventId,
                 type = "flight",
                 itineraryId = itinerary.itineraryId,
-                date = firstLeg?.departureTime?.substringBefore(" ") ?: request.dateFrom,
-                startTime = firstLeg?.departureTime?.substringAfter(" ", "") ?: "",
-                endTime = lastLeg?.arrivalTime?.substringAfter(" ", "") ?: "",
+                date = departureTimestamp.datePart(request.dateFrom),
+                startTime = departureTimestamp.timePart(),
+                endTime = arrivalTimestamp.timePart(),
                 imageUrl = selectedOption.airlineLogo ?: "",
                 details = buildMap {
                     firstLeg?.let {
                         put("airline", it.airline)
                         put("flight_number", it.flightNumber)
                         put("origin_airport", it.departureAirport.id)
+                        put("departure_time", departureTimestamp)
                     }
-                    lastLeg?.let { put("destination_airport", it.arrivalAirport.id) }
+                    lastLeg?.let {
+                        put("destination_airport", it.arrivalAirport.id)
+                        put("arrival_time", arrivalTimestamp)
+                    }
                     put("total_price", selectedOption.price.toString())
                     put("price_level", priceLevel)
                     put("stops", (selectedOption.flights.size - 1).toString())
@@ -195,6 +214,8 @@ object SerpRepository {
             selected = isSelected,
             imageUrl = option.airlineLogo ?: "",
             details = buildMap {
+                val departureTimestamp = firstLeg?.departureTimestamp().orEmpty()
+                val arrivalTimestamp = lastLeg?.arrivalTimestamp().orEmpty()
                 put("price", option.price.toString())
                 put("price_level", priceLevel)
                 put("total_duration", option.totalDuration.toString())
@@ -203,13 +224,13 @@ object SerpRepository {
                     put("airline", it.airline)
                     put("flight_number", it.flightNumber)
                     put("origin_airport", it.departureAirport.id)
-                    put("departure_time", it.departureTime)
+                    put("departure_time", departureTimestamp)
                     it.legroom?.let { lr -> put("legroom", lr) }
                     if (it.oftenDelayed) put("often_delayed", "true")
                 }
                 lastLeg?.let {
                     put("destination_airport", it.arrivalAirport.id)
-                    put("arrival_time", it.arrivalTime)
+                    put("arrival_time", arrivalTimestamp)
                 }
                 option.carbonEmissions?.differencePercent?.let {
                     put("carbon_diff_percent", it.toString())
@@ -220,8 +241,8 @@ object SerpRepository {
                     put("leg_${i}_flight_number", leg.flightNumber)
                     put("leg_${i}_from", leg.departureAirport.id)
                     put("leg_${i}_to", leg.arrivalAirport.id)
-                    put("leg_${i}_departure", leg.departureTime)
-                    put("leg_${i}_arrival", leg.arrivalTime)
+                    put("leg_${i}_departure", leg.departureTimestamp())
+                    put("leg_${i}_arrival", leg.arrivalTimestamp())
                     put("leg_${i}_duration_min", leg.duration.toString())
                     leg.legroom?.let { lr -> put("leg_${i}_legroom", lr) }
                     if (leg.oftenDelayed) put("leg_${i}_often_delayed", "true")
