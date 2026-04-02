@@ -30,16 +30,19 @@ data class EventOption(
             "optionId", "eventId", "source", "selected", "votes", "imageUrl", "localImagePath"
         )
 
-        fun fromMap(map: Map<String, Any>): EventOption = EventOption(
-            optionId = map["optionId"] as? String ?: UUID.randomUUID().toString(),
-            eventId = map["eventId"] as? String ?: "",
-            source = map["source"] as? String ?: "",
-            selected = map["selected"] as? Boolean ?: false,
-            @Suppress("UNCHECKED_CAST")
-            votes = (map["votes"] as? Map<String, String>) ?: emptyMap(),
-            imageUrl = map["imageUrl"] as? String ?: "",
-            localImagePath = map["localImagePath"] as? String ?: "",
-            details = map.filterKeys { it !in RESERVED }.mapValues { it.value.toString() }
-        )
+        @Suppress("UNCHECKED_CAST")
+        fun fromMap(map: Map<String, Any>): EventOption {
+            val votes = (map["votes"] as? Map<String, String>) ?: emptyMap()
+            return EventOption(
+                optionId = map["optionId"] as? String ?: UUID.randomUUID().toString(),
+                eventId = map["eventId"] as? String ?: "",
+                source = map["source"] as? String ?: "",
+                selected = map["selected"] as? Boolean ?: false,
+                votes = votes,
+                imageUrl = map["imageUrl"] as? String ?: "",
+                localImagePath = map["localImagePath"] as? String ?: "",
+                details = map.filterKeys { it !in RESERVED }.mapValues { it.value.toString() }
+            )
+        }
     }
 }
