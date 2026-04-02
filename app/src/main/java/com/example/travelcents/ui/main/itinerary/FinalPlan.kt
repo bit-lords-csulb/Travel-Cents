@@ -61,6 +61,46 @@ private fun eventTypeColor(type: String): Color = when (type.lowercase()) {
     else -> SecondaryColor
 }
 
+private fun primaryEventTitle(event: TravelEvent): String {
+    return when (event.type.lowercase()) {
+        "flight" -> listOfNotNull(
+            event.details["title"]?.takeIf { it.isNotBlank() },
+            listOfNotNull(
+                event.details["airline"]?.takeIf { it.isNotBlank() },
+                event.details["flight_number"]?.takeIf { it.isNotBlank() }
+            ).joinToString(" ").takeIf { it.isNotBlank() }
+        ).firstOrNull()
+
+        "hotel" -> event.details["hotel_name"] ?: event.details["name"]
+        "restaurant", "dining", "food" -> event.details["restaurant_name"] ?: event.details["name"]
+        else -> event.details["activity_name"] ?: event.details["title"] ?: event.details["name"]
+    } ?: event.type.replaceFirstChar { it.uppercase() }
+}
+
+private fun secondaryEventText(event: TravelEvent): String {
+    return when (event.type.lowercase()) {
+        "flight" -> listOfNotNull(
+            listOfNotNull(
+                event.details["origin_airport"]?.takeIf { it.isNotBlank() },
+                event.details["destination_airport"]?.takeIf { it.isNotBlank() }
+            ).takeIf { it.isNotEmpty() }?.joinToString(" to "),
+            event.details["total_price"]?.takeIf { it.isNotBlank() }?.let { "\$$it" }
+        ).joinToString(" · ")
+
+        "hotel" -> listOfNotNull(
+            event.details["address"]?.takeIf { it.isNotBlank() },
+            event.details["rating"]?.takeIf { it.isNotBlank() }?.let { "★$it" }
+        ).joinToString(" · ")
+
+        else -> listOfNotNull(
+            event.details["notes"]?.takeIf { it.isNotBlank() },
+            event.details["description"]?.takeIf { it.isNotBlank() },
+            event.details["location"]?.takeIf { it.isNotBlank() },
+            event.details["address"]?.takeIf { it.isNotBlank() }
+        ).firstOrNull().orEmpty()
+    }
+}
+
 private fun formatDateHeader(dateStr: String): String {
     return try {
         val sdf = SimpleDateFormat("yyyy-MM-dd", Locale.US)
@@ -214,8 +254,7 @@ fun FinalPlanPage(
                     contentPadding = PaddingValues(bottom = 32.dp)
                 ) {
                     item {
-                        Spacer(modifier = Modifier.height(24.dp))
-                        Spacer(modifier = Modifier.height(32.dp))
+                        Spacer(modifier = Modifier.height(16.dp))
                     }
 
                     items(planItems, key = { it.key }) { item ->
@@ -231,7 +270,7 @@ fun FinalPlanPage(
                                     TimelineEventCard(
                                         event = event,
                                         isLast = item.isLastInDay,
-                                        optionCount = activeOptionCount,
+                                        hasAlternatives = activeOptionCount > 1,
                                         isDragging = isDragging,
                                         dragHandleModifier = Modifier.longPressDraggableHandle(),
                                         onCardClick = { expandedEventId = event.eventId },
@@ -239,7 +278,7 @@ fun FinalPlanPage(
                                     )
                                 }
                             }
-                            is FinalPlanItem.DaySpacer -> Spacer(modifier = Modifier.height(16.dp))
+                            is FinalPlanItem.DaySpacer -> Spacer(modifier = Modifier.height(0.dp))
                         }
                     }
                 }
@@ -550,7 +589,7 @@ private fun FinalPlanTopBar(
 @Composable
 private fun DayHeader(date: String) {
     Row(
-        modifier = Modifier.fillMaxWidth().padding(vertical = 24.dp),
+        modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
         Text(text = date, color = PrimaryBlue, fontSize = 14.sp, fontWeight = FontWeight.Bold, letterSpacing = 2.sp)
@@ -563,21 +602,15 @@ private fun DayHeader(date: String) {
 private fun TimelineEventCard(
     event: TravelEvent,
     isLast: Boolean,
-    optionCount: Int,
+    hasAlternatives: Boolean,
     isDragging: Boolean,
     dragHandleModifier: Modifier,
     onCardClick: () -> Unit,
     onChangeClick: () -> Unit
 ) {
     val typeColor = eventTypeColor(event.type)
-    val title = event.details["title"]
-        ?: event.details["activity_name"]
-        ?: event.details["restaurant_name"]
-        ?: event.type.replaceFirstChar { it.uppercase() }
-    val description = event.details["notes"]
-        ?: event.details["description"]
-        ?: event.details["location"]
-        ?: ""
+    val title = primaryEventTitle(event)
+    val description = secondaryEventText(event)
     val imageUrl = event.imageUrl.ifBlank { event.details["imageUrl"] ?: event.details["image_url"] ?: "" }
 
     Row(
@@ -617,7 +650,7 @@ private fun TimelineEventCard(
         Card(
             modifier = Modifier
                 .weight(1f)
-                .padding(bottom = 24.dp)
+                .padding(bottom = 8.dp)
                 .clickable { onCardClick() },
             shape = RoundedCornerShape(12.dp),
             colors = CardDefaults.cardColors(
@@ -669,9 +702,11 @@ private fun TimelineEventCard(
                                     fontWeight = FontWeight.Bold,
                                     modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp))
                             }
-                            Spacer(modifier = Modifier.width(8.dp))
-                            Text(text = event.startTime, color = OnSurfaceVariant, fontSize = 9.sp,
-                                fontWeight = FontWeight.Bold, letterSpacing = 1.sp)
+                            if (event.startTime.isNotBlank()) {
+                                Spacer(modifier = Modifier.width(8.dp))
+                                Text(text = event.startTime, color = OnSurfaceVariant, fontSize = 9.sp,
+                                    fontWeight = FontWeight.Bold, letterSpacing = 1.sp)
+                            }
                         }
                         Spacer(modifier = Modifier.height(4.dp))
                         Text(text = title, color = OnSurface, fontSize = 15.sp, fontWeight = FontWeight.Bold,
@@ -683,43 +718,23 @@ private fun TimelineEventCard(
                     }
                 }
 
-                // Change button + option count badge — top-right corner overlay
-                if (optionCount > 1) {
-                    Row(
+                if (hasAlternatives) {
+                    Surface(
+                        color = SurfaceContainerHigh,
+                        shape = RoundedCornerShape(6.dp),
+                        border = androidx.compose.foundation.BorderStroke(1.dp, OutlineVariant.copy(alpha = 0.4f)),
                         modifier = Modifier
                             .align(Alignment.TopEnd)
-                            .padding(top = 6.dp, end = 6.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(4.dp)
+                            .padding(top = 6.dp, end = 6.dp)
+                            .clickable { onChangeClick() }
                     ) {
-                        // Option count badge
-                        Surface(
-                            color = typeColor.copy(alpha = 0.18f),
-                            shape = RoundedCornerShape(6.dp)
-                        ) {
-                            Text(
-                                text = "$optionCount options",
-                                color = typeColor,
-                                fontSize = 9.sp,
-                                fontWeight = FontWeight.Bold,
-                                modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
-                            )
-                        }
-                        // Change button
-                        Surface(
-                            color = SurfaceContainerHigh,
-                            shape = RoundedCornerShape(6.dp),
-                            border = androidx.compose.foundation.BorderStroke(1.dp, OutlineVariant.copy(alpha = 0.4f)),
-                            modifier = Modifier.clickable { onChangeClick() }
-                        ) {
-                            Text(
-                                text = "Change",
-                                color = OnSurfaceVariant,
-                                fontSize = 9.sp,
-                                fontWeight = FontWeight.SemiBold,
-                                modifier = Modifier.padding(horizontal = 7.dp, vertical = 3.dp)
-                            )
-                        }
+                        Text(
+                            text = "Change",
+                            color = OnSurfaceVariant,
+                            fontSize = 9.sp,
+                            fontWeight = FontWeight.SemiBold,
+                            modifier = Modifier.padding(horizontal = 7.dp, vertical = 3.dp)
+                        )
                     }
                 }
 
