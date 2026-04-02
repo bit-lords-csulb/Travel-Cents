@@ -40,7 +40,8 @@ fun DirectChatPage(
     viewModel: DirectChatViewModel = viewModel(
         key = friend.uid,
         factory = DirectChatViewModel.Factory(friend)
-    )
+    ),
+    onTripCardClick: ((tripId: String, ownerUid: String) -> Unit)? = null
 ) {
     val messages     by viewModel.messages.collectAsState()
     val messageText  by viewModel.messageText.collectAsState()
@@ -116,7 +117,11 @@ fun DirectChatPage(
             contentPadding = PaddingValues(top = 16.dp, bottom = 8.dp)
         ) {
             items(messages, key = { it.id }) { message ->
-                ChatBubble(message = message, isMine = message.senderId == currentUid)
+                ChatBubble(
+                    message = message,
+                    isMine = message.senderId == currentUid,
+                    onTripCardClick = onTripCardClick
+                )
             }
         }
 
