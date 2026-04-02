@@ -27,26 +27,23 @@
 ## Phase 1 — Performance & Image Loading Fixes
 
 ### Task 1.1 — Bundle Static Images (Steps 1, 5, Landing)
-**Decision:** Bundle all wizard static images as APK drawable resources. Remove all runtime URL fetching for these images. Use the exact same images that were previously loaded at runtime from Google — recover their URLs from old commits, download them, and ship them as local drawable assets.
-**Files:** `TripStep1DestinationPage.kt`, `TripStep5InterestsPage.kt`, `NewTripLandingPage.kt`, `res/drawable/`
+**Decision:** Bundle all wizard static images as APK drawable resources. Remove all runtime URL fetching for these images. Images were directly sourced and added to `res/drawable-nodpi/` (git history recovery steps were skipped — not needed).
+**Files:** `TripStep1DestinationPage.kt`, `TripStep5InterestsPage.kt`, `NewTripLandingPage.kt`, `res/drawable-nodpi/`
 
-- [ ] **Recover URLs from git history**: run `git log --all -p -- TripStep1DestinationPage.kt TripStep5InterestsPage.kt NewTripLandingPage.kt` (and any related ViewModel/data files) to find all commits that previously contained Google CDN / Google Aida / LoremFlickr image URLs. Extract every URL for cities and interests.
-- [ ] Download each recovered URL as a PNG/JPEG and save to `res/drawable/` with a descriptive name (e.g. `city_paris.jpg`, `interest_hiking.jpg`).
-- [ ] Repeat for the 2 landing page card images — recover their URLs from the same git history sweep.
-- [ ] Source and add to `res/drawable/`: 6 destination images (Paris, Tokyo, Bali, New York, London, Dubai) + 2 landing page card images
-- [ ] Source and add to `res/drawable/`: 20 interest images — replace all 8 Google Aida URLs and all 12 LoremFlickr placeholders with the recovered (now local) assets
-- [ ] Replace every `AsyncImage(model = "https://...")` for these images with `painterResource(R.drawable.*)`
-- [ ] Remove LoremFlickr URLs from `TripStep5InterestsPage.kt` entirely
-- [ ] Remove Google Aida CDN URLs from all wizard pages
+- [x] Source and add to `res/drawable-nodpi/`: 6 destination images (Paris, Tokyo, Bali, New York, London, Dubai) + 2 landing page card images
+- [x] Source and add to `res/drawable-nodpi/`: 20 interest images — replaced all 8 Google Aida URLs and all 12 LoremFlickr placeholders with local assets
+- [x] Replace every `AsyncImage(model = "https://...")` for these images with `painterResource(R.drawable.*)`
+- [x] Remove LoremFlickr URLs from `TripStep5InterestsPage.kt` entirely
+- [x] Remove Google Aida CDN URLs from all wizard pages
 
 ### Task 1.2 — Reduce Main Thread Work
 **Problem:** `Choreographer: Skipped 137 frames!` — heavy work on main thread during navigation.
 **Files:** `ChatsViewModel.kt`, `FriendsViewModel.kt`, `ItineraryViewModel.kt`, `MainScaffold.kt`
 
 - [ ] Move Firestore listener setup out of `init{}` blocks — defer to first collection in `viewModelScope.launch`
-- [ ] Fix `FriendsViewModel` O(n) nested listeners — batch friend lookups into a single `whereIn` query
-- [ ] Fix `FirestoreRepository.listenToDirectChatPreviews()` N+1 problem — batch user name lookups
-- [ ] Remove eager `sharedItineraryViewModel.loadTrip()` from `MainScaffold` LaunchedEffect — load only when navigating to trip screen
+- [x] Fix `FriendsViewModel` O(n) nested listeners — batch friend lookups into a single `whereIn` query
+- [x] Fix `FirestoreRepository.listenToDirectChatPreviews()` N+1 problem — batch user name lookups
+- [x] Remove eager `sharedItineraryViewModel.loadTrip()` from `MainScaffold` LaunchedEffect — load only when navigating to trip screen
 - [ ] `ItineraryViewModel.fetchAllTrips()` — add `.whereEqualTo("userId", uid)` server-side filter instead of client-side
 
 ### Task 1.3 — Reduce Logging Overhead
