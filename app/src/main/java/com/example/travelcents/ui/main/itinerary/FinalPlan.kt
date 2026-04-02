@@ -53,6 +53,8 @@ private val OutlineVariant = Color(0xFF3B4861)
 private val TertiaryColor = Color(0xFFB5A0FF)
 private val ErrorColor = Color(0xFFFF716C)
 private val SecondaryColor = Color(0xFFD5E3FB)
+private const val UndatedGroupKey = "__undated__"
+private const val UndatedHeader = "DATE TBD"
 
 private fun eventTypeColor(type: String): Color = when (type.lowercase()) {
     "flight" -> PrimaryBlue
@@ -65,6 +67,12 @@ private fun primaryEventTitle(event: TravelEvent): String {
     return when (event.type.lowercase()) {
         "flight" -> listOfNotNull(
             event.details["title"]?.takeIf { it.isNotBlank() },
+            event.details["destination_airport"]?.takeIf { it.isNotBlank() }?.let { destination ->
+                when (event.details["trip_segment"]?.lowercase()) {
+                    "return" -> "Return to $destination"
+                    else -> "Flight to $destination"
+                }
+            },
             listOfNotNull(
                 event.details["airline"]?.takeIf { it.isNotBlank() },
                 event.details["flight_number"]?.takeIf { it.isNotBlank() }
@@ -81,10 +89,15 @@ private fun secondaryEventText(event: TravelEvent): String {
     return when (event.type.lowercase()) {
         "flight" -> listOfNotNull(
             listOfNotNull(
+                event.details["airline"]?.takeIf { it.isNotBlank() },
+                event.details["flight_number"]?.takeIf { it.isNotBlank() }
+            ).joinToString(" ").takeIf { it.isNotBlank() },
+            listOfNotNull(
                 event.details["origin_airport"]?.takeIf { it.isNotBlank() },
                 event.details["destination_airport"]?.takeIf { it.isNotBlank() }
             ).takeIf { it.isNotEmpty() }?.joinToString(" to "),
-            event.details["total_price"]?.takeIf { it.isNotBlank() }?.let { "\$$it" }
+            event.details["total_price"]?.takeIf { it.isNotBlank() }?.let { "\$$it" },
+            event.details["description"]?.takeIf { it.isNotBlank() }
         ).joinToString(" · ")
 
         "hotel" -> listOfNotNull(
@@ -121,6 +134,15 @@ private fun formatDateHeader(dateStr: String): String {
     }
 }
 
+private fun planGroupKey(event: TravelEvent): String =
+    event.date.ifBlank { UndatedGroupKey }
+
+private fun planHeaderLabel(groupKey: String): String =
+    if (groupKey == UndatedGroupKey) UndatedHeader else formatDateHeader(groupKey)
+
+private fun planSortDate(event: TravelEvent): String =
+    event.date.ifBlank { "9999-12-31" }
+
 // Keyed items so the reorderable library can track positions correctly
 private sealed interface FinalPlanItem {
     val key: String
@@ -131,12 +153,13 @@ private sealed interface FinalPlanItem {
 
 private fun buildPlanItems(events: List<TravelEvent>): List<FinalPlanItem> {
     val sorted = events
-        .filter { it.date.isNotEmpty() }
-        .sortedWith(compareBy({ it.date }, { it.details["sortOrder"]?.toIntOrNull() ?: 0 }, { it.startTime }))
-    val grouped = sorted.groupBy { it.date }.entries.sortedBy { it.key }
+        .sortedWith(compareBy({ planSortDate(it) }, { it.details["sortOrder"]?.toIntOrNull() ?: 0 }, { it.startTime }))
+    val grouped = sorted.groupBy(::planGroupKey).entries.sortedBy { entry ->
+        if (entry.key == UndatedGroupKey) "9999-12-31" else entry.key
+    }
     return buildList {
         grouped.forEach { (date, dayEvents) ->
-            add(FinalPlanItem.Header(formatDateHeader(date)))
+            add(FinalPlanItem.Header(planHeaderLabel(date)))
             dayEvents.forEachIndexed { idx, event ->
                 add(FinalPlanItem.EventItem(event, isLastInDay = idx == dayEvents.lastIndex, dayIndex = idx))
             }

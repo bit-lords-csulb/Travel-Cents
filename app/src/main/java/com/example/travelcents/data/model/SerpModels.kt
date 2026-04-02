@@ -15,7 +15,9 @@ data class SerpFlightOption(
     val price: Int = 0,
     @SerializedName("total_duration") val totalDuration: Int = 0,
     @SerializedName("airline_logo") val airlineLogo: String? = null,
-    @SerializedName("carbon_emissions") val carbonEmissions: SerpCarbonEmissions? = null
+    @SerializedName("carbon_emissions") val carbonEmissions: SerpCarbonEmissions? = null,
+    @SerializedName("departure_token") val departureToken: String? = null,
+    val type: String? = null
 )
 
 data class SerpFlightLeg(

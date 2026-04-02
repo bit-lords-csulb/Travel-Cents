@@ -17,6 +17,8 @@ import java.util.concurrent.TimeUnit
 
 object SerpRepository {
 
+    private const val FLIGHT_CACHE_VERSION = "v2"
+
     private val client = OkHttpClient.Builder()
         .addInterceptor(HttpLoggingInterceptor().apply {
             level = if (BuildConfig.DEBUG) HttpLoggingInterceptor.Level.BODY
@@ -66,6 +68,16 @@ object SerpRepository {
         "GRU" to "GRU,GIG"
     )
 
+    private enum class FlightSegment(val key: String) {
+        OUTBOUND("outbound"),
+        RETURN("return")
+    }
+
+    private data class FlightSearchResult(
+        val event: TravelEvent,
+        val selectedOption: SerpFlightOption? = null
+    )
+
     private fun SerpFlightLeg.departureTimestamp(): String =
         departureAirport.time.ifBlank { departureTime }
 
@@ -78,36 +90,107 @@ object SerpRepository {
     private fun String.timePart(): String =
         substringAfter(" ", "").ifBlank { this }
 
-    // Returns a single TravelEvent with all flight options as EventOption alternatives.
+    private fun buildFlightTitle(
+        segment: FlightSegment,
+        destinationAirport: String,
+        itinerary: Itinerary
+    ): String {
+        val fallbackDestination = when (segment) {
+            FlightSegment.OUTBOUND -> itinerary.destinationIata.ifBlank { itinerary.destination }
+            FlightSegment.RETURN -> itinerary.originIata.ifBlank { itinerary.origin }
+        }
+        val resolvedDestination = destinationAirport.ifBlank { fallbackDestination }
+        return when (segment) {
+            FlightSegment.OUTBOUND -> "Flight to $resolvedDestination"
+            FlightSegment.RETURN -> "Return to $resolvedDestination"
+        }
+    }
+
+    // Returns outbound + return TravelEvents, each with flight options as alternatives.
     // Falls back through metro airport expansions before giving up.
     suspend fun searchFlights(request: TravelRequest, itinerary: Itinerary): List<TravelEvent> {
-        val cacheKey = "${itinerary.originIata}_${itinerary.destinationIata}_${request.dateFrom}_${request.dateTo}_${request.adults}_${request.children}_${request.currency}"
+        val cacheKey = "${FLIGHT_CACHE_VERSION}_${itinerary.originIata}_${itinerary.destinationIata}_${request.dateFrom}_${request.dateTo}_${request.adults}_${request.children}_${request.currency}"
 
         SerpCache.getFlights(cacheKey)?.let { cached ->
             return cached.map { it.copy(itineraryId = itinerary.itineraryId) }
         }
 
-        val event = tryFlightSearch(
+        val outbound = tryFlightSearch(
             originId = itinerary.originIata,
             destinationId = itinerary.destinationIata,
             request = request,
             itinerary = itinerary,
-            stops = "2"
+            stops = "2",
+            defaultDate = request.dateFrom,
+            segment = FlightSegment.OUTBOUND,
+            searchType = "1",
+            returnDate = request.dateTo
         ) ?: tryFlightSearch(
             originId = metroAirports[itinerary.originIata] ?: itinerary.originIata,
             destinationId = itinerary.destinationIata,
             request = request,
             itinerary = itinerary,
-            stops = "3"
+            stops = "3",
+            defaultDate = request.dateFrom,
+            segment = FlightSegment.OUTBOUND,
+            searchType = "1",
+            returnDate = request.dateTo
         ) ?: tryFlightSearch(
             originId = metroAirports[itinerary.originIata] ?: itinerary.originIata,
             destinationId = metroAirports[itinerary.destinationIata] ?: itinerary.destinationIata,
             request = request,
             itinerary = itinerary,
-            stops = "3"
-        ) ?: noFlightsPlaceholder(itinerary)
+            stops = "3",
+            defaultDate = request.dateFrom,
+            segment = FlightSegment.OUTBOUND,
+            searchType = "1",
+            returnDate = request.dateTo
+        )
 
-        val result = listOf(event)
+        val result = if (outbound == null) {
+            listOf(
+                noFlightsPlaceholder(itinerary, request.dateFrom, FlightSegment.OUTBOUND),
+                noFlightsPlaceholder(itinerary, request.dateTo, FlightSegment.RETURN)
+            )
+        } else {
+            val returnEvent = tryReturnFlightSearch(
+                departureToken = outbound.selectedOption?.departureToken.orEmpty(),
+                request = request,
+                itinerary = itinerary
+            ) ?: tryFlightSearch(
+                originId = itinerary.destinationIata,
+                destinationId = itinerary.originIata,
+                request = request,
+                itinerary = itinerary,
+                stops = "2",
+                defaultDate = request.dateTo,
+                segment = FlightSegment.RETURN,
+                searchType = "2"
+            ) ?: tryFlightSearch(
+                originId = metroAirports[itinerary.destinationIata] ?: itinerary.destinationIata,
+                destinationId = itinerary.originIata,
+                request = request,
+                itinerary = itinerary,
+                stops = "3",
+                defaultDate = request.dateTo,
+                segment = FlightSegment.RETURN,
+                searchType = "2"
+            ) ?: tryFlightSearch(
+                originId = metroAirports[itinerary.destinationIata] ?: itinerary.destinationIata,
+                destinationId = metroAirports[itinerary.originIata] ?: itinerary.originIata,
+                request = request,
+                itinerary = itinerary,
+                stops = "3",
+                defaultDate = request.dateTo,
+                segment = FlightSegment.RETURN,
+                searchType = "2"
+            ) ?: FlightSearchResult(
+                noFlightsPlaceholder(itinerary, request.dateTo, FlightSegment.RETURN)
+            )
+
+            listOf(outbound.event, returnEvent.event)
+        }
+
         SerpCache.putFlights(cacheKey, result.map { it.copy(itineraryId = "") })
         return result
     }
@@ -117,81 +200,170 @@ object SerpRepository {
         destinationId: String,
         request: TravelRequest,
         itinerary: Itinerary,
-        stops: String
-    ): TravelEvent? {
+        stops: String,
+        defaultDate: String,
+        segment: FlightSegment,
+        searchType: String,
+        returnDate: String? = null
+    ): FlightSearchResult? {
         return try {
             val params = mapOf(
                 "engine" to "google_flights",
                 "departure_id" to originId,
                 "arrival_id" to destinationId,
-                "outbound_date" to request.dateFrom,
-                "return_date" to request.dateTo,
+                "outbound_date" to defaultDate,
                 "adults" to request.adults.toString(),
                 "children" to request.children.toString(),
                 "currency" to request.currency,
                 "stops" to stops,
-                "type" to "1",
+                "type" to searchType,
                 "api_key" to BuildConfig.SERP_API_KEY
-            )
+            ) + listOfNotNull(
+                returnDate?.let { "return_date" to it }
+            ).toMap()
             val response = api.searchFlights(params)
             val allOptions = (response.bestFlights ?: emptyList()) + (response.otherFlights ?: emptyList())
-            if (allOptions.isEmpty()) return null
-
-            val eventId = UUID.randomUUID().toString()
-            val selectedOption = response.bestFlights?.firstOrNull() ?: allOptions.first()
-            val firstLeg = selectedOption.flights.firstOrNull()
-            val lastLeg = selectedOption.flights.lastOrNull()
-            val departureTimestamp = firstLeg?.departureTimestamp().orEmpty()
-            val arrivalTimestamp = lastLeg?.arrivalTimestamp().orEmpty()
-
-            val priceLevel = response.priceInsights?.priceLevel ?: ""
-            val eventOptions = allOptions.mapIndexed { idx, option ->
-                flightOptionToEventOption(option, eventId, isSelected = idx == 0, priceLevel = priceLevel)
+            if (allOptions.isEmpty()) {
+                null
+            } else {
+                val selectedOption = response.bestFlights?.firstOrNull() ?: allOptions.first()
+                val priceLevel = response.priceInsights?.priceLevel ?: ""
+                FlightSearchResult(
+                    event = buildFlightEvent(
+                        allOptions = allOptions,
+                        selectedOption = selectedOption,
+                        itinerary = itinerary,
+                        defaultDate = defaultDate,
+                        segment = segment,
+                        priceLevel = priceLevel
+                    ),
+                    selectedOption = selectedOption
+                )
             }
-
-            TravelEvent(
-                eventId = eventId,
-                type = "flight",
-                itineraryId = itinerary.itineraryId,
-                date = departureTimestamp.datePart(request.dateFrom),
-                startTime = departureTimestamp.timePart(),
-                endTime = arrivalTimestamp.timePart(),
-                imageUrl = selectedOption.airlineLogo ?: "",
-                details = buildMap {
-                    firstLeg?.let {
-                        put("airline", it.airline)
-                        put("flight_number", it.flightNumber)
-                        put("origin_airport", it.departureAirport.id)
-                        put("departure_time", departureTimestamp)
-                    }
-                    lastLeg?.let {
-                        put("destination_airport", it.arrivalAirport.id)
-                        put("arrival_time", arrivalTimestamp)
-                    }
-                    put("total_price", selectedOption.price.toString())
-                    put("price_level", priceLevel)
-                    put("stops", (selectedOption.flights.size - 1).toString())
-                    selectedOption.carbonEmissions?.differencePercent?.let {
-                        put("carbon_diff_percent", it.toString())
-                    }
-                },
-                options = eventOptions
-            )
         } catch (_: Exception) {
             null
         }
     }
 
-    private fun noFlightsPlaceholder(itinerary: Itinerary): TravelEvent {
-        val origin = itinerary.originIata
-        val dest = itinerary.destinationIata
+    private suspend fun tryReturnFlightSearch(
+        departureToken: String,
+        request: TravelRequest,
+        itinerary: Itinerary
+    ): FlightSearchResult? {
+        if (departureToken.isBlank()) return null
+        return try {
+            val params = mapOf(
+                "engine" to "google_flights",
+                "departure_token" to departureToken,
+                "adults" to request.adults.toString(),
+                "children" to request.children.toString(),
+                "currency" to request.currency,
+                "api_key" to BuildConfig.SERP_API_KEY
+            )
+            val response = api.searchFlights(params)
+            val allOptions = (response.bestFlights ?: emptyList()) + (response.otherFlights ?: emptyList())
+            if (allOptions.isEmpty()) {
+                null
+            } else {
+                val selectedOption = response.bestFlights?.firstOrNull() ?: allOptions.first()
+                val priceLevel = response.priceInsights?.priceLevel ?: ""
+                FlightSearchResult(
+                    event = buildFlightEvent(
+                        allOptions = allOptions,
+                        selectedOption = selectedOption,
+                        itinerary = itinerary,
+                        defaultDate = request.dateTo,
+                        segment = FlightSegment.RETURN,
+                        priceLevel = priceLevel
+                    ),
+                    selectedOption = selectedOption
+                )
+            }
+        } catch (_: Exception) {
+            null
+        }
+    }
+
+    private fun buildFlightEvent(
+        allOptions: List<SerpFlightOption>,
+        selectedOption: SerpFlightOption,
+        itinerary: Itinerary,
+        defaultDate: String,
+        segment: FlightSegment,
+        priceLevel: String
+    ): TravelEvent {
+        val eventId = UUID.randomUUID().toString()
+        val firstLeg = selectedOption.flights.firstOrNull()
+        val lastLeg = selectedOption.flights.lastOrNull()
+        val departureTimestamp = firstLeg?.departureTimestamp().orEmpty()
+        val arrivalTimestamp = lastLeg?.arrivalTimestamp().orEmpty()
+        val destinationAirport = lastLeg?.arrivalAirport?.id.orEmpty()
+        val eventOptions = allOptions.mapIndexed { idx, option ->
+            flightOptionToEventOption(
+                option = option,
+                eventId = eventId,
+                isSelected = idx == 0,
+                priceLevel = priceLevel,
+                segment = segment,
+                itinerary = itinerary
+            )
+        }
+
+        return TravelEvent(
+            eventId = eventId,
+            type = "flight",
+            itineraryId = itinerary.itineraryId,
+            date = departureTimestamp.datePart(defaultDate),
+            startTime = departureTimestamp.timePart(),
+            endTime = arrivalTimestamp.timePart(),
+            imageUrl = selectedOption.airlineLogo ?: "",
+            details = buildMap {
+                put("trip_segment", segment.key)
+                put("title", buildFlightTitle(segment, destinationAirport, itinerary))
+                firstLeg?.let {
+                    put("airline", it.airline)
+                    put("flight_number", it.flightNumber)
+                    put("origin_airport", it.departureAirport.id)
+                    put("departure_time", departureTimestamp)
+                }
+                lastLeg?.let {
+                    put("destination_airport", it.arrivalAirport.id)
+                    put("arrival_time", arrivalTimestamp)
+                }
+                put("total_price", selectedOption.price.toString())
+                put("price_level", priceLevel)
+                put("stops", (selectedOption.flights.size - 1).toString())
+                selectedOption.type?.let { put("trip_type", it) }
+                selectedOption.carbonEmissions?.differencePercent?.let {
+                    put("carbon_diff_percent", it.toString())
+                }
+            },
+            options = eventOptions
+        )
+    }
+
+    private fun noFlightsPlaceholder(
+        itinerary: Itinerary,
+        date: String,
+        segment: FlightSegment
+    ): TravelEvent {
+        val origin = when (segment) {
+            FlightSegment.OUTBOUND -> itinerary.originIata
+            FlightSegment.RETURN -> itinerary.destinationIata
+        }
+        val dest = when (segment) {
+            FlightSegment.OUTBOUND -> itinerary.destinationIata
+            FlightSegment.RETURN -> itinerary.originIata
+        }
         return TravelEvent(
             eventId = UUID.randomUUID().toString(),
             type = "flight",
             itineraryId = itinerary.itineraryId,
-            date = "",
+            date = date,
             details = buildMap {
-                put("title", "No flights found")
+                put("trip_segment", segment.key)
+                put("title", buildFlightTitle(segment, dest, itinerary))
+                put("description", "No flights found")
                 put("origin_airport", origin)
                 put("destination_airport", dest)
                 put("booking_url", "https://www.google.com/flights?q=flights+from+$origin+to+$dest")
@@ -203,10 +375,13 @@ object SerpRepository {
         option: SerpFlightOption,
         eventId: String,
         isSelected: Boolean,
-        priceLevel: String
+        priceLevel: String,
+        segment: FlightSegment,
+        itinerary: Itinerary
     ): EventOption {
         val firstLeg = option.flights.firstOrNull()
         val lastLeg = option.flights.lastOrNull()
+        val destinationAirport = lastLeg?.arrivalAirport?.id.orEmpty()
         return EventOption(
             optionId = UUID.randomUUID().toString(),
             eventId = eventId,
@@ -216,6 +391,8 @@ object SerpRepository {
             details = buildMap {
                 val departureTimestamp = firstLeg?.departureTimestamp().orEmpty()
                 val arrivalTimestamp = lastLeg?.arrivalTimestamp().orEmpty()
+                put("trip_segment", segment.key)
+                put("title", buildFlightTitle(segment, destinationAirport, itinerary))
                 put("price", option.price.toString())
                 put("price_level", priceLevel)
                 put("total_duration", option.totalDuration.toString())
@@ -235,6 +412,7 @@ object SerpRepository {
                 option.carbonEmissions?.differencePercent?.let {
                     put("carbon_diff_percent", it.toString())
                 }
+                option.type?.let { put("trip_type", it) }
                 // Per-leg breakdown stored with leg_N_ prefix for detailed display
                 option.flights.forEachIndexed { i, leg ->
                     put("leg_${i}_airline", leg.airline)
