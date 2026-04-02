@@ -60,6 +60,27 @@ data class YelpOpenHours(
     @SerializedName("is_overnight") val isOvernight: Boolean = false
 )
 
+// ── Reviews ──────────────────────────────────────────────────────────────────
+
+data class YelpReviewsResponse(
+    val reviews: List<YelpReview> = emptyList(),
+    val total: Int = 0
+)
+
+data class YelpReview(
+    val id: String = "",
+    val rating: Int = 0,
+    val text: String = "",
+    val url: String = "",
+    val user: YelpUser? = null,
+    @SerializedName("time_created") val timeCreated: String = ""
+)
+
+data class YelpUser(
+    val name: String = "",
+    @SerializedName("image_url") val imageUrl: String = ""
+)
+
 // ── Events Search ────────────────────────────────────────────────────────────
 
 data class YelpEventsResponse(

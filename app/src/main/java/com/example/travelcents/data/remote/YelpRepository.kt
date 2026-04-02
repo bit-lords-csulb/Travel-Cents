@@ -5,6 +5,7 @@ import com.example.travelcents.data.model.EventOption
 import com.example.travelcents.data.model.TravelEvent
 import com.example.travelcents.data.model.YelpBusiness
 import com.example.travelcents.data.model.YelpEvent
+import com.example.travelcents.data.model.YelpReview
 import okhttp3.OkHttpClient
 import okhttp3.logging.HttpLoggingInterceptor
 import retrofit2.Retrofit
@@ -174,6 +175,16 @@ object YelpRepository {
         } catch (_: Exception) {
             emptyList()
         }
+    }
+
+    // Fetch full business details (photos, hours, etc.) — called lazily on first expand
+    suspend fun getBusinessDetail(yelpId: String): YelpBusiness? {
+        return try { api.getBusinessDetail(yelpId) } catch (_: Exception) { null }
+    }
+
+    // Fetch up to 3 review snippets — called lazily on first expand
+    suspend fun getBusinessReviews(yelpId: String): List<YelpReview> {
+        return try { api.getBusinessReviews(yelpId, limit = 3).reviews } catch (_: Exception) { emptyList() }
     }
 
     private fun businessToEventOption(
