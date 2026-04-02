@@ -81,6 +81,13 @@ object MainRoutes {
 private val bottomNavRoutes = setOf(
     MainRoutes.Current,
     MainRoutes.NewTrip,
+    MainRoutes.NewTripStep1,
+    MainRoutes.NewTripStep2,
+    MainRoutes.NewTripStep3,
+    MainRoutes.NewTripStep4,
+    MainRoutes.NewTripStep5,
+    MainRoutes.TripGenerating,
+    MainRoutes.AiTripChat,
     MainRoutes.Home,
     MainRoutes.Chats,
     MainRoutes.Settings
@@ -101,6 +108,9 @@ fun MainScaffold(modifier: Modifier = Modifier, onLogout: () -> Unit = {}) {
     val navBackStackEntry by navController.currentBackStackEntryAsState()
     val currentRoute = navBackStackEntry?.destination?.route ?: MainRoutes.Home
     val itineraryUiState by sharedItineraryViewModel.uiState.collectAsState()
+
+    // Load trip once on mount so currentTripId is available before any tab is visited
+    LaunchedEffect(Unit) { sharedItineraryViewModel.loadTrip() }
 
     val items = listOf(
         BottomNavItem(MainRoutes.Current, "CURRENT", Icons.Outlined.CalendarToday),
@@ -252,7 +262,6 @@ fun MainScaffold(modifier: Modifier = Modifier, onLogout: () -> Unit = {}) {
             }
         }
 
-        // Hide bottom nav on the AI chat screen
         if (currentRoute in bottomNavRoutes) {
             BottomNavBar(
                 items = items,

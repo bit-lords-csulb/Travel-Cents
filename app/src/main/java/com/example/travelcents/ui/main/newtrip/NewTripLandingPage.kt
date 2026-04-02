@@ -100,6 +100,14 @@ fun NewTripLandingPage(
             )
             Spacer(modifier = Modifier.height(32.dp))
 
+            Text(
+                text = "CHOOSE YOUR PATH TO BEGIN",
+                fontSize = 10.sp,
+                color = LandingOnSurfaceVariant.copy(alpha = 0.5f),
+                letterSpacing = 2.sp,
+                fontWeight = FontWeight.SemiBold
+            )
+
             // Planning a Trip card (glass style)
             LandingOptionCard(
                 title = "Planning a Trip",
@@ -130,15 +138,7 @@ fun NewTripLandingPage(
                 onClick = onAiChatClick
             )
 
-            Spacer(modifier = Modifier.height(24.dp))
-
-            Text(
-                text = "CHOOSE YOUR PATH TO BEGIN",
-                fontSize = 10.sp,
-                color = LandingOnSurfaceVariant.copy(alpha = 0.5f),
-                letterSpacing = 2.sp,
-                fontWeight = FontWeight.SemiBold
-            )
+            Spacer(modifier = Modifier.height(12.dp))
 
             if (onViewLastTripClick != null) {
                 Spacer(modifier = Modifier.height(20.dp))
