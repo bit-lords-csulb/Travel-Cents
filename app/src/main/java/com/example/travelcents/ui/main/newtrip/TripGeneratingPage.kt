@@ -49,7 +49,9 @@ private val generationSteps = listOf(
     GenerationStep.CRAFTING_ITINERARY to "Crafting your itinerary",
     GenerationStep.SEARCHING_FLIGHTS to "Searching for flights",
     GenerationStep.FINDING_HOTELS to "Finding hotels",
-    GenerationStep.PLANNING_ACTIVITIES to "Planning daily activities",
+    GenerationStep.FINDING_RESTAURANTS to "Finding restaurants for each day",
+    GenerationStep.FINDING_ACTIVITIES to "Discovering activities & events",
+    GenerationStep.DOWNLOADING_IMAGES to "Saving photos for offline use",
     GenerationStep.SAVING to "Saving your trip"
 )
 

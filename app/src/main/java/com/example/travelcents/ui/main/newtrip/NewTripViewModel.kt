@@ -1,22 +1,26 @@
 package com.example.travelcents.ui.main.newtrip
 
+import android.app.Application
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
-import androidx.lifecycle.ViewModel
+import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
+import com.example.travelcents.data.ImageCacheManager
 import com.example.travelcents.data.model.Itinerary
 import com.example.travelcents.data.model.TravelEvent
 import com.example.travelcents.data.model.TravelRequest
 import com.example.travelcents.data.remote.GroqRepository
 import com.example.travelcents.data.remote.SerpRepository
+import com.example.travelcents.data.remote.YelpRepository
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FirebaseFirestore
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
-import kotlinx.coroutines.async
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.tasks.await
 
@@ -25,12 +29,14 @@ enum class GenerationStep {
     CRAFTING_ITINERARY,
     SEARCHING_FLIGHTS,
     FINDING_HOTELS,
-    PLANNING_ACTIVITIES,
+    FINDING_RESTAURANTS,
+    FINDING_ACTIVITIES,
+    DOWNLOADING_IMAGES,
     SAVING,
     COMPLETE
 }
 
-class NewTripViewModel : ViewModel() {
+class NewTripViewModel(application: Application) : AndroidViewModel(application) {
 
     // Form fields
     var origin by mutableStateOf("")
@@ -56,26 +62,27 @@ class NewTripViewModel : ViewModel() {
         "Los Angeles, USA", "Chicago, USA", "San Francisco, USA", "Miami, USA", "Las Vegas, USA",
         "Vancouver, Canada", "Montreal, Canada", "Mexico City, Mexico", "Cancun, Mexico", "Rio de Janeiro, Brazil",
         "Buenos Aires, Argentina", "Santiago, Chile", "Lima, Peru", "Bogota, Colombia", "Cape Town, South Africa",
-        "Johannesburg, South Africa", "Marrakech, Morocco", "Cairo, Egypt", "Nairobi, Kenya", "Dubai, UAE",
+        "Johannesburg, South Africa", "Marrakech, Morocco", "Cairo, Egypt", "Nairobi, Kenya",
         "Abu Dhabi, UAE", "Doha, Qatar", "Mumbai, India", "New Delhi, India", "Bangalore, India",
         "Shanghai, China", "Beijing, China", "Guangzhou, China", "Taipei, Taiwan", "Osaka, Japan",
         "Kyoto, Japan", "Melbourne, Australia", "Auckland, New Zealand", "Athens, Greece", "Venice, Italy",
         "Florence, Italy", "Milan, Italy", "Munich, Germany", "Frankfurt, Germany", "Zurich, Switzerland",
         "Geneva, Switzerland", "Brussels, Belgium", "Dublin, Ireland", "Edinburgh, UK", "Stockholm, Sweden",
         "Oslo, Norway", "Copenhagen, Denmark", "Helsinki, Finland", "Warsaw, Poland", "Budapest, Hungary",
-        "Prague, Czech Republic", "Bucharest, Romania", "Sofia, Bulgaria", "Belgrade, Serbia", "Zagreb, Croatia",
+        "Bucharest, Romania", "Sofia, Bulgaria", "Belgrade, Serbia", "Zagreb, Croatia",
         "Ljubljana, Slovenia", "Bratislava, Slovakia", "Tallinn, Estonia", "Riga, Latvia", "Vilnius, Lithuania",
-        "Moscow, Russia", "Saint Petersburg, Russia", "Kiev, Ukraine", "Minsk, Belarus", "Tashkent, Uzbekistan",
-        "Almaty, Kazakhstan", "Baku, Azerbaijan", "Tbilisi, Georgia", "Yerevan, Armenia", "Tehran, Iran",
-        "Baghdad, Iraq", "Riyadh, Saudi Arabia", "Jeddah, Saudi Arabia", "Kuwait City, Kuwait", "Muscat, Oman",
-        "Manama, Bahrain", "Beirut, Lebanon", "Amman, Jordan", "Damascus, Syria", "Tel Aviv, Israel",
-        "Jerusalem, Israel", "Karachi, Pakistan", "Lahore, Pakistan", "Dhaka, Bangladesh", "Colombo, Sri Lanka",
-        "Kathmandu, Nepal", "Male, Maldives", "Hanoi, Vietnam", "Ho Chi Minh City, Vietnam", "Phnom Penh, Cambodia",
-        "Vientiane, Laos", "Yangon, Myanmar", "Kuala Lumpur, Malaysia", "Jakarta, Indonesia", "Manila, Philippines",
-        "Sydney, Australia", "Perth, Australia", "Brisbane, Australia", "Adelaide, Australia", "Canberra, Australia",
-        "Wellington, New Zealand", "Christchurch, New Zealand", "Port Moresby, Papua New Guinea", "Suva, Fiji",
-        "Honolulu, USA", "Anchorage, USA", "Seattle, USA", "Portland, USA", "Denver, USA", "Phoenix, USA",
-        "Dallas, USA", "Houston, USA", "Atlanta, USA", "Boston, USA", "Philadelphia, USA", "Washington D.C., USA"
+        "Moscow, Russia", "Saint Petersburg, Russia", "Tashkent, Uzbekistan",
+        "Almaty, Kazakhstan", "Baku, Azerbaijan", "Tbilisi, Georgia", "Yerevan, Armenia",
+        "Riyadh, Saudi Arabia", "Jeddah, Saudi Arabia", "Kuwait City, Kuwait", "Muscat, Oman",
+        "Manama, Bahrain", "Beirut, Lebanon", "Amman, Jordan", "Tel Aviv, Israel",
+        "Karachi, Pakistan", "Lahore, Pakistan", "Dhaka, Bangladesh", "Colombo, Sri Lanka",
+        "Kathmandu, Nepal", "Male, Maldives", "Hanoi, Vietnam", "Ho Chi Minh City, Vietnam",
+        "Phnom Penh, Cambodia", "Vientiane, Laos", "Yangon, Myanmar", "Kuala Lumpur, Malaysia",
+        "Jakarta, Indonesia", "Manila, Philippines", "Perth, Australia", "Brisbane, Australia",
+        "Adelaide, Australia", "Canberra, Australia", "Wellington, New Zealand", "Christchurch, New Zealand",
+        "Honolulu, USA", "Anchorage, USA", "Seattle, USA", "Portland, USA", "Denver, USA",
+        "Phoenix, USA", "Dallas, USA", "Houston, USA", "Atlanta, USA", "Boston, USA",
+        "Philadelphia, USA", "Washington D.C., USA"
     ).sorted()
 
     var filteredDestinations by mutableStateOf(emptyList<String>())
@@ -101,14 +108,12 @@ class NewTripViewModel : ViewModel() {
             _uiState.value = TripUiState.Error("You must be logged in to create a trip.")
             return
         }
-
         if (origin.isBlank() || destination.isBlank() || dateFrom.isBlank() || dateTo.isBlank()) {
             _uiState.value = TripUiState.Error("Please fill in origin, destination, and dates.")
             return
         }
 
         val budget = budgetTotal.toDoubleOrNull() ?: 0.0
-
         val request = TravelRequest(
             userId = uid,
             origin = origin,
@@ -127,17 +132,17 @@ class NewTripViewModel : ViewModel() {
 
         viewModelScope.launch {
             try {
-                // Step 1: generate itinerary metadata (includes IATA codes)
+                // Step 1: Groq generates itinerary metadata + IATA codes
                 _generationStep.value = GenerationStep.CRAFTING_ITINERARY
                 _uiState.value = TripUiState.Loading(GROQ_ITINERARY_MESSAGES.random())
                 val itinerary = GroqRepository.generateItinerary(request)
 
-                // Step 2: Compute hotel budget slice (~40% of total budget / nights)
+                // Hotel budget slice (~40% of total / nights)
                 val hotelBudgetPerNight = if (budget > 0 && itinerary.durationDays > 0)
                     (budget * 0.40) / itinerary.durationDays
                 else 0.0
 
-                // Step 3: Fetch flights + hotels in parallel (hotels filtered by budget)
+                // Step 2: Flights + hotels in parallel
                 _generationStep.value = GenerationStep.SEARCHING_FLIGHTS
                 _uiState.value = TripUiState.Loading(SERP_FLIGHTS_MESSAGES.random())
                 val flightsDeferred = async { SerpRepository.searchFlights(request, itinerary) }
@@ -147,25 +152,88 @@ class NewTripViewModel : ViewModel() {
                 val realFlights = flightsDeferred.await()
                 val realHotels = hotelsDeferred.await()
 
-                // Step 4: Compute remaining budget from real prices
+                // Remaining budget for activity guidance
                 val flightPrice = realFlights.firstOrNull()?.details?.get("total_price")?.toDoubleOrNull() ?: 0.0
-                val hotelPerNight = realHotels.firstOrNull()?.details?.get("price_per_night")?.toDoubleOrNull() ?: 0.0
+                val hotelPerNight = realHotels.firstOrNull()?.details?.get("rate_per_night")?.toDoubleOrNull() ?: 0.0
                 val hotelTotal = hotelPerNight * itinerary.durationDays
                 val remainingBudget = if (budget > 0) maxOf(0.0, budget - flightPrice - hotelTotal) else 0.0
 
-                // Step 5: Groq generates full daily schedule with budget context
-                _generationStep.value = GenerationStep.PLANNING_ACTIVITIES
-                _uiState.value = TripUiState.Loading(GROQ_EVENTS_MESSAGES.random())
-                val aiEvents = GroqRepository.generateEvents(itinerary, request, realFlights, realHotels, remainingBudget)
+                val tripDates = generateTripDates(request.dateFrom, itinerary.durationDays)
 
-                val allEvents = realFlights + realHotels + aiEvents
+                // Step 3: Yelp restaurants — 1 call per day, all in parallel
+                _generationStep.value = GenerationStep.FINDING_RESTAURANTS
+                _uiState.value = TripUiState.Loading(YELP_RESTAURANTS_MESSAGES.random())
+                val restaurantDeferreds = tripDates.map { date ->
+                    async {
+                        YelpRepository.searchRestaurants(
+                            location = itinerary.destination,
+                            date = date,
+                            itineraryId = itinerary.itineraryId,
+                            dietary = request.dietary
+                        )
+                    }
+                }
+                val restaurantEvents = restaurantDeferreds.awaitAll().filterNotNull()
+
+                // Step 4: Yelp activities (per day) + Yelp events (full trip range), all in parallel
+                _generationStep.value = GenerationStep.FINDING_ACTIVITIES
+                _uiState.value = TripUiState.Loading(YELP_ACTIVITIES_MESSAGES.random())
+                val activityDeferreds = tripDates.map { date ->
+                    async {
+                        YelpRepository.searchActivities(
+                            location = itinerary.destination,
+                            date = date,
+                            itineraryId = itinerary.itineraryId
+                        )
+                    }
+                }
+                val yelpEventsDeferred = async {
+                    YelpRepository.searchEvents(
+                        location = itinerary.destination,
+                        startDate = request.dateFrom,
+                        endDate = request.dateTo,
+                        itineraryId = itinerary.itineraryId
+                    )
+                }
+                val activityEvents = activityDeferreds.awaitAll().filterNotNull()
+                val localEvents = yelpEventsDeferred.await()
+
+                val allEvents = realFlights + realHotels + restaurantEvents + activityEvents + localEvents
                 val linkedItinerary = itinerary.copy(eventIds = allEvents.map { it.eventId })
 
+                // Step 5: Download all option images to internal storage
+                _generationStep.value = GenerationStep.DOWNLOADING_IMAGES
+                _uiState.value = TripUiState.Loading(DOWNLOADING_MESSAGES.random())
+                val allImageUrls = allEvents.flatMap { event ->
+                    listOf(event.imageUrl) + event.options.map { it.imageUrl }
+                }.filter { it.isNotBlank() }
+                val localPaths = ImageCacheManager.downloadTripImages(
+                    getApplication(),
+                    itinerary.itineraryId,
+                    allImageUrls
+                )
+
+                // Patch localImagePath into each option + event imageUrl where cached
+                val patchedEvents = allEvents.map { event ->
+                    val patchedOpts = event.options.map { opt ->
+                        val local = localPaths[opt.imageUrl]
+                        if (local != null) opt.copy(localImagePath = local) else opt
+                    }
+                    val localEventImg = localPaths[event.imageUrl]
+                    event.copy(
+                        options = patchedOpts,
+                        imageUrl = localEventImg ?: event.imageUrl
+                    )
+                }
+
+                // Step 6: Save to Firestore (events + options subcollection)
                 _generationStep.value = GenerationStep.SAVING
                 _uiState.value = TripUiState.Loading(FIRESTORE_MESSAGES.random())
-                saveToFirestore(uid, linkedItinerary, allEvents)
+                saveToFirestore(uid, linkedItinerary, patchedEvents)
+
                 _generationStep.value = GenerationStep.COMPLETE
-                _uiState.value = TripUiState.Success(linkedItinerary, allEvents)
+                _uiState.value = TripUiState.Success(linkedItinerary, patchedEvents)
+
             } catch (e: Exception) {
                 _generationStep.value = GenerationStep.IDLE
                 _uiState.value = TripUiState.Error(e.message ?: "Failed to generate trip.")
@@ -185,10 +253,15 @@ class NewTripViewModel : ViewModel() {
         tripRef.set(itinerary.toFirestoreMap()).await()
 
         for (event in events) {
-            tripRef.collection("events")
-                .document(event.eventId)
-                .set(event.toFirestoreMap())
-                .await()
+            val eventRef = tripRef.collection("events").document(event.eventId)
+            eventRef.set(event.toFirestoreMap()).await()
+            // Options stored as subcollection: events/{eventId}/options/{optionId}
+            for (option in event.options) {
+                eventRef.collection("options")
+                    .document(option.optionId)
+                    .set(option.toMap())
+                    .await()
+            }
         }
     }
 
@@ -205,6 +278,27 @@ class NewTripViewModel : ViewModel() {
         interests = if (item in interests) interests - item else interests + item
     }
 
+    // Generates a list of YYYY-MM-DD strings for each day of the trip
+    private fun generateTripDates(dateFrom: String, durationDays: Int): List<String> {
+        return try {
+            val parts = dateFrom.split("-")
+            val year = parts[0].toInt()
+            val month = parts[1].toInt() - 1 // Calendar months are 0-based
+            val day = parts[2].toInt()
+            val cal = java.util.Calendar.getInstance()
+            cal.set(year, month, day)
+            (0 until durationDays).map {
+                val y = cal.get(java.util.Calendar.YEAR)
+                val m = cal.get(java.util.Calendar.MONTH) + 1
+                val d = cal.get(java.util.Calendar.DAY_OF_MONTH)
+                cal.add(java.util.Calendar.DAY_OF_MONTH, 1)
+                "%04d-%02d-%02d".format(y, m, d)
+            }
+        } catch (_: Exception) {
+            emptyList()
+        }
+    }
+
     companion object {
         private val GROQ_ITINERARY_MESSAGES = listOf(
             "Asking Groq to plan your trip...",
@@ -215,20 +309,27 @@ class NewTripViewModel : ViewModel() {
         private val SERP_FLIGHTS_MESSAGES = listOf(
             "Checking flight availability...",
             "Searching for the best flights...",
-            "Looking up flights via SerpAPI...",
             "Scanning flight options for your dates..."
         )
         private val SERP_HOTELS_MESSAGES = listOf(
-            "Looking for suitable hotels...",
+            "Looking for top-rated hotels...",
             "Searching for accommodations...",
-            "Finding hotels via SerpAPI...",
             "Browsing hotel options at your destination..."
         )
-        private val GROQ_EVENTS_MESSAGES = listOf(
-            "Groq is building your full daily schedule...",
-            "Planning restaurants and activities for every day...",
-            "Groq is curating budget-aware daily experiences...",
-            "Crafting a day-by-day itinerary with Groq..."
+        private val YELP_RESTAURANTS_MESSAGES = listOf(
+            "Finding the best restaurants for each day...",
+            "Searching local dining options via Yelp...",
+            "Curating restaurant picks for your trip..."
+        )
+        private val YELP_ACTIVITIES_MESSAGES = listOf(
+            "Discovering activities and attractions...",
+            "Finding things to do via Yelp...",
+            "Searching local events and experiences..."
+        )
+        private val DOWNLOADING_MESSAGES = listOf(
+            "Saving photos for offline use...",
+            "Downloading images for your trip...",
+            "Almost there — caching your trip photos..."
         )
         private val FIRESTORE_MESSAGES = listOf(
             "Saving your trip...",
