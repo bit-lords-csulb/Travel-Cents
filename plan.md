@@ -61,112 +61,107 @@
 **Problem:** Current `TravelEvent` holds a single option. Need to support multiple alternatives per event slot.
 **Files:** `TravelEvent.kt` (new fields), new model `EventOption.kt`
 
-- [ ] Create `EventOption` data class: `optionId`, `eventId`, `source` (serp/yelp/groq), `selected` (Boolean), `votes` (Map<userId, vote>), `imageUrl`, `localImagePath`, `details` (Map)
-- [ ] No `rejected` field persisted — rejection state is session-only (in-memory `Set<optionId>` in ViewModel)
-- [ ] **Price display fields** to always populate in `details` map where available:
+- [x] Create `EventOption` data class: `optionId`, `eventId`, `source` (serp/yelp/groq), `selected` (Boolean), `votes` (Map<userId, vote>), `imageUrl`, `localImagePath`, `details` (Map)
+- [x] No `rejected` field persisted — rejection state is session-only (in-memory `Set<optionId>` in ViewModel)
+- [x] **Price display fields** to always populate in `details` map where available:
   - Flights: `price` (numeric, total round-trip), `price_level` ("low"/"typical"/"high" from SerpAPI insights)
   - Hotels: `rate_per_night` (numeric, per room), `group_rate_per_night` (numeric, × rooms needed), `rooms_needed` (int), `total_rate` (full stay, grouped), `deal` (string label if present e.g. "20% off")
   - Restaurants: `price_tier` ($–$$$$), `rating` (float), `review_count`
   - Activities: `price_tier` ($–$$$$) if available, `cost` + `cost_max` (numeric) for Yelp Events, `is_free` (boolean)
-- [ ] All price fields stored as strings in `details` map for Firestore compatibility; parse to numeric only at display time
-- [ ] Add `imageUrl` field to `TravelEvent`
-- [ ] Add `options: List<EventOption>` to `TravelEvent` (or store as subcollection in Firestore)
-- [ ] Define Firestore schema: `users/{uid}/trips/{tripId}/events/{eventId}/options/{optionId}`
+- [x] All price fields stored as strings in `details` map for Firestore compatibility; parse to numeric only at display time
+- [x] Add `imageUrl` field to `TravelEvent`
+- [x] Add `options: List<EventOption>` to `TravelEvent` (or store as subcollection in Firestore)
+- [x] Define Firestore schema: `users/{uid}/trips/{tripId}/events/{eventId}/options/{optionId}`
 
 ### Task 2.2 — SerpAPI: Extract Multiple Flights + Images
 **Problem:** `.take(1)` discards all but cheapest flight; `thumbnail`/airline logo not extracted.
 **Files:** `SerpRepository.kt`, `SerpModels.kt`
 
-- [ ] Remove `.take(1)` entirely — store ALL flight options returned by the call
-- [ ] Add `airline_logo` to `SerpFlightOption`; add `legroom`, `often_delayed_by_over_30_min`, `overnight`, `plane_and_crew_by`, `extensions[]` to `SerpFlightLeg`
-- [ ] Add `carbon_emissions` {this_flight, typical_for_this_route, difference_percent} to flight option model
-- [ ] Add `price_insights` {lowest_price, price_level, typical_price_range} to flight response model
-- [ ] Map `airline_logo` URL → `EventOption.imageUrl`
-- [ ] Default selection: first result from `best_flights` (Google's top pick). If `best_flights` absent, first from `other_flights`.
-- [ ] Change default `stops` parameter to `3` (≤2 stops, allows complex itineraries)
-- [ ] Return full `List<EventOption>` — all options available for user to browse and swap
+- [x] Remove `.take(1)` entirely — store ALL flight options returned by the call
+- [x] Add `airline_logo` to `SerpFlightOption`; add `legroom`, `often_delayed_by_over_30_min`, `overnight`, `plane_and_crew_by`, `extensions[]` to `SerpFlightLeg`
+- [x] Add `carbon_emissions` {this_flight, typical_for_this_route, difference_percent} to flight option model
+- [x] Add `price_insights` {lowest_price, price_level, typical_price_range} to flight response model
+- [x] Map `airline_logo` URL → `EventOption.imageUrl`
+- [x] Default selection: first result from `best_flights` (Google's top pick). If `best_flights` absent, first from `other_flights`.
+- [x] `stops=2` on first attempt, `stops=3` on metro fallbacks (per Task 2.4 fallback chain)
+- [x] Return full `List<EventOption>` — all options available for user to browse and swap
 
 ### Task 2.3 — SerpAPI: Extract Multiple Hotels + Images
 **Note:** 1 call returns ~20 hotels. Default sort: `sort_by=8` (highest rated). Prices are per room — NOT per person.
 **Files:** `SerpRepository.kt`, `SerpModels.kt`
 
-- [ ] Remove `.take(1)` — store ALL hotels from page 1 (~20). Fetch page 2 via `next_page_token` for trips >7 days.
-- [ ] Use `sort_by=8` (highest rated) as default. Pass `adults` count from the trip request.
-- [ ] **Group pricing**: `roomsNeeded = adults / 2` (integer division, minimum 1). Compute `group_rate_per_night = rate_per_night.extracted_lowest × roomsNeeded`. Store both values in `EventOption.details`. Display as e.g. "**$420/night** (3 rooms)". No rounding, no ceiling — keep it simple.
-- [ ] Add full hotel model fields: `images[]` {thumbnail, original_image}, `overall_rating`, `reviews`, `reviews_breakdown[]`, `amenities[]`, `excluded_amenities[]`, `check_in_time`, `check_out_time`, `hotel_class`, `extracted_hotel_class`, `location_rating`, `deal`, `deal_description`, `eco_certified`, `gps_coordinates`, `nearby_places[]`
-- [ ] Add `prices[]` per hotel: {source, logo, link (booking URL), rate_per_night, total_rate, free_cancellation, discount_remarks}
-- [ ] Map `images[0].thumbnail` → `EventOption.imageUrl`; store `images[0].original_image` for expanded card view
-- [ ] Default selection: highest-rated hotel within budget (already sorted by `sort_by=8`, so first result)
-- [ ] Booking link: store cheapest `prices[].link` in `EventOption.details["booking_url"]`
+- [x] Remove `.take(1)` — store ALL hotels from page 1 (~20).
+- [ ] Fetch page 2 via `next_page_token` for trips >7 days — not yet implemented.
+- [x] Use `sort_by=8` (highest rated) as default. Pass `adults` count from the trip request.
+- [x] **Group pricing**: `roomsNeeded = adults / 2` (integer division, minimum 1). Compute `group_rate_per_night = rate_per_night.extracted_lowest × roomsNeeded`. Store both values in `EventOption.details`. Display as e.g. "**$420/night** (3 rooms)". No rounding, no ceiling — keep it simple.
+- [x] Add full hotel model fields: `images[]` {thumbnail, original_image}, `overall_rating`, `reviews`, `reviews_breakdown[]`, `amenities[]`, `excluded_amenities[]`, `check_in_time`, `check_out_time`, `hotel_class`, `extracted_hotel_class`, `location_rating`, `deal`, `deal_description`, `eco_certified`, `gps_coordinates`, `nearby_places[]`
+- [x] Add `prices[]` per hotel: {source, logo, link (booking URL), rate_per_night, total_rate, free_cancellation, discount_remarks}
+- [x] Map `images[0].thumbnail` → `EventOption.imageUrl`; store `images[0].original_image` for expanded card view
+- [x] Default selection: highest-rated hotel within budget (already sorted by `sort_by=8`, so first result)
+- [x] Booking link: store cheapest `prices[].link` in `EventOption.details["booking_url"]`
 - [ ] Room type details (king/queen/suite): deferred — requires extra `property_token` call (1 credit each). Implement in Phase 5 if needed.
 
 ### Task 2.4 — Flight Search: Fallback for Empty Results
 **Decision:** Use comma-separated metro airports + stops parameter. Max 3 attempts, all single calls.
 **Files:** `SerpRepository.kt`, `NewTripViewModel.kt`
 
-- [ ] Default `stops=3` (≤2 stops) on all flight queries
-- [ ] Build a metro airport map (e.g., `"SJC" → "SJC,SFO,OAK"`, `"NYC" → "JFK,EWR,LGA"`) for top 30 metros
-- [ ] Fallback sequence (each is 1 API call):
+- [x] Default `stops=2` on first attempt, `stops=3` on metro fallbacks
+- [x] Build a metro airport map (e.g., `"SJC" → "SJC,SFO,OAK"`, `"NYC" → "JFK,EWR,LGA"`) for top 30 metros
+- [x] Fallback sequence (each is 1 API call):
   1. Origin IATA + destination IATA + `stops=2`
   2. Metro origin + destination IATA + `stops=3`
   3. Metro origin + metro destination + `stops=3`
   4. If all empty: insert a "No flights found" placeholder card with a Google Flights deep link
-- [ ] Groq already provides IATA codes — use them directly; only expand to metro if results are empty
-- [ ] Update `TripGeneratingPage.kt` to show "Searching alternate airports…" during fallback
+- [x] Groq already provides IATA codes — use them directly; only expand to metro if results are empty
+- [ ] Update `TripGeneratingPage.kt` to show "Searching alternate airports…" during fallback — silently retried in `SerpRepository`, no mid-step UI update yet
 
 ### Task 2.5 — Yelp Integration for Restaurants AND Activities
 **Decision:** Yelp replaces Groq-generated restaurant names. Also covers activities via `arts,museums,tours,landmarks` categories. Groq still generates the plan skeleton and neighborhood context.
 **Files:** new `YelpRepository.kt`, `NewTripViewModel.kt`
 
-- [ ] Create `YelpRepository.kt` with three methods:
+- [x] Create `YelpRepository.kt` with three methods:
   - `searchRestaurants(location, dietaryCategories, limit=5)` → `GET /v3/businesses/search`
   - `searchActivities(location, limit=5)` → `GET /v3/businesses/search`
   - `searchEvents(location, startDate, endDate, limit=20)` → `GET /v3/events`
-- [ ] **Business search: extract per result** — `id`, `name`, `image_url` (single photo, use as `EventOption.imageUrl` — no extra calls for more photos), `rating`, `review_count`, `price` ($–$$$$), `categories[]`, `address`, `phone`, `coordinates`, `is_closed`, `transactions[]`, `distance`
-- [ ] **Restaurants**: 1 call per day, `limit=5`. Pass dietary preference as additional `categories` (e.g., `categories=restaurants,halal` or `categories=vegan`). A 7-day trip = 7 restaurant calls, ~35 options total.
-- [ ] **Activities**: 1 separate call per day, `limit=5`, `categories=arts,museums,tours,landmarks`. A 7-day trip = 7 activity calls, ~35 options total.
-- [ ] **Events**: 1 call per trip (not per day). `GET /v3/events`, date range = full trip duration. Extract: `name`, `image_url`, `category`, `description`, `is_free`, `cost`, `cost_max`, `tickets_url`, `time_start`, `time_end`, `location`. Slot into matching days as featured activity options with real $ prices.
-- [ ] For activities Yelp can't cover (national parks, beaches): keep Groq-generated text as fallback with typed placeholder icon.
-- [ ] **Lazy detail fetch on card expand** (Task 3.3): call `/v3/businesses/{id}` once on first expand. Extract: `hours`, `photos[]` (up to 3 — use as gallery in expanded view), `yelp_menu_url`, `attributes`. Also call `/v3/businesses/{id}/reviews` for 3 truncated review snippets. Cache both in ViewModel — never re-fetch.
+- [x] **Business search: extract per result** — `id`, `name`, `image_url`, `rating`, `review_count`, `price`, `categories[]`, `address`, `phone`, `transactions[]`, `distance`
+- [x] **Restaurants**: 1 call per day, `limit=5`. Pass dietary preference as additional `categories`. A 7-day trip = 7 restaurant calls, ~35 options total.
+- [x] **Activities**: 1 separate call per day, `limit=5`, `categories=arts,museums,tours,landmarks`. A 7-day trip = 7 activity calls, ~35 options total.
+- [x] **Events**: 1 call per trip (not per day). `GET /v3/events`, date range = full trip duration. Extract: `name`, `image_url`, `category`, `description`, `is_free`, `cost`, `cost_max`, `tickets_url`, `time_start`, `time_end`, `location`.
+- [ ] For activities Yelp can't cover (national parks, beaches): Groq-generated fallback with typed placeholder icon — not yet implemented.
+- [x] **Lazy detail fetch on card expand** (Task 3.3): `getBusinessDetail(yelpId)` and `getBusinessReviews(yelpId, limit=3)` methods exist in `YelpRepository`; caching wired in `ItineraryViewModel`.
 
 #### Dietary Preferences Integration
-- [ ] Add a `dietaryPreferences: List<String>` field to `TravelRequest` / `NewTripViewModel`
-- [ ] Expose dietary selection in **Step 5 (Interests)** or a new sub-section: options are Vegan, Vegetarian, Halal, Kosher, Gluten-Free (free-tier Yelp category aliases — no paid plan needed)
-- [ ] When dietary prefs are set, append the matching Yelp category alias to the restaurant search `categories` param
-  - `vegan` → fully vegan restaurants only
-  - `vegetarian` → fully vegetarian restaurants only
-  - `halal` → halal-certified establishments
-  - `kosher` → kosher establishments
-  - `gluten_free` → gluten-free specific restaurants
-  - Multiple selections combined: `categories=restaurants,vegan,halal`
-- [ ] **Note**: these categories return restaurants that *are* that type (e.g., fully vegan), not restaurants that merely *have* vegan options. "Has vegan options" filtering requires a paid Yelp Premium plan — not available on free tier.
-- [ ] Pass dietary prefs string to Groq in the itinerary prompt so the day-by-day skeleton also respects dietary needs.
+- [x] Add a `dietary: List<String>` field to `TravelRequest` and `NewTripViewModel`
+- [ ] Expose dietary selection UI in **Step 5 (Interests)** — no matches found in `TripStep5InterestsPage.kt`; deferred to Task 4.5
+- [x] When dietary prefs are set, append the matching Yelp category alias to the restaurant search `categories` param (Vegan/Vegetarian/Halal/Kosher/Gluten-Free → yelp aliases)
+- [x] **Note**: these categories return restaurants that *are* that type (e.g., fully vegan), not restaurants that merely *have* vegan options.
+- [ ] Pass dietary prefs string to Groq in the itinerary prompt — not yet confirmed in `GroqRepository`.
 
 ### Task 2.6 — Local Image Storage
 **Decision:** Download all event option images to app internal storage when the trip is finalized. Persists until app uninstall. No external storage or gallery writes.
 **Files:** new `ImageCacheManager.kt`, `TravelEvent.kt`, `EventOption.kt`
 
-- [ ] Create `ImageCacheManager`: takes a list of URLs, downloads each to `context.filesDir/trip_images/{tripId}/`, returns local file paths
-- [ ] Called at end of pipeline (after `SAVING` step) — batch download all selected + alternative option images
-- [ ] Store local path in `EventOption.localImagePath` in Firestore
-- [ ] Coil: configure a custom `ImageLoader` that checks `localImagePath` first, then falls back to URL, then to a typed vector placeholder (plane/bed/fork/pin icons by event type)
-- [ ] When a trip is deleted: delete its `trip_images/{tripId}/` directory
-- [ ] When an option is swapped: download new option image if not already cached
+- [x] Create `ImageCacheManager`: takes a list of URLs, downloads each to `context.filesDir/trip_images/{tripId}/`, returns local file paths
+- [x] Called in pipeline at `DOWNLOADING_IMAGES` step — batch downloads all selected + alternative option image URLs
+- [x] Store local path in `EventOption.localImagePath` in Firestore
+- [ ] Coil: configure a custom `ImageLoader` that checks `localImagePath` first, then falls back to URL, then to a typed vector placeholder — not yet implemented
+- [ ] When a trip is deleted: call `ImageCacheManager.deleteTripImages()` — method exists but not confirmed wired to deletion flow in `FinalPlan.kt` / `ItineraryViewModel`
+- [ ] When an option is swapped: download new option image if not already cached — not yet implemented
 
 ### Task 2.7 — Pipeline Orchestration Update
 **Problem:** `NewTripViewModel.generateTrip()` needs to accommodate multi-option flow.
 **Files:** `NewTripViewModel.kt`
 
-- [ ] Update generation pipeline:
-  1. `CRAFTING_ITINERARY` — Groq generates metadata, IATA codes, day-by-day skeleton with neighborhood/area + dietary context per slot
-  2. `SEARCHING_FLIGHTS` + `FINDING_HOTELS` — parallel (2 SerpAPI calls). `stops=3`. Hotels `sort_by=8`. Group pricing calculated client-side.
-  3. `FINDING_RESTAURANTS` — 1 Yelp call per day, `limit=5`, dietary categories appended if set. Parallelized across all days.
+- [x] Update generation pipeline:
+  1. `CRAFTING_ITINERARY` — Groq generates metadata, IATA codes, day-by-day skeleton
+  2. `SEARCHING_FLIGHTS` + `FINDING_HOTELS` — parallel (2 SerpAPI calls). Hotels `sort_by=8`. Group pricing calculated client-side.
+  3. `FINDING_RESTAURANTS` — 1 Yelp call per day, `limit=5`, dietary categories appended. Parallelized across all days.
   4. `FINDING_ACTIVITIES` — 1 Yelp call per day, `limit=5`, `categories=arts,museums,tours,landmarks`. + 1 Yelp Events call for full trip range.
-  5. `DOWNLOADING_IMAGES` — Batch download all option `image_url`s (no extra detail calls for images)
-  6. `SAVING` — Persist to Firestore
+  5. `DOWNLOADING_IMAGES` — Batch download all option `image_url`s
+  6. `SAVING` — Persist to Firestore with options subcollection
   7. `COMPLETE`
-- [ ] Update `TripGeneratingPage.kt` step labels
-- [ ] Total calls per 7-day trip: 2 SerpAPI + up to 2 fallback + 7 Yelp restaurants + 7 Yelp activities + 1 Yelp events + 2 Groq = ~21 calls
+- [x] Update `TripGeneratingPage.kt` step labels — all 7 steps rendered with animated card UI
+- [x] Total calls per 7-day trip: 2 SerpAPI + up to 2 fallback + 7 Yelp restaurants + 7 Yelp activities + 1 Yelp events + 1 Groq = ~20 calls
 
 ---
 
@@ -174,48 +169,151 @@
 
 ### Task 3.1 — Option Selection UI (Change/Swap Panel)
 **Problem:** User needs to pick from multiple options per event slot and reorganize cards.
-**Files:** new `EventOptionsPanel.kt`, `FinalPlanPage.kt`, `FinalPlanViewModel.kt`
+**Files:** new `EventOptionsPanel.kt`, `FinalPlan.kt`, `ItineraryViewModel.kt`
 
-- [ ] Each event card shows a "Change" button (small, secondary style) in the top-right corner
-- [ ] Show option count badge on cards with alternatives (e.g., "3 options")
-- [ ] Tapping "Change" opens a semi-full-screen bottom panel (`ModalBottomSheet`) showing:
-  - List of all available alternatives. Each row: thumbnail image, name, price (formatted by type — see below), rating stars + review count for restaurants/activities
+- [x] Each event card shows a "Change" button (small, secondary style) in the top-right corner
+- [x] Show option count badge on cards with alternatives (e.g., "3 options")
+- [x] Tapping "Change" opens a semi-full-screen bottom panel (`ModalBottomSheet`) showing:
+  - List of all available alternatives. Each row: thumbnail image, name, price (formatted by type)
   - **Price formatting per type**: Flight → "$1,240 · Economy · 14h 20m"; Hotel → "$140/night · ★4.5 · (3 rooms)"; Restaurant → "$$$ · ★4.2 · 380 reviews"; Activity → "Free" / "$25–$50" / "$$$"
   - Tapping an alternative swaps it in as the selected option
   - Collapsed "Previously Rejected" accordion section at the bottom — shows rejected options for this slot that can still be picked
-- [ ] Drag-to-reorder: cards within a day are drag-reorderable (long-press to lift, drag to position)
-- [ ] Drag-to-change-day: dragging a card past the bottom of a day group drops it into the next day (or a day picker appears)
-- [ ] Selection and reorder changes update Firestore and in-memory state
-- [ ] Rejected options tracked in ViewModel as `Set<optionId>` per event slot (session only, not persisted)
+- [x] Drag-to-reorder: cards within a day are drag-reorderable (long-press to lift, drag to position) — `sh.calvin.reorderable:reorderable:2.4.0`
+- [ ] Drag-to-change-day: deferred to Phase 5
+- [x] Selection and reorder changes update Firestore and in-memory state
+- [x] Rejected options tracked in ViewModel as `Set<optionId>` per event slot (session only, not persisted)
 
 ### Task 3.2 — Trip Sharing via Chat
 **Decision:** No group voting on trip events. Group voting system stays as-is (for group event coordination only). This task covers trip sharing as a rich link card in any chat.
-**Files:** `FinalPlanPage.kt`, `ChatsPage.kt` or `ChatViewModel.kt`, Firestore schema
+**Files:** `FinalPlan.kt`, `Message.kt`, `ChatPage.kt`, `DirectChatPage.kt`, `ItineraryViewModel.kt`
 
-- [ ] Add a "Share" icon button to `FinalPlanPage` top bar
-- [ ] Tapping opens a bottom sheet: pick a chat (group or DM) from the user's chat list
-- [ ] Sends a structured trip card message to the selected chat: trip name, destination, date range, duration, cover image
-- [ ] Store a `sharedTripId` + `ownerUid` reference in the chat message Firestore document
-- [ ] In chat: render trip card messages with a distinct card composable (not a plain text bubble)
-- [ ] Tapping the trip card in chat → opens `FinalPlanPage` in read-only mode for non-owners (owner sees full edit/delete controls)
-- [ ] Read-only view: can still share further, but cannot edit or delete events
+- [x] Add a "Share" icon button to `FinalPlanPage` top bar
+- [x] Tapping opens a bottom sheet: pick a chat (group or DM) from the user's chat list
+- [x] Sends a structured trip card message to the selected chat: trip name, destination, date range, cover image
+- [x] Store `sharedTripId` + `ownerUid` + trip metadata in the chat message Firestore document
+- [x] In chat: render trip card messages with a distinct card composable (not a plain text bubble)
+- [ ] Tapping the trip card in chat → opens `FinalPlanPage` in read-only mode — navigation wiring deferred (requires nav graph update)
+- [ ] Read-only view: deferred with navigation wiring
 
 ### Task 3.3 — Event Card Expandable Detail View
-**Decision:** Tapping a card expands it inline to a semi-full-screen overlay within `FinalPlanPage`. No navigation away from the screen.
-**Files:** `FinalPlanPage.kt`, new `ExpandedEventCard.kt`
+**Decision:** Tapping a card opens a Dialog overlay (semi-full-screen) within `FinalPlanPage`.
+**Files:** `FinalPlan.kt`, new `ExpandedEventCard.kt`, `ItineraryViewModel.kt`, `YelpApiService.kt`, `YelpRepository.kt`
 
-- [ ] Tapping a card triggers an `AnimatedVisibility` / `animateContentSize` expansion to a taller overlay
-- [ ] Expanded view shows — all from stored data, no extra calls on expand:
-  - Full-size image
-  - **Flight**: airline + flight number, departure → arrival airports + times, duration, aircraft, legroom, amenities (Wi-Fi/power), total price, price level badge ("Low price" / "Typical"), carbon emissions delta
-  - **Hotel**: name, star class, overall rating + review count, rate/night per room, group total rate (× rooms), deal label if present, check-in/check-out times, amenities list, booking source + link
-  - **Restaurant**: name, Yelp price tier ($$$$), rating + review count, address, categories, delivery/reservation availability, `yelp_menu_url` as a tappable "View Menu" link
-  - **Activity**: name, price tier or numeric cost range, rating, address, categories
-- [ ] Yelp reviews: lazily fetch `/v3/businesses/{id}/reviews` only on first expand (3 truncated excerpts). Cache in ViewModel.
-- [ ] "Change" button inside expanded view opens the options panel (Task 3.1)
-- [ ] Manual edit fields inline in expanded view (title, time, notes) — saves to Firestore on dismiss
-- [ ] Tap outside / drag down to collapse back to normal card size
-- [ ] Only one card can be expanded at a time; expanding another collapses the current one
+- [x] Tapping a card opens `ExpandedEventCard` Dialog overlay
+- [x] Expanded view shows — all from stored data:
+  - Full-size hero image
+  - **Flight**: airline + flight number, route, times, duration, aircraft, legroom, Wi-Fi/power, total price, price level badge, carbon emissions delta
+  - **Hotel**: name, star class, rating, rate/night, group total rate (× rooms), deal label, check-in/out times, amenities, booking link
+  - **Restaurant**: price tier, rating + review count, address, categories, phone, delivery availability, View Menu link
+  - **Activity**: price (free/range/tier), rating, address, categories, tickets link
+- [x] Yelp reviews: lazily fetch `/v3/businesses/{id}/reviews` only on first expand (3 excerpts). Cache in ViewModel.
+- [x] "Change" button inside expanded view opens the options panel (Task 3.1)
+- [x] Inline edit fields for title, time, notes — saves to Firestore on dismiss
+- [x] Tap outside to dismiss
+- [x] Only one card expanded at a time (state tracked in FinalPlan)
+
+---
+
+## Phase 3 — Post-Completion Refinements
+
+> Added: 2026-04-02. These issues were discovered after Phase 3 was first marked complete. Address before moving to Phase 4.
+
+### Task 3.4 — FinalPlan Header & Navigation Redesign
+**Problem:** Top bar is cluttered (trip-switcher dropdown, clipped trip name). Bottom nav is absent from this screen.
+**Files:** `FinalPlan.kt`, `MainScaffold.kt` (nav graph), `ItineraryViewModel.kt`
+
+- [ ] Remove the trip-name dropdown / multi-trip switcher from the top bar entirely
+- [ ] Move the trip name to a full-width heading row immediately below the top bar, above the first day card — no clipping, large readable text
+- [ ] Top bar left: back arrow only
+- [ ] Top bar right: single triple-dot (`MoreVert`) icon that opens a `DropdownMenu` with:
+  - Share Trip (wires into Task 3.2 share sheet)
+  - Reorder Events (toggles jiggle mode — see Task 3.7)
+  - Archive Trip
+  - Delete Trip (confirmation dialog required)
+- [ ] Add `BottomNavigationBar` to `FinalPlan` scaffold so the five main tabs remain accessible without pressing back
+
+### Task 3.5 — Card Content & Swap Quality Fixes
+**Problem:** Cards show the event type tag instead of the real name; swapping an option does not update the card; change menu shows "Option" instead of real names; already-selected options appear in the change menu.
+**Files:** `FinalPlan.kt`, `EventOptionsPanel.kt`, `ItineraryViewModel.kt`
+
+- [ ] **Primary card label**: render the event's real name (hotel name, restaurant name, activity name, airline+flight number) as the largest text on the card — the type tag is secondary/small
+- [ ] **Remove option-count badge** from cards — replace with a plain "Change" button only
+- [ ] **Change menu row content**: each alternative must show its real name + at least one supporting detail (price, rating, or duration depending on type) — never show "Option N" as the label
+- [ ] **Post-swap card update**: when the user picks an alternative in the change menu or expanded view, update the in-memory selected option immediately so the card reflects the new name, time, image, and price — not the original
+- [ ] **Exclude already-selected**: the change menu must not list the currently active option; the already-selected option for any other slot must also be excluded (no repeats across days in the same pool)
+- [ ] **Two activities per day**: pipeline should aim for 2 activity slots per day and 1 restaurant slot (see also Task 3.6)
+
+### Task 3.6 — No-Duplicate Daily Recommendations
+**Problem:** The same restaurant and activity appear on every day of the trip. Root cause is likely Yelp results are fetched once but the same top result is assigned to every day rather than cycling.
+**Files:** `NewTripViewModel.kt`, `GroqRepository.kt`, `YelpRepository.kt`
+
+- [ ] After fetching Yelp pools for restaurants and activities, distribute them round-robin across days — day 1 gets option[0], day 2 gets option[1], etc. Never assign the same business as the primary slot on more than one day
+- [ ] Same deduplication applies to change-menu alternatives: if a business is already the primary on another day, move it to that day's alternatives list only
+- [ ] Groq itinerary prompt: explicitly instruct the model not to suggest the same restaurant or activity name more than once across the plan skeleton
+- [ ] If the Yelp pool is smaller than the number of days, wrap around only for alternatives — not for primary selections; fall back to Groq-generated name + typed placeholder for overflow primaries
+
+### Task 3.7 — Explicit Reorder Mode (Jiggle Mode)
+**Problem:** Long-press drag-to-reorder silently exists but doesn't work reliably and offers no visual feedback that items are movable.
+**Files:** `FinalPlan.kt`, `EventOptionsPanel.kt` (if reorderable list is there), `build.gradle.kts`
+
+- [ ] Reorder mode is off by default — activated only via "Reorder Events" in the triple-dot menu (Task 3.4)
+- [ ] When active, cards enter a **jiggle mode**: subtle continuous rotation/wobble animation on each card (similar to iOS home screen) + a visible "Done" button or banner indicating edit mode is on
+- [ ] Use `sh.calvin.reorderable:reorderable:2.4.0` — confirm dependency is in `build.gradle.kts`
+- [ ] Exiting jiggle mode: tap "Done" banner or re-tap "Reorder Events" in triple-dot; persists reorder to Firestore on exit
+- [ ] Drag handles are shown only while jiggle mode is active — hidden otherwise to reduce visual noise
+
+### Task 3.8 — API Response Debugging Investigation
+**Problem:** (a) Flights are missing from Day 1 of generated trips. (b) Unclear which event data comes from real API calls vs Groq hallucination. (c) Yelp is not cycling properly. Root cause must be confirmed before fixes are written.
+**Files:** new `debug/test_pipeline.py` (external, not shipped in APK), `NewTripViewModel.kt`, `SerpRepository.kt`, `YelpRepository.kt`, `GroqRepository.kt`
+
+- [ ] **Create `debug/test_pipeline.py`** — a standalone Python script that reproduces the full trip generation pipeline outside Android:
+  - Takes a sample trip request (origin, destination, dates, budget, adults)
+  - Calls SerpAPI flights + hotels with the same params the app uses; pretty-prints full JSON response
+  - Calls Yelp restaurants + activities + events for each day; pretty-prints full JSON response
+  - Calls Groq with the same system prompt the app uses; pretty-prints the structured output
+  - Compares what each API returned against what ends up in Firestore (manual check step)
+- [ ] **Flight missing root cause**: investigate whether `SEARCHING_FLIGHTS` step fires before Groq returns the IATA codes, or whether the IATA codes Groq returns don't match SerpAPI's airport index — log the exact IATA strings used in the flight query
+- [ ] **Groq vs real data labeling**: add a `source` field to every `EventOption` ("groq", "serp", "yelp") visible in debug builds — add a small dev-only label on each card in debug builds showing the source
+- [ ] Once root causes are confirmed, update Tasks 2.4, 3.5, and 3.6 with targeted fixes
+
+### Task 3.9 — Expanded Card Overlay Fixes
+**Problem:** Expanded card shows a black/opaque screen behind it instead of the dimmed original screen. Also the card lacks the richness expected from the stored Yelp / SerpAPI data.
+**Files:** `FinalPlan.kt`, `ExpandedEventCard.kt`
+
+- [ ] Replace full-screen `Dialog` with a `ModalBottomSheet` — the itinerary remains visible (dimmed) behind the sheet, consistent with the change menu (Task 3.1)
+- [ ] Hero image area: display full stored image, not a small thumbnail
+- [ ] Show all stored `EventOption.details` fields — surface every non-null detail in a readable layout (hours, amenities, price breakdown, emissions, booking URL, etc.)
+- [ ] "X" / close affordance: if the event has more than one photo, replace the X button with a **2×2 grid icon** (indicating a gallery); tapping it opens a full-screen swipeable image carousel. X still appears for single-photo events.
+- [ ] Yelp reviews: show the 3 cached review excerpts (already lazily fetched per Task 3.3); render as quote cards
+
+### Task 3.10 — Multi-Photo Gallery for Events
+**Problem:** Hotels should return many photos from SerpAPI but only one is shown. Gallery navigation is missing.
+**Files:** `ExpandedEventCard.kt`, `SerpModels.kt`, `SerpRepository.kt`, new `ImageGalleryScreen.kt`
+
+- [ ] SerpAPI hotel `images[]` is already modeled (Task 2.3) — verify all images are actually stored in Firestore after pipeline runs (see Task 3.8 debugging)
+- [ ] In expanded card: show a horizontal pager (HorizontalPager) of all stored images with a dot indicator
+- [ ] **Gallery icon trigger** (per Task 3.9): tapping the 2×2 grid icon opens `ImageGalleryScreen` — a full-screen composable with swipe-to-navigate and an image counter ("3 / 8")
+- [ ] `ImageGalleryScreen` is a Dialog overlay (not a navigation destination) so back-press returns to the expanded card, not the itinerary
+
+### Task 3.11 — Trip Sharing: Navigation Wiring + Read-Only View + Bug Fixes
+**Problem:** (a) Tapping a shared trip card in chat does nothing (navigation deferred in 3.2). (b) The wrong trip title is shown to the receiver ("New York City Getaway" instead of the shared Madrid trip). (c) Receiver has no way to save the trip to their own profile.
+**Files:** `FinalPlan.kt`, `ChatPage.kt`, `DirectChatPage.kt`, `ItineraryViewModel.kt`, `TravelCentsNavigation.kt`, `MainScaffold.kt`, `Message.kt`, `FirestoreRepository.kt`
+
+- [ ] **Fix wrong-trip bug**: the shared message must store the `ownerUid` + `tripId` that was explicitly shared, not infer it from the receiver's current active trip. When rendering the trip card in chat, read name/destination/dates from the message document itself (denormalized fields) — never from the receiver's own trip list
+- [ ] **Navigation wiring**: add a route `finalPlan/{ownerUid}/{tripId}?readOnly=true` to the nav graph. Tapping the trip card in chat navigates to this route. `ItineraryViewModel` loads the trip by `ownerUid/tripId` (cross-user read — confirm Firestore rules allow it, or add a `sharedWith` field)
+- [ ] **Read-only mode**: when `readOnly=true`, disable all inline edit fields, hide the "Delete Trip" and "Archive Trip" menu options, and replace the "Reorder Events" option with a disabled/hidden state
+- [ ] **Save to My Trips**: in read-only mode, show a "Save to My Trips" primary button (fixed at the bottom or in the triple-dot menu). Tapping deep-copies the trip + all events/options into the receiver's own `users/{uid}/trips/` tree in Firestore with a new `tripId`
+- [ ] **Re-share from read-only view**: "Share Trip" option remains active in read-only mode so the receiver can forward it to other chats
+
+### Task 3.12 — UI Density & Spacing Fixes
+**Problem:** Cards within a day are too far apart; day separators add too much vertical space; overall the timeline feels slow to scroll.
+**Files:** `FinalPlan.kt`
+
+- [ ] Reduce vertical gap between event cards within a single day to 8dp (from current spacing)
+- [ ] Reduce vertical gap between the last card of one day and the day header of the next day to 16dp
+- [ ] Day headers: reduce padding top/bottom
+- [ ] Audit all `Spacer` calls in the timeline composable and halve any value above 12dp
+- [ ] After layout changes: run on a device and confirm the full 7-day itinerary is scrollable without feeling bloated
 
 ---
 
@@ -446,10 +544,21 @@ Phase 2 (Event Pipeline) — Core new functionality
   2.6  Local image storage
   2.7  Pipeline orchestration update
 
-Phase 3 (Selection UX)
+Phase 3 (Selection UX — original)
   3.1  Change/swap panel + drag-to-reorder
   3.2  Trip sharing via chat
   3.3  Event card expandable detail view
+
+Phase 3 (Post-Completion Refinements) — address before Phase 4
+  3.8  API response debugging investigation  ← start here, informs all fixes below
+  3.4  FinalPlan header & navigation redesign (bottom nav, trip name placement, triple-dot)
+  3.5  Card content & swap quality fixes (real names, post-swap update, no duplicates in menu)
+  3.6  No-duplicate daily recommendations (round-robin Yelp pool distribution)
+  3.7  Explicit reorder mode / jiggle mode
+  3.9  Expanded card overlay fix (ModalBottomSheet, not black Dialog)
+  3.10 Multi-photo gallery (HorizontalPager + full-screen gallery screen)
+  3.11 Trip sharing navigation wiring + read-only view + wrong-trip bug fix
+  3.12 UI density & spacing fixes
 
 Phase 4 (UI Standardization) — Can run parallel to Phase 2
   4.1  Unified bottom button bar
@@ -524,6 +633,22 @@ Phase 8 (Settings Overhaul)
 | `SettingsPage.kt` | 8.1, 8.2, 8.3 |
 | `SettingsViewModel.kt` | 8.1, 8.2, 8.3 |
 | `AuthModel.kt` | 8.1 |
+| `FinalPlan.kt` | 3.4, 3.5, 3.7, 3.9, 3.10, 3.12 |
+| `ExpandedEventCard.kt` | 3.9, 3.10 |
+| `EventOptionsPanel.kt` | 3.5, 3.7 |
+| `ItineraryViewModel.kt` | 3.5, 3.11 |
+| `TravelCentsNavigation.kt` | 3.4, 3.11 |
+| `MainScaffold.kt` | 3.4, 3.11 |
+| `ChatPage.kt` | 3.11 |
+| `DirectChatPage.kt` | 3.11 |
+| `Message.kt` | 3.11 |
+| `FirestoreRepository.kt` | 3.11 |
+| `NewTripViewModel.kt` | 3.6 |
+| `YelpRepository.kt` | 3.6 |
+| `GroqRepository.kt` | 3.6, 3.8 |
+| `SerpRepository.kt` | 3.8 |
+| `ImageGalleryScreen.kt` *(new)* | 3.10 |
+| `debug/test_pipeline.py` *(new, external)* | 3.8 |
 
 ---
 
