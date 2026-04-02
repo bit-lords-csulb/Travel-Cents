@@ -145,7 +145,7 @@
 - [x] Called in pipeline at `DOWNLOADING_IMAGES` step — batch downloads all selected + alternative option image URLs
 - [x] Store local path in `EventOption.localImagePath` in Firestore
 - [ ] Coil: configure a custom `ImageLoader` that checks `localImagePath` first, then falls back to URL, then to a typed vector placeholder — not yet implemented
-- [ ] When a trip is deleted: call `ImageCacheManager.deleteTripImages()` — method exists but not confirmed wired to deletion flow in `FinalPlan.kt` / `ItineraryViewModel`
+- [x] When a trip is deleted: call `ImageCacheManager.deleteTripImages()` — wired in `ItineraryViewModel.deleteTrip()`; option subcollection docs are also removed before event deletion
 - [ ] When an option is swapped: download new option image if not already cached — not yet implemented
 
 ### Task 2.7 — Pipeline Orchestration Update
@@ -230,16 +230,16 @@
   - Reorder Events (toggles jiggle mode — see Task 3.7)
   - Archive Trip
   - Delete Trip (confirmation dialog required)
-- [ ] Add `BottomNavigationBar` to `FinalPlan` scaffold so the five main tabs remain accessible without pressing back
+- [x] Add `BottomNavigationBar` to `FinalPlan` scaffold so the five main tabs remain accessible without pressing back
 
 ### Task 3.5 — Card Content & Swap Quality Fixes
 **Problem:** Cards show the event type tag instead of the real name; swapping an option does not update the card; change menu shows "Option" instead of real names; already-selected options appear in the change menu.
 **Files:** `FinalPlan.kt`, `EventOptionsPanel.kt`, `ItineraryViewModel.kt`
 
-- [ ] **Primary card label**: render the event's real name (hotel name, restaurant name, activity name, airline+flight number) as the largest text on the card — the type tag is secondary/small
-- [ ] **Remove option-count badge** from cards — replace with a plain "Change" button only
-- [ ] **Change menu row content**: each alternative must show its real name + at least one supporting detail (price, rating, or duration depending on type) — never show "Option N" as the label
-- [ ] **Post-swap card update**: when the user picks an alternative in the change menu or expanded view, update the in-memory selected option immediately so the card reflects the new name, time, image, and price — not the original
+- [x] **Primary card label**: render the event's real name (hotel name, restaurant name, activity name, airline+flight number) as the largest text on the card — the type tag is secondary/small
+- [x] **Remove option-count badge** from cards — replace with a plain "Change" button only
+- [x] **Change menu row content**: each alternative must show its real name + at least one supporting detail (price, rating, or duration depending on type) — never show "Option N" as the label
+- [x] **Post-swap card update**: when the user picks an alternative in the change menu or expanded view, update the in-memory selected option immediately so the card reflects the new name, time, image, and price — not the original
 - [ ] **Exclude already-selected**: the change menu must not list the currently active option; the already-selected option for any other slot must also be excluded (no repeats across days in the same pool)
 - [ ] **Two activities per day**: pipeline should aim for 2 activity slots per day and 1 restaurant slot (see also Task 3.6)
 
@@ -309,10 +309,10 @@
 **Problem:** Cards within a day are too far apart; day separators add too much vertical space; overall the timeline feels slow to scroll.
 **Files:** `FinalPlan.kt`
 
-- [ ] Reduce vertical gap between event cards within a single day to 8dp (from current spacing)
-- [ ] Reduce vertical gap between the last card of one day and the day header of the next day to 16dp
-- [ ] Day headers: reduce padding top/bottom
-- [ ] Audit all `Spacer` calls in the timeline composable and halve any value above 12dp
+- [x] Reduce vertical gap between event cards within a single day to 8dp (from current spacing)
+- [x] Reduce vertical gap between the last card of one day and the day header of the next day to 16dp
+- [x] Day headers: reduce padding top/bottom
+- [x] Audit all `Spacer` calls in the timeline composable and halve any value above 12dp
 - [ ] After layout changes: run on a device and confirm the full 7-day itinerary is scrollable without feeling bloated
 
 ---

@@ -3,15 +3,18 @@ package com.example.travelcents.ui.main.itinerary
 import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.example.travelcents.data.ImageCacheManager
 import com.example.travelcents.data.model.EventOption
 import com.example.travelcents.data.model.TravelEvent
 import com.example.travelcents.data.model.YelpReview
 import com.example.travelcents.data.remote.YelpRepository
 import com.google.firebase.auth.FirebaseAuth
+import com.google.firebase.FirebaseApp
 import com.google.firebase.firestore.DocumentSnapshot
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.ListenerRegistration
 import com.google.firebase.firestore.Query
+import com.google.firebase.firestore.SetOptions
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -252,13 +255,23 @@ class ItineraryViewModel : ViewModel() {
                     .collection("trips").document(tripId).collection("events")
                 val events = eventsRef.get().await()
                 if (!events.isEmpty) {
-                    val batch = db.batch()
-                    events.documents.forEach { batch.delete(it.reference) }
-                    batch.commit().await()
+                    for (eventDoc in events.documents) {
+                        val options = eventDoc.reference.collection("options").get().await()
+                        if (!options.isEmpty) {
+                            val optionsBatch = db.batch()
+                            options.documents.forEach { optionsBatch.delete(it.reference) }
+                            optionsBatch.commit().await()
+                        }
+                        eventDoc.reference.delete().await()
+                    }
                 }
                 db.collection("users").document(uid)
                     .collection("trips").document(tripId)
                     .delete().await()
+                ImageCacheManager.deleteTripImages(
+                    context = FirebaseApp.getInstance().applicationContext,
+                    tripId = tripId
+                )
                 if (_uiState.value.currentTripId == tripId) loadTrip()
                 else fetchAllTrips(uid)
             } catch (e: Exception) {
@@ -339,16 +352,28 @@ class ItineraryViewModel : ViewModel() {
         val uid = auth.currentUser?.uid ?: return
         val tripId = _uiState.value.currentTripId ?: return
         val currentOpts = _eventOptions.value[eventId] ?: return
+        val currentEvent = _uiState.value.events.firstOrNull { it.eventId == eventId } ?: return
 
         // Optimistic local update
         val updated = currentOpts.map { opt ->
             opt.copy(selected = opt.optionId == selectedOptId)
         }
         _eventOptions.update { it + (eventId to updated) }
+        _rejectedOptions.update { current ->
+            val existing = current[eventId].orEmpty() - selectedOptId
+            current + (eventId to existing)
+        }
 
         // Update the selected event's imageUrl + key detail fields
         val selectedOpt = updated.firstOrNull { it.selected }
         if (selectedOpt != null) {
+            val updatedEvent = applySelectedOption(currentEvent, selectedOpt)
+            val updatedEvents = _uiState.value.events.map { event ->
+                if (event.eventId == eventId) updatedEvent else event
+            }
+            _events.value = updatedEvents
+            _uiState.update { it.copy(events = updatedEvents) }
+
             val eventRef = db.collection("users").document(uid)
                 .collection("trips").document(tripId)
                 .collection("events").document(eventId)
@@ -359,14 +384,7 @@ class ItineraryViewModel : ViewModel() {
                         eventRef.collection("options").document(opt.optionId)
                             .update("selected", opt.selected).await()
                     }
-                    // Update event document to reflect new selected option's name/image
-                    val nameKey = selectedOpt.details.keys
-                        .firstOrNull { it in listOf("name", "restaurant_name", "activity_name", "title") }
-                    val patchMap = buildMap<String, Any> {
-                        put("imageUrl", selectedOpt.imageUrl.ifBlank { selectedOpt.localImagePath })
-                        if (nameKey != null) put(nameKey, selectedOpt.details[nameKey]!!)
-                    }
-                    if (patchMap.isNotEmpty()) eventRef.update(patchMap).await()
+                    eventRef.set(updatedEvent.toFirestoreMap(), SetOptions.merge()).await()
                 } catch (e: Exception) {
                     Log.e("ItineraryViewModel", "Failed to persist option selection", e)
                 }
@@ -632,5 +650,72 @@ class ItineraryViewModel : ViewModel() {
         eventsListener?.remove()
         eventsListener = null
         super.onCleared()
+    }
+
+    private fun applySelectedOption(event: TravelEvent, selectedOpt: EventOption): TravelEvent {
+        val mergedDetails = event.details.toMutableMap().apply {
+            putAll(selectedOpt.details)
+
+            when (event.type.lowercase()) {
+                "flight" -> {
+                    val flightLabel = listOfNotNull(
+                        selectedOpt.details["airline"],
+                        selectedOpt.details["flight_number"]
+                    ).joinToString(" ").trim()
+                    if (flightLabel.isNotBlank()) {
+                        put("title", flightLabel)
+                    }
+                    selectedOpt.details["price"]?.let { put("total_price", it) }
+                }
+
+                "hotel" -> {
+                    selectedOpt.details["hotel_name"]?.let { put("hotel_name", it) }
+                    selectedOpt.details["name"]?.let { put("hotel_name", it) }
+                }
+
+                "restaurant", "dining", "food" -> {
+                    selectedOpt.details["restaurant_name"]?.let { put("restaurant_name", it) }
+                    selectedOpt.details["name"]?.let { put("restaurant_name", it) }
+                }
+
+                else -> {
+                    selectedOpt.details["activity_name"]?.let { put("activity_name", it) }
+                    selectedOpt.details["name"]?.let { put("activity_name", it) }
+                }
+            }
+        }
+
+        return event.copy(
+            imageUrl = selectedOpt.localImagePath.ifBlank {
+                selectedOpt.imageUrl.ifBlank { event.imageUrl }
+            },
+            startTime = selectedTimeFor(event.type, selectedOpt, event.startTime, isStart = true),
+            endTime = selectedTimeFor(event.type, selectedOpt, event.endTime, isStart = false),
+            details = mergedDetails
+        )
+    }
+
+    private fun selectedTimeFor(
+        eventType: String,
+        selectedOpt: EventOption,
+        fallback: String,
+        isStart: Boolean
+    ): String {
+        val raw = when (eventType.lowercase()) {
+            "flight" -> {
+                if (isStart) selectedOpt.details["departure_time"] else selectedOpt.details["arrival_time"]
+            }
+
+            "hotel" -> {
+                if (isStart) selectedOpt.details["check_in_time"] else selectedOpt.details["check_out_time"]
+            }
+
+            else -> null
+        }
+
+        return raw
+            ?.substringAfter(" ", raw)
+            ?.takeIf { it.isNotBlank() }
+            ?: fallback
     }
 }

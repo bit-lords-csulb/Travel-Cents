@@ -90,7 +90,8 @@ private val bottomNavRoutes = setOf(
     MainRoutes.AiTripChat,
     MainRoutes.Home,
     MainRoutes.Chats,
-    MainRoutes.Settings
+    MainRoutes.Settings,
+    MainRoutes.FinalPlan
 )
 
 private data class BottomNavItem(
@@ -107,6 +108,7 @@ fun MainScaffold(modifier: Modifier = Modifier, onLogout: () -> Unit = {}) {
 
     val navBackStackEntry by navController.currentBackStackEntryAsState()
     val currentRoute = navBackStackEntry?.destination?.route ?: MainRoutes.Home
+    val selectedBottomRoute = if (currentRoute == MainRoutes.FinalPlan) MainRoutes.Current else currentRoute
     val itineraryUiState by sharedItineraryViewModel.uiState.collectAsState()
 
     // Load trip once on mount so currentTripId is available before any tab is visited
@@ -265,7 +267,7 @@ fun MainScaffold(modifier: Modifier = Modifier, onLogout: () -> Unit = {}) {
         if (currentRoute in bottomNavRoutes) {
             BottomNavBar(
                 items = items,
-                currentRoute = currentRoute,
+                currentRoute = selectedBottomRoute,
                 onItemSelected = { route ->
                     navController.navigate(route) {
                         popUpTo(navController.graph.findStartDestination().id) {
