@@ -31,6 +31,8 @@ import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.Checkbox
+import androidx.compose.material3.CheckboxDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.Text
@@ -58,6 +60,7 @@ import com.example.travelcents.ui.theme.DeepSea1
 import com.example.travelcents.ui.theme.DeepSea5
 
 private data class InterestItem(val key: String, val label: String, val imageRes: Int)
+private data class DietaryOption(val key: String, val label: String)
 
 private val interestItems = listOf(
     InterestItem("culture",      "Culture & Museums",   R.drawable.interest_culture),
@@ -101,6 +104,14 @@ private val interestVocabulary = listOf(
     "Battlefield Tours", "Cold War Sites", "Catacombs", "Underground Cities"
 )
 
+private val dietaryOptions = listOf(
+    DietaryOption("vegan", "Vegan"),
+    DietaryOption("vegetarian", "Vegetarian"),
+    DietaryOption("halal", "Halal"),
+    DietaryOption("kosher", "Kosher"),
+    DietaryOption("gluten_free", "Gluten-Free")
+)
+
 @Composable
 fun TripStep5InterestsPage(
     modifier: Modifier = Modifier,
@@ -113,6 +124,29 @@ fun TripStep5InterestsPage(
     val errorMessage = (uiState as? TripUiState.Error)?.message
     var searchQuery by remember { mutableStateOf("") }
     var customInterests by remember { mutableStateOf(listOf<String>()) }
+    val presetDietaryKeys = remember { dietaryOptions.map { it.key }.toSet() }
+    var otherDietaryChecked by remember {
+        mutableStateOf(viewModel.dietary.any { it !in presetDietaryKeys })
+    }
+    var otherDietaryText by remember {
+        mutableStateOf(
+            viewModel.dietary
+                .firstOrNull { it !in presetDietaryKeys }
+                ?.replace("_", " ")
+                .orEmpty()
+        )
+    }
+
+    fun updateOtherDietarySelection(enabled: Boolean, text: String = otherDietaryText) {
+        val presetSelections = viewModel.dietary.filter { it in presetDietaryKeys }
+        val normalizedCustom = text.trim().lowercase().replace(" ", "_")
+        val updatedSelections = if (enabled && normalizedCustom.isNotBlank()) {
+            presetSelections + normalizedCustom
+        } else {
+            presetSelections
+        }
+        viewModel.setDietaryItems(updatedSelections)
+    }
 
     Column(
         modifier = modifier
@@ -309,6 +343,105 @@ fun TripStep5InterestsPage(
                     selected = selected,
                     onClick = { viewModel.toggleInterest(item.key) }
                 )
+            }
+
+            item(span = { GridItemSpan(2) }) {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(16.dp))
+                        .background(TripWizardColors.ContainerHigh.copy(alpha = 0.55f))
+                        .border(1.dp, Color.White.copy(alpha = 0.06f), RoundedCornerShape(16.dp))
+                        .padding(16.dp)
+                ) {
+                    Text(
+                        "DIETARY RESTRICTIONS",
+                        fontSize = 10.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = TripWizardColors.OnSurfaceVariant,
+                        letterSpacing = 1.5.sp
+                    )
+                    Spacer(Modifier.height(6.dp))
+                    Text(
+                        "Optional preferences for restaurant suggestions",
+                        fontSize = 13.sp,
+                        color = DeepSea5
+                    )
+                    Spacer(Modifier.height(10.dp))
+
+                    dietaryOptions.forEach { option ->
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(vertical = 2.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Checkbox(
+                                checked = option.key in viewModel.dietary,
+                                onCheckedChange = { viewModel.toggleDietary(option.key) },
+                                colors = CheckboxDefaults.colors(
+                                    checkedColor = TripWizardColors.Blue,
+                                    uncheckedColor = TripWizardColors.OnSurfaceVariant,
+                                    checkmarkColor = Color(0xFF001627)
+                                )
+                            )
+                            Text(
+                                text = option.label,
+                                color = DeepSea5,
+                                fontSize = 14.sp
+                            )
+                        }
+                    }
+
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(top = 4.dp, bottom = if (otherDietaryChecked) 8.dp else 0.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Checkbox(
+                            checked = otherDietaryChecked,
+                            onCheckedChange = { checked ->
+                                otherDietaryChecked = checked
+                                updateOtherDietarySelection(checked)
+                            },
+                            colors = CheckboxDefaults.colors(
+                                checkedColor = TripWizardColors.Blue,
+                                uncheckedColor = TripWizardColors.OnSurfaceVariant,
+                                checkmarkColor = Color(0xFF001627)
+                            )
+                        )
+                        Text(
+                            text = "Other",
+                            color = DeepSea5,
+                            fontSize = 14.sp
+                        )
+                    }
+
+                    if (otherDietaryChecked) {
+                        TextField(
+                            value = otherDietaryText,
+                            onValueChange = {
+                                otherDietaryText = it
+                                updateOtherDietarySelection(true, it)
+                            },
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clip(RoundedCornerShape(12.dp))
+                                .background(TripWizardColors.ContainerHigh),
+                            placeholder = { Text("Add another dietary preference", color = TripWizardColors.OnSurfaceVariant) },
+                            colors = TextFieldDefaults.colors(
+                                focusedContainerColor = Color.Transparent,
+                                unfocusedContainerColor = Color.Transparent,
+                                disabledContainerColor = Color.Transparent,
+                                focusedIndicatorColor = Color.Transparent,
+                                unfocusedIndicatorColor = Color.Transparent,
+                                cursorColor = TripWizardColors.Blue
+                            ),
+                            singleLine = true
+                        )
+                    }
+                }
             }
 
             item(span = { GridItemSpan(2) }) {
