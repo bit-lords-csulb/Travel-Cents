@@ -132,10 +132,10 @@
 
 #### Dietary Preferences Integration
 - [x] Add a `dietary: List<String>` field to `TravelRequest` and `NewTripViewModel`
-- [ ] Expose dietary selection UI in **Step 5 (Interests)** — no matches found in `TripStep5InterestsPage.kt`; deferred to Task 4.5
+- [x] Expose dietary selection UI in **Step 5 (Interests)** — added preset checkboxes plus an `Other` field in `TripStep5InterestsPage.kt`
 - [x] When dietary prefs are set, append the matching Yelp category alias to the restaurant search `categories` param (Vegan/Vegetarian/Halal/Kosher/Gluten-Free → yelp aliases)
 - [x] **Note**: these categories return restaurants that *are* that type (e.g., fully vegan), not restaurants that merely *have* vegan options.
-- [ ] Pass dietary prefs string to Groq in the itinerary prompt — not yet confirmed in `GroqRepository`.
+- [x] Pass dietary prefs string to Groq in the itinerary prompt — confirmed in `GroqRepository`.
 
 ### Task 2.6 — Local Image Storage
 **Decision:** Download all event option images to app internal storage when the trip is finalized. Persists until app uninstall. No external storage or gallery writes.
@@ -222,10 +222,10 @@
 **Problem:** Top bar is cluttered (trip-switcher dropdown, clipped trip name). Bottom nav is absent from this screen.
 **Files:** `FinalPlan.kt`, `MainScaffold.kt` (nav graph), `ItineraryViewModel.kt`
 
-- [ ] Remove the trip-name dropdown / multi-trip switcher from the top bar entirely
-- [ ] Move the trip name to a full-width heading row immediately below the top bar, above the first day card — no clipping, large readable text
-- [ ] Top bar left: back arrow only
-- [ ] Top bar right: single triple-dot (`MoreVert`) icon that opens a `DropdownMenu` with:
+- [x] Remove the trip-name dropdown / multi-trip switcher from the top bar entirely
+- [x] Move the trip name to a full-width heading row immediately below the top bar, above the first day card — no clipping, large readable text
+- [x] Top bar left: back arrow only
+- [x] Top bar right: single triple-dot (`MoreVert`) icon that opens a `DropdownMenu` with share/archive/delete actions and a disabled reorder entry pending Task 3.7:
   - Share Trip (wires into Task 3.2 share sheet)
   - Reorder Events (toggles jiggle mode — see Task 3.7)
   - Archive Trip
@@ -303,7 +303,10 @@
 #### Task 3.8.2 — Order Of Operations To Speed Up Generation
 
 - [ ] **Step 1: Fix correctness before optimization**
-  - Update `SerpRepository.kt` flight parsing to read the actual live response time fields
+  - [x] Update `SerpRepository.kt` flight parsing to read the actual live response time fields
+  - [x] Ensure future trips generate both outbound and return flight events from Serp round-trip searches, using `departure_token` for return options with one-way fallback
+  - [x] Allow Final Plan to render flight cards even when `date` is blank by grouping them under a visible fallback header and showing all available flight info
+  - [x] Add parser/unit coverage for the live Serp flight payload shape, including airport-level times and `departure_token`
   - Validate Day 1 grouping after the parser fix using `test.py`
 - [ ] **Step 2: Reduce Yelp call count**
   - Replace per-day Yelp restaurant/activity searches in `NewTripViewModel.kt` and `YelpRepository.kt` with pooled searches per trip or per area cluster
@@ -324,9 +327,22 @@
 
 #### Task 3.8.3 — Concrete File Change Map
 
-- [ ] `app/src/main/java/com/example/travelcents/data/remote/SerpRepository.kt`
-  - Fix flight time parsing against the real Serp response shape
-  - Improve hotel ranking and selected-option choice
+- [x] `app/src/main/java/com/example/travelcents/data/remote/SerpRepository.kt`
+  - [x] Fix flight time parsing against the real Serp response shape
+  - [x] Generate separate outbound + return flight events for future trips
+  - [x] Use Serp `departure_token` to fetch return-flight options when available
+  - [x] Version the flight cache so new round-trip behavior is not masked by old cached single-flight results
+  - [ ] Improve hotel ranking and selected-option choice
+- [x] `app/src/main/java/com/example/travelcents/ui/main/itinerary/FinalPlan.kt`
+  - [x] Stop dropping undated flight events from Final Plan
+  - [x] Group undated events under a visible fallback header instead of filtering them out
+  - [x] Show all available flight card info even when time/date fields are incomplete
+- [x] `app/src/main/java/com/example/travelcents/data/model/SerpModels.kt`
+  - [x] Add support for live flight metadata needed for return lookup (`departure_token`, round-trip type)
+- [x] `app/src/test/java/com/example/travelcents/data/remote/SerpFlightParsingTest.kt`
+  - [x] Cover airport-level flight timestamps from live Serp payloads
+  - [x] Cover legacy flat timestamp fields for backward compatibility
+  - [x] Cover parsing of `departure_token` used for return-flight retrieval
 - [ ] `app/src/main/java/com/example/travelcents/ui/main/newtrip/NewTripViewModel.kt`
   - Replace per-day Yelp fan-out with pooled fetch + local distribution
   - Deduplicate restaurant/activity primaries across the trip
@@ -430,13 +446,13 @@
 **Decision:** Add dietary preferences as a second optional section below the interests grid on Step 5. Same page, no new step needed. Keeps the wizard at 5 steps.
 **Files:** `TripStep5InterestsPage.kt`, `NewTripViewModel.kt`, `TravelRequest.kt` (or equivalent model)
 
-- [ ] Below the interests grid, add a clearly separated section: "DIETARY PREFERENCES" label + subtitle "Optional — affects restaurant suggestions"
-- [ ] Display as a horizontal wrap of toggle chips (similar to interest cards but smaller pill style): **Vegan**, **Vegetarian**, **Halal**, **Kosher**, **Gluten-Free**
-- [ ] Multi-select allowed. Unselected by default.
-- [ ] Selected chips use the same blue accent / border style as selected interests
-- [ ] Store selected dietary prefs in `NewTripViewModel` as `List<String>` (Yelp category aliases: `vegan`, `vegetarian`, `halal`, `kosher`, `gluten_free`)
-- [ ] Pass dietary prefs into `TravelRequest` so they flow through to `YelpRepository` and Groq prompt
-- [ ] Update "Continue to Generate" button to remain enabled regardless of dietary selection (it's optional)
+- [x] Below the interests grid, add a clearly separated section: "DIETARY RESTRICTIONS" label + subtitle for optional restaurant preferences
+- [x] Display as simple checkbox rows for **Vegan**, **Vegetarian**, **Halal**, **Kosher**, **Gluten-Free**, plus **Other** that reveals a text field
+- [x] Multi-select allowed. Unselected by default.
+- [x] Checkboxes use the same blue accent family as the wizard selection UI
+- [x] Store selected dietary prefs in `NewTripViewModel` as `List<String>` (Yelp category aliases for presets plus optional custom `Other` text)
+- [x] Pass dietary prefs into `TravelRequest` so they flow through to `YelpRepository` and Groq prompt
+- [x] Update "Continue to Generate" button to remain enabled regardless of dietary selection (it's optional)
 
 ### Task 4.4 — Remove Save Draft
 **Decision:** Remove the feature entirely for now.

@@ -274,6 +274,13 @@ class NewTripViewModel(application: Application) : AndroidViewModel(application)
         dietary = if (item in dietary) dietary - item else dietary + item
     }
 
+    fun setDietaryItems(items: List<String>) {
+        dietary = items
+            .map { it.trim() }
+            .filter { it.isNotBlank() }
+            .distinct()
+    }
+
     fun toggleInterest(item: String) {
         interests = if (item in interests) interests - item else interests + item
     }
