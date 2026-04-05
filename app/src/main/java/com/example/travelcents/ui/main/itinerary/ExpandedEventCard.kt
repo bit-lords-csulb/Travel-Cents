@@ -3,6 +3,8 @@ package com.example.travelcents.ui.main.itinerary
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.pager.HorizontalPager
+import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
@@ -10,6 +12,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Edit
+import androidx.compose.material.icons.filled.GridView
 import androidx.compose.material.icons.filled.OpenInNew
 import androidx.compose.material.icons.filled.SwapHoriz
 import androidx.compose.material3.*
@@ -49,6 +52,7 @@ private fun expandedTypeColor(type: String): Color = when (type.lowercase()) {
     else -> Color(0xFFD5E3FB)
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ExpandedEventCard(
     event: TravelEvent,
@@ -59,9 +63,20 @@ fun ExpandedEventCard(
     onSaveEdits: (title: String, startTime: String, notes: String) -> Unit
 ) {
     val typeColor = expandedTypeColor(event.type)
-    val imageSource = event.imageUrl
+    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
 
-    // Current editable fields (pre-filled from event)
+    // All photos: event hero first, then unique option images
+    val photos = remember(event) {
+        buildList {
+            if (event.imageUrl.isNotBlank()) add(event.imageUrl)
+            event.options.forEach { opt ->
+                if (opt.imageUrl.isNotBlank() && opt.imageUrl !in this) add(opt.imageUrl)
+            }
+        }
+    }
+    var showGallery by remember { mutableStateOf(false) }
+
+    // Editable fields pre-filled from event
     val existingTitle = event.details["title"] ?: event.details["activity_name"]
         ?: event.details["restaurant_name"] ?: event.type.replaceFirstChar { it.uppercase() }
     val existingNotes = event.details["description"] ?: event.details["notes"] ?: ""
@@ -72,195 +87,233 @@ fun ExpandedEventCard(
     var isEditing by remember { mutableStateOf(false) }
     val uriHandler = LocalUriHandler.current
 
-    Dialog(
+    ModalBottomSheet(
         onDismissRequest = {
             if (isEditing) onSaveEdits(editTitle, editTime, editNotes)
             onDismiss()
         },
-        properties = DialogProperties(usePlatformDefaultWidth = false)
+        sheetState = sheetState,
+        containerColor = SurfaceCard,
+        dragHandle = null
     ) {
-        Box(
-            modifier = Modifier
-                .fillMaxSize()
-                .background(Color.Black.copy(alpha = 0.6f))
-                .clickable {
-                    if (isEditing) onSaveEdits(editTitle, editTime, editNotes)
-                    onDismiss()
-                },
-            contentAlignment = Alignment.BottomCenter
-        ) {
-            Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .fillMaxHeight(0.85f)
-                    .clip(RoundedCornerShape(topStart = 20.dp, topEnd = 20.dp))
-                    .background(SurfaceCard)
-                    .clickable(onClick = {}) // consume clicks so they don't dismiss
-            ) {
-                // Hero image
-                Box(modifier = Modifier.fillMaxWidth().height(200.dp)) {
-                    if (imageSource.isNotBlank()) {
-                        AsyncImage(
-                            model = imageSource,
-                            contentDescription = null,
-                            modifier = Modifier.fillMaxSize(),
-                            contentScale = ContentScale.Crop
-                        )
-                    } else {
-                        Box(
-                            modifier = Modifier.fillMaxSize().background(SurfaceHighest),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Text(
-                                text = event.type.take(1).uppercase(),
-                                color = typeColor,
-                                fontSize = 52.sp,
-                                fontWeight = FontWeight.ExtraBold
-                            )
-                        }
-                    }
-                    // Close + Change buttons overlay
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(12.dp),
-                        horizontalArrangement = Arrangement.SpaceBetween
+        Column(modifier = Modifier.fillMaxWidth()) {
+            // Hero image
+            Box(modifier = Modifier.fillMaxWidth().height(240.dp)) {
+                if (photos.isNotEmpty()) {
+                    AsyncImage(
+                        model = photos.first(),
+                        contentDescription = null,
+                        modifier = Modifier.fillMaxSize(),
+                        contentScale = ContentScale.Crop
+                    )
+                } else {
+                    Box(
+                        modifier = Modifier.fillMaxSize().background(SurfaceHighest),
+                        contentAlignment = Alignment.Center
                     ) {
+                        Text(
+                            text = event.type.take(1).uppercase(),
+                            color = typeColor,
+                            fontSize = 52.sp,
+                            fontWeight = FontWeight.ExtraBold
+                        )
+                    }
+                }
+                // Overlay: close/gallery icon on the left, edit + change on the right
+                Row(
+                    modifier = Modifier.fillMaxWidth().padding(12.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween
+                ) {
+                    if (photos.size > 1) {
+                        IconButton(
+                            onClick = { showGallery = true },
+                            modifier = Modifier.background(Color.Black.copy(alpha = 0.5f), RoundedCornerShape(8.dp))
+                        ) {
+                            Icon(Icons.Default.GridView, contentDescription = "View photos", tint = Color.White)
+                        }
+                    } else {
                         IconButton(
                             onClick = {
                                 if (isEditing) onSaveEdits(editTitle, editTime, editNotes)
                                 onDismiss()
                             },
-                            modifier = Modifier
-                                .background(Color.Black.copy(alpha = 0.5f), RoundedCornerShape(8.dp))
+                            modifier = Modifier.background(Color.Black.copy(alpha = 0.5f), RoundedCornerShape(8.dp))
                         ) {
                             Icon(Icons.Default.Close, contentDescription = "Close", tint = Color.White)
                         }
-                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                            IconButton(
-                                onClick = { isEditing = !isEditing },
-                                modifier = Modifier
-                                    .background(Color.Black.copy(alpha = 0.5f), RoundedCornerShape(8.dp))
-                            ) {
-                                Icon(Icons.Default.Edit, contentDescription = "Edit", tint = Color.White)
-                            }
-                            Button(
-                                onClick = onChangeClick,
-                                colors = ButtonDefaults.buttonColors(containerColor = typeColor),
-                                contentPadding = PaddingValues(horizontal = 14.dp, vertical = 8.dp),
-                                shape = RoundedCornerShape(8.dp)
-                            ) {
-                                Icon(Icons.Default.SwapHoriz, contentDescription = null, modifier = Modifier.size(16.dp))
-                                Spacer(modifier = Modifier.width(4.dp))
-                                Text("Change", fontSize = 13.sp, fontWeight = FontWeight.Bold)
-                            }
-                        }
                     }
-                }
-
-                // Scrollable content
-                Column(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .weight(1f)
-                        .verticalScroll(rememberScrollState())
-                        .padding(20.dp)
-                ) {
-                    // Type badge + time
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Surface(
-                            color = typeColor.copy(alpha = 0.2f),
-                            shape = RoundedCornerShape(100.dp)
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        IconButton(
+                            onClick = { isEditing = !isEditing },
+                            modifier = Modifier.background(Color.Black.copy(alpha = 0.5f), RoundedCornerShape(8.dp))
                         ) {
-                            Text(
-                                text = event.type.uppercase(),
-                                color = typeColor,
-                                fontSize = 9.sp,
-                                fontWeight = FontWeight.Bold,
-                                modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp)
-                            )
+                            Icon(Icons.Default.Edit, contentDescription = "Edit", tint = Color.White)
                         }
-                        Spacer(modifier = Modifier.width(8.dp))
-                        if (isEditing) {
-                            InlineEditField(
-                                value = editTime,
-                                onValueChange = { editTime = it },
-                                placeholder = "HH:MM",
-                                fontSize = 11.sp,
-                                color = OnSurfaceVar
-                            )
-                        } else {
-                            Text(text = event.startTime, color = OnSurfaceVar, fontSize = 11.sp, fontWeight = FontWeight.Bold)
-                        }
-                    }
-
-                    Spacer(modifier = Modifier.height(8.dp))
-
-                    // Title
-                    if (isEditing) {
-                        InlineEditField(
-                            value = editTitle,
-                            onValueChange = { editTitle = it },
-                            placeholder = "Event title",
-                            fontSize = 20.sp,
-                            fontWeight = FontWeight.Bold,
-                            color = OnSurface
-                        )
-                    } else {
-                        Text(text = editTitle, color = OnSurface, fontSize = 20.sp, fontWeight = FontWeight.Bold)
-                    }
-
-                    Spacer(modifier = Modifier.height(16.dp))
-                    HorizontalDivider(color = OutlineVar.copy(alpha = 0.3f))
-                    Spacer(modifier = Modifier.height(16.dp))
-
-                    // Type-specific detail section
-                    when (event.type.lowercase()) {
-                        "flight" -> FlightDetails(event)
-                        "hotel" -> HotelDetails(event)
-                        "restaurant", "dining", "food" -> RestaurantDetails(event, yelpReviews, isLoadingReviews, uriHandler)
-                        else -> ActivityDetails(event, yelpReviews, isLoadingReviews, uriHandler)
-                    }
-
-                    // Notes / description (editable)
-                    Spacer(modifier = Modifier.height(16.dp))
-                    HorizontalDivider(color = OutlineVar.copy(alpha = 0.3f))
-                    Spacer(modifier = Modifier.height(12.dp))
-                    Text(text = "NOTES", color = OnSurfaceVar.copy(alpha = 0.6f), fontSize = 10.sp, fontWeight = FontWeight.Bold, letterSpacing = 2.sp)
-                    Spacer(modifier = Modifier.height(6.dp))
-                    if (isEditing) {
-                        InlineEditField(
-                            value = editNotes,
-                            onValueChange = { editNotes = it },
-                            placeholder = "Add notes…",
-                            fontSize = 13.sp,
-                            color = OnSurfaceVar,
-                            multiline = true
-                        )
-                    } else {
-                        Text(
-                            text = editNotes.ifBlank { "No notes." },
-                            color = if (editNotes.isBlank()) OnSurfaceVar.copy(alpha = 0.4f) else OnSurfaceVar,
-                            fontSize = 13.sp,
-                            lineHeight = 20.sp
-                        )
-                    }
-
-                    if (isEditing) {
-                        Spacer(modifier = Modifier.height(16.dp))
                         Button(
-                            onClick = {
-                                onSaveEdits(editTitle, editTime, editNotes)
-                                isEditing = false
-                            },
-                            modifier = Modifier.fillMaxWidth(),
-                            colors = ButtonDefaults.buttonColors(containerColor = BlueAccent),
-                            shape = RoundedCornerShape(12.dp)
+                            onClick = onChangeClick,
+                            colors = ButtonDefaults.buttonColors(containerColor = typeColor),
+                            contentPadding = PaddingValues(horizontal = 14.dp, vertical = 8.dp),
+                            shape = RoundedCornerShape(8.dp)
                         ) {
-                            Text("Save changes", fontWeight = FontWeight.Bold, color = Color(0xFF010E24))
+                            Icon(Icons.Default.SwapHoriz, contentDescription = null, modifier = Modifier.size(16.dp))
+                            Spacer(modifier = Modifier.width(4.dp))
+                            Text("Change", fontSize = 13.sp, fontWeight = FontWeight.Bold)
                         }
                     }
                 }
+            }
+
+            // Scrollable detail content
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .verticalScroll(rememberScrollState())
+                    .padding(20.dp)
+                    .navigationBarsPadding()
+            ) {
+                // Type badge + time
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Surface(
+                        color = typeColor.copy(alpha = 0.2f),
+                        shape = RoundedCornerShape(100.dp)
+                    ) {
+                        Text(
+                            text = event.type.uppercase(),
+                            color = typeColor,
+                            fontSize = 9.sp,
+                            fontWeight = FontWeight.Bold,
+                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp)
+                        )
+                    }
+                    Spacer(modifier = Modifier.width(8.dp))
+                    if (isEditing) {
+                        InlineEditField(
+                            value = editTime,
+                            onValueChange = { editTime = it },
+                            placeholder = "HH:MM",
+                            fontSize = 11.sp,
+                            color = OnSurfaceVar
+                        )
+                    } else {
+                        Text(text = event.startTime, color = OnSurfaceVar, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(8.dp))
+
+                // Title
+                if (isEditing) {
+                    InlineEditField(
+                        value = editTitle,
+                        onValueChange = { editTitle = it },
+                        placeholder = "Event title",
+                        fontSize = 20.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = OnSurface
+                    )
+                } else {
+                    Text(text = editTitle, color = OnSurface, fontSize = 20.sp, fontWeight = FontWeight.Bold)
+                }
+
+                Spacer(modifier = Modifier.height(16.dp))
+                HorizontalDivider(color = OutlineVar.copy(alpha = 0.3f))
+                Spacer(modifier = Modifier.height(16.dp))
+
+                // Type-specific details
+                when (event.type.lowercase()) {
+                    "flight" -> FlightDetails(event)
+                    "hotel" -> HotelDetails(event)
+                    "restaurant", "dining", "food" -> RestaurantDetails(event, yelpReviews, isLoadingReviews, uriHandler)
+                    else -> ActivityDetails(event, yelpReviews, isLoadingReviews, uriHandler)
+                }
+
+                // Notes (editable)
+                Spacer(modifier = Modifier.height(16.dp))
+                HorizontalDivider(color = OutlineVar.copy(alpha = 0.3f))
+                Spacer(modifier = Modifier.height(12.dp))
+                Text(text = "NOTES", color = OnSurfaceVar.copy(alpha = 0.6f), fontSize = 10.sp, fontWeight = FontWeight.Bold, letterSpacing = 2.sp)
+                Spacer(modifier = Modifier.height(6.dp))
+                if (isEditing) {
+                    InlineEditField(
+                        value = editNotes,
+                        onValueChange = { editNotes = it },
+                        placeholder = "Add notes…",
+                        fontSize = 13.sp,
+                        color = OnSurfaceVar,
+                        multiline = true
+                    )
+                } else {
+                    Text(
+                        text = editNotes.ifBlank { "No notes." },
+                        color = if (editNotes.isBlank()) OnSurfaceVar.copy(alpha = 0.4f) else OnSurfaceVar,
+                        fontSize = 13.sp,
+                        lineHeight = 20.sp
+                    )
+                }
+
+                if (isEditing) {
+                    Spacer(modifier = Modifier.height(16.dp))
+                    Button(
+                        onClick = {
+                            onSaveEdits(editTitle, editTime, editNotes)
+                            isEditing = false
+                        },
+                        modifier = Modifier.fillMaxWidth(),
+                        colors = ButtonDefaults.buttonColors(containerColor = BlueAccent),
+                        shape = RoundedCornerShape(12.dp)
+                    ) {
+                        Text("Save changes", fontWeight = FontWeight.Bold, color = Color(0xFF010E24))
+                    }
+                }
+            }
+        }
+    }
+
+    // Full-screen photo gallery overlay
+    if (showGallery && photos.size > 1) {
+        val pagerState = rememberPagerState(pageCount = { photos.size })
+        Dialog(
+            onDismissRequest = { showGallery = false },
+            properties = DialogProperties(usePlatformDefaultWidth = false)
+        ) {
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .background(Color.Black)
+            ) {
+                HorizontalPager(
+                    state = pagerState,
+                    modifier = Modifier.fillMaxSize()
+                ) { page ->
+                    AsyncImage(
+                        model = photos[page],
+                        contentDescription = null,
+                        modifier = Modifier.fillMaxSize(),
+                        contentScale = ContentScale.Fit
+                    )
+                }
+                // Close button (top-end)
+                IconButton(
+                    onClick = { showGallery = false },
+                    modifier = Modifier
+                        .align(Alignment.TopEnd)
+                        .padding(16.dp)
+                        .background(Color.Black.copy(alpha = 0.5f), RoundedCornerShape(8.dp))
+                ) {
+                    Icon(Icons.Default.Close, contentDescription = "Close gallery", tint = Color.White)
+                }
+                // Page counter (bottom-center)
+                Text(
+                    text = "${pagerState.currentPage + 1} / ${photos.size}",
+                    color = Color.White,
+                    fontSize = 13.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    modifier = Modifier
+                        .align(Alignment.BottomCenter)
+                        .padding(bottom = 24.dp)
+                        .background(Color.Black.copy(alpha = 0.5f), RoundedCornerShape(6.dp))
+                        .padding(horizontal = 10.dp, vertical = 4.dp)
+                )
             }
         }
     }

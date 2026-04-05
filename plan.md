@@ -371,11 +371,11 @@
 **Problem:** Expanded card shows a black/opaque screen behind it instead of the dimmed original screen. Also the card lacks the richness expected from the stored Yelp / SerpAPI data.
 **Files:** `FinalPlan.kt`, `ExpandedEventCard.kt`
 
-- [ ] Replace full-screen `Dialog` with a `ModalBottomSheet` — the itinerary remains visible (dimmed) behind the sheet, consistent with the change menu (Task 3.1)
-- [ ] Hero image area: display full stored image, not a small thumbnail
-- [ ] Show all stored `EventOption.details` fields — surface every non-null detail in a readable layout (hours, amenities, price breakdown, emissions, booking URL, etc.)
-- [ ] "X" / close affordance: if the event has more than one photo, replace the X button with a **2×2 grid icon** (indicating a gallery); tapping it opens a full-screen swipeable image carousel. X still appears for single-photo events.
-- [ ] Yelp reviews: show the 3 cached review excerpts (already lazily fetched per Task 3.3); render as quote cards
+- [x] Replace full-screen `Dialog` with a `ModalBottomSheet` — the itinerary remains visible (dimmed) behind the sheet, consistent with the change menu (Task 3.1)
+- [x] Hero image area: display full stored image, not a small thumbnail
+- [x] Show all stored `EventOption.details` fields — surface every non-null detail in a readable layout (hours, amenities, price breakdown, emissions, booking URL, etc.)
+- [x] "X" / close affordance: if the event has more than one photo, replace the X button with a **2×2 grid icon** (indicating a gallery); tapping it opens a full-screen swipeable image carousel. X still appears for single-photo events.
+- [x] Yelp reviews: show the 3 cached review excerpts (already lazily fetched per Task 3.3); render as quote cards
 
 ### Task 3.10 — Multi-Photo Gallery for Events
 **Problem:** Hotels should return many photos from SerpAPI but only one is shown. Gallery navigation is missing.
