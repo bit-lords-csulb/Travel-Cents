@@ -247,10 +247,10 @@
 **Problem:** The same restaurant and activity appear on every day of the trip. Root cause is likely Yelp results are fetched once but the same top result is assigned to every day rather than cycling.
 **Files:** `NewTripViewModel.kt`, `GroqRepository.kt`, `YelpRepository.kt`
 
-- [ ] After fetching Yelp pools for restaurants and activities, distribute them round-robin across days — day 1 gets option[0], day 2 gets option[1], etc. Never assign the same business as the primary slot on more than one day
+- [x] After fetching Yelp pools for restaurants and activities, distribute them round-robin across days — day 1 gets option[0], day 2 gets option[1], etc. Never assign the same business as the primary slot on more than one day
 - [ ] Same deduplication applies to change-menu alternatives: if a business is already the primary on another day, move it to that day's alternatives list only
 - [ ] Groq itinerary prompt: explicitly instruct the model not to suggest the same restaurant or activity name more than once across the plan skeleton
-- [ ] If the Yelp pool is smaller than the number of days, wrap around only for alternatives — not for primary selections; fall back to Groq-generated name + typed placeholder for overflow primaries
+- [x] If the Yelp pool is smaller than the number of days, wrap around only for alternatives — not for primary selections; fall back to Groq-generated name + typed placeholder for overflow primaries
 
 ### Task 3.7 — Explicit Reorder Mode (Jiggle Mode)
 **Problem:** Long-press drag-to-reorder silently exists but doesn't work reliably and offers no visual feedback that items are movable.
@@ -308,13 +308,13 @@
   - [x] Allow Final Plan to render flight cards even when `date` is blank by grouping them under a visible fallback header and showing all available flight info
   - [x] Add parser/unit coverage for the live Serp flight payload shape, including airport-level times and `departure_token`
   - Validate Day 1 grouping after the parser fix using `test.py`
-- [ ] **Step 2: Reduce Yelp call count**
+- [x] **Step 2: Reduce Yelp call count**
   - Replace per-day Yelp restaurant/activity searches in `NewTripViewModel.kt` and `YelpRepository.kt` with pooled searches per trip or per area cluster
   - Distribute Yelp results locally across day slots instead of asking Yelp the same question once per day
-- [ ] **Step 3: Deduplicate and rank locally**
+- [x] **Step 3: Deduplicate and rank locally**
   - In `NewTripViewModel.kt`, assign primaries round-robin by business id so no restaurant/activity becomes the primary on multiple days unless the pool is exhausted
-  - Improve hotel selection locally in `SerpRepository.kt` using travel-style-aware ranking instead of “first result wins”
-- [ ] **Step 4: Remove unnecessary critical-path downloads**
+  - Improve hotel selection locally in `SerpRepository.kt` using travel-style-aware ranking instead of “first result wins” — deferred
+- [x] **Step 4: Remove unnecessary critical-path downloads**
   - Change `ImageCacheManager.kt` and the image download stage in `NewTripViewModel.kt` so generation prefetches only selected hero images
   - Defer alternative hotel gallery images until expanded view / gallery view
 - [ ] **Step 5: Reduce or remove non-essential model work**

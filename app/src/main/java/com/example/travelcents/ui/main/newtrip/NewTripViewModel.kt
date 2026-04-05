@@ -17,7 +17,6 @@ import com.example.travelcents.data.remote.YelpRepository
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FirebaseFirestore
 import kotlinx.coroutines.async
-import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -160,33 +159,18 @@ class NewTripViewModel(application: Application) : AndroidViewModel(application)
 
                 val tripDates = generateTripDates(request.dateFrom, itinerary.durationDays)
 
-                // Step 3: Yelp restaurants — 1 call per day, all in parallel
+                // Step 3: Yelp restaurants — 1 pooled call, distributed round-robin across days
                 _generationStep.value = GenerationStep.FINDING_RESTAURANTS
                 _uiState.value = TripUiState.Loading(YELP_RESTAURANTS_MESSAGES.random())
-                val restaurantDeferreds = tripDates.map { date ->
-                    async {
-                        YelpRepository.searchRestaurants(
-                            location = itinerary.destination,
-                            date = date,
-                            itineraryId = itinerary.itineraryId,
-                            dietary = request.dietary
-                        )
-                    }
-                }
-                val restaurantEvents = restaurantDeferreds.awaitAll().filterNotNull()
+                val restaurantPool = YelpRepository.fetchRestaurantPool(itinerary.destination, request.dietary)
+                val restaurantEvents = YelpRepository.distributePoolToEvents(
+                    restaurantPool, tripDates, "restaurant", itinerary.itineraryId
+                )
 
-                // Step 4: Yelp activities (per day) + Yelp events (full trip range), all in parallel
+                // Step 4: Yelp activities (1 pooled call) + Yelp events (full trip range), in parallel
                 _generationStep.value = GenerationStep.FINDING_ACTIVITIES
                 _uiState.value = TripUiState.Loading(YELP_ACTIVITIES_MESSAGES.random())
-                val activityDeferreds = tripDates.map { date ->
-                    async {
-                        YelpRepository.searchActivities(
-                            location = itinerary.destination,
-                            date = date,
-                            itineraryId = itinerary.itineraryId
-                        )
-                    }
-                }
+                val activityPoolDeferred = async { YelpRepository.fetchActivityPool(itinerary.destination) }
                 val yelpEventsDeferred = async {
                     YelpRepository.searchEvents(
                         location = itinerary.destination,
@@ -195,35 +179,28 @@ class NewTripViewModel(application: Application) : AndroidViewModel(application)
                         itineraryId = itinerary.itineraryId
                     )
                 }
-                val activityEvents = activityDeferreds.awaitAll().filterNotNull()
+                val activityEvents = YelpRepository.distributePoolToEvents(
+                    activityPoolDeferred.await(), tripDates, "activity", itinerary.itineraryId
+                )
                 val localEvents = yelpEventsDeferred.await()
 
                 val allEvents = realFlights + realHotels + restaurantEvents + activityEvents + localEvents
                 val linkedItinerary = itinerary.copy(eventIds = allEvents.map { it.eventId })
 
-                // Step 5: Download all option images to internal storage
+                // Step 5: Download selected hero images only — alternative images are lazy-loaded on expand
                 _generationStep.value = GenerationStep.DOWNLOADING_IMAGES
                 _uiState.value = TripUiState.Loading(DOWNLOADING_MESSAGES.random())
-                val allImageUrls = allEvents.flatMap { event ->
-                    listOf(event.imageUrl) + event.options.map { it.imageUrl }
-                }.filter { it.isNotBlank() }
+                val heroImageUrls = allEvents.map { it.imageUrl }.filter { it.isNotBlank() }
                 val localPaths = ImageCacheManager.downloadTripImages(
                     getApplication(),
                     itinerary.itineraryId,
-                    allImageUrls
+                    heroImageUrls
                 )
 
-                // Patch localImagePath into each option + event imageUrl where cached
+                // Patch localImagePath into event hero image where cached; alternatives remain remote URLs
                 val patchedEvents = allEvents.map { event ->
-                    val patchedOpts = event.options.map { opt ->
-                        val local = localPaths[opt.imageUrl]
-                        if (local != null) opt.copy(localImagePath = local) else opt
-                    }
                     val localEventImg = localPaths[event.imageUrl]
-                    event.copy(
-                        options = patchedOpts,
-                        imageUrl = localEventImg ?: event.imageUrl
-                    )
+                    if (localEventImg != null) event.copy(imageUrl = localEventImg) else event
                 }
 
                 // Step 6: Save to Firestore (events + options subcollection)
