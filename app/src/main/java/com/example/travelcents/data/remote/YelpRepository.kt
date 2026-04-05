@@ -177,6 +177,92 @@ object YelpRepository {
         }
     }
 
+    // Single pooled fetch for restaurants (limit=20). Use distributePoolToEvents to assign across days.
+    suspend fun fetchRestaurantPool(
+        location: String,
+        dietary: List<String> = emptyList()
+    ): List<YelpBusiness> {
+        return try {
+            val dietaryCategories = dietary.mapNotNull { dietaryAliases[it] }
+            val categories = buildString {
+                append("restaurants")
+                if (dietaryCategories.isNotEmpty()) {
+                    append(",")
+                    append(dietaryCategories.joinToString(","))
+                }
+            }
+            val params = mapOf(
+                "location" to location,
+                "categories" to categories,
+                "limit" to "20",
+                "sort_by" to "rating"
+            )
+            api.searchBusinesses(params).businesses
+        } catch (_: Exception) {
+            emptyList()
+        }
+    }
+
+    // Single pooled fetch for activities (limit=20). Use distributePoolToEvents to assign across days.
+    suspend fun fetchActivityPool(location: String): List<YelpBusiness> {
+        return try {
+            val params = mapOf(
+                "location" to location,
+                "categories" to "arts,museums,tours,landmarks",
+                "limit" to "20",
+                "sort_by" to "rating"
+            )
+            api.searchBusinesses(params).businesses
+        } catch (_: Exception) {
+            emptyList()
+        }
+    }
+
+    // Distribute a Yelp business pool across trip days round-robin.
+    // Day i gets pool[i] as primary; alternatives are up to 4 other businesses from the pool.
+    // Days beyond pool size are skipped (returns fewer events than dates if pool is small).
+    fun distributePoolToEvents(
+        pool: List<YelpBusiness>,
+        dates: List<String>,
+        type: String,
+        itineraryId: String
+    ): List<TravelEvent> {
+        if (pool.isEmpty() || dates.isEmpty()) return emptyList()
+        val nameKey = if (type == "restaurant") "restaurant_name" else "activity_name"
+        val (startTime, endTime) = if (type == "restaurant") "19:00" to "21:00" else "10:00" to "12:00"
+
+        return dates.mapIndexedNotNull { dayIndex, date ->
+            if (dayIndex >= pool.size) return@mapIndexedNotNull null
+            val primary = pool[dayIndex]
+            val eventId = UUID.randomUUID().toString()
+            val alternatives = pool.filterIndexed { i, _ -> i != dayIndex }.take(4)
+            val options = listOf(
+                businessToEventOption(primary, eventId, isSelected = true, source = "yelp")
+            ) + alternatives.map {
+                businessToEventOption(it, eventId, isSelected = false, source = "yelp")
+            }
+            TravelEvent(
+                eventId = eventId,
+                type = type,
+                itineraryId = itineraryId,
+                date = date,
+                startTime = startTime,
+                endTime = endTime,
+                imageUrl = primary.imageUrl,
+                details = buildMap {
+                    put(nameKey, primary.name)
+                    primary.price?.let { put("price_tier", it) }
+                    put("rating", primary.rating.toString())
+                    put("review_count", primary.reviewCount.toString())
+                    primary.location?.displayAddress?.joinToString(", ")?.let { put("address", it) }
+                    put("categories", primary.categories.joinToString(", ") { it.title })
+                    put("yelp_id", primary.id)
+                },
+                options = options
+            )
+        }
+    }
+
     // Fetch full business details (photos, hours, etc.) — called lazily on first expand
     suspend fun getBusinessDetail(yelpId: String): YelpBusiness? {
         return try { api.getBusinessDetail(yelpId) } catch (_: Exception) { null }
