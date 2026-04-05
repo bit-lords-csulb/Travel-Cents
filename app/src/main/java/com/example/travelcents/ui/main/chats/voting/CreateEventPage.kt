@@ -175,9 +175,9 @@ fun CreateEventPage(
             ) {
                 Icon(
                     Icons.AutoMirrored.Filled.ArrowBack,
+                    modifier = Modifier.size(32.dp),
                     contentDescription = "Back",
-                    tint = DeepSea5,
-                    modifier = Modifier.size(28.dp)
+                    tint = DeepSea5
                 )
             }
 
