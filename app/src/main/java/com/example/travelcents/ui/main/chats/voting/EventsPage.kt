@@ -207,7 +207,7 @@ fun EventsPage(
                 .fillMaxWidth()
                 .clip(RoundedCornerShape(bottomStart = 24.dp, bottomEnd = 24.dp))
                 .background(DeepSea2)
-                .padding(top = 48.dp, bottom = 20.dp, start = 16.dp, end = 16.dp)
+                .padding(top = 48.dp, bottom = 20.dp, start = 8.dp, end = 16.dp)
         ) {
             Column(
                 modifier = Modifier.fillMaxWidth(),
@@ -222,6 +222,7 @@ fun EventsPage(
                     ) {
                         Icon(
                             Icons.AutoMirrored.Filled.ArrowBack,
+                            modifier = Modifier.size(32.dp),
                             contentDescription = "Back",
                             tint = DeepSea5
                         )
@@ -243,7 +244,7 @@ fun EventsPage(
                         IconButton(
                             onClick = onNewEvent,
                             modifier = Modifier
-                                .size(48.dp)
+                                .size(32.dp)
                                 .clip(CircleShape)
                                 .background(DeepSea3)
                                 .align(Alignment.CenterEnd)
