@@ -8,5 +8,7 @@ data class Group(
     val members: List<String> = emptyList(),
     val lastMessage: String = "",
     val lastMessageTime: Timestamp? = null,
-    val groupImageUrl: String = ""
+    val groupImageUrl: String = "",
+    val linkedTripId: String = "",
+    val linkedTripOwnerId: String = ""
 )
