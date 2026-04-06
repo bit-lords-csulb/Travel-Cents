@@ -110,6 +110,11 @@ private data class ColorOption(
     val color: Color
 )
 
+private data class EventTypeOption(
+    val key: String,
+    val label: String
+)
+
 @Composable
 fun CurrentPage(
     modifier: Modifier = Modifier,
@@ -1033,6 +1038,9 @@ private fun PlanEditorDialog(
     onDelete: (EditablePlan) -> Unit
 ) {
     val context = LocalContext.current
+    var planType by remember(initialPlan) {
+        mutableStateOf(initialPlan.type.lowercase(Locale.US).ifBlank { "activity" })
+    }
     var title by remember(initialPlan) { mutableStateOf(initialPlan.title) }
     var date by remember(initialPlan) { mutableStateOf(normalizeDate(initialPlan.date)) }
     var time by remember(initialPlan) { mutableStateOf(formatDisplayTime(initialPlan.startTime)) }
@@ -1057,6 +1065,14 @@ private fun PlanEditorDialog(
             ColorOption("plum", Color(0xFF5A2A7B)),
             ColorOption("lavender", Color(0xFF6D5D8E)),
             ColorOption("cyan", Color(0xFF268C95))
+        )
+    }
+    val eventTypeOptions = remember {
+        listOf(
+            EventTypeOption("activity", "Activity"),
+            EventTypeOption("restaurant", "Restaurant"),
+            EventTypeOption("hotel", "Hotel"),
+            EventTypeOption("flight", "Flight")
         )
     }
 
@@ -1120,6 +1136,50 @@ private fun PlanEditorDialog(
                         }
                     } else {
                         Spacer(modifier = Modifier.size(48.dp))
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(18.dp))
+
+                Text(
+                    text = "EVENT TYPE",
+                    color = DeepSea4,
+                    fontSize = 10.sp,
+                    fontWeight = FontWeight.Bold,
+                    letterSpacing = 0.8.sp
+                )
+
+                Spacer(modifier = Modifier.height(10.dp))
+
+                Row(
+                    modifier = Modifier.horizontalScroll(rememberScrollState()),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    eventTypeOptions.forEach { option ->
+                        val selected = option.key == planType
+                        Box(
+                            modifier = Modifier
+                                .clip(RoundedCornerShape(14.dp))
+                                .background(if (selected) DeepSea3 else DeepSea2)
+                                .border(
+                                    width = 1.dp,
+                                    color = if (selected) DeepSea4 else DeepSea3.copy(alpha = 0.7f),
+                                    shape = RoundedCornerShape(14.dp)
+                                )
+                                .clickable {
+                                    planType = option.key
+                                    colorKey = defaultColorKeyForType(option.key)
+                                    validationMessage = null
+                                }
+                                .padding(horizontal = 14.dp, vertical = 10.dp)
+                        ) {
+                            Text(
+                                text = option.label,
+                                color = DeepSea5,
+                                fontSize = 13.sp,
+                                fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Medium
+                            )
+                        }
                     }
                 }
 
@@ -1282,6 +1342,7 @@ private fun PlanEditorDialog(
                             time.isBlank() -> validationMessage = "Select a time for this plan."
                             else -> onSave(
                                 initialPlan.copy(
+                                    type = planType,
                                     title = title.trim(),
                                     date = date,
                                     startTime = time,

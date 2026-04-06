@@ -46,6 +46,7 @@ class ItineraryViewModel : ViewModel() {
 
     companion object {
         private const val DEFAULT_TRIP_TITLE = "Loading Trip..."
+        private const val EMPTY_PLANS_MESSAGE = "No plans yet. Tap + to add one."
     }
 
     private val _events = MutableStateFlow<List<TravelEvent>>(emptyList())
@@ -184,10 +185,10 @@ class ItineraryViewModel : ViewModel() {
                         it.copy(
                             isLoading = false,
                             events = sortedEvents,
-                            infoMessage = if (sortedEvents.isEmpty()) {
-                                "No plans yet. Tap + to add one."
-                            } else {
-                                it.infoMessage
+                            infoMessage = when {
+                                sortedEvents.isEmpty() && it.infoMessage.isNullOrBlank() -> EMPTY_PLANS_MESSAGE
+                                sortedEvents.isNotEmpty() && it.infoMessage == EMPTY_PLANS_MESSAGE -> null
+                                else -> it.infoMessage
                             },
                             errorMessage = null
                         )
