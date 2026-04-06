@@ -5,6 +5,7 @@ import android.app.TimePickerDialog
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -32,24 +33,24 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.AccessTime
-import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.CalendarToday
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.DeleteOutline
 import androidx.compose.material.icons.filled.EditCalendar
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
@@ -64,6 +65,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardCapitalization
@@ -81,9 +83,7 @@ import com.example.travelcents.ui.theme.DeepSea2
 import com.example.travelcents.ui.theme.DeepSea3
 import com.example.travelcents.ui.theme.DeepSea4
 import com.example.travelcents.ui.theme.DeepSea5
-import java.text.SimpleDateFormat
 import java.util.Calendar
-import java.util.Date
 import java.util.Locale
 import kotlin.math.ceil
 import kotlin.math.max
@@ -119,12 +119,19 @@ fun CurrentPage(
     onViewItineraryRequested: (() -> Unit)? = null
 ) {
     val uiState by viewModel.uiState.collectAsState()
-    val events = uiState.events
-    val sortedDates = remember(events) {
+    val events = remember(uiState.events) { sortEventsForCalendar(uiState.events) }
+    val eventDates = remember(events) {
         events.map { it.date }
             .filter { it.isNotBlank() }
             .distinct()
             .sorted()
+    }
+    val calendarDates = remember(uiState.dateFrom, uiState.dateTo, eventDates) {
+        buildCalendarDates(
+            dateFrom = uiState.dateFrom,
+            dateTo = uiState.dateTo,
+            eventDates = eventDates
+        )
     }
 
     var displayModeName by rememberSaveable(startInCalendar) {
@@ -139,12 +146,13 @@ fun CurrentPage(
     val displayMode = CurrentDisplayMode.valueOf(displayModeName)
     var selectedDate by rememberSaveable { mutableStateOf("") }
     var editorPlan by remember { mutableStateOf<EditablePlan?>(null) }
+    var deleteCandidate by remember { mutableStateOf<EditablePlan?>(null) }
 
-    val tripDateRange = remember(uiState.dateFrom, uiState.dateTo, sortedDates) {
+    val tripDateRange = remember(uiState.dateFrom, uiState.dateTo, calendarDates) {
         buildTripDateRange(
             dateFrom = uiState.dateFrom,
             dateTo = uiState.dateTo,
-            eventDates = sortedDates
+            eventDates = calendarDates
         )
     }
 
@@ -154,10 +162,10 @@ fun CurrentPage(
         }
     }
 
-    LaunchedEffect(sortedDates, uiState.dateFrom) {
+    LaunchedEffect(calendarDates, uiState.dateFrom) {
         val fallbackDate = uiState.dateFrom.ifBlank { todayIsoDate() }
-        if (selectedDate.isBlank() || selectedDate !in sortedDates) {
-            selectedDate = sortedDates.firstOrNull() ?: fallbackDate
+        if (selectedDate.isBlank() || selectedDate !in calendarDates) {
+            selectedDate = calendarDates.firstOrNull() ?: fallbackDate
         }
     }
 
@@ -180,10 +188,12 @@ fun CurrentPage(
                         if (uiState.currentTripId == null) {
                             viewModel.postError("Create a trip first before adding calendar plans.")
                         } else {
-                            editorPlan = EditablePlan(
-                                date = selectedDate.ifBlank { uiState.dateFrom.ifBlank { todayIsoDate() } },
-                                startTime = "9:00 AM",
-                                colorKey = "rose"
+                            editorPlan = newEditablePlan(
+                                date = selectedDate.ifBlank {
+                                    calendarDates.firstOrNull()
+                                        ?: uiState.dateFrom.ifBlank { todayIsoDate() }
+                                },
+                                startMinutes = 9 * 60
                             )
                         }
                     },
@@ -239,25 +249,48 @@ fun CurrentPage(
                     )
                     displayMode == CurrentDisplayMode.ITINERARY -> ItineraryContent(
                         events = events,
-                        onEventClick = { event -> editorPlan = event.toEditablePlan() }
+                        onEventClick = { event -> editorPlan = event.toEditablePlan() },
+                        onDeleteClick = { event -> deleteCandidate = event.toEditablePlan() }
                     )
                     displayMode == CurrentDisplayMode.WEEK -> WeekCalendarContent(
                         events = events,
-                        sortedDates = sortedDates,
+                        sortedDates = calendarDates,
                         selectedDate = selectedDate,
                         onDateSelected = { selectedDate = it },
-                        onEventClick = { event -> editorPlan = event.toEditablePlan() }
+                        onEventClick = { event -> editorPlan = event.toEditablePlan() },
+                        onDeleteClick = { event -> deleteCandidate = event.toEditablePlan() },
+                        onCreatePlan = { date, startMinutes ->
+                            editorPlan = newEditablePlan(date = date, startMinutes = startMinutes)
+                        }
                     )
                     else -> DayCalendarContent(
                         events = events,
-                        sortedDates = sortedDates,
+                        sortedDates = calendarDates,
                         selectedDate = selectedDate,
                         onDateSelected = { selectedDate = it },
-                        onEventClick = { event -> editorPlan = event.toEditablePlan() }
+                        onEventClick = { event -> editorPlan = event.toEditablePlan() },
+                        onDeleteClick = { event -> deleteCandidate = event.toEditablePlan() },
+                        onCreatePlan = { date, startMinutes ->
+                            editorPlan = newEditablePlan(date = date, startMinutes = startMinutes)
+                        }
                     )
                 }
             }
         }
+    }
+
+    deleteCandidate?.let { plan ->
+        DeletePlanDialog(
+            plan = plan,
+            onDismiss = { deleteCandidate = null },
+            onConfirmDelete = {
+                viewModel.deletePlan(plan)
+                if (editorPlan?.eventId == plan.eventId) {
+                    editorPlan = null
+                }
+                deleteCandidate = null
+            }
+        )
     }
 
     editorPlan?.let { plan ->
@@ -269,8 +302,8 @@ fun CurrentPage(
                 editorPlan = null
             },
             onDelete = { planToDelete ->
-                viewModel.deletePlan(planToDelete)
                 editorPlan = null
+                deleteCandidate = planToDelete
             }
         )
     }
@@ -379,9 +412,45 @@ private fun EmptyState(
 }
 
 @Composable
+private fun DeletePlanDialog(
+    plan: EditablePlan,
+    onDismiss: () -> Unit,
+    onConfirmDelete: () -> Unit
+) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        containerColor = DeepSea2,
+        title = {
+            Text(
+                text = "Delete Plan?",
+                color = DeepSea5,
+                fontWeight = FontWeight.SemiBold
+            )
+        },
+        text = {
+            Text(
+                text = "Remove ${plan.title.ifBlank { "this event" }} from your trip calendar?",
+                color = DeepSea4
+            )
+        },
+        confirmButton = {
+            TextButton(onClick = onConfirmDelete) {
+                Text(text = "DELETE", color = Color(0xFFE77D90))
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text(text = "CANCEL", color = DeepSea5)
+            }
+        }
+    )
+}
+
+@Composable
 private fun ItineraryContent(
     events: List<TravelEvent>,
-    onEventClick: (TravelEvent) -> Unit
+    onEventClick: (TravelEvent) -> Unit,
+    onDeleteClick: (TravelEvent) -> Unit
 ) {
     if (events.isEmpty()) {
         EmptyState(
@@ -416,7 +485,8 @@ private fun ItineraryContent(
                 groupedEvents[date].orEmpty().forEach { event ->
                     ListPlanCard(
                         event = event,
-                        onClick = { onEventClick(event) }
+                        onClick = { onEventClick(event) },
+                        onDeleteClick = { onDeleteClick(event) }
                     )
                 }
             }
@@ -427,7 +497,8 @@ private fun ItineraryContent(
 @Composable
 private fun ListPlanCard(
     event: TravelEvent,
-    onClick: () -> Unit
+    onClick: () -> Unit,
+    onDeleteClick: () -> Unit
 ) {
     val palette = eventPalette(event)
 
@@ -451,10 +522,12 @@ private fun ListPlanCard(
             )
 
             Column(
-                modifier = Modifier.padding(horizontal = 14.dp, vertical = 12.dp)
+                modifier = Modifier
+                    .weight(1f)
+                    .padding(start = 14.dp, top = 12.dp, bottom = 12.dp)
             ) {
                 Text(
-                    text = formatDisplayTime(event.startTime),
+                    text = formatDisplayTimeRange(event.startTime, event.endTime),
                     color = DeepSea4,
                     fontSize = 11.sp
                 )
@@ -476,6 +549,20 @@ private fun ListPlanCard(
                     overflow = TextOverflow.Ellipsis
                 )
             }
+
+            IconButton(
+                onClick = onDeleteClick,
+                modifier = Modifier
+                    .padding(top = 8.dp, end = 8.dp)
+                    .size(30.dp)
+            ) {
+                Icon(
+                    imageVector = Icons.Default.DeleteOutline,
+                    contentDescription = "Delete plan",
+                    tint = Color(0xFFE77D90),
+                    modifier = Modifier.size(16.dp)
+                )
+            }
         }
     }
 }
@@ -486,12 +573,14 @@ private fun WeekCalendarContent(
     sortedDates: List<String>,
     selectedDate: String,
     onDateSelected: (String) -> Unit,
-    onEventClick: (TravelEvent) -> Unit
+    onEventClick: (TravelEvent) -> Unit,
+    onDeleteClick: (TravelEvent) -> Unit,
+    onCreatePlan: (String, Int) -> Unit
 ) {
-    if (events.isEmpty()) {
+    if (sortedDates.isEmpty()) {
         EmptyState(
-            title = "No Plans Yet",
-            body = "Tap the + button to add plans to your weekly calendar."
+            title = "No Calendar Dates",
+            body = "Set trip dates first so you can add plans to the calendar."
         )
         return
     }
@@ -549,7 +638,9 @@ private fun WeekCalendarContent(
                         showHeader = false,
                         selected = date == selectedDate,
                         onHeaderClick = { onDateSelected(date) },
-                        onEventClick = onEventClick
+                        onEventClick = onEventClick,
+                        onDeleteClick = onDeleteClick,
+                        onEmptySlotClick = { startMinutes -> onCreatePlan(date, startMinutes) }
                     )
                     Spacer(modifier = Modifier.width(columnSpacing))
                 }
@@ -564,12 +655,14 @@ private fun DayCalendarContent(
     sortedDates: List<String>,
     selectedDate: String,
     onDateSelected: (String) -> Unit,
-    onEventClick: (TravelEvent) -> Unit
+    onEventClick: (TravelEvent) -> Unit,
+    onDeleteClick: (TravelEvent) -> Unit,
+    onCreatePlan: (String, Int) -> Unit
 ) {
-    if (events.isEmpty()) {
+    if (sortedDates.isEmpty()) {
         EmptyState(
-            title = "No Plans Yet",
-            body = "Tap the + button to add plans to your day view."
+            title = "No Calendar Dates",
+            body = "Set trip dates first so you can add plans to the calendar."
         )
         return
     }
@@ -618,7 +711,9 @@ private fun DayCalendarContent(
                     showHeader = false,
                     selected = true,
                     onHeaderClick = null,
-                    onEventClick = onEventClick
+                    onEventClick = onEventClick,
+                    onDeleteClick = onDeleteClick,
+                    onEmptySlotClick = { startMinutes -> onCreatePlan(activeDate, startMinutes) }
                 )
             }
         }
@@ -727,7 +822,9 @@ private fun ScheduleDayColumn(
     showHeader: Boolean,
     selected: Boolean,
     onHeaderClick: (() -> Unit)?,
-    onEventClick: (TravelEvent) -> Unit
+    onEventClick: (TravelEvent) -> Unit,
+    onDeleteClick: (TravelEvent) -> Unit,
+    onEmptySlotClick: (Int) -> Unit
 ) {
     val gridHeight = hourHeight * (scheduleWindow.endHour - scheduleWindow.startHour).toFloat()
     val headerShape = RoundedCornerShape(18.dp)
@@ -794,17 +891,46 @@ private fun ScheduleDayColumn(
                 }
                 .padding(horizontal = 4.dp)
         ) {
+            ScheduleGridTapTarget(
+                scheduleWindow = scheduleWindow,
+                hourHeight = hourHeight,
+                onSlotClick = onEmptySlotClick
+            )
+
             events.forEach { event ->
                 ScheduleEventCard(
                     event = event,
                     scheduleWindow = scheduleWindow,
                     hourHeight = hourHeight,
                     compact = compact,
-                    onClick = { onEventClick(event) }
+                    onClick = { onEventClick(event) },
+                    onDeleteClick = { onDeleteClick(event) }
                 )
             }
         }
     }
+}
+
+@Composable
+private fun BoxScope.ScheduleGridTapTarget(
+    scheduleWindow: ScheduleWindow,
+    hourHeight: Dp,
+    onSlotClick: (Int) -> Unit
+) {
+    val totalMinutes = (scheduleWindow.endHour - scheduleWindow.startHour) * 60
+
+    Box(
+        modifier = Modifier
+            .matchParentSize()
+            .pointerInput(scheduleWindow, hourHeight) {
+                detectTapGestures { tapOffset ->
+                    val tappedMinutes = ((tapOffset.y / hourHeight.toPx()) * 60).toInt()
+                    val roundedMinutes = ((tappedMinutes / 30) * 30)
+                        .coerceIn(0, max(totalMinutes - 30, 0))
+                    onSlotClick((scheduleWindow.startHour * 60) + roundedMinutes)
+                }
+            }
+    )
 }
 
 @Composable
@@ -813,7 +939,8 @@ private fun BoxScope.ScheduleEventCard(
     scheduleWindow: ScheduleWindow,
     hourHeight: Dp,
     compact: Boolean,
-    onClick: () -> Unit
+    onClick: () -> Unit,
+    onDeleteClick: () -> Unit
 ) {
     val startMinutes = parseTimeToMinutes(event.startTime) ?: (scheduleWindow.startHour * 60)
     val endMinutes = parseTimeToMinutes(event.endTime)
@@ -852,11 +979,28 @@ private fun BoxScope.ScheduleEventCard(
                     .padding(horizontal = 10.dp, vertical = 8.dp),
                 verticalArrangement = Arrangement.Top
             ) {
-                Text(
-                    text = formatDisplayTime(event.startTime),
-                    color = DeepSea4,
-                    fontSize = if (compact) 9.sp else 10.sp
-                )
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.Top
+                ) {
+                    Text(
+                        text = formatDisplayTimeRange(event.startTime, event.endTime),
+                        color = DeepSea4,
+                        fontSize = if (compact) 9.sp else 10.sp,
+                        modifier = Modifier.weight(1f)
+                    )
+                    IconButton(
+                        onClick = onDeleteClick,
+                        modifier = Modifier.size(if (compact) 18.dp else 24.dp)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.DeleteOutline,
+                            contentDescription = "Delete plan",
+                            tint = Color(0xFFE77D90),
+                            modifier = Modifier.size(if (compact) 11.dp else 14.dp)
+                        )
+                    }
+                }
                 Spacer(modifier = Modifier.height(2.dp))
                 Text(
                     text = eventTitle(event),
@@ -890,11 +1034,19 @@ private fun PlanEditorDialog(
 ) {
     val context = LocalContext.current
     var title by remember(initialPlan) { mutableStateOf(initialPlan.title) }
-    var date by remember(initialPlan) { mutableStateOf(initialPlan.date) }
-    var time by remember(initialPlan) { mutableStateOf(initialPlan.startTime) }
+    var date by remember(initialPlan) { mutableStateOf(normalizeDate(initialPlan.date)) }
+    var time by remember(initialPlan) { mutableStateOf(formatDisplayTime(initialPlan.startTime)) }
+    var endTime by remember(initialPlan) {
+        mutableStateOf(
+            initialPlan.endTime.takeIf { it.isNotBlank() }?.let(::formatDisplayTime).orEmpty()
+        )
+    }
     var location by remember(initialPlan) { mutableStateOf(initialPlan.location) }
     var notes by remember(initialPlan) { mutableStateOf(initialPlan.notes) }
     var colorKey by remember(initialPlan) { mutableStateOf(initialPlan.colorKey.ifBlank { "rose" }) }
+    val timeZoneId = remember(initialPlan) {
+        initialPlan.timeZoneId.ifBlank { defaultPlanTimeZoneId() }
+    }
     var validationMessage by remember { mutableStateOf<String?>(null) }
 
     val colorOptions = remember {
@@ -997,8 +1149,26 @@ private fun PlanEditorDialog(
                         placeholder = "YYYY-MM-DD",
                         icon = Icons.Default.CalendarToday,
                         onClick = {
-                            showDatePicker(context) {
+                            showDatePicker(context, date) {
                                 date = it
+                                validationMessage = null
+                            }
+                        }
+                    )
+                }
+
+                Spacer(modifier = Modifier.height(12.dp))
+
+                Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                    PickerField(
+                        modifier = Modifier.weight(1f),
+                        label = "Start Time",
+                        value = time,
+                        placeholder = "Select time",
+                        icon = Icons.Default.AccessTime,
+                        onClick = {
+                            showTimePicker(context, time) {
+                                time = it
                                 validationMessage = null
                             }
                         }
@@ -1006,18 +1176,37 @@ private fun PlanEditorDialog(
 
                     PickerField(
                         modifier = Modifier.weight(1f),
-                        label = "Time",
-                        value = time,
-                        placeholder = "Select time",
+                        label = "End Time",
+                        value = endTime,
+                        placeholder = "Optional",
                         icon = Icons.Default.AccessTime,
                         onClick = {
-                            showTimePicker(context) {
-                                time = it
-                                validationMessage = null
+                            showTimePicker(context, endTime.ifBlank { plusMinutes(time, 60) }) {
+                                endTime = it
                             }
                         }
                     )
                 }
+
+                Spacer(modifier = Modifier.height(14.dp))
+
+                Text(
+                    text = "TIME ZONE",
+                    color = DeepSea4,
+                    fontSize = 10.sp,
+                    fontWeight = FontWeight.Bold,
+                    letterSpacing = 0.8.sp
+                )
+                Spacer(modifier = Modifier.height(4.dp))
+                Text(
+                    text = formatTimeZoneLabel(
+                        timeZoneId = timeZoneId,
+                        date = date.ifBlank { todayIsoDate() },
+                        time = time.ifBlank { "12:00 PM" }
+                    ),
+                    color = DeepSea5,
+                    fontSize = 13.sp
+                )
 
                 Spacer(modifier = Modifier.height(14.dp))
 
@@ -1096,6 +1285,8 @@ private fun PlanEditorDialog(
                                     title = title.trim(),
                                     date = date,
                                     startTime = time,
+                                    endTime = endTime,
+                                    timeZoneId = timeZoneId,
                                     location = location.trim(),
                                     notes = notes.trim(),
                                     colorKey = colorKey
@@ -1172,13 +1363,28 @@ private fun TravelEvent.toEditablePlan(): EditablePlan {
         eventId = eventId,
         type = type,
         title = eventTitle(this),
-        date = date,
-        startTime = startTime,
-        endTime = endTime,
+        date = normalizeDate(date),
+        startTime = formatDisplayTime(startTime),
+        endTime = endTime.takeIf { it.isNotBlank() }?.let(::formatDisplayTime).orEmpty(),
+        timeZoneId = tz.ifBlank { defaultPlanTimeZoneId() },
         location = editableLocation(this),
         notes = editableNotes(this),
         colorKey = details["colorKey"] ?: defaultColorKeyForType(type),
         existingDetails = details
+    )
+}
+
+private fun newEditablePlan(
+    date: String,
+    startMinutes: Int
+): EditablePlan {
+    val startTime = formatMinutes(startMinutes)
+    return EditablePlan(
+        date = normalizeDate(date),
+        startTime = startTime,
+        endTime = plusMinutes(startTime, 60),
+        timeZoneId = defaultPlanTimeZoneId(),
+        colorKey = defaultColorKeyForType("activity")
     )
 }
 
@@ -1309,94 +1515,17 @@ private fun buildTripDateRange(
     return "${formatTripDate(start).uppercase(Locale.US)} - ${formatTripDate(end).uppercase(Locale.US)}"
 }
 
-private fun hourLabel(hour: Int): String {
-    val calendar = Calendar.getInstance().apply {
-        set(Calendar.HOUR_OF_DAY, hour)
-        set(Calendar.MINUTE, 0)
-    }
-    return SimpleDateFormat("h a", Locale.US).format(calendar.time)
-}
-
-private fun formatDisplayTime(time: String): String {
-    val minutes = parseTimeToMinutes(time) ?: return time.ifBlank { "TIME TBD" }
-    return formatMinutes(minutes)
-}
-
-private fun formatMinutes(minutes: Int): String {
-    val calendar = Calendar.getInstance().apply {
-        set(Calendar.HOUR_OF_DAY, minutes / 60)
-        set(Calendar.MINUTE, minutes % 60)
-    }
-    return SimpleDateFormat("h:mm a", Locale.US).format(calendar.time)
-}
-
-private fun parseTimeToMinutes(rawTime: String): Int? {
-    if (rawTime.isBlank()) return null
-
-    val normalized = rawTime.trim().uppercase(Locale.US).replace(".", "")
-    val formats = listOf("H:mm", "HH:mm", "h:mm a", "hh:mm a", "h a")
-
-    for (pattern in formats) {
-        val parser = SimpleDateFormat(pattern, Locale.US).apply { isLenient = false }
-        val parsed = runCatching { parser.parse(normalized) }.getOrNull() ?: continue
-        val calendar = Calendar.getInstance().apply { time = parsed }
-        return calendar.get(Calendar.HOUR_OF_DAY) * 60 + calendar.get(Calendar.MINUTE)
-    }
-
-    return null
-}
-
-private fun formatTripDate(rawDate: String): String {
-    return parseIsoDate(rawDate)
-        ?.let { SimpleDateFormat("MMM d", Locale.US).format(it) }
-        ?: rawDate
-}
-
-private fun formatItineraryHeader(rawDate: String): String {
-    return parseIsoDate(rawDate)
-        ?.let { SimpleDateFormat("EEEE, MMMM d", Locale.US).format(it) }
-        ?.uppercase(Locale.US)
-        ?: rawDate
-}
-
-private fun formatLongDayLabel(rawDate: String): String {
-    return parseIsoDate(rawDate)
-        ?.let { SimpleDateFormat("MMMM d", Locale.US).format(it) }
-        ?: rawDate
-}
-
-private fun formatDayOfWeekShort(rawDate: String): String {
-    return parseIsoDate(rawDate)
-        ?.let { SimpleDateFormat("EEE", Locale.US).format(it) }
-        ?.uppercase(Locale.US)
-        ?: rawDate
-}
-
-private fun formatMonthDayCompact(rawDate: String): String {
-    return parseIsoDate(rawDate)
-        ?.let { SimpleDateFormat("MMM d", Locale.US).format(it) }
-        ?.uppercase(Locale.US)
-        ?: rawDate
-}
-
-private fun parseIsoDate(rawDate: String): Date? {
-    if (rawDate.isBlank()) return null
-    return runCatching {
-        SimpleDateFormat("yyyy-MM-dd", Locale.US).apply {
-            isLenient = false
-        }.parse(rawDate)
-    }.getOrNull()
-}
-
-private fun todayIsoDate(): String {
-    return SimpleDateFormat("yyyy-MM-dd", Locale.US).format(Date())
-}
-
 private fun showDatePicker(
     context: android.content.Context,
+    initialDate: String = "",
     onDateSelected: (String) -> Unit
 ) {
-    val calendar = Calendar.getInstance()
+    val initial = parseIsoDate(initialDate)
+    val calendar = Calendar.getInstance().apply {
+        if (initial != null) {
+            set(initial.year, initial.monthValue - 1, initial.dayOfMonth)
+        }
+    }
     DatePickerDialog(
         context,
         { _, year, month, dayOfMonth ->
@@ -1410,17 +1539,20 @@ private fun showDatePicker(
 
 private fun showTimePicker(
     context: android.content.Context,
+    initialTime: String = "",
     onTimeSelected: (String) -> Unit
 ) {
-    val calendar = Calendar.getInstance()
+    val initial = parseFlexibleTime(initialTime)
+    val calendar = Calendar.getInstance().apply {
+        if (initial != null) {
+            set(Calendar.HOUR_OF_DAY, initial.hour)
+            set(Calendar.MINUTE, initial.minute)
+        }
+    }
     TimePickerDialog(
         context,
         { _, hourOfDay, minute ->
-            val pickerCalendar = Calendar.getInstance().apply {
-                set(Calendar.HOUR_OF_DAY, hourOfDay)
-                set(Calendar.MINUTE, minute)
-            }
-            onTimeSelected(SimpleDateFormat("h:mm a", Locale.US).format(pickerCalendar.time))
+            onTimeSelected(formatDisplayTime("%02d:%02d".format(hourOfDay, minute)))
         },
         calendar.get(Calendar.HOUR_OF_DAY),
         calendar.get(Calendar.MINUTE),

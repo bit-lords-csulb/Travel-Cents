@@ -24,6 +24,7 @@ data class EditablePlan(
     val date: String = "",
     val startTime: String = "",
     val endTime: String = "",
+    val timeZoneId: String = defaultPlanTimeZoneId(),
     val location: String = "",
     val notes: String = "",
     val colorKey: String = "rose",
@@ -177,12 +178,13 @@ class ItineraryViewModel : ViewModel() {
                         )
                     }
 
-                    _events.value = fetchedEvents
+                    val sortedEvents = sortEventsForCalendar(fetchedEvents)
+                    _events.value = sortedEvents
                     _uiState.update {
                         it.copy(
                             isLoading = false,
-                            events = fetchedEvents,
-                            infoMessage = if (fetchedEvents.isEmpty()) {
+                            events = sortedEvents,
+                            infoMessage = if (sortedEvents.isEmpty()) {
                                 "No plans yet. Tap + to add one."
                             } else {
                                 it.infoMessage
@@ -234,9 +236,10 @@ class ItineraryViewModel : ViewModel() {
                     eventId = eventId,
                     type = plan.type,
                     itineraryId = tripId,
-                    date = plan.date,
-                    startTime = plan.startTime,
-                    endTime = plan.endTime,
+                    tz = plan.timeZoneId.trim().ifBlank { defaultPlanTimeZoneId() },
+                    date = normalizeDate(plan.date),
+                    startTime = normalizeTime(plan.startTime),
+                    endTime = normalizeTime(plan.endTime),
                     details = mergedDetails
                 )
 
