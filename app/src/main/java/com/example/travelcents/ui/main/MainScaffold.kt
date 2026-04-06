@@ -280,14 +280,19 @@ fun MainScaffold(modifier: Modifier = Modifier, onLogout: () -> Unit = {}) {
         if (currentRoute in bottomNavRoutes) {
             BottomNavBar(
                 items = items,
-                currentRoute = selectedBottomRoute,
+                selectedRoute = selectedBottomRoute,
+                activeRoute = currentRoute,
                 onItemSelected = { route ->
+                    val resetNewTripToLanding =
+                        route == MainRoutes.NEW_TRIP && currentRoute == MainRoutes.FINAL_PLAN
+
                     navController.navigate(route) {
                         popUpTo(navController.graph.findStartDestination().id) {
                             saveState = true
                         }
                         launchSingleTop = true
-                        restoreState = true
+                        // Preserve in-progress trip planning, but don't restore Final Plan into the New Trip tab.
+                        restoreState = !resetNewTripToLanding
                     }
                 }
             )
@@ -298,7 +303,8 @@ fun MainScaffold(modifier: Modifier = Modifier, onLogout: () -> Unit = {}) {
 @Composable
 private fun BottomNavBar(
     items: List<BottomNavItem>,
-    currentRoute: String,
+    selectedRoute: String,
+    activeRoute: String,
     onItemSelected: (String) -> Unit
 ) {
     Column {
@@ -312,12 +318,13 @@ private fun BottomNavBar(
             verticalAlignment = Alignment.CenterVertically
         ) {
             items.forEach { item ->
-                val selected = currentRoute == item.route
+                val selected = selectedRoute == item.route
+                val isCurrentDestination = activeRoute == item.route
                 Column(
                     modifier = Modifier
                         .weight(1f)
                         .clickable {
-                            if (!selected) {
+                            if (!isCurrentDestination) {
                                 onItemSelected(item.route)
                             }
                         }
