@@ -109,12 +109,19 @@ fun MainScaffold(modifier: Modifier = Modifier, onLogout: () -> Unit = {}) {
 
     val navBackStackEntry by navController.currentBackStackEntryAsState()
     val currentRoute = navBackStackEntry?.destination?.route ?: MainRoutes.HOME
-    val selectedBottomRoute =
-        if (currentRoute == MainRoutes.FINAL_PLAN || currentRoute == MainRoutes.EDIT_PLAN) {
-            MainRoutes.CURRENT
-        } else {
-            currentRoute
-        }
+    val selectedBottomRoute = when (currentRoute) {
+        MainRoutes.EDIT_PLAN -> MainRoutes.CURRENT
+        MainRoutes.NEW_TRIP,
+        MainRoutes.NEW_TRIP_STEP_1,
+        MainRoutes.NEW_TRIP_STEP_2,
+        MainRoutes.NEW_TRIP_STEP_3,
+        MainRoutes.NEW_TRIP_STEP_4,
+        MainRoutes.NEW_TRIP_STEP_5,
+        MainRoutes.TRIP_GENERATING,
+        MainRoutes.AI_TRIP_CHAT,
+        MainRoutes.FINAL_PLAN -> MainRoutes.NEW_TRIP
+        else -> currentRoute
+    }
     val itineraryUiState by sharedItineraryViewModel.uiState.collectAsState()
 
     // Load trip once on mount so currentTripId is available before any tab is visited
