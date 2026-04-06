@@ -82,9 +82,6 @@ import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.travelcents.data.model.TravelEvent
-import com.example.travelcents.ui.main.itinerary.EditablePlan
-import com.example.travelcents.ui.main.itinerary.ItineraryViewModel
-import com.example.travelcents.ui.main.itinerary.SharedTripHeader
 import com.example.travelcents.ui.theme.DeepSea1
 import com.example.travelcents.ui.theme.DeepSea2
 import com.example.travelcents.ui.theme.DeepSea3
@@ -147,7 +144,7 @@ private data class EventLayoutInfo(
 @Composable
 fun CurrentPage(
     modifier: Modifier = Modifier,
-    viewModel: ItineraryViewModel = viewModel(),
+    viewModel: CurrentTripViewModel = viewModel(),
     startInCalendar: Boolean = false,
     autoLoadTrip: Boolean = true,
     onViewItineraryRequested: (() -> Unit)? = null
