@@ -403,41 +403,113 @@ class ItineraryViewModel : ViewModel() {
     fun isRejected(eventId: String, optId: String): Boolean =
         _rejectedOptions.value[eventId]?.contains(optId) == true
 
-    // Update local list order only — call persistEventOrder() when drag ends
+    private fun eventSortDate(event: TravelEvent): String =
+        event.date.ifBlank { "9999-12-31" }
+
+    private fun eventSortOrder(event: TravelEvent): Int =
+        event.details["sortOrder"]?.toIntOrNull() ?: 0
+
+    private fun sortEvents(events: List<TravelEvent>): List<TravelEvent> =
+        events.sortedWith(
+            compareBy(
+                { eventSortDate(it) },
+                { eventSortOrder(it) },
+                { it.startTime },
+                { it.eventId }
+            )
+        )
+
+    private fun sortEventsForDate(events: List<TravelEvent>, date: String): List<TravelEvent> =
+        events
+            .filter { it.date == date }
+            .sortedWith(
+                compareBy(
+                    { eventSortOrder(it) },
+                    { it.startTime },
+                    { it.eventId }
+                )
+            )
+
+    // Update local list order and date only — call persistEventPlacements() when drag ends
+    fun moveEventLocally(eventId: String, fromDate: String, toDate: String, toIndex: Int) {
+        val currentEvents = _uiState.value.events
+        val sourceDayEvents = sortEventsForDate(currentEvents, fromDate).toMutableList()
+        val sourceIndex = sourceDayEvents.indexOfFirst { it.eventId == eventId }
+        if (sourceIndex == -1) return
+
+        val movingEvent = sourceDayEvents.removeAt(sourceIndex)
+        val targetDayEvents = if (fromDate == toDate) {
+            sourceDayEvents
+        } else {
+            sortEventsForDate(currentEvents, toDate).toMutableList()
+        }
+        val insertionIndex = toIndex.coerceIn(0, targetDayEvents.size)
+        targetDayEvents.add(insertionIndex, movingEvent.copy(date = toDate))
+
+        val updatedEvents = buildMap<String, TravelEvent> {
+            sourceDayEvents.forEachIndexed { index, event ->
+                put(event.eventId, event.copy(details = event.details + ("sortOrder" to index.toString())))
+            }
+            targetDayEvents.forEachIndexed { index, event ->
+                put(event.eventId, event.copy(date = toDate, details = event.details + ("sortOrder" to index.toString())))
+            }
+        }
+
+        val reordered = sortEvents(currentEvents.map { event -> updatedEvents[event.eventId] ?: event })
+        _uiState.update { it.copy(events = reordered) }
+        _events.value = reordered
+    }
+
+    // Update local list order only within a single day — call persistEventPlacements() when drag ends
     fun reorderEventsLocally(date: String, fromIndex: Int, toIndex: Int) {
         if (fromIndex == toIndex) return
-        val currentEvents = _uiState.value.events.toMutableList()
-        val dayEvents = currentEvents.filter { it.date == date }.toMutableList()
+        val currentEvents = _uiState.value.events
+        val dayEvents = sortEventsForDate(currentEvents, date).toMutableList()
         if (fromIndex !in dayEvents.indices || toIndex !in dayEvents.indices) return
 
         val moved = dayEvents.removeAt(fromIndex)
         dayEvents.add(toIndex, moved)
 
-        val otherEvents = currentEvents.filter { it.date != date }
-        val reordered = otherEvents + dayEvents
+        val reorderedDayEvents = dayEvents.mapIndexed { index, event ->
+            event.copy(details = event.details + ("sortOrder" to index.toString()))
+        }
+        val reorderedById = reorderedDayEvents.associateBy { it.eventId }
+        val reordered = sortEvents(
+            currentEvents.map { event ->
+                if (event.date == date) reorderedById[event.eventId] ?: event else event
+            }
+        )
+
         _uiState.update { it.copy(events = reordered) }
         _events.value = reordered
     }
 
-    // Persist the current in-memory order for a date to Firestore
-    fun persistEventOrder(date: String) {
+    // Persist the current in-memory order and date for all affected days to Firestore
+    fun persistEventPlacements(dates: Set<String>) {
         val uid = auth.currentUser?.uid ?: return
         val tripId = _uiState.value.currentTripId ?: return
-        val dayEvents = _uiState.value.events.filter { it.date == date }
-        if (dayEvents.isEmpty()) return
+        if (dates.isEmpty()) return
 
         viewModelScope.launch {
             try {
                 val batch = db.batch()
-                dayEvents.forEachIndexed { idx, event ->
-                    val ref = db.collection("users").document(uid)
-                        .collection("trips").document(tripId)
-                        .collection("events").document(event.eventId)
-                    batch.update(ref, "sortOrder", idx)
+                dates.forEach { date ->
+                    sortEventsForDate(_uiState.value.events, date).forEachIndexed { idx, event ->
+                        val ref = db.collection("users").document(uid)
+                            .collection("trips").document(tripId)
+                            .collection("events").document(event.eventId)
+                        batch.update(
+                            ref,
+                            mapOf(
+                                "date" to event.date,
+                                "sortOrder" to idx
+                            )
+                        )
+                    }
                 }
                 batch.commit().await()
             } catch (e: Exception) {
-                Log.e("ItineraryViewModel", "Failed to persist event order", e)
+                Log.e("ItineraryViewModel", "Failed to persist event placements", e)
             }
         }
     }
