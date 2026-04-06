@@ -10,6 +10,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
@@ -30,18 +31,15 @@ import com.example.travelcents.ui.theme.DeepSea3
 fun SharedTripHeader(
     tripTitle: String,
     dateRange: String,
-    primaryActionLabel: String,
-    onPrimaryActionClick: () -> Unit,
     modifier: Modifier = Modifier,
     canAdd: Boolean = true,
     onAddClick: () -> Unit = {},
-    secondaryActionLabel: String? = null,
-    onSecondaryActionClick: (() -> Unit)? = null
+    controlsContent: (@Composable () -> Unit)? = null
 ) {
     Column(
         modifier = modifier
             .fillMaxWidth()
-            .height(130.dp)
+            .heightIn(min = 130.dp)
     ) {
         Row(
             modifier = Modifier.fillMaxWidth(),
@@ -73,21 +71,8 @@ fun SharedTripHeader(
 
         Spacer(modifier = Modifier.height(16.dp))
 
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(12.dp)
-        ) {
-            TripHeaderPill(
-                label = primaryActionLabel,
-                onClick = onPrimaryActionClick
-            )
-
-            if (secondaryActionLabel != null && onSecondaryActionClick != null) {
-                TripHeaderPill(
-                    label = secondaryActionLabel,
-                    onClick = onSecondaryActionClick
-                )
-            }
+        if (controlsContent != null) {
+            controlsContent()
         }
 
         Spacer(modifier = Modifier.height(20.dp))
@@ -117,23 +102,3 @@ private fun TripHeaderActionButton(
     }
 }
 
-@Composable
-private fun TripHeaderPill(
-    label: String,
-    onClick: () -> Unit
-) {
-    Surface(
-        color = Color.Transparent,
-        shape = RoundedCornerShape(4.dp),
-        border = BorderStroke(1.dp, Color(0xFF334155)),
-        modifier = Modifier.clickable(onClick = onClick)
-    ) {
-        Text(
-            text = label,
-            fontSize = 10.sp,
-            fontWeight = FontWeight.Bold,
-            color = Color(0xFF94A3B8),
-            modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp)
-        )
-    }
-}

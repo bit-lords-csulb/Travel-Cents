@@ -21,6 +21,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
@@ -38,11 +39,24 @@ fun EventsPage(
     onEventClick: (Event) -> Unit = {},
     viewModel: EventsViewModel = viewModel(
         key = group.id,
-        factory = EventsViewModel.Factory(group.id)
+        factory = EventsViewModel.Factory(group)
     )
 ) {
     val events by viewModel.events.collectAsState()
     val isLoading by viewModel.isLoading.collectAsState()
+
+    LaunchedEffect(group) {
+        viewModel.updateGroup(group)
+    }
+
+    // Tab State
+    var selectedTab by remember { mutableIntStateOf(0) }
+    val tabs = listOf("Proposed Events", "Added to Itinerary")
+
+    // Filter events based on status
+    val proposedEvents = events.filter { !it.isWon }
+    val wonEvents = events.filter { it.isWon }
+    val displayedEvents = if (selectedTab == 0) proposedEvents else wonEvents
 
     // State for Deletion
     var eventToDelete by remember { mutableStateOf<Event?>(null) }
@@ -54,6 +68,7 @@ fun EventsPage(
 
     // Full Details Bottom Sheet
     if (showSheet && selectedEventForDetails != null) {
+        val event = selectedEventForDetails!!
         ModalBottomSheet(
             onDismissRequest = { showSheet = false },
             sheetState = sheetState,
@@ -64,39 +79,98 @@ fun EventsPage(
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(horizontal = 24.dp)
-                    .padding(bottom = 64.dp)
+                    .padding(bottom = 48.dp)
             ) {
                 Text(
-                    selectedEventForDetails!!.title,
+                    event.title,
                     fontSize = 24.sp,
                     fontWeight = FontWeight.Bold,
                     color = DeepSea5
                 )
                 Spacer(modifier = Modifier.height(8.dp))
 
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Icon(
-                        Icons.Default.LocationOn,
-                        null,
-                        tint = DeepSea5.copy(alpha = 0.4f),
-                        modifier = Modifier.size(14.dp)
-                    )
-                    Text(
-                        selectedEventForDetails!!.location,
-                        color = DeepSea5.copy(alpha = 0.6f),
-                        fontSize = 13.sp,
-                        modifier = Modifier.padding(start = 4.dp)
-                    )
+                // Location Row
+                if (event.location.isNotBlank()) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Icon(
+                            Icons.Default.LocationOn,
+                            null,
+                            tint = DeepSea5.copy(alpha = 0.4f),
+                            modifier = Modifier.size(14.dp)
+                        )
+                        Text(
+                            event.location,
+                            color = DeepSea5.copy(alpha = 0.6f),
+                            fontSize = 13.sp,
+                            modifier = Modifier.padding(start = 4.dp)
+                        )
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(8.dp))
+
+                // Date and Time row
+                val dateTimeDisplay = formatEventDateTime(event)
+                if (dateTimeDisplay.isNotBlank()) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Icon(
+                            Icons.Default.Schedule,
+                            null,
+                            tint = DeepSea5.copy(alpha = 0.4f),
+                            modifier = Modifier.size(14.dp)
+                        )
+
+                        Text(
+                            text = dateTimeDisplay,
+                            color = DeepSea5.copy(alpha = 0.6f),
+                            fontSize = 13.sp,
+                            modifier = Modifier.padding(start = 4.dp)
+                        )
+                    }
                 }
 
                 Spacer(modifier = Modifier.height(16.dp))
 
                 Text(
-                    text = selectedEventForDetails!!.description,
+                    text = event.description,
                     fontSize = 16.sp,
                     lineHeight = 24.sp,
                     color = DeepSea5.copy(alpha = 0.8f)
                 )
+
+                Spacer(modifier = Modifier.height(32.dp))
+
+                // Add to Itinerary button
+                val isTripOwner =
+                    group.linkedTripOwnerId.isEmpty() || group.linkedTripOwnerId == viewModel.currentUid
+
+                if (selectedTab == 0 && isTripOwner) {
+                    Button(
+                        onClick = {
+                            viewModel.markEventAsWon(event)
+                            showSheet = false
+                        },
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(52.dp),
+                        colors = ButtonDefaults.buttonColors(containerColor = DeepSea4),
+                        shape = RoundedCornerShape(16.dp)
+                    ) {
+                        Icon(
+                            Icons.Default.Check,
+                            contentDescription = null,
+                            tint = DeepSea1,
+                            modifier = Modifier.size(20.dp)
+                        )
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text(
+                            "Add to Itinerary",
+                            color = DeepSea1,
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 16.sp
+                        )
+                    }
+                }
             }
         }
     }
@@ -121,66 +195,92 @@ fun EventsPage(
         )
     }
 
-    Column(modifier = Modifier
-        .fillMaxSize()
-        .background(DeepSea1)) {
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(DeepSea1)
+    ) {
+
         // Header
         Box(
             modifier = Modifier
                 .fillMaxWidth()
                 .clip(RoundedCornerShape(bottomStart = 24.dp, bottomEnd = 24.dp))
                 .background(DeepSea2)
-                .padding(top = 48.dp, bottom = 20.dp)
+                .padding(top = 48.dp, bottom = 20.dp, start = 8.dp, end = 16.dp)
         ) {
             Column(
-                modifier = Modifier.align(Alignment.Center),
+                modifier = Modifier.fillMaxWidth(),
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
-                Text(
-                    "${group.name} Trip Ideas",
-                    fontSize = 20.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = DeepSea5
-                )
-                Text(
-                    "PROPOSED EVENTS",
-                    fontSize = 10.sp,
-                    fontWeight = FontWeight.SemiBold,
-                    color = DeepSea5.copy(alpha = 0.5f),
-                    letterSpacing = 1.sp
-                )
-            }
+                Box(modifier = Modifier.fillMaxWidth()) {
+                    IconButton(
+                        onClick = onBackClick,
+                        modifier = Modifier
+                            .size(48.dp)
+                            .align(Alignment.CenterStart)
+                    ) {
+                        Icon(
+                            Icons.AutoMirrored.Filled.ArrowBack,
+                            modifier = Modifier.size(32.dp),
+                            contentDescription = "Back",
+                            tint = DeepSea5
+                        )
+                    }
 
-            IconButton(
-                onClick = onBackClick,
-                modifier = Modifier
-                    .padding(start = 8.dp)
-                    .size(48.dp)
-                    .align(Alignment.CenterStart)
-            ) {
-                Icon(
-                    Icons.AutoMirrored.Filled.ArrowBack,
-                    contentDescription = "Back",
-                    tint = DeepSea5,
-                    modifier = Modifier.size(28.dp)
-                )
-            }
+                    Column(
+                        modifier = Modifier.align(Alignment.Center),
+                        horizontalAlignment = Alignment.CenterHorizontally
+                    ) {
+                        Text(
+                            "${group.name} Trip Ideas",
+                            fontSize = 20.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = DeepSea5
+                        )
+                    }
 
-            IconButton(
-                onClick = onNewEvent,
-                modifier = Modifier
-                    .padding(end = 12.dp)
-                    .size(48.dp)
-                    .clip(CircleShape)
-                    .background(DeepSea3)
-                    .align(Alignment.CenterEnd)
-            ) {
-                Icon(
-                    Icons.Default.Add,
-                    contentDescription = "Add",
-                    tint = DeepSea5,
-                    modifier = Modifier.size(28.dp)
-                )
+                    if (selectedTab == 0) {
+                        IconButton(
+                            onClick = onNewEvent,
+                            modifier = Modifier
+                                .size(32.dp)
+                                .clip(CircleShape)
+                                .background(DeepSea3)
+                                .align(Alignment.CenterEnd)
+                        ) {
+                            Icon(Icons.Default.Add, contentDescription = "Add", tint = DeepSea5)
+                        }
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(20.dp))
+
+                // Tabs
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    tabs.forEachIndexed { index, title ->
+                        val isSelected = selectedTab == index
+                        Box(
+                            modifier = Modifier
+                                .weight(1f)
+                                .height(36.dp)
+                                .clip(RoundedCornerShape(48.dp))
+                                .background(if (isSelected) DeepSea4 else DeepSea3)
+                                .clickable { selectedTab = index },
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Text(
+                                text = title,
+                                color = if (isSelected) DeepSea1 else DeepSea5.copy(alpha = 0.6f),
+                                fontWeight = if (isSelected) FontWeight.SemiBold else FontWeight.Normal,
+                                fontSize = 14.sp
+                            )
+                        }
+                    }
+                }
             }
         }
 
@@ -191,28 +291,43 @@ fun EventsPage(
                 CircularProgressIndicator(color = DeepSea5)
             }
         } else {
-            LazyColumn(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .padding(horizontal = 16.dp),
-                verticalArrangement = Arrangement.spacedBy(12.dp),
-                contentPadding = PaddingValues(bottom = 24.dp)
-            ) {
-                items(events, key = { it.id }) { event ->
-                    EventCard(
-                        event = event,
-                        currentUid = viewModel.currentUid,
-                        onClick = {
-                            selectedEventForDetails = event
-                            showSheet = true
-                        },
-                        onUpvote = { viewModel.upvote(event) },
-                        onDownvote = { viewModel.downvote(event) },
-                        onCommentClick = { onEventClick(event) },
-                        onLongPress = {
-                            eventToDelete = event.takeIf { it.createdBy == viewModel.currentUid }
-                        }
+            if (displayedEvents.isEmpty()) {
+                // Empty state
+                Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                    Text(
+                        text = if (selectedTab == 0) "No events proposed yet" else "No events added to itinerary yet",
+                        color = DeepSea5.copy(alpha = 0.4f),
+                        fontSize = 14.sp
                     )
+                }
+            } else {
+                LazyColumn(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .padding(horizontal = 16.dp),
+                    verticalArrangement = Arrangement.spacedBy(12.dp),
+                    contentPadding = PaddingValues(bottom = 24.dp)
+                ) {
+                    items(displayedEvents, key = { it.id }) { event ->
+                        EventCard(
+                            event = event,
+                            currentUid = viewModel.currentUid,
+                            showVoting = selectedTab == 0,
+                            onClick = {
+                                selectedEventForDetails = event
+                                showSheet = true
+                            },
+                            onUpvote = { viewModel.upvote(event) },
+                            onDownvote = { viewModel.downvote(event) },
+                            onCommentClick = { onEventClick(event) },
+                            onLongPress = {
+                                eventToDelete = event.takeIf {
+                                    it.createdBy == viewModel.currentUid ||
+                                            group.linkedTripOwnerId == viewModel.currentUid
+                                }
+                            }
+                        )
+                    }
                 }
             }
         }
@@ -225,6 +340,7 @@ fun EventsPage(
 fun EventCard(
     event: Event,
     currentUid: String,
+    showVoting: Boolean = true,
     onClick: () -> Unit,
     onUpvote: () -> Unit,
     onDownvote: () -> Unit,
@@ -243,9 +359,11 @@ fun EventCard(
         shape = RoundedCornerShape(20.dp)
     ) {
         Column {
-            Box(modifier = Modifier
-                .fillMaxWidth()
-                .height(150.dp)) {
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(150.dp)
+            ) {
                 if (event.photoUrl.isNotEmpty()) {
                     AsyncImage(
                         model = event.photoUrl,
@@ -254,16 +372,20 @@ fun EventCard(
                         modifier = Modifier.fillMaxSize()
                     )
                 } else {
-                    Box(modifier = Modifier
-                        .fillMaxSize()
-                        .background(DeepSea3))
+                    Box(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .background(DeepSea3)
+                    )
                 }
                 UserOverlayTag(event.createdByName)
             }
 
             Row(modifier = Modifier.padding(16.dp), verticalAlignment = Alignment.Top) {
-                VotingSideBar(score, hasUpvoted, hasDownvoted, onUpvote, onDownvote)
-                Spacer(modifier = Modifier.width(16.dp))
+                if (showVoting) {
+                    VotingSideBar(score, hasUpvoted, hasDownvoted, onUpvote, onDownvote)
+                    Spacer(modifier = Modifier.width(16.dp))
+                }
 
                 Column(modifier = Modifier.weight(1f)) {
                     Text(
@@ -287,35 +409,48 @@ fun EventCard(
                     Box(modifier = Modifier.fillMaxWidth()) {
                         Column(
                             modifier = Modifier.align(Alignment.BottomStart),
-                            verticalArrangement = Arrangement.spacedBy(0.dp)
+                            verticalArrangement = Arrangement.spacedBy(2.dp)
                         ) {
-                            Row(verticalAlignment = Alignment.CenterVertically) {
-                                Icon(
-                                    Icons.Default.LocationOn,
-                                    null,
-                                    tint = DeepSea5.copy(alpha = 0.4f),
-                                    modifier = Modifier.size(13.dp)
-                                )
-                                Text(
-                                    text = event.location,
-                                    color = DeepSea5.copy(alpha = 0.4f),
-                                    fontSize = 11.sp,
-                                    modifier = Modifier.padding(start = 4.dp)
-                                )
+                            // Location Row
+                            if (event.location.isNotBlank()) {
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    Icon(
+                                        Icons.Default.LocationOn,
+                                        null,
+                                        tint = DeepSea5.copy(alpha = 0.4f),
+                                        modifier = Modifier.size(13.dp)
+                                    )
+                                    Text(
+                                        text = event.location,
+                                        color = DeepSea5.copy(alpha = 0.4f),
+                                        fontSize = 11.sp,
+                                        modifier = Modifier.padding(start = 4.dp),
+                                        maxLines = 1,
+                                        overflow = TextOverflow.Ellipsis
+                                    )
+                                }
                             }
-                            Row(verticalAlignment = Alignment.CenterVertically) {
-                                Icon(
-                                    Icons.Default.Schedule,
-                                    null,
-                                    tint = DeepSea5.copy(alpha = 0.4f),
-                                    modifier = Modifier.size(13.dp)
-                                )
-                                Text(
-                                    text = event.time,
-                                    color = DeepSea5.copy(alpha = 0.4f),
-                                    fontSize = 11.sp,
-                                    modifier = Modifier.padding(start = 4.dp)
-                                )
+
+                            // Date, Start Time, End Time
+                            val finalDisplay = formatEventDateTime(event)
+                            if (finalDisplay.isNotBlank()) {
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    Icon(
+                                        Icons.Default.Schedule,
+                                        null,
+                                        tint = DeepSea5.copy(alpha = 0.4f),
+                                        modifier = Modifier.size(13.dp)
+                                    )
+
+                                    Text(
+                                        text = finalDisplay,
+                                        color = DeepSea5.copy(alpha = 0.4f),
+                                        fontSize = 11.sp,
+                                        modifier = Modifier.padding(start = 4.dp),
+                                        maxLines = 1,
+                                        overflow = TextOverflow.Ellipsis
+                                    )
+                                }
                             }
                         }
 
@@ -352,6 +487,24 @@ fun EventCard(
     }
 }
 
+// Helpers
+fun formatEventDateTime(event: Event): String {
+    val timeText = when {
+        event.startTime.isNotBlank() && event.endTime.isNotBlank() -> {
+            "${event.startTime} - ${event.endTime}"
+        }
+
+        event.startTime.isNotBlank() -> event.startTime
+        else -> event.time.ifBlank { "" }
+    }
+
+    return if (event.date.isNotBlank()) {
+        if (timeText.isNotBlank()) "${event.date}  •  $timeText" else event.date
+    } else {
+        timeText
+    }
+}
+
 @Composable
 fun UserOverlayTag(name: String) {
     Row(
@@ -362,10 +515,12 @@ fun UserOverlayTag(name: String) {
             .padding(horizontal = 10.dp, vertical = 6.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        Box(modifier = Modifier
-            .size(18.dp)
-            .clip(CircleShape)
-            .background(Color.Gray))
+        Box(
+            modifier = Modifier
+                .size(18.dp)
+                .clip(CircleShape)
+                .background(Color.Gray)
+        )
         Spacer(modifier = Modifier.width(8.dp))
         Text(
             name.split(" ").first(),

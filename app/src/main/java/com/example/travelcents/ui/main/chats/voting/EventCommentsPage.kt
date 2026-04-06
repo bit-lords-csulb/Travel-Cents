@@ -68,7 +68,12 @@ fun EventCommentsPage(
                     .align(Alignment.CenterStart)
                     .padding(start = 8.dp)
             ) {
-                Icon(Icons.AutoMirrored.Filled.ArrowBack, "Back", tint = DeepSea5)
+                Icon(
+                    Icons.AutoMirrored.Filled.ArrowBack,
+                    modifier = Modifier.size(32.dp),
+                    contentDescription = "Back",
+                    tint = DeepSea5
+                )
             }
 
             // Comments Title
