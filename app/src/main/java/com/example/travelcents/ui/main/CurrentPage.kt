@@ -9,6 +9,7 @@ import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.BoxScope
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
@@ -33,6 +34,8 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.AccessTime
+import androidx.compose.material.icons.filled.ChevronLeft
+import androidx.compose.material.icons.filled.ChevronRight
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.CalendarToday
 import androidx.compose.material.icons.filled.Close
@@ -67,6 +70,7 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardCapitalization
 import androidx.compose.ui.text.style.TextAlign
@@ -83,11 +87,14 @@ import com.example.travelcents.ui.theme.DeepSea2
 import com.example.travelcents.ui.theme.DeepSea3
 import com.example.travelcents.ui.theme.DeepSea4
 import com.example.travelcents.ui.theme.DeepSea5
+import java.time.Duration
+import java.time.LocalDateTime
 import java.util.Calendar
 import java.util.Locale
 import kotlin.math.ceil
 import kotlin.math.max
 import kotlin.math.min
+import kotlin.math.roundToInt
 
 private enum class CurrentDisplayMode {
     ITINERARY,
@@ -118,6 +125,20 @@ private data class EventTypeOption(
 private data class DisplayModeOption(
     val mode: CurrentDisplayMode,
     val label: String
+)
+
+private data class EventRenderSpan(
+    val event: TravelEvent,
+    val startMinutes: Int,
+    val endMinutes: Int,
+    val continuesBefore: Boolean,
+    val continuesAfter: Boolean
+)
+
+private data class EventLayoutInfo(
+    val span: EventRenderSpan,
+    val columnIndex: Int,
+    val columnCount: Int
 )
 
 @Composable
@@ -340,6 +361,323 @@ private fun CurrentDisplayModeTabs(
                     fontWeight = if (isSelected) FontWeight.SemiBold else FontWeight.Normal
                 )
             }
+        }
+    }
+}
+
+@Composable
+private fun DayNavigationBar(
+    dates: List<String>,
+    activeDate: String,
+    onDateSelected: (String) -> Unit
+) {
+    val activeIndex = dates.indexOf(activeDate).coerceAtLeast(0)
+    val previousDate = dates.getOrNull(activeIndex - 1)
+    val nextDate = dates.getOrNull(activeIndex + 1)
+    val todayDate = todayIsoDate().takeIf { it in dates && it != activeDate }
+
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(18.dp))
+            .background(DeepSea2)
+            .border(1.dp, DeepSea3.copy(alpha = 0.7f), RoundedCornerShape(18.dp))
+            .padding(horizontal = 12.dp, vertical = 10.dp)
+    ) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            IconButton(
+                onClick = { previousDate?.let(onDateSelected) },
+                enabled = previousDate != null,
+                modifier = Modifier.size(32.dp)
+            ) {
+                Icon(
+                    imageVector = Icons.Default.ChevronLeft,
+                    contentDescription = "Previous day",
+                    tint = if (previousDate != null) DeepSea5 else DeepSea4.copy(alpha = 0.35f)
+                )
+            }
+
+            Column(
+                modifier = Modifier.weight(1f),
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
+                Text(
+                    text = formatDayOfWeekShort(activeDate),
+                    color = DeepSea4,
+                    fontSize = 11.sp,
+                    fontWeight = FontWeight.Bold,
+                    letterSpacing = 0.8.sp
+                )
+                Text(
+                    text = formatLongDayLabel(activeDate),
+                    color = DeepSea5,
+                    fontSize = 16.sp,
+                    fontWeight = FontWeight.SemiBold
+                )
+            }
+
+            IconButton(
+                onClick = { nextDate?.let(onDateSelected) },
+                enabled = nextDate != null,
+                modifier = Modifier.size(32.dp)
+            ) {
+                Icon(
+                    imageVector = Icons.Default.ChevronRight,
+                    contentDescription = "Next day",
+                    tint = if (nextDate != null) DeepSea5 else DeepSea4.copy(alpha = 0.35f)
+                )
+            }
+        }
+
+        if (todayDate != null) {
+            Spacer(modifier = Modifier.height(8.dp))
+            Box(
+                modifier = Modifier
+                    .align(Alignment.CenterHorizontally)
+                    .clip(RoundedCornerShape(12.dp))
+                    .background(DeepSea3)
+                    .clickable { onDateSelected(todayDate) }
+                    .padding(horizontal = 12.dp, vertical = 6.dp)
+            ) {
+                Text(
+                    text = "GO TO TODAY",
+                    color = DeepSea5,
+                    fontSize = 11.sp,
+                    fontWeight = FontWeight.SemiBold
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun WeekNavigationBar(
+    allDates: List<String>,
+    visibleDates: List<String>,
+    onDateSelected: (String) -> Unit
+) {
+    val weekStartIndex = allDates.indexOf(visibleDates.firstOrNull()).coerceAtLeast(0)
+    val previousAnchor = allDates.getOrNull((weekStartIndex - 7).coerceAtLeast(0))
+        ?.takeIf { visibleDates.firstOrNull() != allDates.firstOrNull() }
+    val nextAnchor = allDates.getOrNull((weekStartIndex + 7).coerceAtMost(allDates.lastIndex))
+        ?.takeIf { visibleDates.lastOrNull() != allDates.lastOrNull() }
+    val weekLabel = buildTripDateRange(
+        dateFrom = visibleDates.firstOrNull().orEmpty(),
+        dateTo = visibleDates.lastOrNull().orEmpty(),
+        eventDates = visibleDates
+    )
+
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(18.dp))
+            .background(DeepSea2)
+            .border(1.dp, DeepSea3.copy(alpha = 0.7f), RoundedCornerShape(18.dp))
+            .padding(horizontal = 12.dp, vertical = 10.dp)
+    ) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            IconButton(
+                onClick = { previousAnchor?.let(onDateSelected) },
+                enabled = previousAnchor != null,
+                modifier = Modifier.size(32.dp)
+            ) {
+                Icon(
+                    imageVector = Icons.Default.ChevronLeft,
+                    contentDescription = "Previous week",
+                    tint = if (previousAnchor != null) DeepSea5 else DeepSea4.copy(alpha = 0.35f)
+                )
+            }
+
+            Column(
+                modifier = Modifier.weight(1f),
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
+                Text(
+                    text = "WEEK VIEW",
+                    color = DeepSea4,
+                    fontSize = 11.sp,
+                    fontWeight = FontWeight.Bold,
+                    letterSpacing = 0.8.sp
+                )
+                Text(
+                    text = weekLabel,
+                    color = DeepSea5,
+                    fontSize = 15.sp,
+                    fontWeight = FontWeight.SemiBold
+                )
+            }
+
+            IconButton(
+                onClick = { nextAnchor?.let(onDateSelected) },
+                enabled = nextAnchor != null,
+                modifier = Modifier.size(32.dp)
+            ) {
+                Icon(
+                    imageVector = Icons.Default.ChevronRight,
+                    contentDescription = "Next week",
+                    tint = if (nextAnchor != null) DeepSea5 else DeepSea4.copy(alpha = 0.35f)
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun WeekOverviewDayRow(
+    date: String,
+    selected: Boolean,
+    events: List<TravelEvent>,
+    canAddPlan: Boolean,
+    onEventClick: (TravelEvent) -> Unit,
+    onDeleteClick: (TravelEvent) -> Unit,
+    onAddClick: () -> Unit
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(18.dp))
+            .background(if (selected) DeepSea3.copy(alpha = 0.88f) else DeepSea1.copy(alpha = 0.42f))
+            .border(
+                width = 1.dp,
+                color = if (selected) DeepSea4.copy(alpha = 0.45f) else DeepSea3.copy(alpha = 0.6f),
+                shape = RoundedCornerShape(18.dp)
+            )
+            .padding(horizontal = 12.dp, vertical = 10.dp),
+        horizontalArrangement = Arrangement.spacedBy(12.dp),
+        verticalAlignment = Alignment.Top
+    ) {
+        Column(
+            modifier = Modifier.width(78.dp),
+            verticalArrangement = Arrangement.spacedBy(2.dp)
+        ) {
+            Text(
+                text = formatDayOfWeekShort(date),
+                color = DeepSea4,
+                fontSize = 10.sp,
+                fontWeight = FontWeight.Bold,
+                letterSpacing = 0.8.sp
+            )
+            Text(
+                text = formatMonthDayCompact(date),
+                color = DeepSea5,
+                fontSize = 14.sp,
+                fontWeight = FontWeight.SemiBold,
+                maxLines = 1
+            )
+            Text(
+                text = if (events.isEmpty()) "Open day" else "${events.size} plan${if (events.size == 1) "" else "s"}",
+                color = DeepSea4,
+                fontSize = 11.sp
+            )
+        }
+
+        Column(
+            modifier = Modifier
+                .weight(1f)
+                .heightIn(min = 44.dp),
+            verticalArrangement = Arrangement.spacedBy(6.dp)
+        ) {
+            if (events.isEmpty()) {
+                Text(
+                    text = "No plans yet",
+                    color = DeepSea4,
+                    fontSize = 13.sp,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+            } else {
+                events.forEach { event ->
+                    WeekOverviewEventRow(
+                        event = event,
+                        date = date,
+                        onClick = { onEventClick(event) },
+                        onDeleteClick = { onDeleteClick(event) }
+                    )
+                }
+            }
+        }
+
+        Box(
+            modifier = Modifier
+                .clip(RoundedCornerShape(12.dp))
+                .background(if (canAddPlan) DeepSea2 else DeepSea2.copy(alpha = 0.45f))
+                .then(if (canAddPlan) Modifier.clickable(onClick = onAddClick) else Modifier)
+                .padding(horizontal = 10.dp, vertical = 8.dp),
+            contentAlignment = Alignment.Center
+        ) {
+            Text(
+                text = if (canAddPlan) "+ Plan" else "No Trip",
+                color = if (canAddPlan) DeepSea5 else DeepSea4,
+                fontSize = 11.sp,
+                fontWeight = FontWeight.SemiBold
+            )
+        }
+    }
+}
+
+@Composable
+private fun WeekOverviewEventRow(
+    event: TravelEvent,
+    date: String,
+    onClick: () -> Unit,
+    onDeleteClick: () -> Unit
+) {
+    val span = remember(event, date) { eventSpanForDate(event, date) }
+    val palette = eventPalette(event)
+
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(12.dp))
+            .background(palette.container)
+            .clickable(onClick = onClick)
+            .padding(start = 0.dp, top = 6.dp, end = 6.dp, bottom = 6.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Box(
+            modifier = Modifier
+                .width(4.dp)
+                .height(26.dp)
+                .background(palette.accent)
+        )
+
+        Text(
+            text = span?.let(::renderSpanLabel) ?: formatDisplayTimeRange(event.startTime, event.endTime),
+            color = DeepSea4,
+            fontSize = 10.sp,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+            modifier = Modifier
+                .width(76.dp)
+                .padding(start = 8.dp, end = 6.dp)
+        )
+
+        Text(
+            text = eventTitle(event),
+            color = DeepSea5,
+            fontSize = 12.sp,
+            fontWeight = FontWeight.SemiBold,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+            modifier = Modifier.weight(1f)
+        )
+
+        IconButton(
+            onClick = onDeleteClick,
+            modifier = Modifier.size(20.dp)
+        ) {
+            Icon(
+                imageVector = Icons.Default.DeleteOutline,
+                contentDescription = "Delete plan",
+                tint = Color(0xFFE77D90),
+                modifier = Modifier.size(12.dp)
+            )
         }
     }
 }
@@ -620,64 +958,45 @@ private fun WeekCalendarContent(
         return
     }
 
-    val scheduleWindow = remember(events) { buildScheduleWindow(events) }
-    val eventsByDate = remember(events) { events.groupBy { it.date } }
-    val verticalScroll = rememberScrollState()
-    val horizontalScroll = rememberScrollState()
-    val hourHeight = 72.dp
-    val timeAxisWidth = 50.dp
-    val columnSpacing = 8.dp
-    val columnWidth = 116.dp
+    val visibleWeekDates = remember(sortedDates, selectedDate) {
+        visibleWeekDates(sortedDates, selectedDate)
+    }
 
     Column(
         modifier = Modifier
             .fillMaxSize()
             .padding(horizontal = 12.dp, vertical = 10.dp)
     ) {
-        CalendarDateChipRow(
-            dates = sortedDates,
-            selectedDate = selectedDate,
-            onDateSelected = onDateSelected,
-            horizontalScrollState = horizontalScroll,
-            leadingSpacerWidth = timeAxisWidth,
-            chipWidth = columnWidth,
-            trailingSpacerWidth = 0.dp
+        WeekNavigationBar(
+            allDates = sortedDates,
+            visibleDates = visibleWeekDates,
+            onDateSelected = onDateSelected
         )
 
         Spacer(modifier = Modifier.height(14.dp))
 
-        Column(
+        Card(
             modifier = Modifier
-                .fillMaxSize()
-                .verticalScroll(verticalScroll)
+                .fillMaxWidth()
+                .weight(1f),
+            shape = RoundedCornerShape(20.dp),
+            colors = CardDefaults.cardColors(containerColor = DeepSea2)
         ) {
-            Row(
-                modifier = Modifier.horizontalScroll(horizontalScroll)
+            LazyColumn(
+                modifier = Modifier.fillMaxSize(),
+                contentPadding = PaddingValues(horizontal = 10.dp, vertical = 10.dp),
+                verticalArrangement = Arrangement.spacedBy(8.dp)
             ) {
-                TimeAxis(
-                    scheduleWindow = scheduleWindow,
-                    hourHeight = hourHeight,
-                    topSpacing = 0.dp
-                )
-
-                Spacer(modifier = Modifier.width(columnSpacing))
-
-                sortedDates.forEach { date ->
-                    ScheduleDayColumn(
-                        modifier = Modifier.width(columnWidth),
+                items(visibleWeekDates, key = { it }) { date ->
+                    WeekOverviewDayRow(
                         date = date,
-                        events = eventsByDate[date].orEmpty(),
-                        scheduleWindow = scheduleWindow,
-                        hourHeight = hourHeight,
-                        compact = true,
-                        showHeader = false,
                         selected = date == selectedDate,
-                        onHeaderClick = { onDateSelected(date) },
+                        events = eventsForDate(events, date),
+                        canAddPlan = date in sortedDates,
                         onEventClick = onEventClick,
                         onDeleteClick = onDeleteClick,
-                        onEmptySlotClick = { startMinutes -> onCreatePlan(date, startMinutes) }
+                        onAddClick = { onCreatePlan(date, defaultStartMinutesForDate(events, date)) }
                     )
-                    Spacer(modifier = Modifier.width(columnSpacing))
                 }
             }
         }
@@ -703,18 +1022,35 @@ private fun DayCalendarContent(
     }
 
     val activeDate = selectedDate.takeIf { it.isNotBlank() } ?: sortedDates.firstOrNull().orEmpty()
-    val scheduleWindow = remember(events) { buildScheduleWindow(events) }
+    val dayEvents = remember(events, activeDate) { eventsForDate(events, activeDate) }
+    val scheduleWindow = remember(dayEvents, activeDate) {
+        buildScheduleWindow(dayEvents, listOf(activeDate))
+    }
     val verticalScroll = rememberScrollState()
-    val hourHeight = 76.dp
+    val density = LocalDensity.current
+    val hourHeight = 64.dp
+    val initialScrollMinutes = remember(activeDate, dayEvents) {
+        preferredDayScrollMinutes(
+            date = activeDate,
+            events = dayEvents
+        )
+    }
+
+    LaunchedEffect(activeDate) {
+        val targetOffset = with(density) {
+            (((initialScrollMinutes - (scheduleWindow.startHour * 60)).coerceAtLeast(0) / 60f) * hourHeight.toPx()).roundToInt()
+        }
+        verticalScroll.animateScrollTo(targetOffset)
+    }
 
     Column(
         modifier = Modifier
             .fillMaxSize()
             .padding(horizontal = 12.dp, vertical = 10.dp)
     ) {
-        CalendarDateChipRow(
+        DayNavigationBar(
             dates = sortedDates,
-            selectedDate = activeDate,
+            activeDate = activeDate,
             onDateSelected = onDateSelected
         )
 
@@ -739,7 +1075,7 @@ private fun DayCalendarContent(
                 ScheduleDayColumn(
                     modifier = Modifier.weight(1f),
                     date = activeDate,
-                    events = events.filter { it.date == activeDate },
+                    events = dayEvents,
                     scheduleWindow = scheduleWindow,
                     hourHeight = hourHeight,
                     compact = false,
@@ -748,7 +1084,8 @@ private fun DayCalendarContent(
                     onHeaderClick = null,
                     onEventClick = onEventClick,
                     onDeleteClick = onDeleteClick,
-                    onEmptySlotClick = { startMinutes -> onCreatePlan(activeDate, startMinutes) }
+                    onEmptySlotClick = { startMinutes -> onCreatePlan(activeDate, startMinutes) },
+                    showCurrentTimeIndicator = activeDate == todayIsoDate()
                 )
             }
         }
@@ -825,7 +1162,8 @@ private fun CalendarDateChipRow(
 private fun TimeAxis(
     scheduleWindow: ScheduleWindow,
     hourHeight: Dp,
-    topSpacing: Dp = 56.dp
+    topSpacing: Dp = 56.dp,
+    useTwentyFourHourLabels: Boolean = false
 ) {
     Column(modifier = Modifier.width(50.dp)) {
         Spacer(modifier = Modifier.height(topSpacing))
@@ -837,7 +1175,7 @@ private fun TimeAxis(
                 contentAlignment = Alignment.TopStart
             ) {
                 Text(
-                    text = hourLabel(hour),
+                    text = if (useTwentyFourHourLabels) hourLabel24(hour) else hourLabel(hour),
                     color = DeepSea4.copy(alpha = 0.8f),
                     fontSize = 11.sp
                 )
@@ -859,11 +1197,19 @@ private fun ScheduleDayColumn(
     onHeaderClick: (() -> Unit)?,
     onEventClick: (TravelEvent) -> Unit,
     onDeleteClick: (TravelEvent) -> Unit,
-    onEmptySlotClick: (Int) -> Unit
+    onEmptySlotClick: (Int) -> Unit,
+    showCurrentTimeIndicator: Boolean = false
 ) {
     val gridHeight = hourHeight * (scheduleWindow.endHour - scheduleWindow.startHour).toFloat()
     val headerShape = RoundedCornerShape(18.dp)
     val cardShape = RoundedCornerShape(20.dp)
+    val eventLayouts = remember(events, date, scheduleWindow) {
+        buildEventLayouts(
+            date = date,
+            events = events,
+            scheduleWindow = scheduleWindow
+        )
+    }
 
     Column(modifier = modifier) {
         if (showHeader) {
@@ -900,7 +1246,7 @@ private fun ScheduleDayColumn(
             Spacer(modifier = Modifier.height(8.dp))
         }
 
-        Box(
+        BoxWithConstraints(
             modifier = Modifier
                 .fillMaxWidth()
                 .height(gridHeight)
@@ -924,7 +1270,6 @@ private fun ScheduleDayColumn(
                         )
                     }
                 }
-                .padding(horizontal = 4.dp)
         ) {
             ScheduleGridTapTarget(
                 scheduleWindow = scheduleWindow,
@@ -932,14 +1277,25 @@ private fun ScheduleDayColumn(
                 onSlotClick = onEmptySlotClick
             )
 
-            events.forEach { event ->
+            currentTimeMinutes(date)
+                ?.takeIf { showCurrentTimeIndicator && it in (scheduleWindow.startHour * 60) until (scheduleWindow.endHour * 60) }
+                ?.let { nowMinutes ->
+                    CurrentTimeIndicator(
+                        currentMinutes = nowMinutes,
+                        scheduleWindow = scheduleWindow,
+                        hourHeight = hourHeight
+                    )
+                }
+
+            eventLayouts.forEach { layout ->
                 ScheduleEventCard(
-                    event = event,
+                    layout = layout,
+                    maxWidth = maxWidth,
                     scheduleWindow = scheduleWindow,
                     hourHeight = hourHeight,
                     compact = compact,
-                    onClick = { onEventClick(event) },
-                    onDeleteClick = { onDeleteClick(event) }
+                    onClick = { onEventClick(layout.span.event) },
+                    onDeleteClick = { onDeleteClick(layout.span.event) }
                 )
             }
         }
@@ -969,32 +1325,76 @@ private fun BoxScope.ScheduleGridTapTarget(
 }
 
 @Composable
+private fun BoxScope.CurrentTimeIndicator(
+    currentMinutes: Int,
+    scheduleWindow: ScheduleWindow,
+    hourHeight: Dp
+) {
+    val topOffset = hourHeight * ((currentMinutes - (scheduleWindow.startHour * 60)).coerceAtLeast(0) / 60f)
+
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .offset(y = topOffset),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Box(
+            modifier = Modifier
+                .padding(start = 4.dp)
+                .size(8.dp)
+                .clip(CircleShape)
+                .background(Color(0xFFFF6B6B))
+        )
+        Box(
+            modifier = Modifier
+                .padding(start = 4.dp, end = 8.dp)
+                .height(2.dp)
+                .weight(1f)
+                .background(Color(0xFFFF6B6B))
+        )
+    }
+}
+
+@Composable
 private fun BoxScope.ScheduleEventCard(
-    event: TravelEvent,
+    layout: EventLayoutInfo,
+    maxWidth: Dp,
     scheduleWindow: ScheduleWindow,
     hourHeight: Dp,
     compact: Boolean,
     onClick: () -> Unit,
     onDeleteClick: () -> Unit
 ) {
-    val startMinutes = parseTimeToMinutes(event.startTime) ?: (scheduleWindow.startHour * 60)
-    val endMinutes = parseTimeToMinutes(event.endTime)
-    val durationMinutes = when {
-        endMinutes != null && endMinutes > startMinutes -> endMinutes - startMinutes
-        else -> 90
-    }.coerceIn(45, 240)
-
+    val span = layout.span
+    val startMinutes = span.startMinutes
+    val durationMinutes = (span.endMinutes - span.startMinutes).coerceAtLeast(20)
     val topOffset = hourHeight * ((startMinutes - (scheduleWindow.startHour * 60)).coerceAtLeast(0) / 60f)
-    val minHeight = if (compact) 56.dp else 76.dp
+    val minHeight = if (compact) 40.dp else 52.dp
     val calculatedHeight = hourHeight * (durationMinutes / 60f)
     val eventHeight = if (calculatedHeight < minHeight) minHeight else calculatedHeight
-    val palette = eventPalette(event)
+    val palette = eventPalette(span.event)
+    val columnGap = if (compact) 4.dp else 6.dp
+    val horizontalInset = if (compact) 4.dp else 6.dp
+    val totalGap = columnGap * (layout.columnCount - 1).coerceAtLeast(0)
+    val availableWidth = (maxWidth - (horizontalInset * 2) - totalGap).coerceAtLeast(80.dp)
+    val eventWidth = availableWidth / layout.columnCount.coerceAtLeast(1)
+    val xOffset = horizontalInset + ((eventWidth + columnGap) * layout.columnIndex)
+    val showDeleteButton = !compact || eventWidth >= 132.dp
+    val titleMaxLines = when {
+        !compact -> 1
+        showDeleteButton -> 2
+        else -> 3
+    }
+    val subtitleMaxLines = when {
+        !compact -> 1
+        showDeleteButton -> 2
+        else -> 3
+    }
 
     Card(
         modifier = Modifier
-            .fillMaxWidth()
-            .padding(horizontal = 2.dp)
-            .offset(y = topOffset)
+            .width(eventWidth)
+            .offset(x = xOffset, y = topOffset)
             .height(eventHeight)
             .clickable(onClick = onClick),
         shape = RoundedCornerShape(14.dp),
@@ -1019,39 +1419,41 @@ private fun BoxScope.ScheduleEventCard(
                     verticalAlignment = Alignment.Top
                 ) {
                     Text(
-                        text = formatDisplayTimeRange(event.startTime, event.endTime),
+                        text = renderSpanLabel(span),
                         color = DeepSea4,
-                        fontSize = if (compact) 9.sp else 10.sp,
+                        fontSize = if (compact && !showDeleteButton) 10.sp else if (compact) 9.sp else 10.sp,
                         modifier = Modifier.weight(1f)
                     )
-                    IconButton(
-                        onClick = onDeleteClick,
-                        modifier = Modifier.size(if (compact) 18.dp else 24.dp)
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.DeleteOutline,
-                            contentDescription = "Delete plan",
-                            tint = Color(0xFFE77D90),
-                            modifier = Modifier.size(if (compact) 11.dp else 14.dp)
-                        )
+                    if (showDeleteButton) {
+                        IconButton(
+                            onClick = onDeleteClick,
+                            modifier = Modifier.size(if (compact) 18.dp else 24.dp)
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.DeleteOutline,
+                                contentDescription = "Delete plan",
+                                tint = Color(0xFFE77D90),
+                                modifier = Modifier.size(if (compact) 11.dp else 14.dp)
+                            )
+                        }
                     }
                 }
                 Spacer(modifier = Modifier.height(2.dp))
                 Text(
-                    text = eventTitle(event),
+                    text = eventTitle(span.event),
                     color = DeepSea5,
                     fontSize = if (compact) 11.sp else 14.sp,
                     fontWeight = FontWeight.SemiBold,
-                    maxLines = if (compact) 2 else 1,
+                    maxLines = titleMaxLines,
                     overflow = TextOverflow.Ellipsis
                 )
                 if (!compact || eventHeight > 68.dp) {
                     Spacer(modifier = Modifier.height(2.dp))
                     Text(
-                        text = eventSubtitle(event),
+                        text = eventSubtitle(span.event),
                         color = DeepSea4,
                         fontSize = if (compact) 9.sp else 11.sp,
-                        maxLines = if (compact) 2 else 1,
+                        maxLines = subtitleMaxLines,
                         overflow = TextOverflow.Ellipsis
                     )
                 }
@@ -1564,9 +1966,215 @@ private fun defaultColorKeyForType(type: String): String {
     }
 }
 
-private fun buildScheduleWindow(events: List<TravelEvent>): ScheduleWindow {
-    val startMinutes = events.mapNotNull { parseTimeToMinutes(it.startTime) }
-    val endMinutes = events.mapNotNull { parseTimeToMinutes(it.endTime) }
+private fun eventsForDate(
+    events: List<TravelEvent>,
+    date: String
+): List<TravelEvent> {
+    return events.filter { eventSpanForDate(it, date) != null }
+}
+
+private fun visibleWeekDates(
+    allDates: List<String>,
+    selectedDate: String
+): List<String> {
+    if (allDates.isEmpty()) return emptyList()
+
+    val selectedIndex = allDates.indexOf(selectedDate).takeIf { it >= 0 } ?: 0
+    val startIndex = (selectedIndex / 7) * 7
+    val startDate = parseIsoDate(allDates[startIndex]) ?: return allDates.drop(startIndex).take(7)
+    return List(7) { offset -> startDate.plusDays(offset.toLong()).toString() }
+}
+
+private fun defaultStartMinutesForDate(
+    events: List<TravelEvent>,
+    date: String
+): Int {
+    return eventsForDate(events, date)
+        .mapNotNull { eventSpanForDate(it, date)?.startMinutes }
+        .minOrNull()
+        ?.let { (it - 30).coerceAtLeast(0) }
+        ?: 9 * 60
+}
+
+private fun buildEventLayouts(
+    date: String,
+    events: List<TravelEvent>,
+    scheduleWindow: ScheduleWindow
+): List<EventLayoutInfo> {
+    val windowStart = scheduleWindow.startHour * 60
+    val windowEnd = scheduleWindow.endHour * 60
+
+    val spans = events.mapNotNull { event ->
+        eventSpanForDate(event, date)?.let { span ->
+            if (span.endMinutes <= windowStart || span.startMinutes >= windowEnd) {
+                null
+            } else {
+                span.copy(
+                    startMinutes = max(span.startMinutes, windowStart),
+                    endMinutes = min(span.endMinutes, windowEnd)
+                )
+            }
+        }
+    }.sortedWith(
+        compareBy<EventRenderSpan>(
+            { it.startMinutes },
+            { it.endMinutes },
+            { eventTitle(it.event) }
+        )
+    )
+
+    if (spans.isEmpty()) {
+        return emptyList()
+    }
+
+    val clusters = mutableListOf<MutableList<EventRenderSpan>>()
+    var currentCluster = mutableListOf<EventRenderSpan>()
+    var currentClusterEnd = -1
+
+    spans.forEach { span ->
+        if (currentCluster.isEmpty() || span.startMinutes < currentClusterEnd) {
+            currentCluster.add(span)
+            currentClusterEnd = max(currentClusterEnd, span.endMinutes)
+        } else {
+            clusters.add(currentCluster)
+            currentCluster = mutableListOf(span)
+            currentClusterEnd = span.endMinutes
+        }
+    }
+    if (currentCluster.isNotEmpty()) {
+        clusters.add(currentCluster)
+    }
+
+    return clusters.flatMap(::layoutCluster)
+}
+
+private fun layoutCluster(cluster: List<EventRenderSpan>): List<EventLayoutInfo> {
+    val assignments = linkedMapOf<EventRenderSpan, Int>()
+    val active = mutableListOf<Pair<EventRenderSpan, Int>>()
+    var maxColumns = 1
+
+    cluster.forEach { span ->
+        active.removeAll { (activeSpan, _) -> activeSpan.endMinutes <= span.startMinutes }
+        val usedColumns = active.map { it.second }.toSet()
+        val nextColumn = generateSequence(0) { it + 1 }.first { it !in usedColumns }
+        assignments[span] = nextColumn
+        active.add(span to nextColumn)
+        maxColumns = max(maxColumns, active.size)
+    }
+
+    return cluster.map { span ->
+        EventLayoutInfo(
+            span = span,
+            columnIndex = assignments.getValue(span),
+            columnCount = maxColumns
+        )
+    }
+}
+
+private fun eventSpanForDate(
+    event: TravelEvent,
+    date: String
+): EventRenderSpan? {
+    val targetDate = parseIsoDate(date) ?: return null
+    val (startDateTime, endDateTime) = eventDateTimeRange(event) ?: return null
+    val dayStart = targetDate.atStartOfDay()
+    val dayEnd = targetDate.plusDays(1).atStartOfDay()
+
+    if (!endDateTime.isAfter(dayStart) || !startDateTime.isBefore(dayEnd)) {
+        return null
+    }
+
+    val clippedStart = if (startDateTime.isBefore(dayStart)) dayStart else startDateTime
+    val clippedEnd = if (endDateTime.isAfter(dayEnd)) dayEnd else endDateTime
+    val startMinutes = Duration.between(dayStart, clippedStart).toMinutes().toInt()
+    val endMinutes = Duration.between(dayStart, clippedEnd).toMinutes().toInt()
+
+    return EventRenderSpan(
+        event = event,
+        startMinutes = startMinutes.coerceIn(0, 24 * 60),
+        endMinutes = endMinutes.coerceAtLeast(startMinutes + 15).coerceAtMost(24 * 60),
+        continuesBefore = startDateTime.isBefore(dayStart),
+        continuesAfter = endDateTime.isAfter(dayEnd)
+    )
+}
+
+private fun eventDateTimeRange(event: TravelEvent): Pair<LocalDateTime, LocalDateTime>? {
+    val startDate = parseIsoDate(event.date) ?: return null
+    val isAllDay = event.details["is_all_day"]?.equals("true", ignoreCase = true) == true
+    val startMinutes = parseTimeToMinutes(event.startTime) ?: if (isAllDay) 0 else 9 * 60
+    val startDateTime = startDate.atStartOfDay().plusMinutes(startMinutes.toLong())
+
+    val checkOutDate = event.details["check_out_date"]?.let(::parseIsoDate)
+    val baseEndDate = when {
+        checkOutDate != null && !checkOutDate.isBefore(startDate) -> checkOutDate
+        else -> startDate
+    }
+    val parsedEndMinutes = parseTimeToMinutes(event.endTime)
+    var endDateTime = when {
+        isAllDay && baseEndDate.isAfter(startDate) -> baseEndDate.atStartOfDay()
+        isAllDay -> startDate.plusDays(1).atStartOfDay()
+        parsedEndMinutes != null -> baseEndDate.atStartOfDay().plusMinutes(parsedEndMinutes.toLong())
+        else -> startDateTime.plusMinutes(90)
+    }
+
+    if (!endDateTime.isAfter(startDateTime)) {
+        endDateTime = when {
+            baseEndDate.isAfter(startDate) -> {
+                baseEndDate.atStartOfDay().plusMinutes((parsedEndMinutes ?: 0).toLong())
+            }
+            parsedEndMinutes != null -> {
+                startDate.plusDays(1).atStartOfDay().plusMinutes(parsedEndMinutes.toLong())
+            }
+            else -> startDateTime.plusMinutes(90)
+        }
+    }
+
+    return startDateTime to endDateTime
+}
+
+private fun renderSpanLabel(span: EventRenderSpan): String {
+    val safeEndMinutes = span.endMinutes.coerceAtMost((23 * 60) + 59)
+    return when {
+        span.continuesBefore && span.continuesAfter -> "Continues all day"
+        span.continuesBefore -> "Until ${formatMinutes(safeEndMinutes)}"
+        span.continuesAfter -> "${formatMinutes(span.startMinutes)} onward"
+        else -> "${formatMinutes(span.startMinutes)} - ${formatMinutes(safeEndMinutes)}"
+    }
+}
+
+private fun preferredDayScrollMinutes(
+    date: String,
+    events: List<TravelEvent>
+): Int {
+    val todayMinutes = currentTimeMinutes(date)
+    val firstEventMinute = events
+        .mapNotNull { eventSpanForDate(it, date)?.startMinutes }
+        .minOrNull()
+
+    val anchorMinutes = todayMinutes ?: firstEventMinute ?: (8 * 60)
+    return (anchorMinutes - 60).coerceIn(0, 22 * 60)
+}
+
+private fun currentTimeMinutes(date: String): Int? {
+    if (date != todayIsoDate()) return null
+    val now = java.time.LocalTime.now()
+    return (now.hour * 60) + now.minute
+}
+
+private fun buildScheduleWindow(
+    events: List<TravelEvent>,
+    dates: List<String> = emptyList()
+): ScheduleWindow {
+    val spans = if (dates.isEmpty()) {
+        events.mapNotNull { eventSpanForDate(it, normalizeDate(it.date)) }
+    } else {
+        dates.flatMap { date ->
+            events.mapNotNull { eventSpanForDate(it, date) }
+        }
+    }
+
+    val startMinutes = spans.map { it.startMinutes }
+    val endMinutes = spans.map { it.endMinutes }
 
     if (startMinutes.isEmpty()) {
         return ScheduleWindow(startHour = 8, endHour = 20)
@@ -1575,11 +2183,11 @@ private fun buildScheduleWindow(events: List<TravelEvent>): ScheduleWindow {
     val earliest = startMinutes.minOrNull() ?: 8 * 60
     val latest = max(
         endMinutes.maxOrNull() ?: (startMinutes.maxOrNull() ?: 18 * 60) + 90,
-        earliest + 240
+        earliest + 120
     )
 
     val startHour = max(6, (earliest / 60) - 1)
-    val endHour = min(23, ceil((latest + 60) / 60f).toInt())
+    val endHour = min(24, ceil((latest + 60) / 60f).toInt())
 
     return ScheduleWindow(
         startHour = startHour,
