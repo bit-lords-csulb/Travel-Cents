@@ -10,8 +10,15 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.animation.core.LinearEasing
+import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.animation.core.tween
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.DragHandle
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.Share
 import androidx.compose.material.icons.outlined.Archive
@@ -23,6 +30,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -188,6 +196,8 @@ fun FinalPlanPage(
     // Share sheet open
     var showShareSheet by remember { mutableStateOf(false) }
     var shareConfirmation by remember { mutableStateOf<String?>(null) }
+    // Jiggle / reorder mode
+    var jiggleMode by remember { mutableStateOf(false) }
 
     LaunchedEffect(Unit) {
         viewModel.loadTrip()
@@ -214,8 +224,46 @@ fun FinalPlanPage(
                 onShareClick = {
                     viewModel.fetchShareTargets()
                     showShareSheet = true
-                }
+                },
+                isReorderActive = jiggleMode,
+                onReorderClick = { jiggleMode = !jiggleMode }
             )
+        },
+        bottomBar = {
+            if (jiggleMode) {
+                Surface(
+                    color = SurfaceContainerHigh,
+                    tonalElevation = 4.dp
+                ) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .navigationBarsPadding()
+                            .padding(horizontal = 20.dp, vertical = 12.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.DragHandle,
+                            contentDescription = null,
+                            tint = OnSurfaceVariant,
+                            modifier = Modifier.size(18.dp)
+                        )
+                        Spacer(modifier = Modifier.width(10.dp))
+                        Text(
+                            text = "Drag cards to reorder",
+                            color = OnSurfaceVariant,
+                            fontSize = 13.sp,
+                            modifier = Modifier.weight(1f)
+                        )
+                        Button(
+                            onClick = { jiggleMode = false },
+                            colors = ButtonDefaults.buttonColors(containerColor = PrimaryBlue)
+                        ) {
+                            Text("Done", fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
+                        }
+                    }
+                }
+            }
         }
     ) { paddingValues ->
         when {
@@ -243,6 +291,15 @@ fun FinalPlanPage(
                 val lazyListState = rememberLazyListState()
                 // Track last dragged date so we can persist on drag end
                 var lastDraggedDate by remember { mutableStateOf<String?>(null) }
+
+                val infiniteTransition = rememberInfiniteTransition(label = "jiggle")
+                val wobbleAngle by infiniteTransition.animateFloat(
+                    initialValue = -1.5f,
+                    targetValue = 1.5f,
+                    animationSpec = infiniteRepeatable(tween(250, easing = LinearEasing), RepeatMode.Reverse),
+                    label = "wobble"
+                )
+                val cardRotation = if (jiggleMode) wobbleAngle else 0f
 
                 val reorderState = rememberReorderableLazyListState(lazyListState) { from, to ->
                     val fromItem = planItems.getOrNull(from.index) as? FinalPlanItem.EventItem ?: return@rememberReorderableLazyListState
@@ -287,6 +344,8 @@ fun FinalPlanPage(
                                         isLast = item.isLastInDay,
                                         hasAlternatives = activeOptionCount > 1,
                                         isDragging = isDragging,
+                                        jiggleMode = jiggleMode,
+                                        wobbleAngle = cardRotation,
                                         dragHandleModifier = Modifier.longPressDraggableHandle(),
                                         onCardClick = { expandedEventId = event.eventId },
                                         onChangeClick = { optionsPanelEventId = event.eventId }
@@ -326,13 +385,30 @@ fun FinalPlanPage(
         val options = eventOptions[eid] ?: emptyList()
         val rejected = rejectedOptions[eid] ?: emptySet()
         if (event != null) {
+            // Collect names of options already selected as primaries on other same-type event slots
+            val selectedNamesElsewhere = uiState.events
+                .filter { it.eventId != eid && it.type.equals(event.type, ignoreCase = true) }
+                .mapNotNull { other ->
+                    (eventOptions[other.eventId] ?: emptyList()).firstOrNull { it.selected }
+                        ?.let { opt ->
+                            when (other.type.lowercase()) {
+                                "hotel" -> opt.details["hotel_name"] ?: opt.details["name"]
+                                "restaurant", "dining", "food" -> opt.details["restaurant_name"] ?: opt.details["name"]
+                                "flight" -> null // flights are per-day/route, skip dedup
+                                else -> opt.details["activity_name"] ?: opt.details["title"] ?: opt.details["name"]
+                            }
+                        }
+                }
+                .filterNotNull()
+                .toSet()
             EventOptionsPanel(
                 event = event,
                 options = options,
                 rejectedIds = rejected,
                 onSelect = { optId -> viewModel.selectOption(eid, optId) },
                 onReject = { optId -> viewModel.rejectOption(eid, optId) },
-                onDismiss = { optionsPanelEventId = null }
+                onDismiss = { optionsPanelEventId = null },
+                selectedNamesElsewhere = selectedNamesElsewhere
             )
         }
     }
@@ -446,7 +522,9 @@ private fun FinalPlanTopBar(
     onArchiveTrip: (String) -> Unit,
     onDeleteTrip: (String) -> Unit,
     onBackClick: () -> Unit,
-    onShareClick: () -> Unit
+    onShareClick: () -> Unit,
+    isReorderActive: Boolean = false,
+    onReorderClick: () -> Unit = {}
 ) {
     var menuExpanded by remember { mutableStateOf(false) }
     var showDeleteDialog by remember { mutableStateOf(false) }
@@ -526,10 +604,15 @@ private fun FinalPlanTopBar(
 
                     DropdownMenuItem(
                         text = {
-                            Text("Reorder Events", color = OnSurfaceVariant, fontSize = 14.sp, fontWeight = FontWeight.Medium)
+                            Text(
+                                if (isReorderActive) "Done Reordering" else "Reorder Events",
+                                color = OnSurfaceVariant,
+                                fontSize = 14.sp,
+                                fontWeight = FontWeight.Medium
+                            )
                         },
-                        onClick = {},
-                        enabled = false
+                        onClick = { menuExpanded = false; onReorderClick() },
+                        enabled = true
                     )
 
                     DropdownMenuItem(
@@ -595,6 +678,8 @@ private fun TimelineEventCard(
     isLast: Boolean,
     hasAlternatives: Boolean,
     isDragging: Boolean,
+    jiggleMode: Boolean,
+    wobbleAngle: Float,
     dragHandleModifier: Modifier,
     onCardClick: () -> Unit,
     onChangeClick: () -> Unit
@@ -642,6 +727,7 @@ private fun TimelineEventCard(
             modifier = Modifier
                 .weight(1f)
                 .padding(bottom = 8.dp)
+                .graphicsLayer { rotationZ = wobbleAngle }
                 .clickable { onCardClick() },
             shape = RoundedCornerShape(12.dp),
             colors = CardDefaults.cardColors(
@@ -729,13 +815,23 @@ private fun TimelineEventCard(
                     }
                 }
 
-                // Long-press drag handle (invisible area, scope-bound modifier passed in)
+                // Drag handle — visible icon in jiggle mode, invisible touch target otherwise
                 Box(
                     modifier = Modifier
                         .align(Alignment.CenterEnd)
                         .size(32.dp)
-                        .then(dragHandleModifier)
-                )
+                        .then(dragHandleModifier),
+                    contentAlignment = Alignment.Center
+                ) {
+                    if (jiggleMode) {
+                        Icon(
+                            imageVector = Icons.Default.DragHandle,
+                            contentDescription = "Drag to reorder",
+                            tint = OnSurfaceVariant.copy(alpha = 0.6f),
+                            modifier = Modifier.size(18.dp)
+                        )
+                    }
+                }
             }
         }
     }

@@ -127,10 +127,14 @@ fun EventOptionsPanel(
     rejectedIds: Set<String>,
     onSelect: (optionId: String) -> Unit,
     onReject: (optionId: String) -> Unit,
-    onDismiss: () -> Unit
+    onDismiss: () -> Unit,
+    selectedNamesElsewhere: Set<String> = emptySet()
 ) {
     val typeColor = eventTypeColor(event.type)
-    val activeOptions = options.filter { it.optionId !in rejectedIds && !it.selected }
+    val activeOptions = options.filter { opt ->
+        opt.optionId !in rejectedIds && !opt.selected &&
+            optionName(event, opt) !in selectedNamesElsewhere
+    }
     val rejectedOptions = options.filter { it.optionId in rejectedIds }
     var rejectedExpanded by remember { mutableStateOf(false) }
 
