@@ -22,7 +22,6 @@ import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.compose.ui.Alignment
@@ -33,13 +32,10 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.navigation.NavGraph.Companion.findStartDestination
-import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
-import androidx.navigation.navArgument
-import com.example.travelcents.ui.itinerary.EditPlanScreen
 import com.example.travelcents.ui.main.chats.chat.ChatsScreen
 import com.example.travelcents.ui.theme.DeepSea1
 import com.example.travelcents.ui.theme.DeepSea2
@@ -54,7 +50,6 @@ object MainRoutes {
     const val CHATS = "chats"
     const val SETTINGS = "settings"
 
-    const val EDIT_PLAN = "edit_plan/{tripId}/{eventId}"
     const val AI_TRIP_CHAT = "ai_trip_chat"
 }
 
@@ -99,38 +94,8 @@ fun MainScaffold(modifier: Modifier = Modifier, onLogout: () -> Unit = {}) {
                 modifier = Modifier.fillMaxSize()
             ) {
                 composable(MainRoutes.CURRENT) {
-                    val itineraryViewModel: ItineraryViewModel = viewModel()
-                    val uiState by itineraryViewModel.uiState.collectAsState()
-
                     ItineraryScreen(
-                        viewModel = itineraryViewModel,
-                        onEditEventClick = { clickedEventId ->
-                            uiState.currentTripId?.let { tripId ->
-                                navController.navigate("edit_plan/$tripId/$clickedEventId")
-                            }
-                        },
-                        onAddEventClick = {
-                            uiState.currentTripId?.let { tripId ->
-                                navController.navigate("edit_plan/$tripId/new")
-                            }
-                        }
-                    )
-                }
-
-                composable(
-                    route = MainRoutes.EDIT_PLAN,
-                    arguments = listOf(
-                        navArgument("tripId") { type = NavType.StringType },
-                        navArgument("eventId") { type = NavType.StringType }
-                    )
-                ) { backStackEntry ->
-                    val tripId = backStackEntry.arguments?.getString("tripId")
-                    val eventId = backStackEntry.arguments?.getString("eventId")
-
-                    EditPlanScreen(
-                        tripId = tripId,
-                        eventId = eventId,
-                        onBackClick = { navController.popBackStack() }
+                        viewModel = viewModel()
                     )
                 }
 
