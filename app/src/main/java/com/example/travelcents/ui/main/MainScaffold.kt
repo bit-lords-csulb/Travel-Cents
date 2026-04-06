@@ -77,6 +77,7 @@ object MainRoutes {
     const val EDIT_PLAN = "edit_plan/{tripId}/{eventId}"
     const val AI_TRIP_CHAT = "ai_trip_chat"
     const val FINAL_PLAN = "final_plan"
+    const val FINAL_PLAN_BY_ID = "final_plan/{tripId}"
 }
 
 private val bottomNavRoutes = setOf(
@@ -93,7 +94,8 @@ private val bottomNavRoutes = setOf(
     MainRoutes.CHATS,
     MainRoutes.SETTINGS,
     MainRoutes.EDIT_PLAN,
-    MainRoutes.FINAL_PLAN
+    MainRoutes.FINAL_PLAN,
+    MainRoutes.FINAL_PLAN_BY_ID
 )
 
 private data class BottomNavItem(
@@ -121,7 +123,8 @@ fun MainScaffold(modifier: Modifier = Modifier, onLogout: () -> Unit = {}) {
         MainRoutes.NEW_TRIP_STEP_5,
         MainRoutes.TRIP_GENERATING,
         MainRoutes.AI_TRIP_CHAT,
-        MainRoutes.FINAL_PLAN -> MainRoutes.NEW_TRIP
+        MainRoutes.FINAL_PLAN,
+        MainRoutes.FINAL_PLAN_BY_ID -> MainRoutes.NEW_TRIP
         else -> currentRoute
     }
     val itineraryUiState by currentTripViewModel.uiState.collectAsState()
@@ -250,7 +253,12 @@ fun MainScaffold(modifier: Modifier = Modifier, onLogout: () -> Unit = {}) {
                         }
                     )
                 }
-                composable(MainRoutes.HOME) { HomePage(modifier = Modifier.fillMaxSize()) }
+                composable(MainRoutes.HOME) {
+                    HomePage(
+                        modifier = Modifier.fillMaxSize(),
+                        onTripClick = { tripId -> navController.navigate("final_plan/$tripId") }
+                    )
+                }
                 composable(MainRoutes.CHATS) { ChatsScreen(modifier = Modifier.fillMaxSize()) }
                 composable(MainRoutes.SETTINGS) {
                     SettingsPage(
@@ -271,6 +279,22 @@ fun MainScaffold(modifier: Modifier = Modifier, onLogout: () -> Unit = {}) {
                         modifier = Modifier.fillMaxSize(),
                         onBackClick = {
                             navController.navigate(MainRoutes.CURRENT) {
+                                popUpTo(MainRoutes.HOME) { inclusive = false }
+                            }
+                        }
+                    )
+                }
+                composable(
+                    route = MainRoutes.FINAL_PLAN_BY_ID,
+                    arguments = listOf(navArgument("tripId") { type = NavType.StringType })
+                ) { backStackEntry ->
+                    val tripId = backStackEntry.arguments?.getString("tripId")
+                    LaunchedEffect(tripId) { finalPlanViewModel.loadTrip(tripId) }
+                    FinalPlanPage(
+                        viewModel = finalPlanViewModel,
+                        modifier = Modifier.fillMaxSize(),
+                        onBackClick = {
+                            navController.navigate(MainRoutes.HOME) {
                                 popUpTo(MainRoutes.HOME) { inclusive = false }
                             }
                         }
