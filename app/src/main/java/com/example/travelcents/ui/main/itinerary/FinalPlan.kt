@@ -289,33 +289,38 @@ fun FinalPlanPage(
 
             else -> {
                 val lazyListState = rememberLazyListState()
-                // Track last dragged date so we can persist on drag end
-                var lastDraggedDate by remember { mutableStateOf<String?>(null) }
+                // Track all dates touched during a drag so we can persist them together on drag end
+                var affectedDragDates by remember { mutableStateOf<Set<String>>(emptySet()) }
 
                 val infiniteTransition = rememberInfiniteTransition(label = "jiggle")
                 val wobbleAngle by infiniteTransition.animateFloat(
-                    initialValue = -1.5f,
-                    targetValue = 1.5f,
-                    animationSpec = infiniteRepeatable(tween(250, easing = LinearEasing), RepeatMode.Reverse),
+                    initialValue = -0.5f,
+                    targetValue = 0.5f,
+                    animationSpec = infiniteRepeatable(tween(160, easing = LinearEasing), RepeatMode.Reverse),
                     label = "wobble"
                 )
                 val cardRotation = if (jiggleMode) wobbleAngle else 0f
 
                 val reorderState = rememberReorderableLazyListState(lazyListState) { from, to ->
-                    val fromItem = planItems.getOrNull(from.index) as? FinalPlanItem.EventItem ?: return@rememberReorderableLazyListState
-                    val toItem = planItems.getOrNull(to.index) as? FinalPlanItem.EventItem ?: return@rememberReorderableLazyListState
-                    if (fromItem.event.date == toItem.event.date) {
-                        lastDraggedDate = fromItem.event.date
-                        viewModel.reorderEventsLocally(fromItem.event.date, fromItem.dayIndex, toItem.dayIndex)
-                    }
+                    val fromItem = planItems.firstOrNull { it.key == from.key } as? FinalPlanItem.EventItem
+                        ?: return@rememberReorderableLazyListState
+                    val toItem = planItems.firstOrNull { it.key == to.key } as? FinalPlanItem.EventItem
+                        ?: return@rememberReorderableLazyListState
+                    affectedDragDates = affectedDragDates + setOf(fromItem.event.date, toItem.event.date)
+                    viewModel.moveEventLocally(
+                        eventId = fromItem.event.eventId,
+                        fromDate = fromItem.event.date,
+                        toDate = toItem.event.date,
+                        toIndex = toItem.dayIndex
+                    )
                 }
 
-                // Persist sort order to Firestore when drag ends
+                // Persist changed dates and sort order to Firestore when drag ends
                 LaunchedEffect(reorderState.isAnyItemDragging) {
                     if (!reorderState.isAnyItemDragging) {
-                        lastDraggedDate?.let { date ->
-                            viewModel.persistEventOrder(date)
-                            lastDraggedDate = null
+                        if (affectedDragDates.isNotEmpty()) {
+                            viewModel.persistEventPlacements(affectedDragDates)
+                            affectedDragDates = emptySet()
                         }
                     }
                 }
@@ -346,7 +351,7 @@ fun FinalPlanPage(
                                         isDragging = isDragging,
                                         jiggleMode = jiggleMode,
                                         wobbleAngle = cardRotation,
-                                        dragHandleModifier = Modifier.longPressDraggableHandle(),
+                                        dragHandleModifier = Modifier.draggableHandle(enabled = jiggleMode),
                                         onCardClick = { expandedEventId = event.eventId },
                                         onChangeClick = { optionsPanelEventId = event.eventId }
                                     )
@@ -728,7 +733,7 @@ private fun TimelineEventCard(
                 .weight(1f)
                 .padding(bottom = 8.dp)
                 .graphicsLayer { rotationZ = wobbleAngle }
-                .clickable { onCardClick() },
+                .clickable(enabled = !jiggleMode) { onCardClick() },
             shape = RoundedCornerShape(12.dp),
             colors = CardDefaults.cardColors(
                 containerColor = if (isDragging) SurfaceContainerHigh else SurfaceContainerHighest
@@ -803,7 +808,7 @@ private fun TimelineEventCard(
                         modifier = Modifier
                             .align(Alignment.TopEnd)
                             .padding(top = 6.dp, end = 6.dp)
-                            .clickable { onChangeClick() }
+                            .clickable(enabled = !jiggleMode) { onChangeClick() }
                     ) {
                         Text(
                             text = "Change",
