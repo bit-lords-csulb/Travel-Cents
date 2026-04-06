@@ -14,6 +14,7 @@ kotlin = "2.2.10"
 composeBom = "2024.09.00"
 googleGmsGoogleServices = "4.4.4"
 adsMobileSdk = "0.24.0-beta01"
+materialIconsExtended = "1.7.8"
 navigationCompose = "2.9.7"
 foundationLayout = "1.10.3"
 firebaseFirestoreKtx = "26.1.1"
@@ -25,6 +26,7 @@ lifecycleViewmodelKtx = "2.10.0"
 androidx-core-ktx = { group = "androidx.core", name = "core-ktx", version.ref = "coreKtx" }
 androidx-credentials = { module = "androidx.credentials:credentials", version.ref = "credentialsPlayServicesAuth" }
 androidx-credentials-play-services-auth = { module = "androidx.credentials:credentials-play-services-auth", version.ref = "credentialsPlayServicesAuth" }
+androidx-material-icons-extended = { module = "androidx.compose.material:material-icons-extended", version.ref = "materialIconsExtended" }
 firebase-bom = { group = "com.google.firebase", name = "firebase-bom", version.ref = "firebaseBom" }
 firebase-firestore = { module = "com.google.firebase:firebase-firestore", version.ref = "firebaseFirestore" }
 google-firebase-auth = { module = "com.google.firebase:firebase-auth" }
