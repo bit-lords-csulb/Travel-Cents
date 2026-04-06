@@ -115,6 +115,11 @@ private data class EventTypeOption(
     val label: String
 )
 
+private data class DisplayModeOption(
+    val mode: CurrentDisplayMode,
+    val label: String
+)
+
 @Composable
 fun CurrentPage(
     modifier: Modifier = Modifier,
@@ -202,33 +207,16 @@ fun CurrentPage(
                             )
                         }
                     },
-                    primaryActionLabel = when (displayMode) {
-                        CurrentDisplayMode.ITINERARY -> "SWITCH TO CALENDAR"
-                        CurrentDisplayMode.WEEK -> "SWITCH TO DAY"
-                        CurrentDisplayMode.DAY -> "SWITCH TO WEEK"
-                    },
-                    onPrimaryActionClick = {
-                        displayModeName = when (displayMode) {
-                            CurrentDisplayMode.ITINERARY -> CurrentDisplayMode.WEEK.name
-                            CurrentDisplayMode.WEEK -> CurrentDisplayMode.DAY.name
-                            CurrentDisplayMode.DAY -> CurrentDisplayMode.WEEK.name
-                        }
-                    },
-                    secondaryActionLabel = if (displayMode != CurrentDisplayMode.ITINERARY) {
-                        "VIEW ITINERARY"
-                    } else {
-                        null
-                    },
-                    onSecondaryActionClick = if (displayMode != CurrentDisplayMode.ITINERARY) {
-                        {
-                            if (onViewItineraryRequested != null) {
-                                onViewItineraryRequested()
-                            } else {
-                                displayModeName = CurrentDisplayMode.ITINERARY.name
+                    controlsContent = {
+                        CurrentDisplayModeTabs(
+                            selectedMode = displayMode,
+                            onModeSelected = { selectedMode ->
+                                if (selectedMode == CurrentDisplayMode.ITINERARY && onViewItineraryRequested != null) {
+                                    onViewItineraryRequested()
+                                }
+                                displayModeName = selectedMode.name
                             }
-                        }
-                    } else {
-                        null
+                        )
                     }
                 )
             }
@@ -311,6 +299,48 @@ fun CurrentPage(
                 deleteCandidate = planToDelete
             }
         )
+    }
+}
+
+@Composable
+private fun CurrentDisplayModeTabs(
+    selectedMode: CurrentDisplayMode,
+    onModeSelected: (CurrentDisplayMode) -> Unit
+) {
+    val tabs = remember {
+        listOf(
+            DisplayModeOption(CurrentDisplayMode.ITINERARY, "Itinerary"),
+            DisplayModeOption(CurrentDisplayMode.DAY, "Day View"),
+            DisplayModeOption(CurrentDisplayMode.WEEK, "Week View")
+        )
+    }
+
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .background(DeepSea2, RoundedCornerShape(12.dp))
+            .padding(4.dp),
+        horizontalArrangement = Arrangement.SpaceEvenly
+    ) {
+        tabs.forEach { tab ->
+            val isSelected = selectedMode == tab.mode
+            Box(
+                modifier = Modifier
+                    .weight(1f)
+                    .height(42.dp)
+                    .clip(RoundedCornerShape(8.dp))
+                    .background(if (isSelected) DeepSea3 else Color.Transparent)
+                    .clickable(enabled = !isSelected) { onModeSelected(tab.mode) },
+                contentAlignment = Alignment.Center
+            ) {
+                Text(
+                    text = tab.label,
+                    color = if (isSelected) DeepSea5 else DeepSea4,
+                    fontSize = 14.sp,
+                    fontWeight = if (isSelected) FontWeight.SemiBold else FontWeight.Normal
+                )
+            }
+        }
     }
 }
 
