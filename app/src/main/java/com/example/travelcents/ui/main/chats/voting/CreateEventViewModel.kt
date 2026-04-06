@@ -17,6 +17,7 @@ import io.ktor.client.request.*
 import io.ktor.client.statement.*
 import io.ktor.serialization.kotlinx.json.*
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import kotlinx.serialization.json.Json
@@ -47,8 +48,14 @@ class CreateEventViewModel(private val groupId: String) : ViewModel() {
     private val _location = MutableStateFlow("")
     val location = _location.asStateFlow()
 
-    private val _time = MutableStateFlow("")
-    val time = _time.asStateFlow()
+    private val _date = MutableStateFlow("")
+    val date = _date.asStateFlow()
+
+    private val _startTime = MutableStateFlow("")
+    val startTime: StateFlow<String> = _startTime.asStateFlow()
+
+    private val _endTime = MutableStateFlow("")
+    val endTime: StateFlow<String> = _endTime.asStateFlow()
 
     private val _photoUrl = MutableStateFlow("")
     val photoUrl = _photoUrl.asStateFlow()
@@ -87,8 +94,16 @@ class CreateEventViewModel(private val groupId: String) : ViewModel() {
         _location.value = v
     }
 
-    fun onTimeChange(v: String) {
-        _time.value = v
+    fun onDateChange(v: String) {
+        _date.value = v
+    }
+
+    fun onStartTimeChange(time: String) {
+        _startTime.value = time
+    }
+
+    fun onEndTimeChange(time: String) {
+        _endTime.value = time
     }
 
     fun handleLocalImage(uri: Uri) {
@@ -147,13 +162,15 @@ class CreateEventViewModel(private val groupId: String) : ViewModel() {
         _title.value = place.name
         _location.value = place.address
         _photoUrl.value = place.photoUrl
-        _time.value = ""
+        _date.value = ""
+        _startTime.value = ""
+        _endTime.value = ""
 
         _description.value = "Fetching details..."
 
         viewModelScope.launch {
             try {
-                val wikiTerm = place.name.replace(" ", "_")
+                val wikiTerm = java.net.URLEncoder.encode(place.name.replace(" ", "_"), "UTF-8")
                 val response =
                     client.get("https://en.wikipedia.org/api/rest_v1/page/summary/$wikiTerm")
 
@@ -191,11 +208,20 @@ class CreateEventViewModel(private val groupId: String) : ViewModel() {
         val uid = auth.currentUser?.uid ?: return
         _isCreating.value = true
         val data = hashMapOf(
-            "title" to _title.value, "description" to _description.value,
-            "location" to _location.value, "photoUrl" to _photoUrl.value,
-            "createdBy" to uid, "createdByName" to creatorName,
-            "createdAt" to FieldValue.serverTimestamp(), "upvotes" to emptyList<String>(),
-            "downvotes" to emptyList<String>(), "commentCount" to 0
+            "title" to _title.value,
+            "description" to _description.value,
+            "location" to _location.value,
+            "date" to _date.value,
+            "startTime" to _startTime.value,
+            "endTime" to _endTime.value,
+            "photoUrl" to _photoUrl.value,
+            "createdBy" to uid,
+            "createdByName" to creatorName,
+            "createdAt" to FieldValue.serverTimestamp(),
+            "upvotes" to emptyList<String>(),
+            "downvotes" to emptyList<String>(),
+            "commentCount" to 0,
+            "isWon" to false
         )
         db.collection("groups").document(groupId).collection("events").add(data)
             .addOnSuccessListener { _isCreating.value = false; onSuccess() }
@@ -204,12 +230,20 @@ class CreateEventViewModel(private val groupId: String) : ViewModel() {
     fun clearForm() {
         _title.value = ""
         _description.value = ""
+        _date.value = ""
+        _startTime.value = ""
+        _endTime.value = ""
         _location.value = ""
         _photoUrl.value = ""
     }
 
     fun clearSuggestions() {
         _placeSuggestions.value = emptyList()
+    }
+
+    override fun onCleared() {
+        super.onCleared()
+        client.close()
     }
 
     @Suppress("UNCHECKED_CAST")

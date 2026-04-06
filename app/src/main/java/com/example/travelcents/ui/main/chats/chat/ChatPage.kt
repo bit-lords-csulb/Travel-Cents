@@ -92,14 +92,14 @@ fun ChatPage(
                 .fillMaxWidth()
                 .clip(RoundedCornerShape(bottomStart = 24.dp, bottomEnd = 24.dp))
                 .background(DeepSea2)
-                .padding(top = 48.dp, bottom = 16.dp, start = 12.dp, end = 12.dp)
+                .padding(top = 48.dp, bottom = 16.dp, start = 8.dp, end = 16.dp)
         ) {
             Row(
                 verticalAlignment = Alignment.CenterVertically,
                 modifier = Modifier.fillMaxWidth()
             ) {
                 IconButton(onClick = onBackClick) {
-                    Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back", tint = DeepSea5)
+                    Icon(Icons.AutoMirrored.Filled.ArrowBack, modifier = Modifier.size(32.dp), contentDescription = "Back", tint = DeepSea5)
                 }
 
                 Box(

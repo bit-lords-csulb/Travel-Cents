@@ -8,6 +8,9 @@ import com.example.travelcents.data.model.EventOption
 import com.example.travelcents.data.model.TravelEvent
 import com.example.travelcents.data.model.YelpReview
 import com.example.travelcents.data.remote.YelpRepository
+import com.example.travelcents.ui.main.defaultPlanTimeZoneId
+import com.example.travelcents.ui.main.normalizeDate
+import com.example.travelcents.ui.main.normalizeTime
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.FirebaseApp
 import com.google.firebase.firestore.DocumentSnapshot
@@ -30,6 +33,7 @@ data class EditablePlan(
     val date: String = "",
     val startTime: String = "",
     val endTime: String = "",
+    val timeZoneId: String = defaultPlanTimeZoneId(),
     val location: String = "",
     val notes: String = "",
     val colorKey: String = "rose",
@@ -68,6 +72,7 @@ class ItineraryViewModel : ViewModel() {
 
     companion object {
         private const val DEFAULT_TRIP_TITLE = "Loading Trip..."
+        private const val EMPTY_PLANS_MESSAGE = "No plans yet. Tap + to add one."
     }
 
     private val _events = MutableStateFlow<List<TravelEvent>>(emptyList())
@@ -310,12 +315,17 @@ class ItineraryViewModel : ViewModel() {
                         )
                     }
 
-                    _events.value = fetchedEvents
+                    val sortedEvents = sortEvents(fetchedEvents)
+                    _events.value = sortedEvents
                     _uiState.update {
                         it.copy(
                             isLoading = false,
-                            events = fetchedEvents,
-                            infoMessage = if (fetchedEvents.isEmpty()) "No plans yet. Tap + to add one." else it.infoMessage,
+                            events = sortedEvents,
+                            infoMessage = when {
+                                sortedEvents.isEmpty() && it.infoMessage.isNullOrBlank() -> EMPTY_PLANS_MESSAGE
+                                sortedEvents.isNotEmpty() && it.infoMessage == EMPTY_PLANS_MESSAGE -> null
+                                else -> it.infoMessage
+                            },
                             errorMessage = null
                         )
                     }
@@ -655,9 +665,10 @@ class ItineraryViewModel : ViewModel() {
                     eventId = eventId,
                     type = plan.type,
                     itineraryId = tripId,
-                    date = plan.date,
-                    startTime = plan.startTime,
-                    endTime = plan.endTime,
+                    tz = plan.timeZoneId.trim().ifBlank { defaultPlanTimeZoneId() },
+                    date = normalizeDate(plan.date),
+                    startTime = normalizeTime(plan.startTime),
+                    endTime = normalizeTime(plan.endTime),
                     details = mergedDetails
                 )
 
