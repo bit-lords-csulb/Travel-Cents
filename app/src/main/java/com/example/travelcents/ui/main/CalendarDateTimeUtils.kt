@@ -104,6 +104,10 @@ fun hourLabel(hour: Int): String {
     return LocalTime.of(hour.coerceIn(0, 23), 0).format(displayHourFormatter)
 }
 
+fun hourLabel24(hour: Int): String {
+    return "%02d:00".format(Locale.US, hour.coerceIn(0, 23))
+}
+
 fun formatTripDate(rawDate: String): String {
     return parseIsoDate(rawDate)?.format(tripDateFormatter) ?: rawDate
 }
