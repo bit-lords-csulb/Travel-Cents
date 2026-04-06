@@ -3,21 +3,27 @@ package com.example.travelcents.ui.main.itinerary
 import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.example.travelcents.data.ImageCacheManager
+import com.example.travelcents.data.model.DirectChatPreview
 import com.example.travelcents.data.model.EventOption
+import com.example.travelcents.data.model.Group
 import com.example.travelcents.data.model.TravelEvent
 import com.example.travelcents.data.model.YelpReview
 import com.example.travelcents.data.remote.YelpRepository
+import com.example.travelcents.ui.main.CurrentTripUiState
+import com.example.travelcents.ui.main.EditablePlan
 import com.example.travelcents.ui.main.defaultPlanTimeZoneId
 import com.example.travelcents.ui.main.normalizeDate
 import com.example.travelcents.ui.main.normalizeTime
+import com.example.travelcents.ui.main.sortEventsForCalendar
 import com.google.firebase.auth.FirebaseAuth
-import com.google.firebase.FirebaseApp
 import com.google.firebase.firestore.DocumentSnapshot
+import com.google.firebase.firestore.FieldPath
+import com.google.firebase.firestore.FieldValue
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.ListenerRegistration
 import com.google.firebase.firestore.Query
-import com.google.firebase.firestore.SetOptions
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -26,42 +32,6 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.tasks.await
 import java.util.UUID
 
-data class EditablePlan(
-    val eventId: String? = null,
-    val type: String = "activity",
-    val title: String = "",
-    val date: String = "",
-    val startTime: String = "",
-    val endTime: String = "",
-    val timeZoneId: String = defaultPlanTimeZoneId(),
-    val location: String = "",
-    val notes: String = "",
-    val colorKey: String = "rose",
-    val existingDetails: Map<String, String> = emptyMap()
-)
-
-data class TripSummary(
-    val tripId: String,
-    val tripName: String,
-    val destination: String,
-    val dateFrom: String,
-    val dateTo: String,
-    val coverImageUrl: String = ""
-)
-
-data class CurrentTripUiState(
-    val isLoading: Boolean = true,
-    val currentTripId: String? = null,
-    val tripTitle: String = "Loading Trip...",
-    val destination: String = "",
-    val dateFrom: String = "",
-    val dateTo: String = "",
-    val events: List<TravelEvent> = emptyList(),
-    val infoMessage: String? = null,
-    val errorMessage: String? = null
-)
-
-// Available chats/DMs for the share sheet
 data class ShareTarget(
     val id: String,
     val name: String,
@@ -75,44 +45,28 @@ class ItineraryViewModel : ViewModel() {
         private const val EMPTY_PLANS_MESSAGE = "No plans yet. Tap + to add one."
     }
 
-    private val _events = MutableStateFlow<List<TravelEvent>>(emptyList())
-    val events: StateFlow<List<TravelEvent>> = _events.asStateFlow()
-
-    private val _tripTitle = MutableStateFlow(DEFAULT_TRIP_TITLE)
-    val tripTitle: StateFlow<String> = _tripTitle.asStateFlow()
-
     private val _uiState = MutableStateFlow(CurrentTripUiState())
     val uiState: StateFlow<CurrentTripUiState> = _uiState.asStateFlow()
 
-    private val _allTrips = MutableStateFlow<List<TripSummary>>(emptyList())
-    val allTrips: StateFlow<List<TripSummary>> = _allTrips.asStateFlow()
-
-    private val _archivedTrips = MutableStateFlow<List<TripSummary>>(emptyList())
-    val archivedTrips: StateFlow<List<TripSummary>> = _archivedTrips.asStateFlow()
-
-    // eventId -> loaded options list
     private val _eventOptions = MutableStateFlow<Map<String, List<EventOption>>>(emptyMap())
     val eventOptions: StateFlow<Map<String, List<EventOption>>> = _eventOptions.asStateFlow()
 
-    // session-only: eventId -> set of rejected optionIds
     private val _rejectedOptions = MutableStateFlow<Map<String, Set<String>>>(emptyMap())
     val rejectedOptions: StateFlow<Map<String, Set<String>>> = _rejectedOptions.asStateFlow()
 
-    // yelpId -> cached reviews list
     private val _yelpReviews = MutableStateFlow<Map<String, List<YelpReview>>>(emptyMap())
     val yelpReviews: StateFlow<Map<String, List<YelpReview>>> = _yelpReviews.asStateFlow()
 
-    // yelpIds currently being fetched
     private val _reviewsLoading = MutableStateFlow<Set<String>>(emptySet())
     val reviewsLoading: StateFlow<Set<String>> = _reviewsLoading.asStateFlow()
 
-    // share sheet state
     private val _shareTargets = MutableStateFlow<List<ShareTarget>>(emptyList())
     val shareTargets: StateFlow<List<ShareTarget>> = _shareTargets.asStateFlow()
 
     private val db = FirebaseFirestore.getInstance()
     private val auth = FirebaseAuth.getInstance()
     private var eventsListener: ListenerRegistration? = null
+    private var currentTripDestination: String = ""
 
     private fun resetTripState(
         isLoading: Boolean = false,
@@ -122,10 +76,12 @@ class ItineraryViewModel : ViewModel() {
     ) {
         eventsListener?.remove()
         eventsListener = null
-        _events.value = emptyList()
-        _tripTitle.value = tripTitle
+        currentTripDestination = ""
         _eventOptions.value = emptyMap()
         _rejectedOptions.value = emptyMap()
+        _yelpReviews.value = emptyMap()
+        _reviewsLoading.value = emptySet()
+        _shareTargets.value = emptyList()
         _uiState.value = CurrentTripUiState(
             isLoading = isLoading,
             tripTitle = tripTitle,
@@ -142,12 +98,12 @@ class ItineraryViewModel : ViewModel() {
             .get()
             .addOnSuccessListener { tripSnapshot ->
                 if (tripSnapshot.isEmpty) {
-                    Log.d("ItineraryViewModel", "No trips found.")
                     resetTripState(
                         infoMessage = "No trip found yet. Create one from the New Trip tab."
                     )
                     return@addOnSuccessListener
                 }
+
                 handleTripDocument(uid, tripSnapshot.documents.first())
             }
             .addOnFailureListener { e ->
@@ -166,6 +122,7 @@ class ItineraryViewModel : ViewModel() {
                     resetTripState(infoMessage = "That trip is no longer available.")
                     return@addOnSuccessListener
                 }
+
                 handleTripDocument(uid, document)
             }
             .addOnFailureListener { e ->
@@ -175,114 +132,20 @@ class ItineraryViewModel : ViewModel() {
     }
 
     private fun handleTripDocument(uid: String, document: DocumentSnapshot) {
-        _tripTitle.value = document.getString("tripName") ?: "Unnamed Trip"
+        currentTripDestination = document.getString("destination") ?: ""
         _uiState.update {
             it.copy(
                 isLoading = false,
                 currentTripId = document.id,
-                tripTitle = _tripTitle.value,
-                destination = document.getString("destination") ?: "",
+                tripTitle = document.getString("tripName") ?: "Unnamed Trip",
                 dateFrom = document.getString("dateFrom") ?: "",
                 dateTo = document.getString("dateTo") ?: "",
                 infoMessage = null,
                 errorMessage = null
             )
         }
+
         listenToEvents(uid, document.id)
-    }
-
-    private fun fetchAllTrips(uid: String) {
-        db.collection("users").document(uid)
-            .collection("trips")
-            .whereEqualTo("userId", uid)
-            .orderBy("createdAt", Query.Direction.DESCENDING)
-            .get()
-            .addOnSuccessListener { snapshot ->
-                val active = mutableListOf<TripSummary>()
-                val archived = mutableListOf<TripSummary>()
-                snapshot.documents.forEach { doc ->
-                    val tripName = doc.getString("tripName") ?: return@forEach
-                    val summary = TripSummary(
-                        tripId = doc.id,
-                        tripName = tripName,
-                        destination = doc.getString("destination") ?: "",
-                        dateFrom = doc.getString("dateFrom") ?: "",
-                        dateTo = doc.getString("dateTo") ?: "",
-                        coverImageUrl = doc.getString("coverImageUrl") ?: ""
-                    )
-                    if (doc.getString("status") == "archived") archived.add(summary)
-                    else active.add(summary)
-                }
-                _allTrips.value = active
-                _archivedTrips.value = archived
-            }
-            .addOnFailureListener { e ->
-                Log.e("ItineraryViewModel", "Failed to fetch trip list", e)
-            }
-    }
-
-    fun archiveTrip(tripId: String) {
-        val uid = auth.currentUser?.uid ?: return
-        viewModelScope.launch {
-            try {
-                db.collection("users").document(uid)
-                    .collection("trips").document(tripId)
-                    .update("status", "archived")
-                    .await()
-                if (_uiState.value.currentTripId == tripId) loadTrip()
-                else fetchAllTrips(uid)
-            } catch (e: Exception) {
-                _uiState.update { it.copy(errorMessage = e.message ?: "Failed to archive trip.") }
-            }
-        }
-    }
-
-    fun restoreTrip(tripId: String) {
-        val uid = auth.currentUser?.uid ?: return
-        viewModelScope.launch {
-            try {
-                db.collection("users").document(uid)
-                    .collection("trips").document(tripId)
-                    .update("status", "active")
-                    .await()
-                fetchAllTrips(uid)
-            } catch (e: Exception) {
-                _uiState.update { it.copy(errorMessage = e.message ?: "Failed to restore trip.") }
-            }
-        }
-    }
-
-    fun deleteTrip(tripId: String) {
-        val uid = auth.currentUser?.uid ?: return
-        viewModelScope.launch {
-            try {
-                val eventsRef = db.collection("users").document(uid)
-                    .collection("trips").document(tripId).collection("events")
-                val events = eventsRef.get().await()
-                if (!events.isEmpty) {
-                    for (eventDoc in events.documents) {
-                        val options = eventDoc.reference.collection("options").get().await()
-                        if (!options.isEmpty) {
-                            val optionsBatch = db.batch()
-                            options.documents.forEach { optionsBatch.delete(it.reference) }
-                            optionsBatch.commit().await()
-                        }
-                        eventDoc.reference.delete().await()
-                    }
-                }
-                db.collection("users").document(uid)
-                    .collection("trips").document(tripId)
-                    .delete().await()
-                ImageCacheManager.deleteTripImages(
-                    context = FirebaseApp.getInstance().applicationContext,
-                    tripId = tripId
-                )
-                if (_uiState.value.currentTripId == tripId) loadTrip()
-                else fetchAllTrips(uid)
-            } catch (e: Exception) {
-                _uiState.update { it.copy(errorMessage = e.message ?: "Failed to delete trip.") }
-            }
-        }
     }
 
     private fun listenToEvents(uid: String, tripId: String) {
@@ -297,436 +160,468 @@ class ItineraryViewModel : ViewModel() {
                     return@addSnapshotListener
                 }
 
-                if (snapshot != null) {
-                    val coreKeys = setOf("eventId", "type", "itineraryId", "tz", "date", "startTime", "endTime", "imageUrl")
-                    val fetchedEvents = snapshot.documents.mapNotNull { doc ->
-                        val allData = doc.data ?: emptyMap()
-                        val detailsMap = allData.filterKeys { it !in coreKeys }.mapValues { it.value.toString() }
-                        TravelEvent(
-                            eventId = doc.getString("eventId") ?: doc.id,
-                            type = doc.getString("type") ?: "unknown",
-                            itineraryId = doc.getString("itineraryId") ?: tripId,
-                            tz = doc.getString("tz") ?: "",
-                            date = doc.getString("date") ?: "",
-                            startTime = doc.getString("startTime") ?: "",
-                            endTime = doc.getString("endTime") ?: "",
-                            imageUrl = doc.getString("imageUrl") ?: "",
-                            details = detailsMap
-                        )
-                    }
+                val docs = snapshot?.documents ?: emptyList()
+                val fetchedEvents = docs.mapNotNull { doc ->
+                    val allData = doc.data ?: emptyMap()
+                    val coreKeys = setOf(
+                        "eventId",
+                        "type",
+                        "itineraryId",
+                        "tz",
+                        "date",
+                        "startTime",
+                        "endTime",
+                        "imageUrl"
+                    )
 
-                    val sortedEvents = sortEvents(fetchedEvents)
-                    _events.value = sortedEvents
-                    _uiState.update {
-                        it.copy(
-                            isLoading = false,
-                            events = sortedEvents,
-                            infoMessage = when {
-                                sortedEvents.isEmpty() && it.infoMessage.isNullOrBlank() -> EMPTY_PLANS_MESSAGE
-                                sortedEvents.isNotEmpty() && it.infoMessage == EMPTY_PLANS_MESSAGE -> null
-                                else -> it.infoMessage
-                            },
-                            errorMessage = null
-                        )
-                    }
+                    TravelEvent(
+                        eventId = doc.getString("eventId") ?: doc.id,
+                        type = doc.getString("type") ?: "unknown",
+                        itineraryId = doc.getString("itineraryId") ?: tripId,
+                        tz = doc.getString("tz") ?: "",
+                        date = doc.getString("date") ?: "",
+                        startTime = doc.getString("startTime") ?: "",
+                        endTime = doc.getString("endTime") ?: "",
+                        imageUrl = doc.getString("imageUrl") ?: "",
+                        details = allData
+                            .filterKeys { it !in coreKeys }
+                            .mapValues { it.value.toString() }
+                    )
+                }
 
-                    // Fetch options for all events in background
-                    viewModelScope.launch { loadOptionsForEvents(uid, tripId, fetchedEvents.map { it.eventId }) }
+                val sortedEvents = sortPlanEvents(fetchedEvents)
+                _uiState.update {
+                    it.copy(
+                        isLoading = false,
+                        events = sortedEvents,
+                        infoMessage = when {
+                            sortedEvents.isEmpty() && it.infoMessage.isNullOrBlank() -> EMPTY_PLANS_MESSAGE
+                            sortedEvents.isNotEmpty() && it.infoMessage == EMPTY_PLANS_MESSAGE -> null
+                            else -> it.infoMessage
+                        },
+                        errorMessage = null
+                    )
+                }
+
+                viewModelScope.launch {
+                    val optionsByEvent = loadOptionsForEvents(uid, tripId, sortedEvents)
+                    val enrichedEvents = sortPlanEvents(
+                        sortedEvents.map { event ->
+                            event.copy(options = optionsByEvent[event.eventId].orEmpty())
+                        }
+                    )
+                    _eventOptions.value = optionsByEvent
+                    _rejectedOptions.update { current ->
+                        current.filterKeys { key -> optionsByEvent.containsKey(key) }
+                    }
+                    _uiState.update { state ->
+                        state.copy(events = enrichedEvents)
+                    }
                 }
             }
     }
 
-    private suspend fun loadOptionsForEvents(uid: String, tripId: String, eventIds: List<String>) {
-        val optionsMap = _eventOptions.value.toMutableMap()
-        for (eventId in eventIds) {
-            if (optionsMap.containsKey(eventId)) continue // already loaded
-            try {
-                val snap = db.collection("users").document(uid)
-                    .collection("trips").document(tripId)
-                    .collection("events").document(eventId)
-                    .collection("options").get().await()
-                val opts = snap.documents.mapNotNull { doc ->
-                    val data = doc.data ?: return@mapNotNull null
-                    EventOption.fromMap(data)
-                }
-                optionsMap[eventId] = opts
-            } catch (e: Exception) {
-                Log.e("ItineraryViewModel", "Failed to load options for $eventId", e)
-            }
-        }
-        _eventOptions.value = optionsMap
-    }
+    private suspend fun loadOptionsForEvents(
+        uid: String,
+        tripId: String,
+        events: List<TravelEvent>
+    ): Map<String, List<EventOption>> {
+        if (events.isEmpty()) return emptyMap()
 
-    // Mark a new option as selected for an event; update Firestore
-    fun selectOption(eventId: String, selectedOptId: String) {
-        val uid = auth.currentUser?.uid ?: return
-        val tripId = _uiState.value.currentTripId ?: return
-        val currentOpts = _eventOptions.value[eventId] ?: return
-        val currentEvent = _uiState.value.events.firstOrNull { it.eventId == eventId } ?: return
-
-        // Optimistic local update
-        val updated = currentOpts.map { opt ->
-            opt.copy(selected = opt.optionId == selectedOptId)
-        }
-        _eventOptions.update { it + (eventId to updated) }
-        _rejectedOptions.update { current ->
-            val existing = current[eventId].orEmpty() - selectedOptId
-            current + (eventId to existing)
-        }
-
-        // Update the selected event's imageUrl + key detail fields
-        val selectedOpt = updated.firstOrNull { it.selected }
-        if (selectedOpt != null) {
-            val updatedEvent = applySelectedOption(currentEvent, selectedOpt)
-            val updatedEvents = _uiState.value.events.map { event ->
-                if (event.eventId == eventId) updatedEvent else event
-            }
-            _events.value = updatedEvents
-            _uiState.update { it.copy(events = updatedEvents) }
-
-            val eventRef = db.collection("users").document(uid)
-                .collection("trips").document(tripId)
-                .collection("events").document(eventId)
-            viewModelScope.launch {
-                try {
-                    // Persist selection flags on all options
-                    for (opt in updated) {
-                        eventRef.collection("options").document(opt.optionId)
-                            .update("selected", opt.selected).await()
-                    }
-                    eventRef.set(updatedEvent.toFirestoreMap(), SetOptions.merge()).await()
-                } catch (e: Exception) {
-                    Log.e("ItineraryViewModel", "Failed to persist option selection", e)
-                }
-            }
-        }
-    }
-
-    // Track rejected option for a slot — session only, not persisted
-    fun rejectOption(eventId: String, optId: String) {
-        _rejectedOptions.update { current ->
-            val set = (current[eventId] ?: emptySet()) + optId
-            current + (eventId to set)
-        }
-    }
-
-    fun isRejected(eventId: String, optId: String): Boolean =
-        _rejectedOptions.value[eventId]?.contains(optId) == true
-
-    private fun eventSortDate(event: TravelEvent): String =
-        event.date.ifBlank { "9999-12-31" }
-
-    private fun eventSortOrder(event: TravelEvent): Int =
-        event.details["sortOrder"]?.toIntOrNull() ?: 0
-
-    private fun sortEvents(events: List<TravelEvent>): List<TravelEvent> =
-        events.sortedWith(
-            compareBy(
-                { eventSortDate(it) },
-                { eventSortOrder(it) },
-                { it.startTime },
-                { it.eventId }
-            )
-        )
-
-    private fun sortEventsForDate(events: List<TravelEvent>, date: String): List<TravelEvent> =
-        events
-            .filter { it.date == date }
-            .sortedWith(
-                compareBy(
-                    { eventSortOrder(it) },
-                    { it.startTime },
-                    { it.eventId }
-                )
-            )
-
-    // Update local list order and date only — call persistEventPlacements() when drag ends
-    fun moveEventLocally(eventId: String, fromDate: String, toDate: String, toIndex: Int) {
-        val currentEvents = _uiState.value.events
-        val sourceDayEvents = sortEventsForDate(currentEvents, fromDate).toMutableList()
-        val sourceIndex = sourceDayEvents.indexOfFirst { it.eventId == eventId }
-        if (sourceIndex == -1) return
-
-        val movingEvent = sourceDayEvents.removeAt(sourceIndex)
-        val targetDayEvents = if (fromDate == toDate) {
-            sourceDayEvents
-        } else {
-            sortEventsForDate(currentEvents, toDate).toMutableList()
-        }
-        val insertionIndex = toIndex.coerceIn(0, targetDayEvents.size)
-        targetDayEvents.add(insertionIndex, movingEvent.copy(date = toDate))
-
-        val updatedEvents = buildMap<String, TravelEvent> {
-            sourceDayEvents.forEachIndexed { index, event ->
-                put(event.eventId, event.copy(details = event.details + ("sortOrder" to index.toString())))
-            }
-            targetDayEvents.forEachIndexed { index, event ->
-                put(event.eventId, event.copy(date = toDate, details = event.details + ("sortOrder" to index.toString())))
-            }
-        }
-
-        val reordered = sortEvents(currentEvents.map { event -> updatedEvents[event.eventId] ?: event })
-        _uiState.update { it.copy(events = reordered) }
-        _events.value = reordered
-    }
-
-    // Update local list order only within a single day — call persistEventPlacements() when drag ends
-    fun reorderEventsLocally(date: String, fromIndex: Int, toIndex: Int) {
-        if (fromIndex == toIndex) return
-        val currentEvents = _uiState.value.events
-        val dayEvents = sortEventsForDate(currentEvents, date).toMutableList()
-        if (fromIndex !in dayEvents.indices || toIndex !in dayEvents.indices) return
-
-        val moved = dayEvents.removeAt(fromIndex)
-        dayEvents.add(toIndex, moved)
-
-        val reorderedDayEvents = dayEvents.mapIndexed { index, event ->
-            event.copy(details = event.details + ("sortOrder" to index.toString()))
-        }
-        val reorderedById = reorderedDayEvents.associateBy { it.eventId }
-        val reordered = sortEvents(
-            currentEvents.map { event ->
-                if (event.date == date) reorderedById[event.eventId] ?: event else event
-            }
-        )
-
-        _uiState.update { it.copy(events = reordered) }
-        _events.value = reordered
-    }
-
-    // Persist the current in-memory order and date for all affected days to Firestore
-    fun persistEventPlacements(dates: Set<String>) {
-        val uid = auth.currentUser?.uid ?: return
-        val tripId = _uiState.value.currentTripId ?: return
-        if (dates.isEmpty()) return
-
-        viewModelScope.launch {
-            try {
-                val batch = db.batch()
-                dates.forEach { date ->
-                    sortEventsForDate(_uiState.value.events, date).forEachIndexed { idx, event ->
-                        val ref = db.collection("users").document(uid)
-                            .collection("trips").document(tripId)
-                            .collection("events").document(event.eventId)
-                        batch.update(
-                            ref,
-                            mapOf(
-                                "date" to event.date,
-                                "sortOrder" to idx
+        return events.map { event ->
+            viewModelScope.async {
+                val options = db.collection("users")
+                    .document(uid)
+                    .collection("trips")
+                    .document(tripId)
+                    .collection("events")
+                    .document(event.eventId)
+                    .collection("options")
+                    .get()
+                    .await()
+                    .documents
+                    .map { doc ->
+                        val raw = doc.data ?: emptyMap()
+                        EventOption.fromMap(
+                            raw + mapOf(
+                                "optionId" to (raw["optionId"]?.toString() ?: doc.id),
+                                "eventId" to event.eventId
                             )
                         )
                     }
-                }
-                batch.commit().await()
-            } catch (e: Exception) {
-                Log.e("ItineraryViewModel", "Failed to persist event placements", e)
+                    .sortedByDescending { it.selected }
+                event.eventId to options
             }
-        }
+        }.awaitAll().toMap()
     }
 
-    // Lazy-fetch and cache Yelp reviews for a business
     fun fetchYelpReviews(yelpId: String) {
-        if (yelpId.isBlank()) return
-        if (_yelpReviews.value.containsKey(yelpId)) return // already cached
-        if (_reviewsLoading.value.contains(yelpId)) return // already in flight
+        if (yelpId.isBlank() || yelpId in _reviewsLoading.value || yelpId in _yelpReviews.value) return
 
-        _reviewsLoading.update { it + yelpId }
         viewModelScope.launch {
+            _reviewsLoading.update { it + yelpId }
             val reviews = YelpRepository.getBusinessReviews(yelpId)
             _yelpReviews.update { it + (yelpId to reviews) }
             _reviewsLoading.update { it - yelpId }
         }
     }
 
-    // Inline edit an event's title/time/notes — persists to Firestore
-    fun patchEventFields(eventId: String, title: String?, startTime: String?, notes: String?) {
-        val uid = auth.currentUser?.uid ?: return
-        val tripId = _uiState.value.currentTripId ?: return
-        val patchMap = buildMap<String, Any> {
-            if (!title.isNullOrBlank()) put("title", title.trim())
-            if (!startTime.isNullOrBlank()) put("startTime", startTime.trim())
-            if (notes != null) put("description", notes.trim())
-        }
-        if (patchMap.isEmpty()) return
-        viewModelScope.launch {
-            try {
-                db.collection("users").document(uid)
-                    .collection("trips").document(tripId)
-                    .collection("events").document(eventId)
-                    .update(patchMap).await()
-            } catch (e: Exception) {
-                Log.e("ItineraryViewModel", "Failed to patch event fields", e)
-            }
-        }
-    }
-
-    // Fetch the user's groups + DMs for the share bottom sheet
     fun fetchShareTargets() {
         val uid = auth.currentUser?.uid ?: return
+
         viewModelScope.launch {
             try {
-                val groups = db.collection("groups")
-                    .whereArrayContains("members", uid).get().await()
-                val groupTargets = groups.documents.map { doc ->
+                val groupTargets = db.collection("groups")
+                    .whereArrayContains("members", uid)
+                    .get()
+                    .await()
+                    .documents
+                    .map { doc ->
+                        ShareTarget(
+                            id = doc.id,
+                            name = doc.getString("name") ?: "Unnamed Group",
+                            isGroup = true
+                        )
+                    }
+
+                val directChatDocs = db.collection("directChats")
+                    .whereArrayContains("members", uid)
+                    .get()
+                    .await()
+                    .documents
+
+                val chatEntries = directChatDocs.mapNotNull { doc ->
+                    val members = (doc.get("members") as? List<*>)?.filterIsInstance<String>().orEmpty()
+                    val otherUid = members.firstOrNull { it != uid } ?: return@mapNotNull null
+                    doc.id to otherUid
+                }
+
+                val userNames = fetchUserNames(chatEntries.map { it.second }.distinct())
+                val directTargets = chatEntries.map { (chatId, otherUid) ->
                     ShareTarget(
-                        id = doc.id,
-                        name = doc.getString("name") ?: "Group",
-                        isGroup = true
+                        id = chatId,
+                        name = userNames[otherUid] ?: "Unknown",
+                        isGroup = false
                     )
                 }
-                val dms = db.collection("directChats")
-                    .whereArrayContains("members", uid).get().await()
-                // Resolve DM partner names
-                val dmTargets = dms.documents.mapNotNull { doc ->
-                    val members = doc.get("members") as? List<*> ?: return@mapNotNull null
-                    val partnerId = members.firstOrNull { it != uid } as? String ?: return@mapNotNull null
-                    val partnerDoc = db.collection("users").document(partnerId).get().await()
-                    val name = partnerDoc.getString("name") ?: partnerDoc.getString("displayName") ?: "User"
-                    ShareTarget(id = doc.id, name = name, isGroup = false)
-                }
-                _shareTargets.value = groupTargets + dmTargets
+
+                _shareTargets.value = (groupTargets + directTargets).sortedBy { it.name.lowercase() }
             } catch (e: Exception) {
                 Log.e("ItineraryViewModel", "Failed to fetch share targets", e)
+                _uiState.update { it.copy(errorMessage = e.message ?: "Failed to load chats.") }
             }
         }
     }
 
-    // Send trip card to a chat (group or DM)
+    private suspend fun fetchUserNames(uids: List<String>): Map<String, String> {
+        if (uids.isEmpty()) return emptyMap()
+
+        return uids.chunked(30).flatMap { chunk ->
+            db.collection("users")
+                .whereIn(FieldPath.documentId(), chunk)
+                .get()
+                .await()
+                .documents
+                .map { doc ->
+                    val first = doc.getString("firstName") ?: ""
+                    val last = doc.getString("lastName") ?: ""
+                    doc.id to "$first $last".trim().ifBlank { "Unknown" }
+                }
+        }.toMap()
+    }
+
     fun shareTripToChat(target: ShareTarget) {
         val uid = auth.currentUser?.uid ?: return
-        val state = _uiState.value
-        val tripId = state.currentTripId ?: return
-        val currentTrip = _allTrips.value.firstOrNull { it.tripId == tripId }
-            ?: TripSummary(tripId, state.tripTitle, state.destination, state.dateFrom, state.dateTo)
+        val tripId = _uiState.value.currentTripId ?: return
 
         viewModelScope.launch {
             try {
-                val senderName = db.collection("users").document(uid)
-                    .get().await().getString("name") ?: "Traveler"
-
-                val msgData = hashMapOf(
-                    "text" to "Shared a trip: ${currentTrip.tripName}",
+                val senderName = fetchUserNames(listOf(uid))[uid] ?: "Traveler"
+                val container = if (target.isGroup) "groups" else "directChats"
+                val chatRef = db.collection(container).document(target.id)
+                val messageRef = chatRef.collection("messages").document()
+                val coverImage = _uiState.value.events.firstOrNull { it.imageUrl.isNotBlank() }?.imageUrl
+                val message = hashMapOf(
+                    "text" to "Shared trip: ${_uiState.value.tripTitle}",
                     "senderId" to uid,
                     "senderName" to senderName,
+                    "timestamp" to FieldValue.serverTimestamp(),
                     "messageType" to "trip_card",
                     "sharedTripId" to tripId,
                     "ownerUid" to uid,
-                    "tripName" to currentTrip.tripName,
-                    "tripDestination" to currentTrip.destination,
-                    "tripDateFrom" to currentTrip.dateFrom,
-                    "tripDateTo" to currentTrip.dateTo,
-                    "coverImageUrl" to currentTrip.coverImageUrl,
-                    "timestamp" to com.google.firebase.firestore.FieldValue.serverTimestamp()
+                    "tripName" to _uiState.value.tripTitle,
+                    "tripDestination" to currentTripDestination,
+                    "tripDateFrom" to _uiState.value.dateFrom,
+                    "tripDateTo" to _uiState.value.dateTo,
+                    "coverImageUrl" to coverImage
                 )
 
-                val collection = if (target.isGroup) "groups" else "directChats"
-                db.collection(collection).document(target.id)
-                    .collection("messages").add(msgData).await()
-                db.collection(collection).document(target.id)
-                    .update(mapOf(
-                        "lastMessage" to "📍 Shared a trip: ${currentTrip.tripName}",
-                        "lastMessageTime" to com.google.firebase.firestore.FieldValue.serverTimestamp()
-                    )).await()
+                db.runBatch { batch ->
+                    batch.set(messageRef, message)
+                    batch.update(
+                        chatRef,
+                        mapOf(
+                            "lastMessage" to "Shared a trip",
+                            "lastMessageTime" to FieldValue.serverTimestamp()
+                        )
+                    )
+                }.await()
             } catch (e: Exception) {
                 Log.e("ItineraryViewModel", "Failed to share trip", e)
+                _uiState.update { it.copy(errorMessage = e.message ?: "Failed to share trip.") }
             }
         }
     }
 
-    fun clearMessages() {
-        _uiState.update { it.copy(infoMessage = null, errorMessage = null) }
+    fun selectOption(eventId: String, optionId: String) {
+        val uid = auth.currentUser?.uid ?: return
+        val tripId = _uiState.value.currentTripId ?: return
+        val options = _eventOptions.value[eventId].orEmpty()
+        val selectedOption = options.firstOrNull { it.optionId == optionId } ?: return
+        val event = _uiState.value.events.firstOrNull { it.eventId == eventId } ?: return
+
+        val updatedOptions = options.map { it.copy(selected = it.optionId == optionId) }
+        val updatedEvent = applySelectedOption(event, selectedOption).copy(options = updatedOptions)
+        val updatedEvents = sortPlanEvents(
+            _uiState.value.events.map {
+                if (it.eventId == eventId) updatedEvent else it
+            }
+        )
+
+        _eventOptions.update { it + (eventId to updatedOptions) }
+        _rejectedOptions.update { current ->
+            val nextRejected = current[eventId].orEmpty() - optionId
+            current + (eventId to nextRejected)
+        }
+        _uiState.update { it.copy(events = updatedEvents) }
+
+        viewModelScope.launch {
+            try {
+                val eventRef = db.collection("users")
+                    .document(uid)
+                    .collection("trips")
+                    .document(tripId)
+                    .collection("events")
+                    .document(eventId)
+
+                db.runBatch { batch ->
+                    batch.set(eventRef, updatedEvent.toFirestoreMap())
+                    updatedOptions.forEach { option ->
+                        batch.set(
+                            eventRef.collection("options").document(option.optionId),
+                            option.toMap()
+                        )
+                    }
+                }.await()
+            } catch (e: Exception) {
+                Log.e("ItineraryViewModel", "Failed to select option", e)
+                _uiState.update { it.copy(errorMessage = e.message ?: "Failed to update selection.") }
+            }
+        }
     }
 
-    fun postError(message: String) {
-        _uiState.update { it.copy(errorMessage = message) }
+    fun rejectOption(eventId: String, optionId: String) {
+        _rejectedOptions.update { current ->
+            current + (eventId to (current[eventId].orEmpty() + optionId))
+        }
     }
 
-    fun upsertPlan(plan: EditablePlan) {
-        val uid = auth.currentUser?.uid
-        val tripId = _uiState.value.currentTripId
-        if (uid == null || tripId.isNullOrBlank()) {
-            postError("Create or load a trip before adding plans.")
-            return
+    fun patchEventFields(
+        eventId: String,
+        title: String,
+        startTime: String,
+        notes: String
+    ) {
+        val uid = auth.currentUser?.uid ?: return
+        val tripId = _uiState.value.currentTripId ?: return
+        val currentEvent = _uiState.value.events.firstOrNull { it.eventId == eventId } ?: return
+
+        val updatedDetails = currentEvent.details.toMutableMap().apply {
+            val trimmedTitle = title.trim()
+            val trimmedNotes = notes.trim()
+            if (trimmedTitle.isBlank()) {
+                remove("title")
+            } else {
+                put("title", trimmedTitle)
+            }
+            if (trimmedNotes.isBlank()) {
+                remove("description")
+                remove("notes")
+            } else {
+                put("description", trimmedNotes)
+            }
+        }
+
+        val updatedEvent = currentEvent.copy(
+            startTime = normalizeTime(startTime),
+            details = updatedDetails
+        )
+        _uiState.update { state ->
+            state.copy(events = sortPlanEvents(state.events.map { if (it.eventId == eventId) updatedEvent else it }))
         }
 
         viewModelScope.launch {
             try {
-                val eventId = plan.eventId ?: UUID.randomUUID().toString()
-                val mergedDetails = plan.existingDetails.toMutableMap().apply {
-                    put("title", plan.title.trim())
-                    put("colorKey", plan.colorKey)
-                    if (plan.location.isBlank()) remove("location")
-                    else put("location", plan.location.trim())
-                    if (plan.notes.isBlank()) remove("description")
-                    else put("description", plan.notes.trim())
-                }
+                db.collection("users")
+                    .document(uid)
+                    .collection("trips")
+                    .document(tripId)
+                    .collection("events")
+                    .document(eventId)
+                    .set(updatedEvent.toFirestoreMap())
+                    .await()
+            } catch (e: Exception) {
+                Log.e("ItineraryViewModel", "Failed to patch event", e)
+                _uiState.update { it.copy(errorMessage = e.message ?: "Failed to save event changes.") }
+            }
+        }
+    }
 
-                val event = TravelEvent(
-                    eventId = eventId,
-                    type = plan.type,
-                    itineraryId = tripId,
-                    tz = plan.timeZoneId.trim().ifBlank { defaultPlanTimeZoneId() },
-                    date = normalizeDate(plan.date),
-                    startTime = normalizeTime(plan.startTime),
-                    endTime = normalizeTime(plan.endTime),
-                    details = mergedDetails
-                )
+    fun moveEventLocally(
+        eventId: String,
+        fromDate: String,
+        toDate: String,
+        toIndex: Int
+    ) {
+        val currentEvents = _uiState.value.events
+        val movingEvent = currentEvents.firstOrNull { it.eventId == eventId } ?: return
+        val normalizedFromDate = normalizeDate(fromDate)
+        val normalizedToDate = normalizeDate(toDate)
 
-                db.collection("users").document(uid)
-                    .collection("trips").document(tripId)
-                    .collection("events").document(eventId)
-                    .set(event.toFirestoreMap()).await()
+        val grouped = currentEvents
+            .groupBy { normalizeDate(it.date) }
+            .mapValues { (_, events) ->
+                events.sortedWith(compareBy({ it.details["sortOrder"]?.toIntOrNull() ?: 0 }, { it.startTime }))
+                    .toMutableList()
+            }
+            .toMutableMap()
 
-                _uiState.update {
-                    it.copy(
-                        infoMessage = if (plan.eventId == null) "Plan added to your trip." else "Plan updated.",
-                        errorMessage = null
+        val sourceList = grouped[normalizedFromDate] ?: mutableListOf()
+        sourceList.removeAll { it.eventId == eventId }
+
+        val targetList = if (normalizedToDate == normalizedFromDate) {
+            sourceList
+        } else {
+            grouped.getOrPut(normalizedToDate) { mutableListOf() }
+        }
+
+        val insertionIndex = toIndex.coerceIn(0, targetList.size)
+        targetList.add(insertionIndex, movingEvent.copy(date = normalizedToDate))
+
+        val updatedEvents = grouped
+            .toSortedMap(compareBy<String> { if (it.isBlank()) "9999-12-31" else it })
+            .values
+            .flatMap { dayEvents ->
+                dayEvents.mapIndexed { index, event ->
+                    event.copy(
+                        details = event.details.toMutableMap().apply {
+                            put("sortOrder", index.toString())
+                        }
                     )
                 }
+            }
+
+        _uiState.update { it.copy(events = updatedEvents) }
+    }
+
+    fun persistEventPlacements(affectedDates: Set<String>) {
+        val uid = auth.currentUser?.uid ?: return
+        val tripId = _uiState.value.currentTripId ?: return
+        val normalizedDates = affectedDates.map(::normalizeDate).toSet()
+        val affectedEvents = _uiState.value.events.filter { normalizeDate(it.date) in normalizedDates }
+
+        if (affectedEvents.isEmpty()) return
+
+        viewModelScope.launch {
+            try {
+                db.runBatch { batch ->
+                    affectedEvents.forEach { event ->
+                        val eventRef = db.collection("users")
+                            .document(uid)
+                            .collection("trips")
+                            .document(tripId)
+                            .collection("events")
+                            .document(event.eventId)
+                        batch.update(
+                            eventRef,
+                            mapOf(
+                                "date" to normalizeDate(event.date),
+                                "sortOrder" to (event.details["sortOrder"] ?: "0")
+                            )
+                        )
+                    }
+                }.await()
             } catch (e: Exception) {
-                Log.e("ItineraryViewModel", "Failed to save event", e)
-                _uiState.update { it.copy(errorMessage = e.message ?: "Failed to save plan.") }
+                Log.e("ItineraryViewModel", "Failed to persist placements", e)
+                _uiState.update { it.copy(errorMessage = e.message ?: "Failed to save event order.") }
             }
         }
     }
 
-    fun deletePlan(plan: EditablePlan) {
-        val uid = auth.currentUser?.uid
-        val tripId = _uiState.value.currentTripId
-        val eventId = plan.eventId
-        if (uid == null || tripId.isNullOrBlank() || eventId.isNullOrBlank()) {
-            postError("This plan cannot be deleted yet.")
-            return
-        }
+    fun archiveTrip(tripId: String) {
+        val uid = auth.currentUser?.uid ?: return
 
         viewModelScope.launch {
             try {
-                db.collection("users").document(uid)
-                    .collection("trips").document(tripId)
-                    .collection("events").document(eventId)
-                    .delete().await()
-
-                _uiState.update { it.copy(infoMessage = "Plan deleted.", errorMessage = null) }
+                db.collection("users")
+                    .document(uid)
+                    .collection("trips")
+                    .document(tripId)
+                    .update(
+                        mapOf(
+                            "status" to "archived",
+                            "archivedAt" to FieldValue.serverTimestamp()
+                        )
+                    )
+                    .await()
+                _uiState.update { it.copy(infoMessage = "Trip archived.", errorMessage = null) }
             } catch (e: Exception) {
-                Log.e("ItineraryViewModel", "Failed to delete event", e)
-                _uiState.update { it.copy(errorMessage = e.message ?: "Failed to delete plan.") }
+                Log.e("ItineraryViewModel", "Failed to archive trip", e)
+                _uiState.update { it.copy(errorMessage = e.message ?: "Failed to archive trip.") }
+            }
+        }
+    }
+
+    fun deleteTrip(tripId: String) {
+        val uid = auth.currentUser?.uid ?: return
+
+        viewModelScope.launch {
+            try {
+                val tripRef = db.collection("users")
+                    .document(uid)
+                    .collection("trips")
+                    .document(tripId)
+
+                val eventDocs = tripRef.collection("events").get().await().documents
+                eventDocs.forEach { eventDoc ->
+                    val optionDocs = eventDoc.reference.collection("options").get().await().documents
+                    optionDocs.forEach { it.reference.delete().await() }
+                    eventDoc.reference.delete().await()
+                }
+                tripRef.delete().await()
+                resetTripState(infoMessage = "Trip deleted.")
+            } catch (e: Exception) {
+                Log.e("ItineraryViewModel", "Failed to delete trip", e)
+                _uiState.update { it.copy(errorMessage = e.message ?: "Failed to delete trip.") }
             }
         }
     }
 
     fun loadTrip(tripId: String? = null) {
         val uid = auth.currentUser?.uid
+
         if (uid == null) {
-            Log.e("ItineraryViewModel", "UID is NULL. Firebase isn't ready yet.")
             resetTripState(infoMessage = "Log in to load your current trip.")
             return
         }
 
         resetTripState(isLoading = true)
-        Log.d("ItineraryViewModel", "UID found: $uid. Fetching trip: ${tripId ?: "Latest"}")
 
-        fetchAllTrips(uid)
-        if (tripId != null) fetchTrip(uid, tripId) else fetchLatestItinerary(uid)
+        if (tripId != null) {
+            fetchTrip(uid, tripId)
+        } else {
+            fetchLatestItinerary(uid)
+        }
     }
 
     override fun onCleared() {
@@ -735,70 +630,35 @@ class ItineraryViewModel : ViewModel() {
         super.onCleared()
     }
 
-    private fun applySelectedOption(event: TravelEvent, selectedOpt: EventOption): TravelEvent {
+    private fun applySelectedOption(event: TravelEvent, option: EventOption): TravelEvent {
         val mergedDetails = event.details.toMutableMap().apply {
-            putAll(selectedOpt.details)
-
+            putAll(option.details)
             when (event.type.lowercase()) {
-                "flight" -> {
-                    val flightLabel = listOfNotNull(
-                        selectedOpt.details["airline"],
-                        selectedOpt.details["flight_number"]
-                    ).joinToString(" ").trim()
-                    if (flightLabel.isNotBlank()) {
-                        put("title", flightLabel)
-                    }
-                    selectedOpt.details["price"]?.let { put("total_price", it) }
-                }
-
-                "hotel" -> {
-                    selectedOpt.details["hotel_name"]?.let { put("hotel_name", it) }
-                    selectedOpt.details["name"]?.let { put("hotel_name", it) }
-                }
-
+                "hotel" -> option.details["name"]?.let { put("hotel_name", it) }
                 "restaurant", "dining", "food" -> {
-                    selectedOpt.details["restaurant_name"]?.let { put("restaurant_name", it) }
-                    selectedOpt.details["name"]?.let { put("restaurant_name", it) }
+                    val name = option.details["restaurant_name"] ?: option.details["name"]
+                    if (!name.isNullOrBlank()) put("restaurant_name", name)
                 }
-
-                else -> {
-                    selectedOpt.details["activity_name"]?.let { put("activity_name", it) }
-                    selectedOpt.details["name"]?.let { put("activity_name", it) }
+                "activity" -> {
+                    val name = option.details["activity_name"] ?: option.details["title"] ?: option.details["name"]
+                    if (!name.isNullOrBlank()) put("activity_name", name)
                 }
+                "flight" -> option.details["title"]?.let { put("title", it) }
             }
         }
 
-        return event.copy(
-            imageUrl = selectedOpt.localImagePath.ifBlank {
-                selectedOpt.imageUrl.ifBlank { event.imageUrl }
-            },
-            startTime = selectedTimeFor(event.type, selectedOpt, event.startTime, isStart = true),
-            endTime = selectedTimeFor(event.type, selectedOpt, event.endTime, isStart = false),
-            details = mergedDetails
-        )
+        val imageUrl = option.localImagePath.ifBlank { option.imageUrl }.ifBlank { event.imageUrl }
+        return event.copy(imageUrl = imageUrl, details = mergedDetails)
     }
 
-    private fun selectedTimeFor(
-        eventType: String,
-        selectedOpt: EventOption,
-        fallback: String,
-        isStart: Boolean
-    ): String {
-        val raw = when (eventType.lowercase()) {
-            "flight" -> {
-                if (isStart) selectedOpt.details["departure_time"] else selectedOpt.details["arrival_time"]
-            }
-
-            "hotel" -> {
-                if (isStart) selectedOpt.details["check_in_time"] else selectedOpt.details["check_out_time"]
-            }
-
-            else -> null
-        }
-
-        return raw
-            ?.substringAfter(" ", raw)
-            ?.takeIf { it.isNotBlank() }
-            ?: fallback
+    private fun sortPlanEvents(events: List<TravelEvent>): List<TravelEvent> {
+        return events.sortedWith(
+            compareBy<TravelEvent>(
+                { normalizeDate(it.date) },
+                { it.details["sortOrder"]?.toIntOrNull() ?: Int.MAX_VALUE },
+                { normalizeTime(it.startTime) },
+                { it.eventId }
+            )
+        )
     }
 }

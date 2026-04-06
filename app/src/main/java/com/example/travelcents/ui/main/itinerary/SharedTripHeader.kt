@@ -1,4 +1,4 @@
-package com.example.travelcents.ui.main.itinerary
+package com.example.travelcents.ui.main
 
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background

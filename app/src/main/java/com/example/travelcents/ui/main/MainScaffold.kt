@@ -42,6 +42,7 @@ import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
 import com.example.travelcents.ui.main.aichat.AiTripChatPage
 import com.example.travelcents.ui.main.chats.chat.ChatsScreen
+import com.example.travelcents.ui.main.CurrentTripViewModel
 import com.example.travelcents.ui.main.itinerary.EditPlanScreen
 import com.example.travelcents.ui.main.itinerary.FinalPlanPage
 import com.example.travelcents.ui.main.itinerary.ItineraryScreen
@@ -104,7 +105,8 @@ private data class BottomNavItem(
 @Composable
 fun MainScaffold(modifier: Modifier = Modifier, onLogout: () -> Unit = {}) {
     val newTripViewModel: NewTripViewModel = viewModel()
-    val sharedItineraryViewModel: ItineraryViewModel = viewModel()
+    val currentTripViewModel: CurrentTripViewModel = viewModel()
+    val finalPlanViewModel: ItineraryViewModel = viewModel()
     val navController = rememberNavController()
 
     val navBackStackEntry by navController.currentBackStackEntryAsState()
@@ -122,10 +124,10 @@ fun MainScaffold(modifier: Modifier = Modifier, onLogout: () -> Unit = {}) {
         MainRoutes.FINAL_PLAN -> MainRoutes.NEW_TRIP
         else -> currentRoute
     }
-    val itineraryUiState by sharedItineraryViewModel.uiState.collectAsState()
+    val itineraryUiState by currentTripViewModel.uiState.collectAsState()
 
     // Load trip once on mount so currentTripId is available before any tab is visited
-    LaunchedEffect(Unit) { sharedItineraryViewModel.loadTrip() }
+    LaunchedEffect(Unit) { currentTripViewModel.loadTrip() }
 
     val items = listOf(
         BottomNavItem(MainRoutes.CURRENT, "CURRENT", Icons.Outlined.CalendarToday),
@@ -147,9 +149,9 @@ fun MainScaffold(modifier: Modifier = Modifier, onLogout: () -> Unit = {}) {
                 modifier = Modifier.fillMaxSize()
             ) {
                 composable(MainRoutes.CURRENT) {
-                    LaunchedEffect(Unit) { sharedItineraryViewModel.loadTrip() }
+                    LaunchedEffect(Unit) { currentTripViewModel.loadTrip() }
                     ItineraryScreen(
-                        viewModel = sharedItineraryViewModel,
+                        viewModel = currentTripViewModel,
                         onEditEventClick = { clickedEventId ->
                             itineraryUiState.currentTripId?.let { tripId ->
                                 navController.navigate("edit_plan/$tripId/$clickedEventId")
@@ -263,9 +265,9 @@ fun MainScaffold(modifier: Modifier = Modifier, onLogout: () -> Unit = {}) {
                     )
                 }
                 composable(MainRoutes.FINAL_PLAN) {
-                    LaunchedEffect(Unit) { sharedItineraryViewModel.loadTrip() }
+                    LaunchedEffect(Unit) { finalPlanViewModel.loadTrip() }
                     FinalPlanPage(
-                        viewModel = sharedItineraryViewModel,
+                        viewModel = finalPlanViewModel,
                         modifier = Modifier.fillMaxSize(),
                         onBackClick = {
                             navController.navigate(MainRoutes.CURRENT) {
