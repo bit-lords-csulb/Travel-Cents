@@ -6,6 +6,7 @@ import androidx.lifecycle.viewModelScope
 import com.example.travelcents.data.model.DirectChatPreview
 import com.example.travelcents.data.model.EventOption
 import com.example.travelcents.data.model.Group
+import com.example.travelcents.data.model.Itinerary
 import com.example.travelcents.data.model.TravelEvent
 import com.example.travelcents.data.model.YelpReview
 import com.example.travelcents.data.remote.YelpRepository
@@ -62,6 +63,9 @@ class ItineraryViewModel : ViewModel() {
 
     private val _shareTargets = MutableStateFlow<List<ShareTarget>>(emptyList())
     val shareTargets: StateFlow<List<ShareTarget>> = _shareTargets.asStateFlow()
+
+    private val _allTrips = MutableStateFlow<List<Itinerary>>(emptyList())
+    val allTrips: StateFlow<List<Itinerary>> = _allTrips.asStateFlow()
 
     private val db = FirebaseFirestore.getInstance()
     private val auth = FirebaseAuth.getInstance()
@@ -587,6 +591,10 @@ class ItineraryViewModel : ViewModel() {
 
         viewModelScope.launch {
             try {
+                // Remove from list immediately so the UI can switch away before Firestore deletes propagate
+                val remaining = _allTrips.value.filter { it.itineraryId != tripId }
+                _allTrips.value = remaining
+
                 val tripRef = db.collection("users")
                     .document(uid)
                     .collection("trips")
@@ -599,10 +607,82 @@ class ItineraryViewModel : ViewModel() {
                     eventDoc.reference.delete().await()
                 }
                 tripRef.delete().await()
-                resetTripState(infoMessage = "Trip deleted.")
+
+                val nextTrip = remaining.firstOrNull()
+                if (nextTrip != null) {
+                    fetchTrip(uid, nextTrip.itineraryId)
+                } else {
+                    resetTripState(infoMessage = "No trips yet. Create one from the New Trip tab.")
+                }
             } catch (e: Exception) {
                 Log.e("ItineraryViewModel", "Failed to delete trip", e)
                 _uiState.update { it.copy(errorMessage = e.message ?: "Failed to delete trip.") }
+            }
+        }
+    }
+
+    fun loadAllTrips() {
+        val uid = auth.currentUser?.uid ?: return
+
+        viewModelScope.launch {
+            try {
+                val docs = db.collection("users").document(uid)
+                    .collection("trips")
+                    .orderBy("createdAt", Query.Direction.DESCENDING)
+                    .get()
+                    .await()
+                    .documents
+
+                _allTrips.value = docs.mapNotNull { doc ->
+                    try {
+                        Itinerary(
+                            itineraryId = doc.id,
+                            userId = uid,
+                            tripName = doc.getString("tripName") ?: "Unnamed Trip",
+                            destination = doc.getString("destination") ?: "",
+                            origin = doc.getString("origin") ?: "",
+                            originIata = doc.getString("originIata") ?: "",
+                            destinationIata = doc.getString("destinationIata") ?: "",
+                            dateFrom = doc.getString("dateFrom") ?: "",
+                            dateTo = doc.getString("dateTo") ?: "",
+                            durationDays = (doc.getLong("durationDays") ?: 0L).toInt(),
+                            currency = doc.getString("currency") ?: "USD",
+                            travelStyle = doc.getString("travelStyle") ?: "",
+                            adults = (doc.getLong("adults") ?: 1L).toInt(),
+                            children = (doc.getLong("children") ?: 0L).toInt(),
+                            createdAt = doc.getString("createdAt") ?: "",
+                            status = doc.getString("status") ?: "",
+                            eventIds = (doc.get("eventIds") as? List<*>)
+                                ?.filterIsInstance<String>() ?: emptyList()
+                        )
+                    } catch (e: Exception) {
+                        Log.e("ItineraryViewModel", "Failed to parse trip ${doc.id}: ${e.message}")
+                        null
+                    }
+                }
+            } catch (e: Exception) {
+                Log.e("ItineraryViewModel", "Failed to load all trips: ${e.message}")
+            }
+        }
+    }
+
+    fun renameTrip(newName: String) {
+        val uid = auth.currentUser?.uid ?: return
+        val tripId = _uiState.value.currentTripId ?: return
+        val trimmed = newName.trim().ifBlank { return }
+
+        _uiState.update { it.copy(tripTitle = trimmed) }
+        _allTrips.update { trips -> trips.map { if (it.itineraryId == tripId) it.copy(tripName = trimmed) else it } }
+
+        viewModelScope.launch {
+            try {
+                db.collection("users").document(uid)
+                    .collection("trips").document(tripId)
+                    .update("tripName", trimmed)
+                    .await()
+            } catch (e: Exception) {
+                Log.e("ItineraryViewModel", "Failed to rename trip: ${e.message}")
+                _uiState.update { it.copy(errorMessage = e.message ?: "Failed to rename trip.") }
             }
         }
     }

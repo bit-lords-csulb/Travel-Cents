@@ -17,8 +17,10 @@ import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
 import androidx.compose.material.icons.Icons
+import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.DragHandle
+import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.Share
 import androidx.compose.material.icons.outlined.Archive
@@ -27,6 +29,11 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.focus.onFocusChanged
+import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
@@ -40,6 +47,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import coil.compose.AsyncImage
+import com.example.travelcents.data.model.Itinerary
 import com.example.travelcents.data.model.TravelEvent
 import com.example.travelcents.ui.theme.TravelCentsTheme
 import kotlinx.coroutines.delay
@@ -186,6 +194,7 @@ fun FinalPlanPage(
     val yelpReviews by viewModel.yelpReviews.collectAsState()
     val reviewsLoading by viewModel.reviewsLoading.collectAsState()
     val shareTargets by viewModel.shareTargets.collectAsState()
+    val allTrips by viewModel.allTrips.collectAsState()
 
     val planItems = remember(uiState.events) { buildPlanItems(uiState.events) }
 
@@ -201,6 +210,7 @@ fun FinalPlanPage(
 
     LaunchedEffect(Unit) {
         viewModel.loadTrip()
+        viewModel.loadAllTrips()
     }
 
     // Auto-trigger Yelp review fetch when a card is expanded
@@ -218,6 +228,7 @@ fun FinalPlanPage(
             FinalPlanTopBar(
                 tripTitle = uiState.tripTitle,
                 currentTripId = uiState.currentTripId,
+                allTrips = allTrips,
                 onArchiveTrip = { tripId -> viewModel.archiveTrip(tripId) },
                 onDeleteTrip = { tripId -> viewModel.deleteTrip(tripId) },
                 onBackClick = onBackClick,
@@ -226,7 +237,9 @@ fun FinalPlanPage(
                     showShareSheet = true
                 },
                 isReorderActive = jiggleMode,
-                onReorderClick = { jiggleMode = !jiggleMode }
+                onReorderClick = { jiggleMode = !jiggleMode },
+                onSwitchTrip = { tripId -> viewModel.loadTrip(tripId) },
+                onRenameTrip = { newName -> viewModel.renameTrip(newName) }
             )
         },
         bottomBar = {
@@ -524,15 +537,33 @@ private fun ShareTripSheet(
 private fun FinalPlanTopBar(
     tripTitle: String,
     currentTripId: String?,
+    allTrips: List<Itinerary>,
     onArchiveTrip: (String) -> Unit,
     onDeleteTrip: (String) -> Unit,
     onBackClick: () -> Unit,
     onShareClick: () -> Unit,
     isReorderActive: Boolean = false,
-    onReorderClick: () -> Unit = {}
+    onReorderClick: () -> Unit = {},
+    onSwitchTrip: (String) -> Unit = {},
+    onRenameTrip: (String) -> Unit = {}
 ) {
     var menuExpanded by remember { mutableStateOf(false) }
+    var switcherExpanded by remember { mutableStateOf(false) }
     var showDeleteDialog by remember { mutableStateOf(false) }
+    var editableTitle by remember { mutableStateOf(tripTitle) }
+    var isEditingTitle by remember { mutableStateOf(false) }
+    val titleFocusRequester = remember { FocusRequester() }
+
+    // Sync local title when the VM swaps to a different trip
+    LaunchedEffect(tripTitle) {
+        editableTitle = tripTitle
+        isEditingTitle = false
+    }
+
+    // Request focus as soon as edit mode activates
+    LaunchedEffect(isEditingTitle) {
+        if (isEditingTitle) titleFocusRequester.requestFocus()
+    }
 
     if (showDeleteDialog && currentTripId != null) {
         AlertDialog(
@@ -611,13 +642,15 @@ private fun FinalPlanTopBar(
                         text = {
                             Text(
                                 if (isReorderActive) "Done Reordering" else "Reorder Events",
-                                color = OnSurfaceVariant,
+                                color = OnSurface,
                                 fontSize = 14.sp,
                                 fontWeight = FontWeight.Medium
                             )
                         },
-                        onClick = { menuExpanded = false; onReorderClick() },
-                        enabled = true
+                        leadingIcon = {
+                            Icon(Icons.Default.DragHandle, contentDescription = null, tint = OnSurfaceVariant)
+                        },
+                        onClick = { menuExpanded = false; onReorderClick() }
                     )
 
                     DropdownMenuItem(
@@ -651,17 +684,91 @@ private fun FinalPlanTopBar(
             }
         }
 
-        Text(
-            text = tripTitle,
-            color = OnSurface,
-            fontSize = 28.sp,
-            fontWeight = FontWeight.ExtraBold,
-            maxLines = 2,
-            overflow = TextOverflow.Ellipsis,
+        // Editable title + trip switcher arrow
+        Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 24.dp, vertical = 12.dp)
-        )
+                .padding(horizontal = 24.dp, vertical = 12.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            if (isEditingTitle) {
+                BasicTextField(
+                    value = editableTitle,
+                    onValueChange = { new ->
+                        // block newlines and tabs; only accept printable input
+                        editableTitle = new.filter { it != '\n' && it != '\t' }
+                    },
+                    singleLine = true,
+                    textStyle = TextStyle(
+                        color = OnSurface,
+                        fontSize = 28.sp,
+                        fontWeight = FontWeight.ExtraBold
+                    ),
+                    cursorBrush = SolidColor(PrimaryBlue),
+                    modifier = Modifier
+                        .weight(1f)
+                        .focusRequester(titleFocusRequester)
+                        .onFocusChanged { focusState ->
+                            if (!focusState.isFocused && isEditingTitle) {
+                                isEditingTitle = false
+                                onRenameTrip(editableTitle)
+                            }
+                        }
+                )
+            } else {
+                Text(
+                    text = editableTitle,
+                    color = OnSurface,
+                    fontSize = 28.sp,
+                    fontWeight = FontWeight.ExtraBold,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier
+                        .weight(1f)
+                        .clickable { isEditingTitle = true }
+                )
+            }
+
+            // Trip switcher
+            Box {
+                IconButton(
+                    onClick = { switcherExpanded = true },
+                    modifier = Modifier.size(36.dp)
+                ) {
+                    Icon(
+                        Icons.Default.KeyboardArrowDown,
+                        contentDescription = "Switch trip",
+                        tint = OnSurfaceVariant
+                    )
+                }
+                DropdownMenu(
+                    expanded = switcherExpanded,
+                    onDismissRequest = { switcherExpanded = false },
+                    modifier = Modifier
+                        .background(Color(0xFF0B203D))
+                        .widthIn(min = 200.dp)
+                ) {
+                    allTrips.forEach { trip ->
+                        DropdownMenuItem(
+                            text = {
+                                Text(
+                                    text = trip.tripName,
+                                    color = if (trip.itineraryId == currentTripId) PrimaryBlue else OnSurface,
+                                    fontSize = 14.sp,
+                                    fontWeight = if (trip.itineraryId == currentTripId) FontWeight.Bold else FontWeight.Normal
+                                )
+                            },
+                            onClick = {
+                                switcherExpanded = false
+                                if (trip.itineraryId != currentTripId) {
+                                    onSwitchTrip(trip.itineraryId)
+                                }
+                            }
+                        )
+                    }
+                }
+            }
+        }
     }
 }
 

@@ -94,6 +94,7 @@ private val SurfaceBright = Color(0xFF243447)
 @Composable
 fun HomePage(
     modifier: Modifier = Modifier,
+    onTripClick: (String) -> Unit = {},
     homeViewModel: HomeViewModel = viewModel(),
     currencyViewModel: CurrencyViewModel = viewModel()
 ) {
@@ -112,7 +113,8 @@ fun HomePage(
         TripsCarousel(
             trips = homeUiState.trips,
             tripImages = homeUiState.tripImages,
-            isLoading = homeUiState.isLoading
+            isLoading = homeUiState.isLoading,
+            onTripClick = onTripClick
         )
 
         Spacer(modifier = Modifier.height(24.dp))
@@ -213,7 +215,8 @@ private fun HomeHeader() {
 private fun TripsCarousel(
     trips: List<Itinerary>,
     tripImages: Map<String, String>,
-    isLoading: Boolean
+    isLoading: Boolean,
+    onTripClick: (String) -> Unit = {}
 ) {
     Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
         when {
@@ -241,7 +244,8 @@ private fun TripsCarousel(
                     TripCard(
                         trip = trips[page],
                         imageUrl = tripImages[trips[page].destination],
-                        isCurrent = page == pagerState.currentPage
+                        isCurrent = page == pagerState.currentPage,
+                        onClick = { onTripClick(trips[page].itineraryId) }
                     )
                 }
 
@@ -291,7 +295,7 @@ private fun CarouselPlaceholder(content: @Composable () -> Unit) {
 }
 
 @Composable
-private fun TripCard(trip: Itinerary, imageUrl: String?, isCurrent: Boolean) {
+private fun TripCard(trip: Itinerary, imageUrl: String?, isCurrent: Boolean, onClick: () -> Unit = {}) {
     val today = LocalDate.now()
     val countdownDays: Long? = runCatching {
         val fmt = DateTimeFormatter.ofPattern("yyyy-MM-dd")
@@ -307,6 +311,7 @@ private fun TripCard(trip: Itinerary, imageUrl: String?, isCurrent: Boolean) {
             .aspectRatio(4f / 5f)
             .clip(RoundedCornerShape(24.dp))
             .alpha(if (isCurrent) 1f else 0.6f)
+            .clickable(enabled = isCurrent) { onClick() }
     ) {
         AsyncImage(
             model = resolvedImageUrl,
