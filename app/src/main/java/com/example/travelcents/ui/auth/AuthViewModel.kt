@@ -171,7 +171,7 @@ class AuthViewModel : ViewModel() {
             _isLoading.value = false
             result.fold(
                 onSuccess = { _isLoggedIn.value = true },
-                onFailure = { error ->
+                onFailure = { _ ->
                     _errorMessage.value = "Google Login failed. Please try again."
                 }
             )
