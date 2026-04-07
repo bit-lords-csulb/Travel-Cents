@@ -62,12 +62,24 @@ import androidx.navigation.NavController
 import com.example.travelcents.ui.theme.DeepSea1
 import com.example.travelcents.ui.theme.DeepSea2
 import com.example.travelcents.ui.theme.DeepSea4
+import com.example.travelcents.ui.theme.DeepSea5
+import kotlin.Result
+import kotlin.runCatching
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.ui.platform.LocalContext
+import androidx.credentials.CredentialManager
+import androidx.credentials.CustomCredential
+import androidx.credentials.GetCredentialRequest
+import androidx.credentials.exceptions.GetCredentialException
+import com.google.android.libraries.identity.googleid.GetGoogleIdOption
+import com.google.android.libraries.identity.googleid.GoogleIdTokenCredential
+import kotlinx.coroutines.launch
+import android.util.Log
 
 private const val LOGIN_PREFS = "login_preferences"
 private const val KEY_REMEMBER_ME = "remember_me"
 private const val KEY_SAVED_EMAIL = "saved_email_or_username"
 private const val KEY_SAVED_PASSWORD = "saved_password"
-
 @Composable
 fun LoginPage(modifier: Modifier = Modifier, navController: NavController, authViewModel: AuthViewModel) {
     val context = LocalContext.current
