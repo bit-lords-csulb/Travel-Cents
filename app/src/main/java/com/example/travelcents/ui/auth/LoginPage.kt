@@ -182,14 +182,6 @@ fun LoginPage(modifier: Modifier = Modifier, navController: NavController, authV
                             }
                             true
                         }
-                        event.key == Key.Enter && event.type == KeyEventType.KeyDown -> {
-                            if (email.isNotBlank() && password.isNotBlank()) {
-                                authViewModel.logIn(email, password)
-                            } else {
-                                passwordFocusRequester.requestFocus()
-                            }
-                            true
-                        }
                         else -> false
                     }
                 },
