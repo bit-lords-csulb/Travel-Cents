@@ -11,7 +11,6 @@ data class TravelRequest(
     val travelStyle: String,
     val currency: String,
     val budgetTotal: Double,
-    val dietary: List<String>,
     val interests: List<String>,
     val specialRequests: String
 )
