@@ -28,7 +28,8 @@ object GroqRepository {
             chain.proceed(request)
         }
         .addInterceptor(HttpLoggingInterceptor().apply {
-            level = HttpLoggingInterceptor.Level.BODY
+            level = if (BuildConfig.DEBUG) HttpLoggingInterceptor.Level.BODY
+                    else HttpLoggingInterceptor.Level.NONE
         })
         .connectTimeout(60, TimeUnit.SECONDS)
         .readTimeout(60, TimeUnit.SECONDS)
@@ -129,7 +130,6 @@ Return a single JSON object with these fields only:
 Generate a full daily schedule of local events for this itinerary (id: ${itinerary.itineraryId}).
 Trip: ${itinerary.origin} to ${itinerary.destination}, ${itinerary.dateFrom} to ${itinerary.dateTo} (${itinerary.durationDays} days).
 Travelers: $travelersJson. Style: ${itinerary.travelStyle}.
-Dietary preferences: ${request.dietary.joinToString(", ").ifBlank { "none" }}.
 Interests: ${request.interests.joinToString(", ").ifBlank { "general" }}.
 $flightContext
 $hotelContext
@@ -139,7 +139,7 @@ Flights and hotel are already booked. Generate ONLY restaurants and activities �
 
 Rules:
 - Include EVERY day between dateFrom and dateTo (inclusive).
-- At least 1 restaurant per day (respect dietary preferences).
+- At least 1 restaurant per day.
 - Multiple activities per day UNLESS it is an all-day activity (theme park, full-day tour, cruise) — in that case, just that 1 activity + 1 restaurant/dinner for the day.
 - For regular days: aim for 2–3 activities spread through the day.
 - Set is_all_day to true only for genuinely all-day activities.

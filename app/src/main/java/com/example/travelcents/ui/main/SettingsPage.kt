@@ -13,7 +13,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
-import androidx.compose.material.icons.filled.ExitToApp
+import androidx.compose.material.icons.automirrored.filled.ExitToApp
 import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.Mail
 import androidx.compose.material.icons.filled.Person
@@ -37,13 +37,14 @@ import com.google.firebase.auth.EmailAuthProvider
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FirebaseFirestore
 
+@Suppress("ASSIGNED_BUT_NEVER_ACCESSED_VARIABLE")
 @Composable
 fun SettingsPage(modifier: Modifier = Modifier, onLoggedOut: () -> Unit = {}) {
     var selectedTab by remember { mutableStateOf("Preferences") }
     val currentUser = FirebaseAuth.getInstance().currentUser
     val userEmail = currentUser?.email ?: "demo@student.csulb.edu"
     var userName by remember { mutableStateOf("Loading...") }
-    var refreshTrigger by remember { mutableStateOf(0) }
+    var refreshTrigger by remember { mutableIntStateOf(0) }
 
     var showLogoutDialog by remember { mutableStateOf(false) }
     var showDeleteDialog by remember { mutableStateOf(false) }
@@ -183,7 +184,7 @@ fun SettingsPage(modifier: Modifier = Modifier, onLoggedOut: () -> Unit = {}) {
             horizontalArrangement = Arrangement.Center
         ) {
             IconButton(onClick = { showLogoutDialog = true }) {
-                Icon(Icons.Default.ExitToApp, contentDescription = "Logout", tint = DeepSea4)
+                Icon(Icons.AutoMirrored.Filled.ExitToApp, contentDescription = "Logout", tint = DeepSea4)
             }
             Spacer(modifier = Modifier.width(16.dp))
             IconButton(onClick = { showDeleteDialog = true }) {
@@ -367,6 +368,7 @@ fun ProfileInputField(label: String, value: String, onValueChange: (String) -> U
     }
 }
 
+@Suppress("ASSIGNED_BUT_NEVER_ACCESSED_VARIABLE")
 @Composable
 fun SecurityTab() {
     val auth = FirebaseAuth.getInstance()
@@ -614,17 +616,5 @@ fun RegionalInputItem(label: String, value: String) {
         Text(text = value, color = DeepSea5, fontSize = 16.sp, fontWeight = FontWeight.Medium)
         Spacer(modifier = Modifier.height(4.dp))
         HorizontalDivider(color = DeepSea3, thickness = 1.dp)
-    }
-}
-
-@Composable
-fun PlaceholderContent(text: String) {
-    Box(
-        modifier = Modifier
-            .fillMaxWidth()
-            .height(200.dp),
-        contentAlignment = Alignment.Center
-    ) {
-        Text(text = text, color = DeepSea4, fontSize = 16.sp)
     }
 }

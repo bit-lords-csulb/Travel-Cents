@@ -1,5 +1,6 @@
 package com.example.travelcents.ui.main
 
+import android.util.Log
 import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -54,6 +55,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
@@ -71,6 +73,8 @@ import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import coil.compose.AsyncImage
+import coil.request.ImageRequest
+import com.example.travelcents.BuildConfig
 import com.example.travelcents.data.model.Itinerary
 import com.example.travelcents.ui.theme.DeepSea1
 import com.example.travelcents.ui.theme.DeepSea2
@@ -80,7 +84,6 @@ import com.example.travelcents.ui.theme.DeepSea5
 import java.time.LocalDate
 import java.time.format.DateTimeFormatter
 import java.time.temporal.ChronoUnit
-import kotlin.math.abs
 
 // Accent colors that mirror the HTML template's primary palette
 private val Primary = Color(0xFF64B5F6)
@@ -94,6 +97,7 @@ private val SurfaceBright = Color(0xFF243447)
 @Composable
 fun HomePage(
     modifier: Modifier = Modifier,
+    onTripClick: (String) -> Unit = {},
     homeViewModel: HomeViewModel = viewModel(),
     currencyViewModel: CurrencyViewModel = viewModel()
 ) {
@@ -112,7 +116,8 @@ fun HomePage(
         TripsCarousel(
             trips = homeUiState.trips,
             tripImages = homeUiState.tripImages,
-            isLoading = homeUiState.isLoading
+            isLoading = homeUiState.isLoading,
+            onTripClick = onTripClick
         )
 
         Spacer(modifier = Modifier.height(24.dp))
@@ -213,7 +218,8 @@ private fun HomeHeader() {
 private fun TripsCarousel(
     trips: List<Itinerary>,
     tripImages: Map<String, String>,
-    isLoading: Boolean
+    isLoading: Boolean,
+    onTripClick: (String) -> Unit = {}
 ) {
     Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
         when {
@@ -240,8 +246,9 @@ private fun TripsCarousel(
                 ) { page ->
                     TripCard(
                         trip = trips[page],
-                        imageUrl = tripImages[trips[page].destination],
-                        isCurrent = page == pagerState.currentPage
+                        imageUrl = tripImages[trips[page].itineraryId],
+                        isCurrent = page == pagerState.currentPage,
+                        onClick = { onTripClick(trips[page].itineraryId) }
                     )
                 }
 
@@ -291,15 +298,13 @@ private fun CarouselPlaceholder(content: @Composable () -> Unit) {
 }
 
 @Composable
-private fun TripCard(trip: Itinerary, imageUrl: String?, isCurrent: Boolean) {
+private fun TripCard(trip: Itinerary, imageUrl: String?, isCurrent: Boolean, onClick: () -> Unit = {}) {
+    val context = LocalContext.current
     val today = LocalDate.now()
     val countdownDays: Long? = runCatching {
         val fmt = DateTimeFormatter.ofPattern("yyyy-MM-dd")
         ChronoUnit.DAYS.between(today, LocalDate.parse(trip.dateFrom, fmt))
     }.getOrNull()
-
-    val imageSeed = abs(trip.destination.hashCode() % 1000)
-    val resolvedImageUrl = imageUrl ?: "https://picsum.photos/seed/$imageSeed/400/500"
 
     Box(
         modifier = Modifier
@@ -307,13 +312,42 @@ private fun TripCard(trip: Itinerary, imageUrl: String?, isCurrent: Boolean) {
             .aspectRatio(4f / 5f)
             .clip(RoundedCornerShape(24.dp))
             .alpha(if (isCurrent) 1f else 0.6f)
+            .clickable(enabled = isCurrent) { onClick() }
     ) {
-        AsyncImage(
-            model = resolvedImageUrl,
-            contentDescription = trip.destination,
-            contentScale = ContentScale.Crop,
-            modifier = Modifier.fillMaxSize()
-        )
+        if (imageUrl != null) {
+            val request = remember(imageUrl) {
+                ImageRequest.Builder(context)
+                    .data(imageUrl)
+                    .setHeader("User-Agent", WIKIMEDIA_IMAGE_USER_AGENT)
+                    .setHeader("Api-User-Agent", WIKIMEDIA_IMAGE_USER_AGENT)
+                    .crossfade(true)
+                    .listener(
+                        onError = { request, result ->
+                            Log.w(
+                                "HomePage",
+                                "Trip card image failed for '${trip.destination}' url='${request.data}': ${result.throwable.message}"
+                            )
+                        }
+                    )
+                    .build()
+            }
+            AsyncImage(
+                model = request,
+                contentDescription = trip.destination,
+                contentScale = ContentScale.Crop,
+                modifier = Modifier.fillMaxSize()
+            )
+        } else {
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .background(
+                        Brush.linearGradient(
+                            colors = listOf(DeepSea3, SurfaceBright, DeepSea2)
+                        )
+                    )
+            )
+        }
 
         // Gradient scrim
         Box(
@@ -975,3 +1009,7 @@ private fun DocumentsWidget() {
         }
     }
 }
+
+private const val WIKIMEDIA_CONTACT_URL = "https://github.com/bit-lords-csulb/Travel-Cents"
+private val WIKIMEDIA_IMAGE_USER_AGENT =
+    "TravelCents/${BuildConfig.VERSION_NAME} (Android app; $WIKIMEDIA_CONTACT_URL)"

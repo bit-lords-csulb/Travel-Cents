@@ -98,6 +98,8 @@ dependencies {
 
     implementation(libs.androidx.material3)
     implementation(libs.androidx.lifecycle.viewmodel.ktx)
+    implementation(libs.play.services.location)
+    implementation("sh.calvin.reorderable:reorderable:2.4.0")
     testImplementation(libs.junit)
     androidTestImplementation(libs.androidx.junit)
     androidTestImplementation(libs.androidx.espresso.core)

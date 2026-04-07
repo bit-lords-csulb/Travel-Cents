@@ -7,7 +7,6 @@ import kotlinx.coroutines.tasks.await
 
 object SerpCache {
 
-    private val db = Firebase.firestore
     private const val TTL_MS = 24 * 60 * 60 * 1000L
 
     suspend fun getFlights(key: String): List<TravelEvent>? = get("flight_$key")
@@ -18,7 +17,7 @@ object SerpCache {
 
     private suspend fun get(docId: String): List<TravelEvent>? {
         return try {
-            val doc = db.collection("serpCache").document(docId).get().await()
+            val doc = Firebase.firestore.collection("serpCache").document(docId).get().await()
             if (!doc.exists()) return null
 
             val cachedAt = doc.getLong("cachedAt") ?: return null
@@ -34,7 +33,7 @@ object SerpCache {
 
     private suspend fun put(docId: String, events: List<TravelEvent>) {
         try {
-            db.collection("serpCache").document(docId).set(
+            Firebase.firestore.collection("serpCache").document(docId).set(
                 mapOf(
                     "events" to events.map { it.toCacheMap() },
                     "cachedAt" to System.currentTimeMillis()
