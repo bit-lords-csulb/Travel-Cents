@@ -209,7 +209,6 @@ fun FinalPlanPage(
     var jiggleMode by remember { mutableStateOf(false) }
 
     LaunchedEffect(Unit) {
-        viewModel.loadTrip()
         viewModel.loadAllTrips()
     }
 
@@ -364,7 +363,7 @@ fun FinalPlanPage(
                                         isDragging = isDragging,
                                         jiggleMode = jiggleMode,
                                         wobbleAngle = cardRotation,
-                                        dragHandleModifier = Modifier.draggableHandle(enabled = jiggleMode),
+                                        modifier = Modifier.draggableHandle(enabled = jiggleMode),
                                         onCardClick = { expandedEventId = event.eventId },
                                         onChangeClick = { optionsPanelEventId = event.eventId }
                                     )
@@ -792,7 +791,7 @@ private fun TimelineEventCard(
     isDragging: Boolean,
     jiggleMode: Boolean,
     wobbleAngle: Float,
-    dragHandleModifier: Modifier,
+    modifier: Modifier,
     onCardClick: () -> Unit,
     onChangeClick: () -> Unit
 ) {
@@ -932,7 +931,7 @@ private fun TimelineEventCard(
                     modifier = Modifier
                         .align(Alignment.CenterEnd)
                         .size(32.dp)
-                        .then(dragHandleModifier),
+                        .then(modifier),
                     contentAlignment = Alignment.Center
                 ) {
                     if (jiggleMode) {

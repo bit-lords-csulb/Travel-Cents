@@ -33,6 +33,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import android.view.View
+import androidx.core.content.edit
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -107,7 +108,7 @@ fun LoginPage(modifier: Modifier = Modifier, navController: NavController, authV
     // Navigate to the home screen if the user is logged in
     LaunchedEffect(isLoggedIn) {
         if (isLoggedIn) {
-            with(sharedPreferences.edit()) {
+            sharedPreferences.edit {
                 if (rememberMeState) {
                     putBoolean(KEY_REMEMBER_ME, true)
                     putString(KEY_SAVED_EMAIL, email.trim())
@@ -117,7 +118,6 @@ fun LoginPage(modifier: Modifier = Modifier, navController: NavController, authV
                     remove(KEY_SAVED_EMAIL)
                     remove(KEY_SAVED_PASSWORD)
                 }
-                apply()
             }
             navController.navigate("home") {
                 popUpTo("login") { inclusive = true }

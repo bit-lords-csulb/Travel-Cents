@@ -1,6 +1,7 @@
 package com.example.travelcents.data.local
 
 import android.content.Context
+import androidx.core.content.edit
 
 class CurrencyRateCache(context: Context) {
 
@@ -14,11 +15,11 @@ class CurrencyRateCache(context: Context) {
     }
 
     fun saveRate(from: String, to: String, rate: Double) {
-        prefs.edit()
-            .putFloat("${from}_${to}", rate.toFloat())
+        prefs.edit {
+            putFloat("${from}_${to}", rate.toFloat())
             // Auto-save inverse so reverse pairs are always served locally
-            .putFloat("${to}_${from}", (1.0 / rate).toFloat())
-            .apply()
+            putFloat("${to}_${from}", (1.0 / rate).toFloat())
+        }
     }
 
     // --- Recent pairs storage ---
@@ -40,8 +41,8 @@ class CurrencyRateCache(context: Context) {
         val updated = (listOf(Pair(from, to)) + existing)
             .distinctBy { it.first + "_" + it.second }
             .take(5)
-        prefs.edit()
-            .putString(recentPairsKey, updated.joinToString("|") { "${it.first},${it.second}" })
-            .apply()
+        prefs.edit {
+            putString(recentPairsKey, updated.joinToString("|") { "${it.first},${it.second}" })
+        }
     }
 }

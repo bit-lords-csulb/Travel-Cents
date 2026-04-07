@@ -43,7 +43,7 @@ fun SettingsPage(modifier: Modifier = Modifier, onLoggedOut: () -> Unit = {}) {
     val currentUser = FirebaseAuth.getInstance().currentUser
     val userEmail = currentUser?.email ?: "demo@student.csulb.edu"
     var userName by remember { mutableStateOf("Loading...") }
-    var refreshTrigger by remember { mutableStateOf(0) }
+    var refreshTrigger by remember { mutableIntStateOf(0) }
 
     var showLogoutDialog by remember { mutableStateOf(false) }
     var showDeleteDialog by remember { mutableStateOf(false) }
