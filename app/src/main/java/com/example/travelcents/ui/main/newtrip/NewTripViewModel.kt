@@ -48,7 +48,6 @@ class NewTripViewModel(application: Application) : AndroidViewModel(application)
     var travelStyle by mutableStateOf("comfort")
     var currency by mutableStateOf("USD")
     var budgetTotal by mutableStateOf("")
-    var dietary by mutableStateOf(emptyList<String>())
     var interests by mutableStateOf(emptyList<String>())
     var specialRequests by mutableStateOf("")
 
@@ -124,7 +123,6 @@ class NewTripViewModel(application: Application) : AndroidViewModel(application)
             travelStyle = travelStyle,
             currency = currency,
             budgetTotal = budget,
-            dietary = dietary,
             interests = interests,
             specialRequests = specialRequests
         )
@@ -160,7 +158,6 @@ class NewTripViewModel(application: Application) : AndroidViewModel(application)
                 val restaurantPoolTarget = tripDates.size * 5
                 val restaurantPool = YelpRepository.fetchRestaurantPool(
                     location = itinerary.destination,
-                    dietary = request.dietary,
                     targetCount = restaurantPoolTarget
                 )
                 val restaurantEvents = YelpRepository.distributePoolToEvents(
@@ -245,17 +242,6 @@ class NewTripViewModel(application: Application) : AndroidViewModel(application)
     fun resetState() {
         _uiState.value = TripUiState.Idle
         _generationStep.value = GenerationStep.IDLE
-    }
-
-    fun toggleDietary(item: String) {
-        dietary = if (item in dietary) dietary - item else dietary + item
-    }
-
-    fun setDietaryItems(items: List<String>) {
-        dietary = items
-            .map { it.trim() }
-            .filter { it.isNotBlank() }
-            .distinct()
     }
 
     fun toggleInterest(item: String) {

@@ -41,35 +41,16 @@ object YelpRepository {
         .build()
         .create(YelpApiService::class.java)
 
-    // Dietary alias map for Yelp category params
-    private val dietaryAliases = mapOf(
-        "Vegan" to "vegan",
-        "Vegetarian" to "vegetarian",
-        "Halal" to "halal",
-        "Kosher" to "kosher",
-        "Gluten-Free" to "gluten_free"
-    )
-
-    // 1 call per day for the given location + dietary prefs. Returns a TravelEvent with 5 options.
+    // 1 call per day for the given location. Returns a TravelEvent with 5 options.
     suspend fun searchRestaurants(
         location: String,
         date: String,
-        itineraryId: String,
-        dietary: List<String> = emptyList()
+        itineraryId: String
     ): TravelEvent? {
         return try {
-            val dietaryCategories = dietary.mapNotNull { dietaryAliases[it] }
-            val categories = buildString {
-                append("restaurants")
-                if (dietaryCategories.isNotEmpty()) {
-                    append(",")
-                    append(dietaryCategories.joinToString(","))
-                }
-            }
-
             val params = mapOf(
                 "location" to location,
-                "categories" to categories,
+                "categories" to "restaurants",
                 "limit" to "5",
                 "sort_by" to "rating"
             )
@@ -184,21 +165,12 @@ object YelpRepository {
     // Single pooled fetch for restaurants. Size the pool to the itinerary, paging as needed.
     suspend fun fetchRestaurantPool(
         location: String,
-        dietary: List<String> = emptyList(),
         targetCount: Int = OPTIONS_PER_EVENT
     ): List<YelpBusiness> {
         return try {
-            val dietaryCategories = dietary.mapNotNull { dietaryAliases[it] }
-            val categories = buildString {
-                append("restaurants")
-                if (dietaryCategories.isNotEmpty()) {
-                    append(",")
-                    append(dietaryCategories.joinToString(","))
-                }
-            }
             fetchBusinessPool(
                 location = location,
-                categories = categories,
+                categories = "restaurants",
                 targetCount = targetCount,
                 sortBy = "rating"
             )
