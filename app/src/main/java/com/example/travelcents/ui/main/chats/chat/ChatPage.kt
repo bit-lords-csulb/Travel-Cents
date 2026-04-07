@@ -25,19 +25,12 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import coil.compose.AsyncImage
-import com.example.travelcents.ui.main.chats.chat.ChatViewModel
+import com.example.travelcents.data.model.Message
+import com.example.travelcents.data.model.Group
 import com.example.travelcents.ui.theme.*
 import com.google.firebase.Timestamp
 import java.text.SimpleDateFormat
 import java.util.*
-
-data class Message(
-    val id: String = "",
-    val text: String = "",
-    val senderId: String = "",
-    val senderName: String = "",
-    val timestamp: Timestamp? = null
-)
 
 fun formatMessageTime(timestamp: Timestamp?): String {
     if (timestamp == null) return ""
@@ -74,7 +67,8 @@ fun ChatPage(
     viewModel: ChatViewModel = viewModel(
         key = group.id,
         factory = ChatViewModel.Factory(group)
-    )
+    ),
+    onEventsClick: () -> Unit
 ) {
     val messages by viewModel.messages.collectAsState()
     val messageText by viewModel.messageText.collectAsState()
@@ -97,14 +91,14 @@ fun ChatPage(
                 .fillMaxWidth()
                 .clip(RoundedCornerShape(bottomStart = 24.dp, bottomEnd = 24.dp))
                 .background(DeepSea2)
-                .padding(top = 48.dp, bottom = 16.dp, start = 12.dp, end = 12.dp)
+                .padding(top = 48.dp, bottom = 16.dp, start = 8.dp, end = 16.dp)
         ) {
             Row(
                 verticalAlignment = Alignment.CenterVertically,
                 modifier = Modifier.fillMaxWidth()
             ) {
                 IconButton(onClick = onBackClick) {
-                    Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back", tint = DeepSea5)
+                    Icon(Icons.AutoMirrored.Filled.ArrowBack, modifier = Modifier.size(32.dp), contentDescription = "Back", tint = DeepSea5)
                 }
 
                 Box(
@@ -142,8 +136,9 @@ fun ChatPage(
                     )
                 }
 
+                // Event Button
                 OutlinedButton(
-                    onClick = { },
+                    onClick = { onEventsClick() },
                     shape = RoundedCornerShape(20.dp),
                     colors = ButtonDefaults.outlinedButtonColors(contentColor = DeepSea5),
                     border = BorderStroke(1.dp, DeepSea5.copy(alpha = 0.3f)),
@@ -153,6 +148,7 @@ fun ChatPage(
                     Text("EVENTS", fontSize = 11.sp, fontWeight = FontWeight.SemiBold)
                 }
 
+                // More Options Dots
                 IconButton(onClick = { }) {
                     Icon(Icons.Default.MoreVert, contentDescription = "More", tint = DeepSea5)
                 }
