@@ -28,6 +28,7 @@ fun TravelCentsNavigation(modifier: Modifier = Modifier, authViewModel: AuthView
             MainScaffold(
                 modifier = modifier,
                 onLogout = {
+                    authViewModel.signOut()
                     navController.navigate("login") {
                         popUpTo("home") { inclusive = true }
                     }

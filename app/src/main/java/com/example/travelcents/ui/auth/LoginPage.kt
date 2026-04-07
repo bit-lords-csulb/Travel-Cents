@@ -1,5 +1,6 @@
 package com.example.travelcents.ui.auth
 
+import android.content.Context
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -32,10 +33,11 @@ import androidx.compose.runtime.setValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import android.view.View
+import androidx.core.content.edit
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.platform.LocalView
+import androidx.compose.ui.focus.FocusDirection
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.input.key.Key
@@ -44,13 +46,15 @@ import androidx.compose.ui.input.key.isShiftPressed
 import androidx.compose.ui.input.key.key
 import androidx.compose.ui.input.key.onPreviewKeyEvent
 import androidx.compose.ui.input.key.type
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalFocusManager
+import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
-import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -72,13 +76,22 @@ import com.google.android.libraries.identity.googleid.GoogleIdTokenCredential
 import kotlinx.coroutines.launch
 import android.util.Log
 
+private const val LOGIN_PREFS = "login_preferences"
+private const val KEY_REMEMBER_ME = "remember_me"
+private const val KEY_SAVED_EMAIL = "saved_email_or_username"
+private const val KEY_SAVED_PASSWORD = "saved_password"
 @Composable
 fun LoginPage(modifier: Modifier = Modifier, navController: NavController, authViewModel: AuthViewModel) {
+    val context = LocalContext.current
+    val sharedPreferences = remember(context) {
+        context.getSharedPreferences(LOGIN_PREFS, Context.MODE_PRIVATE)
+    }
     var email by remember { mutableStateOf("") }
     var password by remember { mutableStateOf("") }
     var rememberMeState by remember { mutableStateOf(false) }
     val emailFocusRequester = remember { FocusRequester() }
     val passwordFocusRequester = remember { FocusRequester() }
+    val focusManager = LocalFocusManager.current
 
     // Suppress Android autofill overlay (clipboard/saved credentials popup)
     val view = LocalView.current
@@ -91,13 +104,32 @@ fun LoginPage(modifier: Modifier = Modifier, navController: NavController, authV
     // Collect StateFlows as Compose state
     val isLoggedIn by authViewModel.isLoggedIn.collectAsStateWithLifecycle()
     val isLoading by authViewModel.isLoading.collectAsStateWithLifecycle()
-    val isAccountCreated by authViewModel.isAccountCreated.collectAsStateWithLifecycle()
     val errorMessage by authViewModel.errorMessage.collectAsStateWithLifecycle()
     val statusMessage by authViewModel.statusMessage.collectAsStateWithLifecycle()
+
+    LaunchedEffect(sharedPreferences) {
+        val shouldRemember = sharedPreferences.getBoolean(KEY_REMEMBER_ME, false)
+        rememberMeState = shouldRemember
+        if (shouldRemember) {
+            email = sharedPreferences.getString(KEY_SAVED_EMAIL, "").orEmpty()
+            password = sharedPreferences.getString(KEY_SAVED_PASSWORD, "").orEmpty()
+        }
+    }
 
     // Navigate to the home screen if the user is logged in
     LaunchedEffect(isLoggedIn) {
         if (isLoggedIn) {
+            sharedPreferences.edit {
+                if (rememberMeState) {
+                    putBoolean(KEY_REMEMBER_ME, true)
+                    putString(KEY_SAVED_EMAIL, email.trim())
+                    putString(KEY_SAVED_PASSWORD, password)
+                } else {
+                    remove(KEY_REMEMBER_ME)
+                    remove(KEY_SAVED_EMAIL)
+                    remove(KEY_SAVED_PASSWORD)
+                }
+            }
             navController.navigate("home") {
                 popUpTo("login") { inclusive = true }
             }
@@ -141,14 +173,25 @@ fun LoginPage(modifier: Modifier = Modifier, navController: NavController, authV
                 authViewModel.clearError()
             },
             placeholder = { Text("email or username", color = Color.Gray, fontSize = 14.sp) },
+            singleLine = true,
             modifier = Modifier
                 .fillMaxWidth()
                 .height(50.dp)
                 .focusRequester(emailFocusRequester)
                 .onPreviewKeyEvent { event ->
                     when {
-                        event.key == Key.Tab && event.type == KeyEventType.KeyDown && !event.isShiftPressed -> {
-                            passwordFocusRequester.requestFocus()
+                        event.key == Key.Tab && event.type == KeyEventType.KeyDown -> {
+                            focusManager.moveFocus(
+                                if (event.isShiftPressed) FocusDirection.Previous else FocusDirection.Next
+                            )
+                            true
+                        }
+                        event.key == Key.Enter && event.type == KeyEventType.KeyDown -> {
+                            if (email.isNotBlank() && password.isNotBlank()) {
+                                authViewModel.logIn(email, password)
+                            } else {
+                                passwordFocusRequester.requestFocus()
+                            }
                             true
                         }
                         else -> false
@@ -184,17 +227,17 @@ fun LoginPage(modifier: Modifier = Modifier, navController: NavController, authV
             },
             placeholder = { Text("enter password", color = Color.Gray, fontSize = 14.sp) },
             visualTransformation = PasswordVisualTransformation(),
+            singleLine = true,
             modifier = Modifier
                 .fillMaxWidth()
                 .height(50.dp)
                 .focusRequester(passwordFocusRequester)
                 .onPreviewKeyEvent { event ->
                     when {
-                        event.key == Key.Tab && event.type == KeyEventType.KeyDown && event.isShiftPressed -> {
-                            emailFocusRequester.requestFocus()
-                            true
-                        }
                         event.key == Key.Tab && event.type == KeyEventType.KeyDown -> {
+                            focusManager.moveFocus(
+                                if (event.isShiftPressed) FocusDirection.Previous else FocusDirection.Next
+                            )
                             true
                         }
                         event.key == Key.Enter && event.type == KeyEventType.KeyDown -> {
@@ -227,13 +270,15 @@ fun LoginPage(modifier: Modifier = Modifier, navController: NavController, authV
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically
         ) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                modifier = Modifier.clickable { rememberMeState = !rememberMeState }
+            ) {
                 Box(
                     modifier = Modifier
                         .requiredSize(16.dp)
                         .clip(RoundedCornerShape(3.dp))
-                        .border(1.5.dp, DeepSea4, RoundedCornerShape(3.dp))
-                        .clickable { rememberMeState = !rememberMeState },
+                        .border(1.5.dp, DeepSea4, RoundedCornerShape(3.dp)),
                     contentAlignment = Alignment.Center
                 ) {
                     if (rememberMeState) {

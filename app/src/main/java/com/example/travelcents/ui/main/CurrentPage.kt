@@ -144,7 +144,7 @@ private data class EventLayoutInfo(
 @Composable
 fun CurrentPage(
     modifier: Modifier = Modifier,
-    viewModel: ItineraryViewModel = viewModel(),
+    viewModel: CurrentTripViewModel = viewModel(),
     startInCalendar: Boolean = false,
     autoLoadTrip: Boolean = true,
     onViewItineraryRequested: (() -> Unit)? = null
