@@ -17,7 +17,8 @@ data class Itinerary(
     val children: Int,
     val createdAt: String,
     val status: String,
-    val eventIds: List<String>
+    val eventIds: List<String>,
+    val homeImageUrl: String = ""
 ) {
     fun toFirestoreMap(): Map<String, Any> = mapOf(
         "itineraryId" to itineraryId,
@@ -36,6 +37,7 @@ data class Itinerary(
         "children" to children,
         "createdAt" to createdAt,
         "status" to status,
-        "eventIds" to eventIds
+        "eventIds" to eventIds,
+        "homeImageUrl" to homeImageUrl
     )
 }
