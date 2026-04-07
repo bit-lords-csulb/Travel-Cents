@@ -6,6 +6,8 @@ import com.google.firebase.firestore.FieldValue
 import com.google.firebase.firestore.FirebaseFirestore
 import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlin.coroutines.resume
+import com.google.firebase.auth.GoogleAuthProvider
+
 
 class AuthModel {
     private val auth: FirebaseAuth by lazy { FirebaseAuth.getInstance() }
@@ -127,7 +129,52 @@ class AuthModel {
     fun signOut() {
         auth.signOut()
     }
+    // Log in with Google ID Token
+    suspend fun signInWithGoogle(idToken: String): Result<String> = suspendCancellableCoroutine { continuation ->
+        val credential = GoogleAuthProvider.getCredential(idToken, null)
+
+        auth.signInWithCredential(credential)
+            .addOnCompleteListener { task ->
+                if (task.isSuccessful) {
+                    val user = auth.currentUser
+                    val isNewUser = task.result?.additionalUserInfo?.isNewUser ?: false
+
+                    if (isNewUser && user != null) {
+                        // Extract names from Google Profile
+                        val fullName = user.displayName ?: ""
+                        val nameParts = fullName.split(" ", limit = 2)
+                        val firstName = nameParts.getOrNull(0) ?: "Google"
+                        val lastName = nameParts.getOrNull(1) ?: "User"
+
+                        // Generate a temporary username from email
+                        val email = user.email ?: ""
+                        val generatedUsername = email.substringBefore("@")
+
+                        // Save to Firestore using your existing helper
+                        saveUserToFirestore(
+                            uid = user.uid,
+                            firstName = firstName,
+                            lastName = lastName,
+                            username = generatedUsername,
+                            email = email
+                        ) { success, error ->
+                            if (success) {
+                                continuation.resume(Result.success("Google account synced to Firestore!"))
+                            } else {
+                                continuation.resume(Result.failure(Exception(error ?: "Firestore sync failed")))
+                            }
+                        }
+                    } else {
+                        continuation.resume(Result.success("Login Successful"))
+                    }
+                } else {
+                    continuation.resume(Result.failure(task.exception ?: Exception("Google Login failed")))
+                }
+            }
+    }
 }
+
+
 
 
 
