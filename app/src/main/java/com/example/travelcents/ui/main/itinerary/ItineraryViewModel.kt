@@ -3,19 +3,14 @@ package com.example.travelcents.ui.main.itinerary
 import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.example.travelcents.data.model.DirectChatPreview
 import com.example.travelcents.data.model.EventOption
-import com.example.travelcents.data.model.Group
 import com.example.travelcents.data.model.Itinerary
 import com.example.travelcents.data.model.TravelEvent
 import com.example.travelcents.data.model.YelpReview
 import com.example.travelcents.data.remote.YelpRepository
 import com.example.travelcents.ui.main.CurrentTripUiState
-import com.example.travelcents.ui.main.EditablePlan
-import com.example.travelcents.ui.main.defaultPlanTimeZoneId
 import com.example.travelcents.ui.main.normalizeDate
 import com.example.travelcents.ui.main.normalizeTime
-import com.example.travelcents.ui.main.sortEventsForCalendar
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.DocumentSnapshot
 import com.google.firebase.firestore.FieldPath
@@ -31,7 +26,6 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.tasks.await
-import java.util.UUID
 
 data class ShareTarget(
     val id: String,
