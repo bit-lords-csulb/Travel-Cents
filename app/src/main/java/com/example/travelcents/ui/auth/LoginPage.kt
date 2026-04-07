@@ -344,7 +344,9 @@ fun LoginPage(modifier: Modifier = Modifier, navController: NavController, authV
             }
         }
 
-        Spacer(modifier = Modifier.height(28.dp))
+        Spacer(modifier = Modifier.height(16.dp))
+
+        GoogleSignInButton(authViewModel = authViewModel)
 
         Row(
             modifier = Modifier.fillMaxWidth(),
@@ -368,5 +370,58 @@ fun LoginPage(modifier: Modifier = Modifier, navController: NavController, authV
                 }
             )
         }
+    }
+}
+
+@Composable
+fun GoogleSignInButton(authViewModel: AuthViewModel) {
+    val context = LocalContext.current
+    val coroutineScope = rememberCoroutineScope()
+
+    Button(
+        onClick = {
+            coroutineScope.launch {
+                val credentialManager = CredentialManager.create(context)
+
+                // 1. Build the Google ID Option
+                val googleIdOption = GetGoogleIdOption.Builder()
+                    .setFilterByAuthorizedAccounts(false)
+                    .setServerClientId("805994740096-d31i7240546h0701vh3m2kphrtsqqqtt.apps.googleusercontent.com")
+                    .setAutoSelectEnabled(false)
+                    .build()
+
+                // 2. Build the Credential Request
+                val request = GetCredentialRequest.Builder()
+                    .addCredentialOption(googleIdOption)
+                    .build()
+
+                try {
+                    // 3. Launch the Android Bottom Sheet Prompt
+                    val result = credentialManager.getCredential(
+                        request = request,
+                        context = context,
+                    )
+
+                    // 4. Extract the ID Token if successful
+                    val credential = result.credential
+                    if (credential is CustomCredential && credential.type == GoogleIdTokenCredential.TYPE_GOOGLE_ID_TOKEN_CREDENTIAL) {
+                        val googleIdTokenCredential = GoogleIdTokenCredential.createFrom(credential.data)
+                        val idToken = googleIdTokenCredential.idToken
+
+                        Log.d("GoogleAuth", "Google ID token received")
+                        authViewModel.logInWithGoogle(idToken)
+                    }
+                } catch (e: GetCredentialException) {
+                    Log.e("GoogleAuth", "Google Sign-In failed", e)
+                }
+            }
+        },
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(48.dp),
+        shape = RoundedCornerShape(12.dp),
+        colors = ButtonDefaults.buttonColors(containerColor = Color.White)
+    ) {
+        Text("Continue with Google", color = Color.Black, fontSize = 16.sp, fontWeight = FontWeight.SemiBold)
     }
 }
