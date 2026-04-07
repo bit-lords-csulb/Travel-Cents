@@ -714,7 +714,13 @@ class ItineraryViewModel : ViewModel() {
         val mergedDetails = event.details.toMutableMap().apply {
             putAll(option.details)
             when (event.type.lowercase()) {
-                "hotel" -> option.details["name"]?.let { put("hotel_name", it) }
+                "hotel" -> {
+                    val hotelName = option.details["hotel_name"] ?: option.details["name"]
+                    if (!hotelName.isNullOrBlank()) {
+                        put("hotel_name", hotelName)
+                        put("title", hotelName)
+                    }
+                }
                 "restaurant", "dining", "food" -> {
                     val name = option.details["restaurant_name"] ?: option.details["name"]
                     if (!name.isNullOrBlank()) put("restaurant_name", name)

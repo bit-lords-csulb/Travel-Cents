@@ -75,13 +75,19 @@ fun ExpandedEventCard(
     var showGallery by remember { mutableStateOf(false) }
 
     // Editable fields pre-filled from event
-    val existingTitle = event.details["title"] ?: event.details["activity_name"]
-        ?: event.details["restaurant_name"] ?: event.type.replaceFirstChar { it.uppercase() }
+    val existingTitle = when (event.type.lowercase()) {
+        "hotel" -> event.details["hotel_name"] ?: event.details["title"] ?: event.details["name"]
+        "restaurant", "dining", "food" -> event.details["restaurant_name"] ?: event.details["title"] ?: event.details["name"]
+        else -> event.details["title"]
+            ?: event.details["activity_name"]
+            ?: event.details["restaurant_name"]
+            ?: event.details["name"]
+    } ?: event.type.replaceFirstChar { it.uppercase() }
     val existingNotes = event.details["description"] ?: event.details["notes"] ?: ""
 
-    var editTitle by remember(event.eventId) { mutableStateOf(existingTitle) }
-    var editTime by remember(event.eventId) { mutableStateOf(event.startTime) }
-    var editNotes by remember(event.eventId) { mutableStateOf(existingNotes) }
+    var editTitle by remember(event.eventId, existingTitle) { mutableStateOf(existingTitle) }
+    var editTime by remember(event.eventId, event.startTime) { mutableStateOf(event.startTime) }
+    var editNotes by remember(event.eventId, existingNotes) { mutableStateOf(existingNotes) }
     var isEditing by remember { mutableStateOf(false) }
     val uriHandler = LocalUriHandler.current
 
@@ -431,7 +437,7 @@ private fun RestaurantDetails(
 ) {
     val d = event.details
     DetailGroup("RESTAURANT INFO") {
-        DetailRow("Price", d["price_tier"] ?: "—")
+        DetailRow("Price", d["price_tier"] ?: "Not listed")
         DetailRow("Rating", d["rating"]?.let { "★$it" } ?: "—")
         DetailRow("Reviews", d["review_count"] ?: "—")
         if (d["address"] != null) DetailRow("Address", d["address"]!!)
