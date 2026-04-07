@@ -311,7 +311,7 @@ fun TripStep5InterestsPage(
                 )
             }
 
-s            item(span = { GridItemSpan(2) }) {
+            item(span = { GridItemSpan(2) }) {
                 Spacer(Modifier.height(4.dp))
             }
         }
