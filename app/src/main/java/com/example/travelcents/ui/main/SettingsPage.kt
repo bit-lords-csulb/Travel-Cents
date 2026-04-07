@@ -37,6 +37,7 @@ import com.google.firebase.auth.EmailAuthProvider
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FirebaseFirestore
 
+@Suppress("ASSIGNED_BUT_NEVER_ACCESSED_VARIABLE")
 @Composable
 fun SettingsPage(modifier: Modifier = Modifier, onLoggedOut: () -> Unit = {}) {
     var selectedTab by remember { mutableStateOf("Preferences") }
@@ -367,6 +368,7 @@ fun ProfileInputField(label: String, value: String, onValueChange: (String) -> U
     }
 }
 
+@Suppress("ASSIGNED_BUT_NEVER_ACCESSED_VARIABLE")
 @Composable
 fun SecurityTab() {
     val auth = FirebaseAuth.getInstance()

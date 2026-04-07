@@ -182,6 +182,7 @@ private fun buildPlanItems(events: List<TravelEvent>): List<FinalPlanItem> {
     }
 }
 
+@Suppress("ASSIGNED_BUT_NEVER_ACCESSED_VARIABLE")
 @Composable
 fun FinalPlanPage(
     viewModel: ItineraryViewModel,
@@ -379,7 +380,7 @@ fun FinalPlanPage(
         // Share confirmation snackbar
         shareConfirmation?.let { msg ->
             LaunchedEffect(msg) {
-                kotlinx.coroutines.delay(2500)
+                delay(2500)
                 shareConfirmation = null
             }
             Box(modifier = Modifier.fillMaxSize().padding(paddingValues).padding(bottom = 16.dp, start = 16.dp, end = 16.dp),
@@ -416,7 +417,6 @@ fun FinalPlanPage(
                             }
                         }
                 }
-                .filterNotNull()
                 .toSet()
             EventOptionsPanel(
                 event = event,
@@ -532,6 +532,7 @@ private fun ShareTripSheet(
     }
 }
 
+@Suppress("ASSIGNED_BUT_NEVER_ACCESSED_VARIABLE")
 @Composable
 private fun FinalPlanTopBar(
     tripTitle: String,

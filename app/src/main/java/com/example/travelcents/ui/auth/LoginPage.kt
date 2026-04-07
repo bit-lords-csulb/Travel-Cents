@@ -92,7 +92,6 @@ fun LoginPage(modifier: Modifier = Modifier, navController: NavController, authV
     // Collect StateFlows as Compose state
     val isLoggedIn by authViewModel.isLoggedIn.collectAsStateWithLifecycle()
     val isLoading by authViewModel.isLoading.collectAsStateWithLifecycle()
-    val isAccountCreated by authViewModel.isAccountCreated.collectAsStateWithLifecycle()
     val errorMessage by authViewModel.errorMessage.collectAsStateWithLifecycle()
     val statusMessage by authViewModel.statusMessage.collectAsStateWithLifecycle()
 
