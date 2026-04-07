@@ -1,5 +1,6 @@
 package com.example.travelcents.ui.auth
 
+import android.util.Log
 import androidx.compose.runtime.mutableStateOf
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
@@ -56,7 +57,9 @@ class AuthViewModel : ViewModel() {
                     _statusMessage.value = message
                 },
                 onFailure = { error ->
-                    _errorMessage.value = error.message ?: "An unknown error occurred"
+                    Log.e("AuthViewModel", "Google sign in failed: ${error.message}")
+
+                    _errorMessage.value = "Google Login failed. Please try again."
                 }
             )
         }
@@ -157,4 +160,22 @@ class AuthViewModel : ViewModel() {
         }
         return true
     }
+    // Log in user with Google ID Token
+    fun logInWithGoogle(idToken: String) {
+        viewModelScope.launch {
+            _isLoading.value = true
+            _errorMessage.value = null
+
+            val result = authModel.signInWithGoogle(idToken)
+
+            _isLoading.value = false
+            result.fold(
+                onSuccess = { _isLoggedIn.value = true },
+                onFailure = { _ ->
+                    _errorMessage.value = "Google Login failed. Please try again."
+                }
+            )
+        }
+    }
 }
+
