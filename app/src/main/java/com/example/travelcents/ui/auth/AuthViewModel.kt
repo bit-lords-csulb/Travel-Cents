@@ -103,6 +103,26 @@ class AuthViewModel : ViewModel() {
         _statusMessage.value = null
     }
 
+    // Delete user account and reset all state
+    fun deleteAccount(onComplete: (Boolean) -> Unit) {
+        viewModelScope.launch {
+            _isLoading.value = true
+            val result = authModel.deleteAccount()
+            _isLoading.value = false
+            
+            result.fold(
+                onSuccess = {
+                    signOut() // This will clear all states and set _isLoggedIn to false
+                    onComplete(true)
+                },
+                onFailure = { error ->
+                    _errorMessage.value = error.message ?: "Failed to delete account"
+                    onComplete(false)
+                }
+            )
+        }
+    }
+
     // Reset sign-up flow state (e.g. after navigating away)
     fun resetSignUpState() {
         _isAccountCreated.value = false
@@ -175,4 +195,3 @@ class AuthViewModel : ViewModel() {
         }
     }
 }
-

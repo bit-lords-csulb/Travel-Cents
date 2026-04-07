@@ -4,6 +4,7 @@ plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.compose)
     alias(libs.plugins.google.gms.google.services)
+    alias(libs.plugins.kotlin.serialization)
 }
 
 val localProperties = Properties().apply {
@@ -13,16 +14,12 @@ val localProperties = Properties().apply {
 
 android {
     namespace = "com.example.travelcents"
-    compileSdk {
-        version = release(36) {
-            minorApiLevel = 1
-        }
-    }
+    compileSdk = 35
 
     defaultConfig {
         applicationId = "com.example.travelcents"
         minSdk = 24
-        targetSdk = 36
+        targetSdk = 35
         versionCode = 1
         versionName = "1.0"
 
@@ -35,6 +32,10 @@ android {
         buildConfigField(
             "String", "SERP_API_KEY",
             "\"${localProperties.getProperty("SERP_API_KEY") ?: ""}\""
+        )
+        buildConfigField(
+            "String", "YELP_API_KEY",
+            "\"${localProperties.getProperty("YELP_API_KEY") ?: ""}\""
         )
     }
 
@@ -73,7 +74,6 @@ dependencies {
     implementation(libs.androidx.credentials)
     implementation(libs.androidx.credentials.play.services.auth)
     implementation(libs.googleid)
-    implementation(libs.ads.mobile.sdk)
     implementation(libs.androidx.navigation.compose)
     coreLibraryDesugaring("com.android.tools:desugar_jdk_libs:2.0.4")
 
@@ -92,6 +92,14 @@ dependencies {
 
     implementation(libs.androidx.material3)
     implementation(libs.androidx.lifecycle.viewmodel.ktx)
+
+    // Ktor client
+    implementation(libs.ktor.client.core)
+    implementation(libs.ktor.client.android)
+    implementation(libs.ktor.client.content.negotiation)
+    implementation(libs.ktor.serialization.kotlinx.json)
+    implementation(libs.kotlinx.serialization.json)
+
     testImplementation(libs.junit)
     androidTestImplementation(libs.androidx.junit)
     androidTestImplementation(libs.androidx.espresso.core)

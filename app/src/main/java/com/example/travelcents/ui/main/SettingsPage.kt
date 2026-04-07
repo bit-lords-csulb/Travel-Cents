@@ -32,13 +32,18 @@ import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.travelcents.data.FirestoreRepository
+import com.example.travelcents.ui.auth.AuthViewModel
 import com.example.travelcents.ui.theme.*
 import com.google.firebase.auth.EmailAuthProvider
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FirebaseFirestore
 
 @Composable
-fun SettingsPage(modifier: Modifier = Modifier, onLoggedOut: () -> Unit = {}) {
+fun SettingsPage(
+    modifier: Modifier = Modifier,
+    authViewModel: AuthViewModel,
+    onLoggedOut: () -> Unit = {}
+) {
     var selectedTab by remember { mutableStateOf("Preferences") }
     val currentUser = FirebaseAuth.getInstance().currentUser
     val userEmail = currentUser?.email ?: "demo@student.csulb.edu"
@@ -74,7 +79,7 @@ fun SettingsPage(modifier: Modifier = Modifier, onLoggedOut: () -> Unit = {}) {
             text = { Text("Are you sure you want to logout?") },
             confirmButton = {
                 TextButton(onClick = {
-                    FirebaseAuth.getInstance().signOut()
+                    authViewModel.signOut()
                     showLogoutDialog = false
                     onLoggedOut()
                 }) {
@@ -99,13 +104,8 @@ fun SettingsPage(modifier: Modifier = Modifier, onLoggedOut: () -> Unit = {}) {
             text = { Text("Are you sure? All data will be lost permanently. This action cannot be undone.") },
             confirmButton = {
                 TextButton(onClick = {
-                    val user = FirebaseAuth.getInstance().currentUser
-                    val uid = user?.uid
-                    user?.delete()?.addOnCompleteListener { task ->
-                        if (task.isSuccessful) {
-                            uid?.let {
-                                FirebaseFirestore.getInstance().collection("users").document(it).delete()
-                            }
+                    authViewModel.deleteAccount { success ->
+                        if (success) {
                             showDeleteDialog = false
                             onLoggedOut()
                         }

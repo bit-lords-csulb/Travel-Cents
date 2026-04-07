@@ -27,6 +27,7 @@ fun TravelCentsNavigation(modifier: Modifier = Modifier, authViewModel: AuthView
         composable("home") {
             MainScaffold(
                 modifier = modifier,
+                authViewModel = authViewModel,
                 onLogout = {
                     navController.navigate("login") {
                         popUpTo("home") { inclusive = true }

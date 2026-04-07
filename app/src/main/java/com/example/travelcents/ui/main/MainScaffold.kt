@@ -39,6 +39,7 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
+import com.example.travelcents.ui.auth.AuthViewModel
 import com.example.travelcents.ui.itinerary.EditPlanScreen
 import com.example.travelcents.ui.main.chats.chat.ChatsScreen
 import com.example.travelcents.ui.theme.DeepSea1
@@ -73,7 +74,11 @@ private data class BottomNavItem(
 )
 
 @Composable
-fun MainScaffold(modifier: Modifier = Modifier, onLogout: () -> Unit = {}) {
+fun MainScaffold(
+    modifier: Modifier = Modifier,
+    authViewModel: AuthViewModel,
+    onLogout: () -> Unit = {}
+) {
     val newTripViewModel: NewTripViewModel = viewModel()
     val navController = rememberNavController()
     val navBackStackEntry by navController.currentBackStackEntryAsState()
@@ -146,6 +151,7 @@ fun MainScaffold(modifier: Modifier = Modifier, onLogout: () -> Unit = {}) {
                 composable(MainRoutes.SETTINGS) { 
                     SettingsPage(
                         modifier = Modifier.fillMaxSize(),
+                        authViewModel = authViewModel,
                         onLoggedOut = onLogout
                     ) 
                 }
