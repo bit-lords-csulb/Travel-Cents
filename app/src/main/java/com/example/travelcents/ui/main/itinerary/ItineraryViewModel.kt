@@ -169,8 +169,13 @@ class ItineraryViewModel : ViewModel() {
                         "date",
                         "startTime",
                         "endTime",
-                        "imageUrl"
+                        "imageUrl",
+                        "photoUrls"
                     )
+
+                    @Suppress("UNCHECKED_CAST")
+                    val photoUrls = (doc.get("photoUrls") as? List<*>)
+                        ?.filterIsInstance<String>() ?: emptyList()
 
                     TravelEvent(
                         eventId = doc.getString("eventId") ?: doc.id,
@@ -181,6 +186,7 @@ class ItineraryViewModel : ViewModel() {
                         startTime = doc.getString("startTime") ?: "",
                         endTime = doc.getString("endTime") ?: "",
                         imageUrl = doc.getString("imageUrl") ?: "",
+                        photoUrls = photoUrls,
                         details = allData
                             .filterKeys { it !in coreKeys }
                             .mapValues { it.value.toString() }
@@ -722,7 +728,8 @@ class ItineraryViewModel : ViewModel() {
         }
 
         val imageUrl = option.localImagePath.ifBlank { option.imageUrl }.ifBlank { event.imageUrl }
-        return event.copy(imageUrl = imageUrl, details = mergedDetails)
+        val photoUrls = option.photoUrls.ifEmpty { event.photoUrls }
+        return event.copy(imageUrl = imageUrl, photoUrls = photoUrls, details = mergedDetails)
     }
 
     private fun sortPlanEvents(events: List<TravelEvent>): List<TravelEvent> {

@@ -136,18 +136,13 @@ class NewTripViewModel(application: Application) : AndroidViewModel(application)
                 _uiState.value = TripUiState.Loading(GROQ_ITINERARY_MESSAGES.random())
                 val itinerary = GroqRepository.generateItinerary(request)
 
-                // Hotel budget slice (~40% of total / nights)
-                val hotelBudgetPerNight = if (budget > 0 && itinerary.durationDays > 0)
-                    (budget * 0.40) / itinerary.durationDays
-                else 0.0
-
                 // Step 2: Flights + hotels in parallel
                 _generationStep.value = GenerationStep.SEARCHING_FLIGHTS
                 _uiState.value = TripUiState.Loading(SERP_FLIGHTS_MESSAGES.random())
                 val flightsDeferred = async { SerpRepository.searchFlights(request, itinerary) }
                 _generationStep.value = GenerationStep.FINDING_HOTELS
                 _uiState.value = TripUiState.Loading(SERP_HOTELS_MESSAGES.random())
-                val hotelsDeferred = async { SerpRepository.searchHotels(request, itinerary, hotelBudgetPerNight) }
+                val hotelsDeferred = async { SerpRepository.searchHotels(request, itinerary) }
                 val realFlights = flightsDeferred.await()
                 val realHotels = hotelsDeferred.await()
 
@@ -162,7 +157,12 @@ class NewTripViewModel(application: Application) : AndroidViewModel(application)
                 // Step 3: Yelp restaurants — 1 pooled call, distributed round-robin across days
                 _generationStep.value = GenerationStep.FINDING_RESTAURANTS
                 _uiState.value = TripUiState.Loading(YELP_RESTAURANTS_MESSAGES.random())
-                val restaurantPool = YelpRepository.fetchRestaurantPool(itinerary.destination, request.dietary)
+                val restaurantPoolTarget = tripDates.size * 5
+                val restaurantPool = YelpRepository.fetchRestaurantPool(
+                    location = itinerary.destination,
+                    dietary = request.dietary,
+                    targetCount = restaurantPoolTarget
+                )
                 val restaurantEvents = YelpRepository.distributePoolToEvents(
                     restaurantPool, tripDates, "restaurant", itinerary.itineraryId
                 )

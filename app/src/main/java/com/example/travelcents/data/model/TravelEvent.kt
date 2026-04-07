@@ -11,6 +11,7 @@ data class TravelEvent(
     val startTime: String = "",
     val endTime: String = "",
     val imageUrl: String = "",
+    val photoUrls: List<String> = emptyList(),
     val details: Map<String, String> = emptyMap(),
     // options are stored as a Firestore subcollection; populated in-memory only
     val options: List<EventOption> = emptyList()
@@ -25,6 +26,7 @@ data class TravelEvent(
         put("startTime", startTime)
         put("endTime", endTime)
         put("imageUrl", imageUrl)
+        put("photoUrls", photoUrls)
         putAll(details)
     }
 
@@ -39,7 +41,7 @@ data class TravelEvent(
     companion object {
         private val RESERVED = setOf(
             "eventId", "type", "itineraryId", "tz", "date",
-            "startTime", "endTime", "imageUrl", "options"
+            "startTime", "endTime", "imageUrl", "photoUrls", "options"
         )
 
         fun fromCacheMap(map: Map<String, Any>): TravelEvent {
@@ -47,6 +49,7 @@ data class TravelEvent(
             val opts = (map["options"] as? List<Map<String, Any>>)
                 ?.map { EventOption.fromMap(it) }
                 ?: emptyList()
+            val photos = (map["photoUrls"] as? List<*>)?.filterIsInstance<String>() ?: emptyList()
 
             return TravelEvent(
                 eventId = map["eventId"] as? String ?: UUID.randomUUID().toString(),
@@ -57,6 +60,7 @@ data class TravelEvent(
                 startTime = map["startTime"] as? String ?: "",
                 endTime = map["endTime"] as? String ?: "",
                 imageUrl = map["imageUrl"] as? String ?: "",
+                photoUrls = photos,
                 details = map.filterKeys { it !in RESERVED }.mapValues { it.value.toString() },
                 options = opts
             )

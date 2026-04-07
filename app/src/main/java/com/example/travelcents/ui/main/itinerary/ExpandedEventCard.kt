@@ -65,13 +65,11 @@ fun ExpandedEventCard(
     val typeColor = expandedTypeColor(event.type)
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
 
-    // All photos: event hero first, then unique option images
+    // Photos of this specific venue: use photoUrls if populated (hotel images from SerpAPI),
+    // otherwise fall back to the single hero image.
     val photos = remember(event) {
-        buildList {
-            if (event.imageUrl.isNotBlank()) add(event.imageUrl)
-            event.options.forEach { opt ->
-                if (opt.imageUrl.isNotBlank() && opt.imageUrl !in this) add(opt.imageUrl)
-            }
+        event.photoUrls.ifEmpty {
+            listOfNotNull(event.imageUrl.takeIf { it.isNotBlank() })
         }
     }
     var showGallery by remember { mutableStateOf(false) }
