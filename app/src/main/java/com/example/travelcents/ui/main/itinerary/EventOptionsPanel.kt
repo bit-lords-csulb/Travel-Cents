@@ -132,8 +132,7 @@ fun EventOptionsPanel(
 ) {
     val typeColor = eventTypeColor(event.type)
     val activeOptions = options.filter { opt ->
-        opt.optionId !in rejectedIds && !opt.selected &&
-            optionName(event, opt) !in selectedNamesElsewhere
+        opt.optionId !in rejectedIds && !opt.selected
     }
     val rejectedOptions = options.filter { it.optionId in rejectedIds }
     var rejectedExpanded by remember { mutableStateOf(false) }
@@ -211,6 +210,7 @@ fun EventOptionsPanel(
                             typeColor = typeColor,
                             isSelected = opt.selected,
                             isRejected = false,
+                            isChosenElsewhere = optionName(event, opt) in selectedNamesElsewhere,
                             onSelect = {
                                 onSelect(opt.optionId)
                                 onDismiss()
@@ -257,6 +257,7 @@ fun EventOptionsPanel(
                                 typeColor = typeColor.copy(alpha = 0.5f),
                                 isSelected = false,
                                 isRejected = true,
+                                isChosenElsewhere = optionName(event, opt) in selectedNamesElsewhere,
                                 onSelect = {
                                     onSelect(opt.optionId)
                                     onDismiss()
@@ -278,11 +279,17 @@ private fun OptionRow(
     typeColor: Color,
     isSelected: Boolean,
     isRejected: Boolean,
+    isChosenElsewhere: Boolean,
     onSelect: () -> Unit,
     onReject: () -> Unit
 ) {
     val imageSource = opt.localImagePath.ifBlank { opt.imageUrl }
     val subtitle = formatOptionSubtitle(event, opt)
+    val name = optionName(event, opt)
+    val chosenElsewhereLabel = when (event.type.lowercase()) {
+        "restaurant", "dining", "food", "activity" -> "Chosen on another day"
+        else -> "Chosen elsewhere"
+    }
 
     Row(
         modifier = Modifier
@@ -321,11 +328,26 @@ private fun OptionRow(
         // Name + subtitle
         Column(modifier = Modifier.weight(1f)) {
             Text(
-                text = optionName(event, opt),
+                text = name,
                 color = if (isRejected) OnSurfaceVar else OnSurface,
                 fontSize = 14.sp,
                 fontWeight = FontWeight.SemiBold
             )
+            if (isChosenElsewhere) {
+                Spacer(modifier = Modifier.height(4.dp))
+                Surface(
+                    color = typeColor.copy(alpha = if (isRejected) 0.10f else 0.18f),
+                    shape = RoundedCornerShape(999.dp)
+                ) {
+                    Text(
+                        text = chosenElsewhereLabel,
+                        color = if (isRejected) OnSurfaceVar else typeColor,
+                        fontSize = 10.sp,
+                        fontWeight = FontWeight.Medium,
+                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp)
+                    )
+                }
+            }
             if (subtitle.isNotBlank()) {
                 Spacer(modifier = Modifier.height(2.dp))
                 Text(
