@@ -230,9 +230,9 @@ fun LabeledTextField(
     label: String,
     value: String,
     onValueChange: (String) -> Unit,
+    modifier: Modifier = Modifier,
     placeholder: String = "",
-    singleLine: Boolean = true,
-    modifier: Modifier = Modifier
+    singleLine: Boolean = true
 ) {
     Column(modifier = modifier) {
         Text(label, color = DeepSea5, fontWeight = FontWeight.Bold, fontSize = 14.sp)
