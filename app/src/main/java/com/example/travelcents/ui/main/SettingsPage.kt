@@ -13,7 +13,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
-import androidx.compose.material.icons.filled.ExitToApp
+import androidx.compose.material.icons.automirrored.filled.ExitToApp
 import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.Mail
 import androidx.compose.material.icons.filled.Person
@@ -183,7 +183,7 @@ fun SettingsPage(
             horizontalArrangement = Arrangement.Center
         ) {
             IconButton(onClick = { showLogoutDialog = true }) {
-                Icon(Icons.Default.ExitToApp, contentDescription = "Logout", tint = DeepSea4)
+                Icon(Icons.AutoMirrored.Filled.ExitToApp, contentDescription = "Logout", tint = DeepSea4)
             }
             Spacer(modifier = Modifier.width(16.dp))
             IconButton(onClick = { showDeleteDialog = true }) {
@@ -614,17 +614,5 @@ fun RegionalInputItem(label: String, value: String) {
         Text(text = value, color = DeepSea5, fontSize = 16.sp, fontWeight = FontWeight.Medium)
         Spacer(modifier = Modifier.height(4.dp))
         HorizontalDivider(color = DeepSea3, thickness = 1.dp)
-    }
-}
-
-@Composable
-fun PlaceholderContent(text: String) {
-    Box(
-        modifier = Modifier
-            .fillMaxWidth()
-            .height(200.dp),
-        contentAlignment = Alignment.Center
-    ) {
-        Text(text = text, color = DeepSea4, fontSize = 16.sp)
     }
 }

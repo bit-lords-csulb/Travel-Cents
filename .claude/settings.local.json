@@ -5,7 +5,8 @@
       "Bash(git fetch:*)",
       "Bash(mkdir:*)",
       "Bash(cd /c/Users/Zaher503/AndroidStudioProjects/Travel-Cents && git merge main 2>&1)",
-      "Bash(cd:*)"
+      "Bash(cd:*)",
+      "mcp__ide__getDiagnostics"
     ]
   }
 }

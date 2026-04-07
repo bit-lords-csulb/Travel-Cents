@@ -8,6 +8,7 @@ import com.example.travelcents.data.model.Group
 import com.google.firebase.Firebase
 import com.google.firebase.auth.auth
 import com.google.firebase.firestore.ListenerRegistration
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -25,15 +26,8 @@ class ChatsViewModel(
     // Groups
     private val _groups = MutableStateFlow<List<Group>>(emptyList())
 
-    val filteredGroups: StateFlow<List<Group>> = combine(
-        _groups,
-        MutableStateFlow("")
-    ) { groups, _ -> groups }
-        .stateIn(viewModelScope, SharingStarted.Companion.WhileSubscribed(5000), emptyList())
-
     // Direct Chats
     private val _directChats = MutableStateFlow<List<DirectChatPreview>>(emptyList())
-    val directChats: StateFlow<List<DirectChatPreview>> = _directChats.asStateFlow()
 
     // Search
     private val _searchQuery = MutableStateFlow("")
@@ -49,7 +43,7 @@ class ChatsViewModel(
                 ignoreCase = true
             )
         }
-    }.stateIn(viewModelScope, SharingStarted.Companion.WhileSubscribed(5000), emptyList())
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
     val filteredDirectChats: StateFlow<List<DirectChatPreview>> = combine(
         _directChats,
@@ -61,12 +55,12 @@ class ChatsViewModel(
                 ignoreCase = true
             )
         }
-    }.stateIn(viewModelScope, SharingStarted.Companion.WhileSubscribed(5000), emptyList())
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
     private var groupsListener:      ListenerRegistration? = null
     private var directChatsListener: ListenerRegistration? = null
 
-    init { startListening() }
+    init { viewModelScope.launch { startListening() } }
 
     fun startListening() {
         if (currentUid.isEmpty()) return

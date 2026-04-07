@@ -68,7 +68,8 @@ fun ChatPage(
         key = group.id,
         factory = ChatViewModel.Factory(group)
     ),
-    onEventsClick: () -> Unit
+    onEventsClick: () -> Unit,
+    onTripCardClick: ((tripId: String, ownerUid: String) -> Unit)? = null
 ) {
     val messages by viewModel.messages.collectAsState()
     val messageText by viewModel.messageText.collectAsState()
@@ -166,7 +167,11 @@ fun ChatPage(
             contentPadding = PaddingValues(top = 16.dp, bottom = 8.dp)
         ) {
             items(messages, key = { it.id }) { message ->
-                ChatBubble(message = message, isMine = message.senderId == currentUid)
+                ChatBubble(
+                    message = message,
+                    isMine = message.senderId == currentUid,
+                    onTripCardClick = onTripCardClick
+                )
             }
         }
 
@@ -218,7 +223,11 @@ fun ChatPage(
 }
 
 @Composable
-fun ChatBubble(message: Message, isMine: Boolean) {
+fun ChatBubble(
+    message: Message,
+    isMine: Boolean,
+    onTripCardClick: ((tripId: String, ownerUid: String) -> Unit)? = null
+) {
     Column(
         modifier = Modifier.fillMaxWidth(),
         horizontalAlignment = if (isMine) Alignment.End else Alignment.Start
@@ -232,21 +241,35 @@ fun ChatBubble(message: Message, isMine: Boolean) {
             )
         }
 
-        Box(
-            modifier = Modifier
-                .widthIn(max = 280.dp)
-                .clip(
-                    RoundedCornerShape(
-                        topStart = 18.dp,
-                        topEnd = 18.dp,
-                        bottomStart = if (isMine) 18.dp else 4.dp,
-                        bottomEnd = if (isMine) 4.dp else 18.dp
+        if (message.messageType == "trip_card") {
+            TripCardBubble(
+                message = message,
+                isMine = isMine,
+                onClick = {
+                    val tripId = message.sharedTripId
+                    val ownerUid = message.ownerUid
+                    if (tripId != null && ownerUid != null) {
+                        onTripCardClick?.invoke(tripId, ownerUid)
+                    }
+                }
+            )
+        } else {
+            Box(
+                modifier = Modifier
+                    .widthIn(max = 280.dp)
+                    .clip(
+                        RoundedCornerShape(
+                            topStart = 18.dp,
+                            topEnd = 18.dp,
+                            bottomStart = if (isMine) 18.dp else 4.dp,
+                            bottomEnd = if (isMine) 4.dp else 18.dp
+                        )
                     )
-                )
-                .background(if (isMine) DeepSea3 else DeepSea2)
-                .padding(horizontal = 14.dp, vertical = 10.dp)
-        ) {
-            Text(text = message.text, color = DeepSea5, fontSize = 14.sp)
+                    .background(if (isMine) DeepSea3 else DeepSea2)
+                    .padding(horizontal = 14.dp, vertical = 10.dp)
+            ) {
+                Text(text = message.text, color = DeepSea5, fontSize = 14.sp)
+            }
         }
 
         Text(
@@ -257,5 +280,86 @@ fun ChatBubble(message: Message, isMine: Boolean) {
         )
 
         Spacer(modifier = Modifier.height(6.dp))
+    }
+}
+
+@Composable
+private fun TripCardBubble(
+    message: Message,
+    isMine: Boolean,
+    onClick: () -> Unit
+) {
+    val bgColor = if (isMine) DeepSea3 else DeepSea2
+    Card(
+        modifier = Modifier
+            .widthIn(min = 220.dp, max = 280.dp)
+            .clickable { onClick() },
+        shape = RoundedCornerShape(
+            topStart = 18.dp, topEnd = 18.dp,
+            bottomStart = if (isMine) 18.dp else 4.dp,
+            bottomEnd = if (isMine) 4.dp else 18.dp
+        ),
+        colors = CardDefaults.cardColors(containerColor = bgColor),
+        border = BorderStroke(1.dp, DeepSea5.copy(alpha = 0.1f))
+    ) {
+        Column {
+            // Cover image or placeholder
+            val cover = message.coverImageUrl ?: ""
+            if (cover.isNotBlank()) {
+                AsyncImage(
+                    model = cover,
+                    contentDescription = null,
+                    modifier = Modifier.fillMaxWidth().height(110.dp),
+                    contentScale = ContentScale.Crop
+                )
+            } else {
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(64.dp)
+                        .background(Color(0xFF0B203D)),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text("✈", fontSize = 28.sp)
+                }
+            }
+            Column(modifier = Modifier.padding(12.dp)) {
+                // "Shared a trip" label
+                Text(
+                    text = "📍 Shared a trip",
+                    color = DeepSea5.copy(alpha = 0.55f),
+                    fontSize = 10.sp,
+                    fontWeight = FontWeight.SemiBold
+                )
+                Spacer(modifier = Modifier.height(4.dp))
+                Text(
+                    text = message.tripName ?: "Trip",
+                    color = DeepSea5,
+                    fontSize = 14.sp,
+                    fontWeight = FontWeight.Bold
+                )
+                if (!message.tripDestination.isNullOrBlank()) {
+                    Spacer(modifier = Modifier.height(2.dp))
+                    Text(
+                        text = buildString {
+                            append(message.tripDestination)
+                            val from = message.tripDateFrom
+                            val to = message.tripDateTo
+                            if (!from.isNullOrBlank()) append("  •  $from")
+                            if (!to.isNullOrBlank()) append(" → $to")
+                        },
+                        color = DeepSea5.copy(alpha = 0.6f),
+                        fontSize = 11.sp
+                    )
+                }
+                Spacer(modifier = Modifier.height(8.dp))
+                Text(
+                    text = "Tap to view trip →",
+                    color = Color(0xFF64B5F6),
+                    fontSize = 11.sp,
+                    fontWeight = FontWeight.SemiBold
+                )
+            }
+        }
     }
 }

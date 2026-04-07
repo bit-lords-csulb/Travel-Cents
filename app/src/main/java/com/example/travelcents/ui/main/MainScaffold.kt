@@ -39,7 +39,6 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
-import com.example.travelcents.ui.auth.AuthViewModel
 import com.example.travelcents.ui.itinerary.EditPlanScreen
 import com.example.travelcents.ui.main.chats.chat.ChatsScreen
 import com.example.travelcents.ui.theme.DeepSea1
@@ -49,22 +48,22 @@ import com.example.travelcents.ui.theme.DeepSea4
 import com.example.travelcents.ui.theme.DeepSea5
 
 object MainRoutes {
-    const val CURRENT = "current"
-    const val NEW_TRIP = "new_trip"
-    const val HOME = "home"
-    const val CHATS = "chats"
-    const val SETTINGS = "settings"
+    const val Current = "current"
+    const val NewTrip = "new_trip"
+    const val Home = "home"
+    const val Chats = "chats"
+    const val Settings = "settings"
 
-    const val EDIT_PLAN = "edit_plan/{tripId}/{eventId}"
-    const val AI_TRIP_CHAT = "ai_trip_chat"
+    const val EditPlan = "edit_plan/{tripId}/{eventId}"
+    const val AiTripChat = "ai_trip_chat"
 }
 
 private val bottomNavRoutes = setOf(
-    MainRoutes.CURRENT,
-    MainRoutes.NEW_TRIP,
-    MainRoutes.HOME,
-    MainRoutes.CHATS,
-    MainRoutes.SETTINGS
+    MainRoutes.Current,
+    MainRoutes.NewTrip,
+    MainRoutes.Home,
+    MainRoutes.Chats,
+    MainRoutes.Settings
 )
 
 private data class BottomNavItem(
@@ -74,22 +73,18 @@ private data class BottomNavItem(
 )
 
 @Composable
-fun MainScaffold(
-    modifier: Modifier = Modifier,
-    authViewModel: AuthViewModel,
-    onLogout: () -> Unit = {}
-) {
+fun MainScaffold(modifier: Modifier = Modifier, onLogout: () -> Unit = {}) {
     val newTripViewModel: NewTripViewModel = viewModel()
     val navController = rememberNavController()
     val navBackStackEntry by navController.currentBackStackEntryAsState()
-    val currentRoute = navBackStackEntry?.destination?.route ?: MainRoutes.HOME
+    val currentRoute = navBackStackEntry?.destination?.route ?: MainRoutes.Home
 
     val items = listOf(
-        BottomNavItem(MainRoutes.CURRENT, "CURRENT", Icons.Outlined.CalendarToday),
-        BottomNavItem(MainRoutes.NEW_TRIP, "NEW TRIP", Icons.Outlined.AutoAwesome),
-        BottomNavItem(MainRoutes.HOME, "HOME", Icons.Outlined.Home),
-        BottomNavItem(MainRoutes.CHATS, "CHATS", Icons.Outlined.ChatBubbleOutline),
-        BottomNavItem(MainRoutes.SETTINGS, "SETTINGS", Icons.Outlined.Settings)
+        BottomNavItem(MainRoutes.Current, "CURRENT", Icons.Outlined.CalendarToday),
+        BottomNavItem(MainRoutes.NewTrip, "NEW TRIP", Icons.Outlined.AutoAwesome),
+        BottomNavItem(MainRoutes.Home, "HOME", Icons.Outlined.Home),
+        BottomNavItem(MainRoutes.Chats, "CHATS", Icons.Outlined.ChatBubbleOutline),
+        BottomNavItem(MainRoutes.Settings, "SETTINGS", Icons.Outlined.Settings)
     )
 
     Column(
@@ -100,10 +95,10 @@ fun MainScaffold(
         Box(modifier = Modifier.weight(1f).fillMaxWidth()) {
             NavHost(
                 navController = navController,
-                startDestination = MainRoutes.HOME,
+                startDestination = MainRoutes.Home,
                 modifier = Modifier.fillMaxSize()
             ) {
-                composable(MainRoutes.CURRENT) {
+                composable(MainRoutes.Current) {
                     val itineraryViewModel: ItineraryViewModel = viewModel()
                     val uiState by itineraryViewModel.uiState.collectAsState()
 
@@ -123,7 +118,7 @@ fun MainScaffold(
                 }
 
                 composable(
-                    route = MainRoutes.EDIT_PLAN,
+                    route = MainRoutes.EditPlan,
                     arguments = listOf(
                         navArgument("tripId") { type = NavType.StringType },
                         navArgument("eventId") { type = NavType.StringType }
@@ -139,23 +134,22 @@ fun MainScaffold(
                     )
                 }
 
-                composable(MainRoutes.NEW_TRIP) {
+                composable(MainRoutes.NewTrip) {
                     NewTripPage(
                         modifier = Modifier.fillMaxSize(),
                         viewModel = newTripViewModel,
-                        onChatClick = { navController.navigate(MainRoutes.AI_TRIP_CHAT) }
+                        onChatClick = { navController.navigate(MainRoutes.AiTripChat) }
                     )
                 }
-                composable(MainRoutes.HOME) { HomePage(modifier = Modifier.fillMaxSize()) }
-                composable(MainRoutes.CHATS) { ChatsScreen(modifier = Modifier.fillMaxSize()) }
-                composable(MainRoutes.SETTINGS) { 
+                composable(MainRoutes.Home) { HomePage(modifier = Modifier.fillMaxSize()) }
+                composable(MainRoutes.Chats) { ChatsScreen(modifier = Modifier.fillMaxSize()) }
+                composable(MainRoutes.Settings) { 
                     SettingsPage(
                         modifier = Modifier.fillMaxSize(),
-                        authViewModel = authViewModel,
                         onLoggedOut = onLogout
                     ) 
                 }
-                composable(MainRoutes.AI_TRIP_CHAT) {
+                composable(MainRoutes.AiTripChat) {
                     AiTripChatPage(
                         modifier = Modifier.fillMaxSize(),
                         onBackClick = { navController.popBackStack() }
