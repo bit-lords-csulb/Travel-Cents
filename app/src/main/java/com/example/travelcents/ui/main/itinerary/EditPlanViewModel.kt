@@ -57,12 +57,22 @@ class EditPlanViewModel : ViewModel() {
 
                     type = document.getString("type") ?: ""
 
-                    title = document.getString("title")
-                        ?: document.getString("activity_name")
-                                ?: detailsMap?.get("title")?.toString()
-                                ?: document.getString("hotel_name")
-                                ?: document.getString("restaurant_name")
-                                ?: type.replaceFirstChar { it.uppercase() }
+                    title = when (type.lowercase()) {
+                        "hotel" -> document.getString("hotel_name")
+                            ?: detailsMap?.get("hotel_name")?.toString()
+                            ?: document.getString("title")
+                            ?: detailsMap?.get("title")?.toString()
+                            ?: type.replaceFirstChar { it.uppercase() }
+                        "restaurant" -> document.getString("restaurant_name")
+                            ?: detailsMap?.get("restaurant_name")?.toString()
+                            ?: document.getString("title")
+                            ?: detailsMap?.get("title")?.toString()
+                            ?: type.replaceFirstChar { it.uppercase() }
+                        else -> document.getString("title")
+                            ?: document.getString("activity_name")
+                            ?: detailsMap?.get("title")?.toString()
+                            ?: type.replaceFirstChar { it.uppercase() }
+                    }
 
                     date = document.getString("date") ?: ""
                     time = document.getString("startTime") ?: ""
