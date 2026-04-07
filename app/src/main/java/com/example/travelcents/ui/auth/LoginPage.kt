@@ -363,7 +363,7 @@ fun GoogleSignInButton(authViewModel: AuthViewModel) {
                         val googleIdTokenCredential = GoogleIdTokenCredential.createFrom(credential.data)
                         val idToken = googleIdTokenCredential.idToken
 
-                        Log.d("GoogleAuth", "Got ID Token: $idToken")
+                        Log.d("GoogleAuth", "Google ID token received")
                         authViewModel.logInWithGoogle(idToken)
                     }
                 } catch (e: GetCredentialException) {
