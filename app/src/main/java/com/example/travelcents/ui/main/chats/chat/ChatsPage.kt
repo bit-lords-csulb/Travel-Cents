@@ -4,6 +4,10 @@ import com.example.travelcents.ui.main.chats.friends.Friend
 import com.example.travelcents.ui.main.chats.friends.AddFriendPage
 import com.example.travelcents.ui.main.chats.friends.FriendRequestsPage
 import com.example.travelcents.ui.main.chats.friends.FriendsPage
+import com.example.travelcents.data.model.DirectChatPreview
+import com.example.travelcents.ui.main.chats.groups.NewTripChatPage
+import com.example.travelcents.data.model.Group
+import com.example.travelcents.data.model.Event
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
@@ -26,28 +30,10 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
-import com.example.travelcents.ui.main.chats.NewTripChatPage
 import com.example.travelcents.ui.theme.*
 import com.google.firebase.Timestamp
 import java.text.SimpleDateFormat
 import java.util.*
-
-data class Group(
-    val id: String = "",
-    val name: String = "",
-    val members: List<String> = emptyList(),
-    val lastMessage: String = "",
-    val lastMessageTime: Timestamp? = null,
-    val groupImageUrl: String = ""
-)
-
-data class DirectChatPreview(
-    val id: String = "",
-    val otherUid: String = "",
-    val otherUserName: String = "",
-    val lastMessage: String = "",
-    val lastMessageTime: Timestamp? = null
-)
 
 fun formatTimestamp(timestamp: Timestamp?): String {
     if (timestamp == null) return ""
@@ -255,32 +241,63 @@ fun DirectChatRow(dm: DirectChatPreview, onClick: () -> Unit) {
 // Nav Wrapper
 @Composable
 fun ChatsScreen(modifier: Modifier = Modifier) {
-    var selectedGroup  by remember { mutableStateOf<Group?>(null) }
-    var showNewTrip    by remember { mutableStateOf(false) }
-    var showFriends    by remember { mutableStateOf(false) }
-    var selectedFriend by remember { mutableStateOf<Friend?>(null) }
-    var showAddFriend  by remember { mutableStateOf(false) }
-    var showRequests   by remember { mutableStateOf(false) }
-    var selectedDM     by remember { mutableStateOf<DirectChatPreview?>(null) }
-    var activeTab      by remember { mutableIntStateOf(0) }
-
+    var selectedGroup   by remember { mutableStateOf<Group?>(null) }
+    var showNewTrip     by remember { mutableStateOf(false) }
+    var showFriends     by remember { mutableStateOf(false) }
+    var selectedFriend  by remember { mutableStateOf<Friend?>(null) }
+    var showAddFriend   by remember { mutableStateOf(false) }
+    var showRequests    by remember { mutableStateOf(false) }
+    var selectedDM      by remember { mutableStateOf<DirectChatPreview?>(null) }
+    var activeTab       by remember { mutableIntStateOf(0) }
+    var showEvents      by remember { mutableStateOf(false) }
+    var showCreateEvent by remember { mutableStateOf(false) }
+    var selectedEvent by remember { mutableStateOf<Event?>(null) }
     when {
+        // Viewing a specific event's comments
+        selectedGroup != null && selectedEvent != null ->
+            com.example.travelcents.ui.main.chats.voting.EventCommentsPage(
+                event       = selectedEvent!!,
+                groupId     = selectedGroup!!.id,
+                onBackClick = { selectedEvent = null }
+            )
+
+        // Creating a new event
+        selectedGroup != null && showCreateEvent ->
+            com.example.travelcents.ui.main.chats.voting.CreateEventPage(
+                group          = selectedGroup!!,
+                onBackClick    = { showCreateEvent = false },
+                onEventCreated = { showCreateEvent = false }
+            )
+
+        // Viewing the events list
+        selectedGroup != null && showEvents ->
+            com.example.travelcents.ui.main.chats.voting.EventsPage(
+                group        = selectedGroup!!,
+                onBackClick  = { showEvents = false },
+                onNewEvent   = { showCreateEvent = true },
+                onEventClick = { event -> selectedEvent = event }
+            )
+
+        // Viewing the group chat
         selectedGroup != null -> ChatPage(
-            group = selectedGroup!!,
-            onBackClick = { selectedGroup = null }
+            group         = selectedGroup!!,
+            onBackClick   = { selectedGroup = null },
+            onEventsClick = { showEvents = true }
         )
+
+        // DMs and Friends
         selectedFriend != null -> DirectChatPage(
-            friend = selectedFriend!!,
+            friend      = selectedFriend!!,
             onBackClick = { selectedFriend = null }
         )
         selectedDM != null -> DirectChatPage(
-            friend = Friend(uid = selectedDM!!.otherUid, displayName = selectedDM!!.otherUserName),
+            friend      = Friend(uid = selectedDM!!.otherUid, displayName = selectedDM!!.otherUserName),
             onBackClick = { selectedDM = null; activeTab = 1 }
         )
         showAddFriend -> AddFriendPage(onBackClick = { showAddFriend = false })
         showRequests  -> FriendRequestsPage(onBackClick = { showRequests = false })
         showNewTrip   -> NewTripChatPage(
-            onBackClick = { showNewTrip = false },
+            onBackClick   = { showNewTrip = false },
             onTripCreated = { newGroup -> showNewTrip = false; selectedGroup = newGroup }
         )
         showFriends -> FriendsPage(
