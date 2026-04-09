@@ -81,6 +81,7 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import androidx.lifecycle.viewmodel.compose.viewModel
+import com.example.travelcents.ui.main.itinerary.EventOptionsPanel
 import com.example.travelcents.data.model.TravelEvent
 import com.example.travelcents.ui.theme.DeepSea1
 import com.example.travelcents.ui.theme.DeepSea2
@@ -150,6 +151,12 @@ fun CurrentPage(
     onViewItineraryRequested: (() -> Unit)? = null
 ) {
     val uiState by viewModel.uiState.collectAsState()
+    val allTrips by viewModel.allTrips.collectAsState()
+    val eventOptions by viewModel.eventOptions.collectAsState()
+    val rejectedOptions by viewModel.rejectedOptions.collectAsState()
+    val yelpReviews by viewModel.yelpReviews.collectAsState()
+    val reviewsLoading by viewModel.reviewsLoading.collectAsState()
+    val shareTargets by viewModel.shareTargets.collectAsState()
     val events = remember(uiState.events) { sortEventsForCalendar(uiState.events) }
     val eventDates = remember(events) {
         events.map { it.date }
@@ -178,6 +185,10 @@ fun CurrentPage(
     var selectedDate by rememberSaveable { mutableStateOf("") }
     var editorPlan by remember { mutableStateOf<EditablePlan?>(null) }
     var deleteCandidate by remember { mutableStateOf<EditablePlan?>(null) }
+    var jiggleMode by remember { mutableStateOf(false) }
+    var optionsPanelEventId by remember { mutableStateOf<String?>(null) }
+    var showShareSheet by remember { mutableStateOf(false) }
+    var shareConfirmation by remember { mutableStateOf<String?>(null) }
 
     val tripDateRange = remember(uiState.dateFrom, uiState.dateTo, calendarDates) {
         buildTripDateRange(
@@ -193,11 +204,19 @@ fun CurrentPage(
         }
     }
 
+    LaunchedEffect(uiState.currentTripId) {
+        viewModel.loadAllTrips()
+    }
+
     LaunchedEffect(calendarDates, uiState.dateFrom) {
         val fallbackDate = uiState.dateFrom.ifBlank { todayIsoDate() }
         if (selectedDate.isBlank() || selectedDate !in calendarDates) {
             selectedDate = calendarDates.firstOrNull() ?: fallbackDate
         }
+    }
+
+    LaunchedEffect(editorPlan) {
+        editorPlan?.existingDetails?.get("yelp_id")?.takeIf { it.isNotBlank() }?.let(viewModel::fetchYelpReviews)
     }
 
     Box(
@@ -210,37 +229,59 @@ fun CurrentPage(
                 .fillMaxSize()
                 .padding(top = 24.dp)
         ) {
-            Box(modifier = Modifier.padding(horizontal = 24.dp)) {
-                SharedTripHeader(
-                    tripTitle = uiState.tripTitle,
-                    dateRange = tripDateRange,
-                    canAdd = uiState.currentTripId != null,
-                    onAddClick = {
-                        if (uiState.currentTripId == null) {
-                            viewModel.postError("Create a trip first before adding calendar plans.")
-                        } else {
-                            editorPlan = newEditablePlan(
-                                date = selectedDate.ifBlank {
-                                    calendarDates.firstOrNull()
-                                        ?: uiState.dateFrom.ifBlank { todayIsoDate() }
-                                },
-                                startMinutes = 9 * 60
-                            )
-                        }
-                    },
-                    controlsContent = {
-                        CurrentDisplayModeTabs(
-                            selectedMode = displayMode,
-                            onModeSelected = { selectedMode ->
-                                if (selectedMode == CurrentDisplayMode.ITINERARY && onViewItineraryRequested != null) {
-                                    onViewItineraryRequested()
-                                }
-                                displayModeName = selectedMode.name
-                            }
+            UnifiedTripHeader(
+                tripTitle = uiState.tripTitle,
+                dateRange = tripDateRange,
+                currentTripId = uiState.currentTripId,
+                allTrips = allTrips,
+                canAdd = uiState.currentTripId != null,
+                isReorderActive = jiggleMode,
+                onAddClick = {
+                    if (uiState.currentTripId == null) {
+                        viewModel.postError("Create a trip first before adding calendar plans.")
+                    } else {
+                        editorPlan = newEditablePlan(
+                            date = selectedDate.ifBlank {
+                                calendarDates.firstOrNull()
+                                    ?: uiState.dateFrom.ifBlank { todayIsoDate() }
+                            },
+                            startMinutes = 9 * 60
                         )
                     }
-                )
-            }
+                },
+                onShareClick = {
+                    viewModel.fetchShareTargets()
+                    showShareSheet = true
+                },
+                onToggleReorder = { jiggleMode = !jiggleMode },
+                onArchiveTrip = { tripId ->
+                    jiggleMode = false
+                    viewModel.archiveTrip(tripId)
+                },
+                onDeleteTrip = { tripId ->
+                    jiggleMode = false
+                    viewModel.deleteTrip(tripId)
+                },
+                onSwitchTrip = { tripId ->
+                    jiggleMode = false
+                    optionsPanelEventId = null
+                    editorPlan = null
+                    deleteCandidate = null
+                    viewModel.loadTrip(tripId)
+                },
+                onRenameTrip = viewModel::renameTrip,
+                controlsContent = {
+                    CurrentDisplayModeTabs(
+                        selectedMode = displayMode,
+                        onModeSelected = { selectedMode ->
+                            if (selectedMode == CurrentDisplayMode.ITINERARY && onViewItineraryRequested != null) {
+                                onViewItineraryRequested()
+                            }
+                            displayModeName = selectedMode.name
+                        }
+                    )
+                }
+            )
 
             if (uiState.infoMessage != null || uiState.errorMessage != null) {
                 MessageCard(
@@ -261,10 +302,16 @@ fun CurrentPage(
                         title = "No Trip Yet",
                         body = uiState.infoMessage ?: "Create a trip from the New Trip tab to populate this calendar."
                     )
-                    displayMode == CurrentDisplayMode.ITINERARY -> ItineraryContent(
+                    displayMode == CurrentDisplayMode.ITINERARY -> UnifiedItineraryContent(
                         events = events,
+                        eventOptions = eventOptions,
+                        rejectedOptions = rejectedOptions,
+                        jiggleMode = jiggleMode,
                         onEventClick = { event -> editorPlan = event.toEditablePlan() },
-                        onDeleteClick = { event -> deleteCandidate = event.toEditablePlan() }
+                        onDeleteClick = { event -> deleteCandidate = event.toEditablePlan() },
+                        onOpenAlternatives = { optionsPanelEventId = it },
+                        onMoveEvent = viewModel::moveEventLocally,
+                        onPersistEventPlacements = viewModel::persistEventPlacements
                     )
                     displayMode == CurrentDisplayMode.WEEK -> WeekCalendarContent(
                         events = events,
@@ -308,8 +355,12 @@ fun CurrentPage(
     }
 
     editorPlan?.let { plan ->
-        PlanEditorDialog(
+        val yelpId = plan.existingDetails["yelp_id"].orEmpty()
+        UnifiedPlanEditorDialog(
             initialPlan = plan,
+            currentOptions = eventOptions[plan.eventId].orEmpty(),
+            yelpReviews = yelpReviews[yelpId].orEmpty(),
+            reviewsLoading = reviewsLoading.contains(yelpId),
             onDismiss = { editorPlan = null },
             onSave = {
                 viewModel.upsertPlan(it)
@@ -318,8 +369,80 @@ fun CurrentPage(
             onDelete = { planToDelete ->
                 editorPlan = null
                 deleteCandidate = planToDelete
+            },
+            onAlternatives = {
+                editorPlan = null
+                plan.eventId?.let { optionsPanelEventId = it }
             }
         )
+    }
+
+    optionsPanelEventId?.let { eid ->
+        val event = uiState.events.firstOrNull { it.eventId == eid }
+        val options = eventOptions[eid].orEmpty()
+        val rejected = rejectedOptions[eid].orEmpty()
+        if (event != null) {
+            val selectedNamesElsewhere = uiState.events
+                .filter { it.eventId != eid && it.type.equals(event.type, ignoreCase = true) }
+                .mapNotNull { other ->
+                    eventOptions[other.eventId].orEmpty().firstOrNull { it.selected }?.let { opt ->
+                        when (other.type.lowercase(Locale.US)) {
+                            "hotel" -> opt.details["hotel_name"] ?: opt.details["name"]
+                            "restaurant", "dining", "food" -> opt.details["restaurant_name"] ?: opt.details["name"]
+                            "flight" -> null
+                            else -> opt.details["activity_name"] ?: opt.details["title"] ?: opt.details["name"]
+                        }
+                    }
+                }
+                .toSet()
+            EventOptionsPanel(
+                event = event,
+                options = options,
+                rejectedIds = rejected,
+                onSelect = { optId -> viewModel.selectOption(eid, optId) },
+                onReject = { optId -> viewModel.rejectOption(eid, optId) },
+                onDismiss = { optionsPanelEventId = null },
+                selectedNamesElsewhere = selectedNamesElsewhere
+            )
+        }
+    }
+
+    if (showShareSheet) {
+        UnifiedShareTripSheet(
+            targets = shareTargets,
+            onShare = { target ->
+                viewModel.shareTripToChat(target)
+                showShareSheet = false
+                shareConfirmation = "Trip shared to ${target.name}"
+            },
+            onDismiss = { showShareSheet = false }
+        )
+    }
+
+    shareConfirmation?.let { msg ->
+        LaunchedEffect(msg) {
+            kotlinx.coroutines.delay(2500)
+            shareConfirmation = null
+        }
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(bottom = 16.dp, start = 16.dp, end = 16.dp),
+            contentAlignment = Alignment.BottomCenter
+        ) {
+            Surface(
+                color = DeepSea2,
+                shape = RoundedCornerShape(12.dp),
+                border = androidx.compose.foundation.BorderStroke(1.dp, DeepSea3.copy(alpha = 0.3f))
+            ) {
+                Text(
+                    text = msg,
+                    color = DeepSea5,
+                    fontSize = 13.sp,
+                    modifier = Modifier.padding(horizontal = 20.dp, vertical = 12.dp)
+                )
+            }
+        }
     }
 }
 
@@ -1882,40 +2005,62 @@ private fun newEditablePlan(
 }
 
 private fun eventTitle(event: TravelEvent): String {
-    return event.details["title"]
-        ?: when (event.type.lowercase(Locale.US)) {
-            "flight" -> {
-                val destination = event.details["destination_airport"]
-                    ?: event.details["location"]
-                    ?: "Destination"
-                "Flight to $destination"
-            }
-            "hotel" -> "Hotel Check-in"
-            "restaurant" -> event.details["restaurant_name"] ?: "Dinner Reservation"
-            else -> event.details["activity_name"]
-                ?: event.details["name"]
-                ?: event.details["title"]
-                ?: event.type.replaceFirstChar { it.uppercase(Locale.US) }
-        }
+    return when (event.type.lowercase(Locale.US)) {
+        "flight" -> listOfNotNull(
+            event.details["title"]?.takeIf { it.isNotBlank() },
+            event.details["destination_airport"]?.takeIf { it.isNotBlank() }?.let { destination ->
+                when (event.details["trip_segment"]?.lowercase(Locale.US)) {
+                    "return" -> "Return to $destination"
+                    else -> "Flight to $destination"
+                }
+            },
+            listOfNotNull(
+                event.details["airline"]?.takeIf { it.isNotBlank() },
+                event.details["flight_number"]?.takeIf { it.isNotBlank() }
+            ).joinToString(" ").takeIf { it.isNotBlank() }
+        ).firstOrNull()
+        "hotel" -> event.details["hotel_name"] ?: event.details["name"] ?: "Hotel Check-in"
+        "restaurant", "dining", "food" -> event.details["restaurant_name"] ?: event.details["name"] ?: "Dinner Reservation"
+        else -> event.details["activity_name"] ?: event.details["title"] ?: event.details["name"]
+    } ?: event.type.replaceFirstChar { it.uppercase(Locale.US) }
 }
 
 private fun eventSubtitle(event: TravelEvent): String {
-    return event.details["location"]
-        ?: when (event.type.lowercase(Locale.US)) {
-            "flight" -> listOf(
-                event.details["airline"],
-                event.details["flight_number"]
-            ).filter { !it.isNullOrBlank() }.joinToString(" ")
-            "hotel" -> event.details["hotel_name"]
-            "restaurant" -> event.details["cuisine"]
-            else -> event.details["description"]
-        }.orEmpty().ifBlank { "Tap to edit details" }
+    return when (event.type.lowercase(Locale.US)) {
+        "flight" -> listOfNotNull(
+            listOfNotNull(
+                event.details["airline"]?.takeIf { it.isNotBlank() },
+                event.details["flight_number"]?.takeIf { it.isNotBlank() }
+            ).joinToString(" ").takeIf { it.isNotBlank() },
+            listOfNotNull(
+                event.details["origin_airport"]?.takeIf { it.isNotBlank() },
+                event.details["destination_airport"]?.takeIf { it.isNotBlank() }
+            ).takeIf { it.isNotEmpty() }?.joinToString(" to "),
+            event.details["total_price"]?.takeIf { it.isNotBlank() }?.let { "\$$it" }
+        ).joinToString(" · ")
+        "hotel" -> listOfNotNull(
+            event.details["address"]?.takeIf { it.isNotBlank() },
+            event.details["rating"]?.takeIf { it.isNotBlank() }?.let { "★$it" }
+        ).joinToString(" · ")
+        "restaurant", "dining", "food" -> listOfNotNull(
+            event.details["cuisine"]?.takeIf { it.isNotBlank() },
+            event.details["location"]?.takeIf { it.isNotBlank() },
+            event.details["address"]?.takeIf { it.isNotBlank() }
+        ).joinToString(" · ")
+        else -> listOfNotNull(
+            event.details["description"]?.takeIf { it.isNotBlank() },
+            event.details["location"]?.takeIf { it.isNotBlank() },
+            event.details["address"]?.takeIf { it.isNotBlank() }
+        ).firstOrNull().orEmpty()
+    }.ifBlank { "Tap to edit details" }
 }
 
 private fun editableLocation(event: TravelEvent): String {
     return event.details["location"]
+        ?: event.details["address"]
         ?: event.details["hotel_name"]
         ?: event.details["restaurant_name"]
+        ?: event.details["origin_airport"]
         ?: event.details["destination_airport"]
         ?: ""
 }
@@ -1923,6 +2068,7 @@ private fun editableLocation(event: TravelEvent): String {
 private fun editableNotes(event: TravelEvent): String {
     return event.details["description"]
         ?: event.details["cuisine"]
+        ?: event.details["notes"]
         ?: listOf(event.details["airline"], event.details["flight_number"])
             .filter { !it.isNullOrBlank() }
             .joinToString(" ")
