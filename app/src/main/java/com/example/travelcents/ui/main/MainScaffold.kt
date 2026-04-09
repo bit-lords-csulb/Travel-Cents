@@ -43,9 +43,7 @@ import androidx.navigation.navArgument
 import com.example.travelcents.ui.main.aichat.AiTripChatPage
 import com.example.travelcents.ui.main.chats.chat.ChatsScreen
 import com.example.travelcents.ui.main.itinerary.EditPlanScreen
-import com.example.travelcents.ui.main.itinerary.FinalPlanPage
 import com.example.travelcents.ui.main.itinerary.ItineraryScreen
-import com.example.travelcents.ui.main.itinerary.ItineraryViewModel
 import com.example.travelcents.ui.main.newtrip.NewTripLandingPage
 import com.example.travelcents.ui.main.newtrip.NewTripViewModel
 import com.example.travelcents.ui.main.newtrip.TripGeneratingPage
@@ -92,9 +90,7 @@ private val bottomNavRoutes = setOf(
     MainRoutes.HOME,
     MainRoutes.CHATS,
     MainRoutes.SETTINGS,
-    MainRoutes.EDIT_PLAN,
-    MainRoutes.FINAL_PLAN,
-    MainRoutes.FINAL_PLAN_BY_ID
+    MainRoutes.EDIT_PLAN
 )
 
 private data class BottomNavItem(
@@ -107,7 +103,6 @@ private data class BottomNavItem(
 fun MainScaffold(modifier: Modifier = Modifier, onLogout: () -> Unit = {}) {
     val newTripViewModel: NewTripViewModel = viewModel()
     val currentTripViewModel: CurrentTripViewModel = viewModel()
-    val finalPlanViewModel: ItineraryViewModel = viewModel()
     val navController = rememberNavController()
 
     val navBackStackEntry by navController.currentBackStackEntryAsState()
@@ -121,9 +116,7 @@ fun MainScaffold(modifier: Modifier = Modifier, onLogout: () -> Unit = {}) {
         MainRoutes.NEW_TRIP_STEP_4,
         MainRoutes.NEW_TRIP_STEP_5,
         MainRoutes.TRIP_GENERATING,
-        MainRoutes.AI_TRIP_CHAT,
-        MainRoutes.FINAL_PLAN,
-        MainRoutes.FINAL_PLAN_BY_ID -> MainRoutes.NEW_TRIP
+        MainRoutes.AI_TRIP_CHAT -> MainRoutes.NEW_TRIP
         else -> currentRoute
     }
     val itineraryUiState by currentTripViewModel.uiState.collectAsState()
@@ -190,7 +183,7 @@ fun MainScaffold(modifier: Modifier = Modifier, onLogout: () -> Unit = {}) {
                         onPlanTripClick = { navController.navigate(MainRoutes.NEW_TRIP_STEP_1) },
                         onAiChatClick = { navController.navigate(MainRoutes.AI_TRIP_CHAT) },
                         onViewLastTripClick = if (itineraryUiState.currentTripId != null) {
-                            { navController.navigate(MainRoutes.FINAL_PLAN) }
+                            { navController.navigate(MainRoutes.CURRENT) }
                         } else null
                     )
                 }
@@ -246,7 +239,7 @@ fun MainScaffold(modifier: Modifier = Modifier, onLogout: () -> Unit = {}) {
                         modifier = Modifier.fillMaxSize(),
                         viewModel = newTripViewModel,
                         onTripReady = {
-                            navController.navigate(MainRoutes.FINAL_PLAN) {
+                            navController.navigate(MainRoutes.CURRENT) {
                                 popUpTo(MainRoutes.HOME) { inclusive = false }
                             }
                         }
@@ -255,7 +248,10 @@ fun MainScaffold(modifier: Modifier = Modifier, onLogout: () -> Unit = {}) {
                 composable(MainRoutes.HOME) {
                     HomePage(
                         modifier = Modifier.fillMaxSize(),
-                        onTripClick = { tripId -> navController.navigate("final_plan/$tripId") }
+                        onTripClick = { tripId ->
+                            currentTripViewModel.loadTrip(tripId)
+                            navController.navigate(MainRoutes.CURRENT)
+                        }
                     )
                 }
                 composable(MainRoutes.CHATS) { ChatsScreen(modifier = Modifier.fillMaxSize()) }
@@ -272,32 +268,24 @@ fun MainScaffold(modifier: Modifier = Modifier, onLogout: () -> Unit = {}) {
                     )
                 }
                 composable(MainRoutes.FINAL_PLAN) {
-                    LaunchedEffect(Unit) { finalPlanViewModel.loadTrip() }
-                    FinalPlanPage(
-                        viewModel = finalPlanViewModel,
-                        modifier = Modifier.fillMaxSize(),
-                        onBackClick = {
-                            navController.navigate(MainRoutes.CURRENT) {
-                                popUpTo(MainRoutes.HOME) { inclusive = false }
-                            }
+                    LaunchedEffect(Unit) {
+                        currentTripViewModel.loadTrip()
+                        navController.navigate(MainRoutes.CURRENT) {
+                            popUpTo(MainRoutes.HOME) { inclusive = false }
                         }
-                    )
+                    }
                 }
                 composable(
                     route = MainRoutes.FINAL_PLAN_BY_ID,
                     arguments = listOf(navArgument("tripId") { type = NavType.StringType })
                 ) { backStackEntry ->
                     val tripId = backStackEntry.arguments?.getString("tripId")
-                    LaunchedEffect(tripId) { finalPlanViewModel.loadTrip(tripId) }
-                    FinalPlanPage(
-                        viewModel = finalPlanViewModel,
-                        modifier = Modifier.fillMaxSize(),
-                        onBackClick = {
-                            navController.navigate(MainRoutes.HOME) {
-                                popUpTo(MainRoutes.HOME) { inclusive = false }
-                            }
+                    LaunchedEffect(tripId) {
+                        currentTripViewModel.loadTrip(tripId)
+                        navController.navigate(MainRoutes.CURRENT) {
+                            popUpTo(MainRoutes.HOME) { inclusive = false }
                         }
-                    )
+                    }
                 }
             }
         }
@@ -308,16 +296,12 @@ fun MainScaffold(modifier: Modifier = Modifier, onLogout: () -> Unit = {}) {
                 selectedRoute = selectedBottomRoute,
                 activeRoute = currentRoute,
                 onItemSelected = { route ->
-                    val resetNewTripToLanding =
-                        route == MainRoutes.NEW_TRIP && currentRoute == MainRoutes.FINAL_PLAN
-
                     navController.navigate(route) {
                         popUpTo(navController.graph.findStartDestination().id) {
                             saveState = true
                         }
                         launchSingleTop = true
-                        // Preserve in-progress trip planning, but don't restore Final Plan into the New Trip tab.
-                        restoreState = !resetNewTripToLanding
+                        restoreState = true
                     }
                 }
             )
