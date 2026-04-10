@@ -42,16 +42,19 @@ import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
 import com.example.travelcents.ui.main.aichat.AiTripChatPage
 import com.example.travelcents.ui.main.chats.chat.ChatsScreen
-import com.example.travelcents.ui.main.itinerary.EditPlanScreen
-import com.example.travelcents.ui.main.itinerary.ItineraryScreen
-import com.example.travelcents.ui.main.newtrip.NewTripLandingPage
-import com.example.travelcents.ui.main.newtrip.NewTripViewModel
-import com.example.travelcents.ui.main.newtrip.TripGeneratingPage
-import com.example.travelcents.ui.main.newtrip.TripStep1DestinationPage
-import com.example.travelcents.ui.main.newtrip.TripStep2DatesPage
-import com.example.travelcents.ui.main.newtrip.TripStep3TravelersPage
-import com.example.travelcents.ui.main.newtrip.TripStep4BudgetPage
-import com.example.travelcents.ui.main.newtrip.TripStep5InterestsPage
+import com.example.travelcents.ui.main.current.CurrentDisplayMode
+import com.example.travelcents.ui.main.current.CurrentPage
+import com.example.travelcents.ui.main.current.CurrentTripRoutes
+import com.example.travelcents.ui.main.current.CurrentTripViewModel
+import com.example.travelcents.ui.main.current.EditPlanScreen
+import com.example.travelcents.ui.main.newTrip.NewTripLandingPage
+import com.example.travelcents.ui.main.newTrip.NewTripViewModel
+import com.example.travelcents.ui.main.newTrip.TripGeneratingPage
+import com.example.travelcents.ui.main.newTrip.TripStep1DestinationPage
+import com.example.travelcents.ui.main.newTrip.TripStep2DatesPage
+import com.example.travelcents.ui.main.newTrip.TripStep3TravelersPage
+import com.example.travelcents.ui.main.newTrip.TripStep4BudgetPage
+import com.example.travelcents.ui.main.newTrip.TripStep5InterestsPage
 import com.example.travelcents.ui.theme.DeepSea1
 import com.example.travelcents.ui.theme.DeepSea2
 import com.example.travelcents.ui.theme.DeepSea3
@@ -59,7 +62,10 @@ import com.example.travelcents.ui.theme.DeepSea4
 import com.example.travelcents.ui.theme.DeepSea5
 
 object MainRoutes {
-    const val CURRENT = "current"
+    const val CURRENT = CurrentTripRoutes.ROOT
+    const val CURRENT_ITINERARY = CurrentTripRoutes.ITINERARY
+    const val CURRENT_DAY = CurrentTripRoutes.DAY
+    const val CURRENT_WEEK = CurrentTripRoutes.WEEK
     const val NEW_TRIP = "new_trip"
     const val NEW_TRIP_STEP_1 = "new_trip_step1"
     const val NEW_TRIP_STEP_2 = "new_trip_step2"
@@ -79,6 +85,9 @@ object MainRoutes {
 
 private val bottomNavRoutes = setOf(
     MainRoutes.CURRENT,
+    MainRoutes.CURRENT_ITINERARY,
+    MainRoutes.CURRENT_DAY,
+    MainRoutes.CURRENT_WEEK,
     MainRoutes.NEW_TRIP,
     MainRoutes.NEW_TRIP_STEP_1,
     MainRoutes.NEW_TRIP_STEP_2,
@@ -108,6 +117,9 @@ fun MainScaffold(modifier: Modifier = Modifier, onLogout: () -> Unit = {}) {
     val navBackStackEntry by navController.currentBackStackEntryAsState()
     val currentRoute = navBackStackEntry?.destination?.route ?: MainRoutes.HOME
     val selectedBottomRoute = when (currentRoute) {
+        MainRoutes.CURRENT_ITINERARY,
+        MainRoutes.CURRENT_DAY,
+        MainRoutes.CURRENT_WEEK,
         MainRoutes.EDIT_PLAN -> MainRoutes.CURRENT
         MainRoutes.NEW_TRIP,
         MainRoutes.NEW_TRIP_STEP_1,
@@ -144,17 +156,50 @@ fun MainScaffold(modifier: Modifier = Modifier, onLogout: () -> Unit = {}) {
                 modifier = Modifier.fillMaxSize()
             ) {
                 composable(MainRoutes.CURRENT) {
-                    LaunchedEffect(Unit) { currentTripViewModel.loadTrip() }
-                    ItineraryScreen(
+                    LaunchedEffect(Unit) {
+                        navController.navigate(MainRoutes.CURRENT_ITINERARY) {
+                            popUpTo(MainRoutes.CURRENT) { inclusive = true }
+                        }
+                    }
+                }
+
+                composable(MainRoutes.CURRENT_ITINERARY) {
+                    CurrentPage(
+                        modifier = Modifier.fillMaxSize(),
                         viewModel = currentTripViewModel,
-                        onEditEventClick = { clickedEventId ->
-                            itineraryUiState.currentTripId?.let { tripId ->
-                                navController.navigate("edit_plan/$tripId/$clickedEventId")
+                        displayMode = CurrentDisplayMode.ITINERARY,
+                        autoLoadTrip = false,
+                        onNavigateToMode = { mode ->
+                            navController.navigate(CurrentTripRoutes.routeFor(mode)) {
+                                launchSingleTop = true
                             }
-                        },
-                        onAddEventClick = {
-                            itineraryUiState.currentTripId?.let { tripId ->
-                                navController.navigate("edit_plan/$tripId/new")
+                        }
+                    )
+                }
+
+                composable(MainRoutes.CURRENT_DAY) {
+                    CurrentPage(
+                        modifier = Modifier.fillMaxSize(),
+                        viewModel = currentTripViewModel,
+                        displayMode = CurrentDisplayMode.DAY,
+                        autoLoadTrip = false,
+                        onNavigateToMode = { mode ->
+                            navController.navigate(CurrentTripRoutes.routeFor(mode)) {
+                                launchSingleTop = true
+                            }
+                        }
+                    )
+                }
+
+                composable(MainRoutes.CURRENT_WEEK) {
+                    CurrentPage(
+                        modifier = Modifier.fillMaxSize(),
+                        viewModel = currentTripViewModel,
+                        displayMode = CurrentDisplayMode.WEEK,
+                        autoLoadTrip = false,
+                        onNavigateToMode = { mode ->
+                            navController.navigate(CurrentTripRoutes.routeFor(mode)) {
+                                launchSingleTop = true
                             }
                         }
                     )
@@ -183,7 +228,7 @@ fun MainScaffold(modifier: Modifier = Modifier, onLogout: () -> Unit = {}) {
                         onPlanTripClick = { navController.navigate(MainRoutes.NEW_TRIP_STEP_1) },
                         onAiChatClick = { navController.navigate(MainRoutes.AI_TRIP_CHAT) },
                         onViewLastTripClick = if (itineraryUiState.currentTripId != null) {
-                            { navController.navigate(MainRoutes.CURRENT) }
+                            { navController.navigate(MainRoutes.CURRENT_ITINERARY) }
                         } else null
                     )
                 }
@@ -239,7 +284,7 @@ fun MainScaffold(modifier: Modifier = Modifier, onLogout: () -> Unit = {}) {
                         modifier = Modifier.fillMaxSize(),
                         viewModel = newTripViewModel,
                         onTripReady = {
-                            navController.navigate(MainRoutes.CURRENT) {
+                            navController.navigate(MainRoutes.CURRENT_ITINERARY) {
                                 popUpTo(MainRoutes.HOME) { inclusive = false }
                             }
                         }
@@ -250,7 +295,7 @@ fun MainScaffold(modifier: Modifier = Modifier, onLogout: () -> Unit = {}) {
                         modifier = Modifier.fillMaxSize(),
                         onTripClick = { tripId ->
                             currentTripViewModel.loadTrip(tripId)
-                            navController.navigate(MainRoutes.CURRENT)
+                            navController.navigate(MainRoutes.CURRENT_ITINERARY)
                         }
                     )
                 }
@@ -270,7 +315,7 @@ fun MainScaffold(modifier: Modifier = Modifier, onLogout: () -> Unit = {}) {
                 composable(MainRoutes.FINAL_PLAN) {
                     LaunchedEffect(Unit) {
                         currentTripViewModel.loadTrip()
-                        navController.navigate(MainRoutes.CURRENT) {
+                        navController.navigate(MainRoutes.CURRENT_ITINERARY) {
                             popUpTo(MainRoutes.HOME) { inclusive = false }
                         }
                     }
@@ -282,7 +327,7 @@ fun MainScaffold(modifier: Modifier = Modifier, onLogout: () -> Unit = {}) {
                     val tripId = backStackEntry.arguments?.getString("tripId")
                     LaunchedEffect(tripId) {
                         currentTripViewModel.loadTrip(tripId)
-                        navController.navigate(MainRoutes.CURRENT) {
+                        navController.navigate(MainRoutes.CURRENT_ITINERARY) {
                             popUpTo(MainRoutes.HOME) { inclusive = false }
                         }
                     }
