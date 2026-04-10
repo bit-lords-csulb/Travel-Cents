@@ -1,4 +1,4 @@
-package com.example.travelcents.ui.main.newtrip
+package com.example.travelcents.ui.main.newTrip
 
 import android.app.Application
 import androidx.compose.runtime.getValue

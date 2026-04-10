@@ -1,4 +1,4 @@
-package com.example.travelcents.ui.main.newtrip
+package com.example.travelcents.ui.main.newTrip
 
 import android.Manifest
 import android.annotation.SuppressLint
