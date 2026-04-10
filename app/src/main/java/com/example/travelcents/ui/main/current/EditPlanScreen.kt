@@ -1,4 +1,4 @@
-package com.example.travelcents.ui.main.itinerary
+package com.example.travelcents.ui.main.current
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable

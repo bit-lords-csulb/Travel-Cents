@@ -1,4 +1,4 @@
-package com.example.travelcents.ui.main
+package com.example.travelcents.ui.modules
 
 import com.example.travelcents.data.model.TravelEvent
 import java.time.LocalDate

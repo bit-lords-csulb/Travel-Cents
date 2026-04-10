@@ -1,4 +1,4 @@
-package com.example.travelcents.ui.main
+package com.example.travelcents.ui.main.current
 
 import android.util.Log
 import androidx.lifecycle.ViewModel
@@ -8,6 +8,9 @@ import com.example.travelcents.data.model.Itinerary
 import com.example.travelcents.data.model.TravelEvent
 import com.example.travelcents.data.model.YelpReview
 import com.example.travelcents.data.remote.YelpRepository
+import com.example.travelcents.ui.modules.defaultPlanTimeZoneId
+import com.example.travelcents.ui.modules.normalizeDate
+import com.example.travelcents.ui.modules.normalizeTime
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.DocumentSnapshot
 import com.google.firebase.firestore.FieldPath

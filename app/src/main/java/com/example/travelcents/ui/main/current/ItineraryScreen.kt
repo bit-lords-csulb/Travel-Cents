@@ -1,11 +1,9 @@
-package com.example.travelcents.ui.main.itinerary
+package com.example.travelcents.ui.main.current
 
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.ui.Modifier
 import androidx.lifecycle.viewmodel.compose.viewModel
-import com.example.travelcents.ui.main.CurrentPage
-import com.example.travelcents.ui.main.CurrentTripViewModel
 
 @Composable
 fun ItineraryScreen(
@@ -22,8 +20,8 @@ fun ItineraryScreen(
     CurrentPage(
         modifier = modifier,
         viewModel = viewModel,
-        startInCalendar = false,
+        displayMode = CurrentDisplayMode.ITINERARY,
         autoLoadTrip = false,
-        onViewItineraryRequested = null
+        tripId = tripId
     )
 }

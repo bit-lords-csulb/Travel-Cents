@@ -1,4 +1,4 @@
-package com.example.travelcents.ui.main.itinerary
+package com.example.travelcents.ui.main.current
 
 import android.util.Log
 import androidx.compose.runtime.getValue
