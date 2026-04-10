@@ -43,7 +43,7 @@ import androidx.navigation.navArgument
 import com.example.travelcents.ui.main.aichat.AiTripChatPage
 import com.example.travelcents.ui.main.chats.chat.ChatsScreen
 import com.example.travelcents.ui.main.current.CurrentDisplayMode
-import com.example.travelcents.ui.main.current.CurrentPage
+import com.example.travelcents.ui.main.current.CurrentTripScreen
 import com.example.travelcents.ui.main.current.CurrentTripRoutes
 import com.example.travelcents.ui.main.current.CurrentTripViewModel
 import com.example.travelcents.ui.main.newTrip.NewTripLandingPage
@@ -52,6 +52,7 @@ import com.example.travelcents.ui.main.newTrip.TripGeneratingPage
 import com.example.travelcents.ui.main.newTrip.TripStep1DestinationPage
 import com.example.travelcents.ui.main.newTrip.TripStep2DatesPage
 import com.example.travelcents.ui.main.newTrip.TripStep3TravelersPage
+import com.example.travelcents.ui.main.home.HomePage
 import com.example.travelcents.ui.main.newTrip.TripStep4BudgetPage
 import com.example.travelcents.ui.main.newTrip.TripStep5InterestsPage
 import com.example.travelcents.ui.theme.DeepSea1
@@ -160,7 +161,7 @@ fun MainScaffold(modifier: Modifier = Modifier, onLogout: () -> Unit = {}) {
                 }
 
                 composable(MainRoutes.CURRENT_ITINERARY) {
-                    CurrentPage(
+                    CurrentTripScreen(
                         modifier = Modifier.fillMaxSize(),
                         viewModel = currentTripViewModel,
                         displayMode = CurrentDisplayMode.ITINERARY,
@@ -174,7 +175,7 @@ fun MainScaffold(modifier: Modifier = Modifier, onLogout: () -> Unit = {}) {
                 }
 
                 composable(MainRoutes.CURRENT_DAY) {
-                    CurrentPage(
+                    CurrentTripScreen(
                         modifier = Modifier.fillMaxSize(),
                         viewModel = currentTripViewModel,
                         displayMode = CurrentDisplayMode.DAY,
@@ -188,7 +189,7 @@ fun MainScaffold(modifier: Modifier = Modifier, onLogout: () -> Unit = {}) {
                 }
 
                 composable(MainRoutes.CURRENT_WEEK) {
-                    CurrentPage(
+                    CurrentTripScreen(
                         modifier = Modifier.fillMaxSize(),
                         viewModel = currentTripViewModel,
                         displayMode = CurrentDisplayMode.WEEK,

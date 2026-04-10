@@ -30,7 +30,7 @@ private data class DisplayModeOption(
 )
 
 @Composable
-fun CurrentDisplayModeTabs(
+fun CurrentTripModeSwitcher(
     selectedMode: CurrentDisplayMode,
     onModeSelected: (CurrentDisplayMode) -> Unit
 ) {

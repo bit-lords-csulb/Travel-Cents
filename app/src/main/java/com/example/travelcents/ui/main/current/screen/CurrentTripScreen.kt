@@ -24,7 +24,7 @@ import com.example.travelcents.ui.modules.todayIsoDate
 import com.example.travelcents.ui.theme.DeepSea1
 
 @Composable
-fun CurrentPage(
+fun CurrentTripScreen(
     modifier: Modifier = Modifier,
     viewModel: CurrentTripViewModel = viewModel(),
     displayMode: CurrentDisplayMode = CurrentDisplayMode.ITINERARY,
@@ -104,7 +104,7 @@ fun CurrentPage(
                 .fillMaxSize()
                 .padding(top = 24.dp)
         ) {
-            UnifiedTripHeader(
+            CurrentTripHeader(
                 tripTitle = uiState.tripTitle,
                 dateRange = tripDateRange,
                 currentTripId = uiState.currentTripId,
@@ -150,7 +150,7 @@ fun CurrentPage(
                 },
                 onRenameTrip = viewModel::renameTrip,
                 controlsContent = {
-                    CurrentDisplayModeTabs(
+                    CurrentTripModeSwitcher(
                         selectedMode = displayMode,
                         onModeSelected = {
                             jiggleMode = false
@@ -179,7 +179,7 @@ fun CurrentPage(
                         title = "No Trip Yet",
                         body = uiState.infoMessage ?: "Create a trip from the New Trip tab to populate this calendar."
                     )
-                    displayMode == CurrentDisplayMode.ITINERARY -> UnifiedItineraryContent(
+                    displayMode == CurrentDisplayMode.ITINERARY -> CurrentTripItineraryContent(
                         events = events,
                         eventOptions = eventOptions,
                         rejectedOptions = rejectedOptions,
@@ -190,7 +190,7 @@ fun CurrentPage(
                         onMoveEvent = viewModel::moveEventLocally,
                         onPersistEventPlacements = viewModel::persistEventPlacements
                     )
-                    displayMode == CurrentDisplayMode.WEEK -> WeekPage(
+                    displayMode == CurrentDisplayMode.WEEK -> CurrentTripWeekView(
                         events = events,
                         sortedDates = calendarDates,
                         selectedDate = selectedDate,
@@ -201,7 +201,7 @@ fun CurrentPage(
                             editorPlan = newEditablePlan(date, startMinutes)
                         }
                     )
-                    else -> DayPage(
+                    else -> CurrentTripDayView(
                         events = events,
                         sortedDates = calendarDates,
                         selectedDate = selectedDate,
