@@ -54,7 +54,7 @@ import com.example.travelcents.ui.theme.DeepSea4
 import com.example.travelcents.ui.theme.DeepSea5
 
 @Composable
-fun WeekPage(
+fun CurrentTripWeekView(
     events: List<TravelEvent>,
     sortedDates: List<String>,
     selectedDate: String,

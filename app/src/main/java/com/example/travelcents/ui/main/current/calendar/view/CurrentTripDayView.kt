@@ -67,7 +67,7 @@ import kotlin.math.max
 import kotlin.math.roundToInt
 
 @Composable
-fun DayPage(
+fun CurrentTripDayView(
     events: List<TravelEvent>,
     sortedDates: List<String>,
     selectedDate: String,

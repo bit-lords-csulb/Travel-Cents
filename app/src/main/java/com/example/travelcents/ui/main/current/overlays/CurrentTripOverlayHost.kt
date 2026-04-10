@@ -58,7 +58,7 @@ fun CurrentTripOverlayHost(
 
     editorPlan?.let { plan ->
         val yelpId = plan.existingDetails["yelp_id"].orEmpty()
-        UnifiedPlanEditorDialog(
+        CurrentPlanEditorDialog(
             initialPlan = plan,
             currentOptions = eventOptions[plan.eventId].orEmpty(),
             yelpReviews = yelpReviews[yelpId].orEmpty(),
@@ -110,7 +110,7 @@ fun CurrentTripOverlayHost(
     }
 
     if (showShareSheet) {
-        UnifiedShareTripSheet(
+        CurrentTripShareSheet(
             targets = shareTargets,
             onShare = { target ->
                 onShareTrip(target)
