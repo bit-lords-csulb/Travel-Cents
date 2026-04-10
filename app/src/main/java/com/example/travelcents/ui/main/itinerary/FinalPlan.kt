@@ -49,6 +49,7 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import coil.compose.AsyncImage
 import com.example.travelcents.data.model.Itinerary
 import com.example.travelcents.data.model.TravelEvent
+import com.example.travelcents.ui.main.current.EventOptionsPanel
 import com.example.travelcents.ui.theme.TravelCentsTheme
 import kotlinx.coroutines.delay
 import sh.calvin.reorderable.ReorderableItem
