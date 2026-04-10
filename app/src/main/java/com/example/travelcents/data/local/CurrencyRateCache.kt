@@ -45,4 +45,19 @@ class CurrencyRateCache(context: Context) {
             putString(recentPairsKey, updated.joinToString("|") { "${it.first},${it.second}" })
         }
     }
+
+    // --- Selected pair (persisted across restarts) ---
+
+    fun saveSelectedPair(from: String, to: String) {
+        prefs.edit {
+            putString("selected_from", from)
+            putString("selected_to", to)
+        }
+    }
+
+    fun getSelectedPair(): Pair<String, String>? {
+        val from = prefs.getString("selected_from", null) ?: return null
+        val to = prefs.getString("selected_to", null) ?: return null
+        return Pair(from, to)
+    }
 }
