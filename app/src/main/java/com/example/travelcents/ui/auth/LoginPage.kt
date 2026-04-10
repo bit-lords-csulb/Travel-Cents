@@ -12,6 +12,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.requiredSize
 import androidx.compose.foundation.layout.requiredWidth
@@ -55,6 +56,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
+import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -62,11 +64,7 @@ import androidx.navigation.NavController
 import com.example.travelcents.ui.theme.DeepSea1
 import com.example.travelcents.ui.theme.DeepSea2
 import com.example.travelcents.ui.theme.DeepSea4
-import com.example.travelcents.ui.theme.DeepSea5
-import kotlin.Result
-import kotlin.runCatching
 import androidx.compose.runtime.rememberCoroutineScope
-import androidx.compose.ui.platform.LocalContext
 import androidx.credentials.CredentialManager
 import androidx.credentials.CustomCredential
 import androidx.credentials.GetCredentialRequest
@@ -174,9 +172,10 @@ fun LoginPage(modifier: Modifier = Modifier, navController: NavController, authV
             },
             placeholder = { Text("email or username", color = Color.Gray, fontSize = 14.sp) },
             singleLine = true,
+            textStyle = TextStyle(color = Color.White, fontSize = 15.sp),
             modifier = Modifier
                 .fillMaxWidth()
-                .height(50.dp)
+                .heightIn(min = 56.dp)
                 .focusRequester(emailFocusRequester)
                 .onPreviewKeyEvent { event ->
                     when {
@@ -205,14 +204,7 @@ fun LoginPage(modifier: Modifier = Modifier, navController: NavController, authV
             keyboardActions = KeyboardActions(
                 onNext = { passwordFocusRequester.requestFocus() }
             ),
-            colors = TextFieldDefaults.colors(
-                focusedContainerColor = Color.Transparent,
-                unfocusedContainerColor = Color.Transparent,
-                focusedTextColor = Color.White,
-                unfocusedTextColor = Color.White,
-                focusedIndicatorColor = Color.White,
-                unfocusedIndicatorColor = DeepSea4
-            )
+            colors = loginTextFieldColors()
         )
 
         Spacer(modifier = Modifier.height(20.dp))
@@ -228,9 +220,10 @@ fun LoginPage(modifier: Modifier = Modifier, navController: NavController, authV
             placeholder = { Text("enter password", color = Color.Gray, fontSize = 14.sp) },
             visualTransformation = PasswordVisualTransformation(),
             singleLine = true,
+            textStyle = TextStyle(color = Color.White, fontSize = 15.sp),
             modifier = Modifier
                 .fillMaxWidth()
-                .height(50.dp)
+                .heightIn(min = 56.dp)
                 .focusRequester(passwordFocusRequester)
                 .onPreviewKeyEvent { event ->
                     when {
@@ -254,14 +247,7 @@ fun LoginPage(modifier: Modifier = Modifier, navController: NavController, authV
             keyboardActions = KeyboardActions(
                 onDone = { authViewModel.logIn(email, password) }
             ),
-            colors = TextFieldDefaults.colors(
-                focusedContainerColor = Color.Transparent,
-                unfocusedContainerColor = Color.Transparent,
-                focusedTextColor = Color.White,
-                unfocusedTextColor = Color.White,
-                focusedIndicatorColor = Color.White,
-                unfocusedIndicatorColor = DeepSea4
-            )
+            colors = loginTextFieldColors()
         )
 
         // REMEMBER ME & FORGOT PASSWORD
@@ -425,3 +411,15 @@ fun GoogleSignInButton(authViewModel: AuthViewModel) {
         Text("Continue with Google", color = Color.Black, fontSize = 16.sp, fontWeight = FontWeight.SemiBold)
     }
 }
+
+@Composable
+private fun loginTextFieldColors() = TextFieldDefaults.colors(
+    focusedContainerColor = Color.Transparent,
+    unfocusedContainerColor = Color.Transparent,
+    disabledContainerColor = Color.Transparent,
+    focusedTextColor = Color.White,
+    unfocusedTextColor = Color.White,
+    cursorColor = Color.White,
+    focusedIndicatorColor = Color.White,
+    unfocusedIndicatorColor = DeepSea4
+)
