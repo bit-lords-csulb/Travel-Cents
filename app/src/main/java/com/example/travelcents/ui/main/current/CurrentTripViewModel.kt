@@ -214,6 +214,7 @@ class CurrentTripViewModel : ViewModel() {
                         "startTime",
                         "endTime",
                         "imageUrl",
+                        "localImagePath",
                         "photoUrls"
                     )
 
@@ -221,6 +222,12 @@ class CurrentTripViewModel : ViewModel() {
                     val photoUrls = (doc.get("photoUrls") as? List<*>)
                         ?.filterIsInstance<String>()
                         ?: emptyList()
+                    val rawImageUrl = doc.getString("imageUrl") ?: ""
+                    val rawLocalImagePath = doc.getString("localImagePath") ?: ""
+                    val localImagePath = rawLocalImagePath.ifBlank {
+                        rawImageUrl.takeIf(::looksLikeLocalImagePath).orEmpty()
+                    }
+                    val imageUrl = rawImageUrl.takeUnless(::looksLikeLocalImagePath).orEmpty()
 
                     TravelEvent(
                         eventId = doc.getString("eventId") ?: doc.id,
@@ -230,7 +237,8 @@ class CurrentTripViewModel : ViewModel() {
                         date = doc.getString("date") ?: "",
                         startTime = doc.getString("startTime") ?: "",
                         endTime = doc.getString("endTime") ?: "",
-                        imageUrl = doc.getString("imageUrl") ?: "",
+                        imageUrl = imageUrl,
+                        localImagePath = localImagePath,
                         photoUrls = photoUrls,
                         details = allData
                             .filterKeys { it !in coreKeys }
@@ -257,7 +265,14 @@ class CurrentTripViewModel : ViewModel() {
                     val optionsByEvent = loadOptionsForEvents(uid, tripId, sortedEvents)
                     val enrichedEvents = sortPlanEvents(
                         sortedEvents.map { event ->
-                            event.copy(options = optionsByEvent[event.eventId].orEmpty())
+                            val options = optionsByEvent[event.eventId].orEmpty()
+                            val baseEvent = event.copy(options = options)
+                            val selectedOption = options.firstOrNull { it.selected }
+                            if (selectedOption != null) {
+                                applySelectedOption(baseEvent, selectedOption).copy(options = options)
+                            } else {
+                                baseEvent
+                            }
                         }
                     )
                     _eventOptions.value = optionsByEvent
@@ -910,9 +925,19 @@ class CurrentTripViewModel : ViewModel() {
             }
         }
 
-        val imageUrl = option.localImagePath.ifBlank { option.imageUrl }.ifBlank { event.imageUrl }
+        val imageUrl = option.imageUrl.ifBlank { event.imageUrl }
+        val localImagePath = option.localImagePath.ifBlank { event.localImagePath }
         val photoUrls = option.photoUrls.ifEmpty { event.photoUrls }
-        return event.copy(imageUrl = imageUrl, photoUrls = photoUrls, details = mergedDetails)
+        return event.copy(
+            imageUrl = imageUrl,
+            localImagePath = localImagePath,
+            photoUrls = photoUrls,
+            details = mergedDetails
+        )
+    }
+
+    private fun looksLikeLocalImagePath(value: String): Boolean {
+        return value.startsWith("/") || value.startsWith("file:/")
     }
 
     private fun sortPlanEvents(events: List<TravelEvent>): List<TravelEvent> {

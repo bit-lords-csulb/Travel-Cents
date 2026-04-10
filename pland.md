@@ -312,3 +312,108 @@ This was the previous "Current" tab UI (a simpler version). It is no longer wire
 - **`listenToEvents()` divergence**: CurrentTripViewModel's version omits `imageUrl`/`photoUrls` and the options-loading pipeline. The ItineraryViewModel version includes both. Use the ItineraryViewModel version verbatim to avoid missing thumbnails.
 - **Two ViewModels in MainScaffold**: Currently `currentTripViewModel` and `finalPlanViewModel` are separate instances. After the merge, a single `currentTripViewModel` handles both tabs. Verify that navigating from the Current tab to the New Trip wizard and back does not reset the loaded trip (it should not since the VM is scoped to `MainScaffold`).
 - **jiggle mode + PlanEditor conflict**: When jiggle mode is active, card clicks should be suppressed (handled by `enabled = !jiggleMode` on the card's `clickable`). The bottom bar "Done" button exits jiggle mode. These behaviors carry over from FinalPlan unchanged.
+
+---
+
+## Additional Requirements
+
+---
+
+### A. Home Page Modularization
+
+**Goal**: Split `HomePage.kt` into smaller, self-contained composable modules — mirroring how Current Trip was decomposed into route-based pages.
+
+Each card section on the home page should be extracted into its own composable module that:
+- Can be imported and reused independently in other screens (e.g., a `UpcomingTripsCard` appearing both on Home and in a future dashboard)
+- Exposes a clean parameter surface (data + callbacks only, no ViewModel dependency)
+- Lives in its own file under `ui/main/home/` (or `ui/main/components/home/`)
+
+**Candidate modules to extract:**
+
+| Section | Suggested file |
+|---|---|
+| Active / upcoming trip card | `HomeActiveTrip.kt` |
+| Recent trips list row | `HomeRecentTripRow.kt` |
+| Quick-action buttons row | `HomeQuickActions.kt` |
+| Budget summary card | `HomeBudgetSummary.kt` |
+| Currency converter card | `HomeCurrencyConverter.kt` |
+
+`HomePage.kt` becomes a thin coordinator that assembles these modules and passes data down from `HomeViewModel`.
+
+**Order of implementation:**
+1. Create `ui/main/home/` package.
+2. Extract each section composable into its own file.
+3. Replace inline content in `HomePage.kt` with the new imports.
+4. Verify each module compiles and renders identically.
+
+---
+
+### B. Currency Converter — Full Currency Search and Scroll
+
+**Problem**: The converter currently hard-codes or defaults to USD → EUR and only displays 3–4 currency pairs with no way to browse or search the full list.
+
+**Required changes:**
+
+1. **Expose the full currency list** — load all available currency codes (and their display names/flags if available) from the exchange rate API response into a `StateFlow<List<CurrencyEntry>>` in the ViewModel.
+
+2. **Searchable currency picker** — replace the current static dropdown with a modal bottom sheet (or full-screen dialog) that contains:
+   - A `TextField` for filtering by code or country name
+   - A `LazyColumn` showing the filtered list with scroll support
+   - Each row: currency code (bold) + full name (secondary text)
+   - Tapping a row selects it as the From or To currency and dismisses the sheet
+
+3. **Two separate picker triggers** — the From and To currency fields each open the same picker sheet but write to their respective StateFlow slot.
+
+4. **Persist last-used pair** — save the selected From/To pair to `SharedPreferences` (or `DataStore`) so it survives app restarts without defaulting back to USD/EUR.
+
+5. **Display all conversion results** — the output area should show the converted amount for the selected pair prominently, with an optional expandable section listing conversions to a user-configurable set of "pinned" currencies.
+
+**Files affected:**
+- `HomeCurrencyConverter.kt` (new module from §A above, or the existing inline section)
+- `HomeViewModel.kt` (or a new `CurrencyViewModel.kt` if the logic warrants isolation)
+- The exchange rate data source / repository layer
+
+---
+
+### C. Current Trip — Event Card Detail View (Two-Step Edit Flow)
+
+**Problem**: Tapping an event card in the Current Trip screen immediately opens `PlanEditorDialog` (the edit form). This is too aggressive — the user may just want to view the event details, not edit them.
+
+**Required changes:**
+
+**Step 1 — Default tap action: Enlarged Event Detail View**
+
+Replace the direct-to-editor navigation with a new `EventDetailSheet` (modal bottom sheet or full-screen overlay) that shows:
+
+- Large hero image (if `imageUrl` present)
+- Event type chip + color indicator
+- Full event title (large text)
+- Date, time range, timezone
+- Location / address
+- Notes / description
+- Type-specific details (airline + flight number, hotel name + rating, cuisine, etc.)
+- Yelp star rating + review count (if `yelp_id` present) — lazy-loaded the same way reviews are
+- Two primary action buttons at the bottom:
+  - **"Switch Event"** — opens the existing `EventOptionsPanel` (alternatives picker) to swap the entire event for a different provider option
+  - **"Edit Details"** — opens `PlanEditorDialog` (the existing edit form) pre-populated with this event
+
+**Step 2 — Edit Details: existing `PlanEditorDialog`**
+
+No structural change to `PlanEditorDialog` itself — it is simply no longer the first thing the user sees on a card tap.
+
+**Step 3 — Switch Event: existing `EventOptionsPanel`**
+
+No structural change to `EventOptionsPanel` — it is surfaced from the detail view instead of from inside the editor footer.
+
+**Implementation notes:**
+- Add `var detailSheetEvent by remember { mutableStateOf<TravelEvent?>(null) }` to `CurrentPage`.
+- Card `onClick` sets `detailSheetEvent = event` (instead of `editorPlan = ...`).
+- `EventDetailSheet` receives the event, `eventOptions`, `yelpReviews`, `reviewsLoading`, and two callbacks: `onEditClick` and `onSwitchClick`.
+- `onEditClick` → set `editorPlan` from the event (existing path), dismiss the sheet.
+- `onSwitchClick` → set `optionsPanelEventId`, dismiss the sheet.
+- The sheet can be a `ModalBottomSheet` or a slide-up `AnimatedVisibility` overlay depending on preference.
+- Apply to all three view modes (Itinerary, Week, Day) — all three currently route card taps through `onEventClick`, so changing the handler in one place covers all modes.
+
+**Files affected:**
+- `CurrentPage.kt` — add `EventDetailSheet` composable, update card click handlers
+- `CurrentTripViewModel.kt` — no new methods needed; `fetchYelpReviews` already exists

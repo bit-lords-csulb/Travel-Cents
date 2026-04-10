@@ -33,6 +33,7 @@ import androidx.compose.ui.window.DialogProperties
 import coil.compose.AsyncImage
 import com.example.travelcents.data.model.TravelEvent
 import com.example.travelcents.data.model.YelpReview
+import com.example.travelcents.ui.modules.galleryPhotoModels
 
 private val SurfaceCard = Color(0xFF0B203D)
 private val SurfaceHighest = Color(0xFF102645)
@@ -65,13 +66,7 @@ fun ExpandedEventCard(
     val typeColor = expandedTypeColor(event.type)
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
 
-    // Photos of this specific venue: use photoUrls if populated (hotel images from SerpAPI),
-    // otherwise fall back to the single hero image.
-    val photos = remember(event) {
-        event.photoUrls.ifEmpty {
-            listOfNotNull(event.imageUrl.takeIf { it.isNotBlank() })
-        }
-    }
+    val photos = remember(event) { event.galleryPhotoModels() }
     var showGallery by remember { mutableStateOf(false) }
 
     // Editable fields pre-filled from event

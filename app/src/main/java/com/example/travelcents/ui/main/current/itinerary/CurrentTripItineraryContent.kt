@@ -58,7 +58,11 @@ import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImage
 import com.example.travelcents.data.model.EventOption
 import com.example.travelcents.data.model.TravelEvent
+import com.example.travelcents.ui.modules.PhotoGalleryButton
+import com.example.travelcents.ui.modules.TripPhotoGalleryDialog
 import com.example.travelcents.ui.modules.formatDisplayTime
+import com.example.travelcents.ui.modules.galleryPhotoModels
+import com.example.travelcents.ui.modules.heroImageModel
 import com.example.travelcents.ui.modules.normalizeTime
 import com.example.travelcents.ui.theme.DeepSea1
 import com.example.travelcents.ui.theme.DeepSea2
@@ -243,7 +247,9 @@ private fun CurrentTripItineraryCard(
     val accent = eventPalette(event).accent
     val title = eventTitle(event)
     val description = eventSubtitle(event).ifBlank { "Tap to edit details" }
-    val imageUrl = event.imageUrl.ifBlank { event.details["imageUrl"] ?: event.details["image_url"] ?: "" }
+    val photos = remember(event) { event.galleryPhotoModels() }
+    val heroImage = remember(event) { event.heroImageModel() }
+    var showGallery by remember(event.eventId) { mutableStateOf(false) }
 
     Row(
         modifier = Modifier
@@ -302,16 +308,29 @@ private fun CurrentTripItineraryCard(
                         .fillMaxWidth()
                         .heightIn(min = 116.dp)
                 ) {
-                    if (imageUrl.isNotBlank()) {
-                        AsyncImage(
-                            model = imageUrl,
-                            contentDescription = null,
+                    if (heroImage.isNotBlank()) {
+                        Box(
                             modifier = Modifier
                                 .width(116.dp)
                                 .fillMaxHeight()
-                                .clip(RoundedCornerShape(topStart = 16.dp, bottomStart = 16.dp)),
-                            contentScale = ContentScale.Crop
-                        )
+                        ) {
+                            AsyncImage(
+                                model = heroImage,
+                                contentDescription = null,
+                                modifier = Modifier
+                                    .fillMaxSize()
+                                    .clip(RoundedCornerShape(topStart = 16.dp, bottomStart = 16.dp)),
+                                contentScale = ContentScale.Crop
+                            )
+
+                            PhotoGalleryButton(
+                                photoCount = photos.size,
+                                onClick = { showGallery = true },
+                                modifier = Modifier
+                                    .align(Alignment.TopStart)
+                                    .padding(8.dp)
+                            )
+                        }
                     } else {
                         Box(
                             modifier = Modifier
@@ -438,6 +457,13 @@ private fun CurrentTripItineraryCard(
                 }
             }
         }
+    }
+
+    if (showGallery && photos.isNotEmpty()) {
+        TripPhotoGalleryDialog(
+            photos = photos,
+            onDismiss = { showGallery = false }
+        )
     }
 }
 
