@@ -194,10 +194,10 @@ class NewTripViewModel(application: Application) : AndroidViewModel(application)
                     heroImageUrls
                 )
 
-                // Patch localImagePath into event hero image where cached; alternatives remain remote URLs
+                // Keep the remote hero URL intact and persist the local cache path separately.
                 val patchedEvents = allEvents.map { event ->
                     val localEventImg = localPaths[event.imageUrl]
-                    if (localEventImg != null) event.copy(imageUrl = localEventImg) else event
+                    if (localEventImg != null) event.copy(localImagePath = localEventImg) else event
                 }
 
                 // Step 6: Save to Firestore (events + options subcollection)

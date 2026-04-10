@@ -50,6 +50,10 @@ import coil.compose.AsyncImage
 import com.example.travelcents.data.model.Itinerary
 import com.example.travelcents.data.model.TravelEvent
 import com.example.travelcents.ui.main.current.EventOptionsPanel
+import com.example.travelcents.ui.modules.PhotoGalleryButton
+import com.example.travelcents.ui.modules.TripPhotoGalleryDialog
+import com.example.travelcents.ui.modules.galleryPhotoModels
+import com.example.travelcents.ui.modules.heroImageModel
 import com.example.travelcents.ui.theme.TravelCentsTheme
 import kotlinx.coroutines.delay
 import sh.calvin.reorderable.ReorderableItem
@@ -800,7 +804,9 @@ private fun TimelineEventCard(
     val typeColor = eventTypeColor(event.type)
     val title = primaryEventTitle(event)
     val description = secondaryEventText(event)
-    val imageUrl = event.imageUrl.ifBlank { event.details["imageUrl"] ?: event.details["image_url"] ?: "" }
+    val photos = remember(event) { event.galleryPhotoModels() }
+    val heroImage = remember(event) { event.heroImageModel() }
+    var showGallery by remember(event.eventId) { mutableStateOf(false) }
 
     Row(
         modifier = Modifier
@@ -854,16 +860,29 @@ private fun TimelineEventCard(
             Box {
                 Row(modifier = Modifier.height(120.dp)) {
                     // Thumbnail
-                    if (imageUrl.isNotEmpty()) {
-                        AsyncImage(
-                            model = imageUrl,
-                            contentDescription = null,
+                    if (heroImage.isNotEmpty()) {
+                        Box(
                             modifier = Modifier
                                 .weight(1f)
                                 .fillMaxHeight()
-                                .clip(RoundedCornerShape(topStart = 12.dp, bottomStart = 12.dp)),
-                            contentScale = ContentScale.Crop
-                        )
+                        ) {
+                            AsyncImage(
+                                model = heroImage,
+                                contentDescription = null,
+                                modifier = Modifier
+                                    .fillMaxSize()
+                                    .clip(RoundedCornerShape(topStart = 12.dp, bottomStart = 12.dp)),
+                                contentScale = ContentScale.Crop
+                            )
+
+                            PhotoGalleryButton(
+                                photoCount = photos.size,
+                                onClick = { showGallery = true },
+                                modifier = Modifier
+                                    .align(Alignment.TopStart)
+                                    .padding(8.dp)
+                            )
+                        }
                     } else {
                         Box(
                             modifier = Modifier
@@ -947,6 +966,13 @@ private fun TimelineEventCard(
                 }
             }
         }
+    }
+
+    if (showGallery && photos.isNotEmpty()) {
+        TripPhotoGalleryDialog(
+            photos = photos,
+            onDismiss = { showGallery = false }
+        )
     }
 }
 
