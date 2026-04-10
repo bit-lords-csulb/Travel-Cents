@@ -46,7 +46,6 @@ import com.example.travelcents.ui.main.current.CurrentDisplayMode
 import com.example.travelcents.ui.main.current.CurrentPage
 import com.example.travelcents.ui.main.current.CurrentTripRoutes
 import com.example.travelcents.ui.main.current.CurrentTripViewModel
-import com.example.travelcents.ui.main.current.EditPlanScreen
 import com.example.travelcents.ui.main.newTrip.NewTripLandingPage
 import com.example.travelcents.ui.main.newTrip.NewTripViewModel
 import com.example.travelcents.ui.main.newTrip.TripGeneratingPage
@@ -77,7 +76,6 @@ object MainRoutes {
     const val CHATS = "chats"
     const val SETTINGS = "settings"
 
-    const val EDIT_PLAN = "edit_plan/{tripId}/{eventId}"
     const val AI_TRIP_CHAT = "ai_trip_chat"
     const val FINAL_PLAN = "final_plan"
     const val FINAL_PLAN_BY_ID = "final_plan/{tripId}"
@@ -98,8 +96,7 @@ private val bottomNavRoutes = setOf(
     MainRoutes.AI_TRIP_CHAT,
     MainRoutes.HOME,
     MainRoutes.CHATS,
-    MainRoutes.SETTINGS,
-    MainRoutes.EDIT_PLAN
+    MainRoutes.SETTINGS
 )
 
 private data class BottomNavItem(
@@ -119,8 +116,7 @@ fun MainScaffold(modifier: Modifier = Modifier, onLogout: () -> Unit = {}) {
     val selectedBottomRoute = when (currentRoute) {
         MainRoutes.CURRENT_ITINERARY,
         MainRoutes.CURRENT_DAY,
-        MainRoutes.CURRENT_WEEK,
-        MainRoutes.EDIT_PLAN -> MainRoutes.CURRENT
+        MainRoutes.CURRENT_WEEK -> MainRoutes.CURRENT
         MainRoutes.NEW_TRIP,
         MainRoutes.NEW_TRIP_STEP_1,
         MainRoutes.NEW_TRIP_STEP_2,
@@ -202,23 +198,6 @@ fun MainScaffold(modifier: Modifier = Modifier, onLogout: () -> Unit = {}) {
                                 launchSingleTop = true
                             }
                         }
-                    )
-                }
-
-                composable(
-                    route = MainRoutes.EDIT_PLAN,
-                    arguments = listOf(
-                        navArgument("tripId") { type = NavType.StringType },
-                        navArgument("eventId") { type = NavType.StringType }
-                    )
-                ) { backStackEntry ->
-                    val tripId = backStackEntry.arguments?.getString("tripId")
-                    val eventId = backStackEntry.arguments?.getString("eventId")
-
-                    EditPlanScreen(
-                        tripId = tripId,
-                        eventId = eventId,
-                        onBackClick = { navController.popBackStack() }
                     )
                 }
 

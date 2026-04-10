@@ -179,7 +179,7 @@ fun CurrentPage(
                         title = "No Trip Yet",
                         body = uiState.infoMessage ?: "Create a trip from the New Trip tab to populate this calendar."
                     )
-                    displayMode == CurrentDisplayMode.ITINERARY -> ItineraryPage(
+                    displayMode == CurrentDisplayMode.ITINERARY -> UnifiedItineraryContent(
                         events = events,
                         eventOptions = eventOptions,
                         rejectedOptions = rejectedOptions,
