@@ -26,11 +26,13 @@ fun CurrentTripOverlayHost(
     yelpReviews: Map<String, List<com.example.travelcents.data.model.YelpReview>>,
     reviewsLoading: Set<String>,
     shareTargets: List<ShareTarget>,
+    selectedEventId: String?,
     editorPlan: EditablePlan?,
     deleteCandidate: EditablePlan?,
     optionsPanelEventId: String?,
     showShareSheet: Boolean,
     shareConfirmation: String?,
+    onSelectedEventIdChange: (String?) -> Unit,
     onEditorPlanChange: (EditablePlan?) -> Unit,
     onDeleteCandidateChange: (EditablePlan?) -> Unit,
     onOptionsPanelEventIdChange: (String?) -> Unit,
@@ -42,6 +44,36 @@ fun CurrentTripOverlayHost(
     onSelectOption: (String, String) -> Unit,
     onRejectOption: (String, String) -> Unit
 ) {
+    selectedEventId?.let { eventId ->
+        val event = uiState.events.firstOrNull { it.eventId == eventId }
+        if (event != null) {
+            val yelpId = event.details["yelp_id"].orEmpty()
+            CurrentTripEventDetailsDialog(
+                event = event,
+                currentOptions = eventOptions[eventId].orEmpty(),
+                yelpReviews = yelpReviews[yelpId].orEmpty(),
+                reviewsLoading = reviewsLoading.contains(yelpId),
+                onDismiss = { onSelectedEventIdChange(null) },
+                onEdit = {
+                    onSelectedEventIdChange(null)
+                    onEditorPlanChange(event.toEditablePlan())
+                },
+                onDelete = {
+                    onSelectedEventIdChange(null)
+                    onDeleteCandidateChange(event.toEditablePlan())
+                },
+                onAlternatives = if (eventOptions[eventId].orEmpty().size > 1) {
+                    {
+                        onSelectedEventIdChange(null)
+                        onOptionsPanelEventIdChange(eventId)
+                    }
+                } else {
+                    null
+                }
+            )
+        }
+    }
+
     deleteCandidate?.let { plan ->
         DeletePlanDialog(
             plan = plan,

@@ -56,6 +56,7 @@ fun CurrentTripScreen(
     }
 
     var selectedDate by rememberSaveable { mutableStateOf("") }
+    var selectedEventId by remember { mutableStateOf<String?>(null) }
     var editorPlan by remember { mutableStateOf<EditablePlan?>(null) }
     var deleteCandidate by remember { mutableStateOf<EditablePlan?>(null) }
     var jiggleMode by remember { mutableStateOf(false) }
@@ -90,6 +91,15 @@ fun CurrentTripScreen(
 
     LaunchedEffect(editorPlan) {
         editorPlan?.existingDetails?.get("yelp_id")
+            ?.takeIf { it.isNotBlank() }
+            ?.let(viewModel::fetchYelpReviews)
+    }
+
+    LaunchedEffect(selectedEventId, uiState.events) {
+        uiState.events
+            .firstOrNull { it.eventId == selectedEventId }
+            ?.details
+            ?.get("yelp_id")
             ?.takeIf { it.isNotBlank() }
             ?.let(viewModel::fetchYelpReviews)
     }
@@ -143,6 +153,7 @@ fun CurrentTripScreen(
                 },
                 onSwitchTrip = { currentTripId ->
                     jiggleMode = false
+                    selectedEventId = null
                     optionsPanelEventId = null
                     editorPlan = null
                     deleteCandidate = null
@@ -184,7 +195,7 @@ fun CurrentTripScreen(
                         eventOptions = eventOptions,
                         rejectedOptions = rejectedOptions,
                         jiggleMode = jiggleMode,
-                        onEventClick = { editorPlan = it.toEditablePlan() },
+                        onEventClick = { selectedEventId = it.eventId },
                         onDeleteClick = { deleteCandidate = it.toEditablePlan() },
                         onOpenAlternatives = { optionsPanelEventId = it },
                         onMoveEvent = viewModel::moveEventLocally,
@@ -195,7 +206,7 @@ fun CurrentTripScreen(
                         sortedDates = calendarDates,
                         selectedDate = selectedDate,
                         onDateSelected = { selectedDate = it },
-                        onEventClick = { editorPlan = it.toEditablePlan() },
+                        onEventClick = { selectedEventId = it.eventId },
                         onDeleteClick = { deleteCandidate = it.toEditablePlan() },
                         onCreatePlan = { date, startMinutes ->
                             editorPlan = newEditablePlan(date, startMinutes)
@@ -206,7 +217,7 @@ fun CurrentTripScreen(
                         sortedDates = calendarDates,
                         selectedDate = selectedDate,
                         onDateSelected = { selectedDate = it },
-                        onEventClick = { editorPlan = it.toEditablePlan() },
+                        onEventClick = { selectedEventId = it.eventId },
                         onDeleteClick = { deleteCandidate = it.toEditablePlan() },
                         onCreatePlan = { date, startMinutes ->
                             editorPlan = newEditablePlan(date, startMinutes)
@@ -224,11 +235,13 @@ fun CurrentTripScreen(
         yelpReviews = yelpReviews,
         reviewsLoading = reviewsLoading,
         shareTargets = shareTargets,
+        selectedEventId = selectedEventId,
         editorPlan = editorPlan,
         deleteCandidate = deleteCandidate,
         optionsPanelEventId = optionsPanelEventId,
         showShareSheet = showShareSheet,
         shareConfirmation = shareConfirmation,
+        onSelectedEventIdChange = { selectedEventId = it },
         onEditorPlanChange = { editorPlan = it },
         onDeleteCandidateChange = { deleteCandidate = it },
         onOptionsPanelEventIdChange = { optionsPanelEventId = it },
@@ -239,6 +252,9 @@ fun CurrentTripScreen(
             viewModel.deletePlan(plan)
             if (editorPlan?.eventId == plan.eventId) {
                 editorPlan = null
+            }
+            if (selectedEventId == plan.eventId) {
+                selectedEventId = null
             }
         },
         onShareTrip = viewModel::shareTripToChat,
