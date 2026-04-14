@@ -8,6 +8,7 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -16,21 +17,30 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.AccessTime
 import androidx.compose.material.icons.filled.CalendarToday
+import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.Language
+import androidx.compose.material.icons.filled.LocationOn
+import androidx.compose.material.icons.filled.Map
+import androidx.compose.material.icons.filled.MoreVert
+import androidx.compose.material.icons.filled.Star
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
-import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.OutlinedTextFieldDefaults
+import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -39,16 +49,20 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardCapitalization
-import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
+import coil.compose.AsyncImage
 import com.example.travelcents.data.model.EventOption
 import com.example.travelcents.data.model.YelpReview
 import com.example.travelcents.ui.modules.defaultPlanTimeZoneId
@@ -59,13 +73,24 @@ import com.example.travelcents.ui.modules.parseFlexibleTime
 import com.example.travelcents.ui.modules.parseIsoDate
 import com.example.travelcents.ui.modules.plusMinutes
 import com.example.travelcents.ui.modules.todayIsoDate
-import com.example.travelcents.ui.theme.DeepSea1
-import com.example.travelcents.ui.theme.DeepSea2
-import com.example.travelcents.ui.theme.DeepSea3
 import com.example.travelcents.ui.theme.DeepSea4
 import com.example.travelcents.ui.theme.DeepSea5
 import java.util.Calendar
 import java.util.Locale
+
+// Design tokens matching the HTML spec
+private val EditorBg = Color(0xFF0B1326)
+private val SurfaceLowest = Color(0xFF060E20)
+private val SurfaceContainerHigh = Color(0xFF222A3D)
+private val SurfaceContainerHighest = Color(0xFF2D3449)
+private val PrimaryAccent = Color(0xFFCEBDFF)
+private val PrimaryContainer = Color(0xFFA78BFA)
+private val OnSurface = Color(0xFFDAE2FD)
+private val OnSurfaceVariant = Color(0xFFCAC4D4)
+private val ErrorContainer = Color(0xFF93000A)
+private val OnErrorContainer = Color(0xFFFFDAD6)
+
+private val GradientAccent = Brush.linearGradient(listOf(PrimaryAccent, PrimaryContainer))
 
 private data class PlanDetailField(
     val label: String,
@@ -98,7 +123,7 @@ fun CurrentPlanEditorDialog(
     var colorKey by remember(initialPlan) { mutableStateOf(initialPlan.colorKey.ifBlank { "rose" }) }
     val timeZoneId = remember(initialPlan) { initialPlan.timeZoneId.ifBlank { defaultPlanTimeZoneId() } }
     var validationMessage by remember { mutableStateOf<String?>(null) }
-    var reviewsExpanded by remember { mutableStateOf(false) }
+    var menuExpanded by remember { mutableStateOf(false) }
 
     var airline by remember(initialPlan) { mutableStateOf(initialPlan.existingDetails["airline"].orEmpty()) }
     var flightNumber by remember(initialPlan) { mutableStateOf(initialPlan.existingDetails["flight_number"].orEmpty()) }
@@ -125,144 +150,246 @@ fun CurrentPlanEditorDialog(
             "cyan" to Color(0xFF268C95)
         )
     }
-    val textFieldColors = OutlinedTextFieldDefaults.colors(
-        focusedContainerColor = DeepSea2,
-        unfocusedContainerColor = DeepSea2,
-        focusedTextColor = DeepSea5,
-        unfocusedTextColor = DeepSea5,
-        focusedBorderColor = DeepSea3,
-        unfocusedBorderColor = DeepSea3.copy(alpha = 0.7f),
-        focusedLabelColor = DeepSea5,
-        unfocusedLabelColor = DeepSea4,
-        cursorColor = DeepSea5
-    )
+    val activeColorName = remember(colorKey) {
+        colorKey.replaceFirstChar { it.uppercase() }
+    }
 
     Dialog(
         onDismissRequest = onDismiss,
         properties = DialogProperties(usePlatformDefaultWidth = false)
     ) {
         Surface(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(16.dp),
-            shape = RoundedCornerShape(28.dp),
-            color = DeepSea1
+            modifier = Modifier.fillMaxSize(),
+            color = EditorBg
         ) {
-            Column(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .verticalScroll(rememberScrollState())
-                    .padding(20.dp)
-            ) {
+            Column(modifier = Modifier.fillMaxSize()) {
+
+                // ── Top bar ──────────────────────────────────────────────────
                 Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .background(EditorBg)
+                        .padding(horizontal = 8.dp, vertical = 8.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    TextButton(onClick = onDismiss) { Text("Close", color = DeepSea4) }
+                    IconButton(onClick = onDismiss) {
+                        Icon(Icons.Default.Close, contentDescription = "Close", tint = PrimaryAccent)
+                    }
                     Text(
-                        text = if (initialPlan.eventId == null) "ADD PLAN" else "EDIT PLAN",
-                        color = DeepSea5,
-                        fontSize = 11.sp,
+                        text = if (initialPlan.eventId == null) "ADD PLAN" else "EDIT EVENT",
+                        color = OnSurface,
+                        fontSize = 12.sp,
                         fontWeight = FontWeight.Bold,
-                        letterSpacing = 1.3.sp
+                        letterSpacing = 2.sp,
+                        modifier = Modifier.weight(1f).padding(start = 4.dp)
                     )
-                    Spacer(modifier = Modifier.width(48.dp))
-                }
-
-                Spacer(modifier = Modifier.height(18.dp))
-                OutlinedTextField(
-                    value = title,
-                    onValueChange = {
-                        title = it
-                        validationMessage = null
-                    },
-                    modifier = Modifier.fillMaxWidth(),
-                    label = { Text("Title") },
-                    placeholder = { Text("e.g. Scuba Diving") },
-                    singleLine = true,
-                    colors = textFieldColors,
-                    keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Words)
-                )
-
-                Spacer(modifier = Modifier.height(14.dp))
-
-                Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                    PlanPickerField(
-                        modifier = Modifier.weight(1f),
-                        label = "Date",
-                        value = date,
-                        placeholder = "YYYY-MM-DD",
-                        icon = Icons.Default.CalendarToday,
-                        onClick = {
-                            showPlanDatePicker(context, date) {
-                                date = it
-                                validationMessage = null
+                    Box {
+                        IconButton(onClick = { menuExpanded = true }) {
+                            Icon(Icons.Default.MoreVert, contentDescription = "More", tint = PrimaryAccent)
+                        }
+                        DropdownMenu(
+                            expanded = menuExpanded,
+                            onDismissRequest = { menuExpanded = false },
+                            modifier = Modifier.background(SurfaceContainerHigh)
+                        ) {
+                            if (canShowAlternatives) {
+                                DropdownMenuItem(
+                                    text = { Text("Alternatives", color = OnSurface) },
+                                    onClick = { menuExpanded = false; onAlternatives() }
+                                )
                             }
                         }
-                    )
+                    }
                 }
 
-                Spacer(modifier = Modifier.height(12.dp))
+                // ── Scrollable content ───────────────────────────────────────
+                Column(
+                    modifier = Modifier
+                        .weight(1f)
+                        .verticalScroll(rememberScrollState())
+                        .padding(horizontal = 24.dp)
+                ) {
+                    // Hero section: type label + big title + image
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Text(
+                        text = planType.uppercase(Locale.US),
+                        color = PrimaryAccent,
+                        fontSize = 10.sp,
+                        fontWeight = FontWeight.Bold,
+                        letterSpacing = 3.sp
+                    )
+                    Spacer(modifier = Modifier.height(6.dp))
+                    BasicTextField(
+                        value = title,
+                        onValueChange = { title = it.filter { c -> c != '\n' }; validationMessage = null },
+                        singleLine = true,
+                        textStyle = TextStyle(
+                            color = OnSurface,
+                            fontSize = 28.sp,
+                            fontWeight = FontWeight.ExtraBold,
+                            lineHeight = 34.sp
+                        ),
+                        cursorBrush = SolidColor(PrimaryAccent),
+                        decorationBox = { inner ->
+                            Box {
+                                if (title.isEmpty()) {
+                                    Text(
+                                        "Event title",
+                                        color = OnSurfaceVariant.copy(alpha = 0.5f),
+                                        fontSize = 28.sp,
+                                        fontWeight = FontWeight.ExtraBold
+                                    )
+                                }
+                                inner()
+                            }
+                        },
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                    Spacer(modifier = Modifier.height(16.dp))
 
-                Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                    PlanPickerField(
-                        modifier = Modifier.weight(1f),
-                        label = "Start Time",
-                        value = time,
-                        placeholder = "Select time",
-                        icon = Icons.Default.AccessTime,
-                        onClick = {
-                            showPlanTimePicker(context, time) {
-                                time = it
-                                validationMessage = null
+                    // Hero image
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(192.dp)
+                            .clip(RoundedCornerShape(24.dp))
+                            .background(SurfaceContainerHigh)
+                    ) {
+                        if (initialPlan.imageUrl.isNotBlank()) {
+                            AsyncImage(
+                                model = initialPlan.imageUrl,
+                                contentDescription = title,
+                                modifier = Modifier.fillMaxSize(),
+                                contentScale = ContentScale.Crop
+                            )
+                        }
+                        Box(
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .background(
+                                    Brush.verticalGradient(
+                                        listOf(Color.Transparent, EditorBg.copy(alpha = 0.75f))
+                                    )
+                                )
+                        )
+                    }
+
+                    Spacer(modifier = Modifier.height(28.dp))
+
+                    // Date + timezone row
+                    Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                        EditorPickerField(
+                            modifier = Modifier.weight(1f),
+                            label = "DATE",
+                            value = date,
+                            placeholder = "YYYY-MM-DD",
+                            icon = Icons.Default.CalendarToday,
+                            onClick = {
+                                showPlanDatePicker(context, date) {
+                                    date = it
+                                    validationMessage = null
+                                }
+                            }
+                        )
+                        Column(modifier = Modifier.weight(1f)) {
+                            EditorFieldLabel("TIME ZONE")
+                            Spacer(modifier = Modifier.height(6.dp))
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .clip(RoundedCornerShape(12.dp))
+                                    .background(SurfaceLowest)
+                                    .padding(horizontal = 14.dp, vertical = 16.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Icon(
+                                    Icons.Default.Language,
+                                    contentDescription = null,
+                                    tint = PrimaryAccent,
+                                    modifier = Modifier.size(18.dp)
+                                )
+                                Spacer(modifier = Modifier.width(8.dp))
+                                Text(
+                                    text = formatTimeZoneLabel(
+                                        timeZoneId = timeZoneId,
+                                        date = date.ifBlank { todayIsoDate() },
+                                        time = time.ifBlank { "12:00 PM" }
+                                    ),
+                                    color = OnSurface,
+                                    fontSize = 13.sp,
+                                    fontWeight = FontWeight.Medium,
+                                    maxLines = 1
+                                )
                             }
                         }
-                    )
-                    PlanPickerField(
-                        modifier = Modifier.weight(1f),
-                        label = "End Time",
-                        value = endTime,
-                        placeholder = "Optional",
-                        icon = Icons.Default.AccessTime,
-                        onClick = {
-                            showPlanTimePicker(context, endTime.ifBlank { plusMinutes(time, 60) }) {
-                                endTime = it
+                    }
+
+                    Spacer(modifier = Modifier.height(12.dp))
+
+                    // Start + End time row
+                    Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                        EditorPickerField(
+                            modifier = Modifier.weight(1f),
+                            label = "START TIME",
+                            value = time,
+                            placeholder = "Select time",
+                            icon = Icons.Default.AccessTime,
+                            onClick = {
+                                showPlanTimePicker(context, time) { time = it; validationMessage = null }
                             }
-                        }
-                    )
-                }
+                        )
+                        EditorPickerField(
+                            modifier = Modifier.weight(1f),
+                            label = "END TIME",
+                            value = endTime,
+                            placeholder = "Optional",
+                            icon = Icons.Default.AccessTime,
+                            onClick = {
+                                showPlanTimePicker(context, endTime.ifBlank { plusMinutes(time, 60) }) { endTime = it }
+                            }
+                        )
+                    }
 
-                Spacer(modifier = Modifier.height(14.dp))
-                Text("TIME ZONE", color = DeepSea4, fontSize = 10.sp, fontWeight = FontWeight.Bold, letterSpacing = 0.8.sp)
-                Spacer(modifier = Modifier.height(4.dp))
-                Text(
-                    text = formatTimeZoneLabel(
-                        timeZoneId = timeZoneId,
-                        date = date.ifBlank { todayIsoDate() },
-                        time = time.ifBlank { "12:00 PM" }
-                    ),
-                    color = DeepSea5,
-                    fontSize = 13.sp
-                )
+                    Spacer(modifier = Modifier.height(12.dp))
 
-                Spacer(modifier = Modifier.height(14.dp))
-                OutlinedTextField(
-                    value = location,
-                    onValueChange = { location = it },
-                    modifier = Modifier.fillMaxWidth(),
-                    label = { Text("Location") },
-                    placeholder = { Text("Beach, resort, restaurant...") },
-                    singleLine = true,
-                    colors = textFieldColors
-                )
+                    // Location
+                    EditorFieldLabel("LOCATION")
+                    Spacer(modifier = Modifier.height(6.dp))
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clip(RoundedCornerShape(12.dp))
+                            .background(SurfaceLowest)
+                            .padding(horizontal = 14.dp, vertical = 4.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Icon(
+                            Icons.Default.LocationOn,
+                            contentDescription = null,
+                            tint = PrimaryAccent,
+                            modifier = Modifier.size(18.dp)
+                        )
+                        Spacer(modifier = Modifier.width(8.dp))
+                        EditorTextField(
+                            value = location,
+                            onValueChange = { location = it },
+                            placeholder = "Beach, resort, restaurant...",
+                            modifier = Modifier.weight(1f)
+                        )
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Icon(
+                            Icons.Default.Map,
+                            contentDescription = null,
+                            tint = PrimaryAccent.copy(alpha = 0.5f),
+                            modifier = Modifier.size(18.dp)
+                        )
+                    }
 
-                Spacer(modifier = Modifier.height(14.dp))
+                    Spacer(modifier = Modifier.height(20.dp))
 
-                when (planType) {
-                    "flight" -> {
-                        PlanDetailFields(
-                            textFieldColors = textFieldColors,
+                    // Type-specific detail fields
+                    when (planType) {
+                        "flight" -> PlanDetailFields(
                             fields = listOf(
                                 PlanDetailField("Airline", airline, { airline = it }, "Delta"),
                                 PlanDetailField("Flight Number", flightNumber, { flightNumber = it }, "DL 123"),
@@ -272,10 +399,7 @@ fun CurrentPlanEditorDialog(
                                 PlanDetailField("Trip Segment", tripSegment, { tripSegment = it }, "outbound / return")
                             )
                         )
-                    }
-                    "hotel" -> {
-                        PlanDetailFields(
-                            textFieldColors = textFieldColors,
+                        "hotel" -> PlanDetailFields(
                             fields = listOf(
                                 PlanDetailField("Hotel Name", hotelName, { hotelName = it }, "The Carlyle"),
                                 PlanDetailField("Address", hotelAddress, { hotelAddress = it }, "35 E 76th St"),
@@ -284,144 +408,175 @@ fun CurrentPlanEditorDialog(
                                 PlanDetailField("Check-Out", checkOut, { checkOut = it }, "11:00 AM")
                             )
                         )
-                    }
-                    "restaurant", "dining", "food" -> {
-                        PlanDetailFields(
-                            textFieldColors = textFieldColors,
+                        "restaurant", "dining", "food" -> PlanDetailFields(
                             fields = listOf(
                                 PlanDetailField("Restaurant Name", restaurantName, { restaurantName = it }, "Via Carota"),
                                 PlanDetailField("Cuisine", cuisine, { cuisine = it }, "Italian")
                             )
                         )
                     }
-                }
 
-                OutlinedTextField(
-                    value = notes,
-                    onValueChange = { notes = it },
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(120.dp),
-                    label = { Text("Notes") },
-                    placeholder = { Text("Add booking notes or reminders") },
-                    maxLines = 5,
-                    colors = textFieldColors
-                )
-
-                Spacer(modifier = Modifier.height(18.dp))
-                Text("LABEL COLOR", color = DeepSea4, fontSize = 10.sp, fontWeight = FontWeight.Bold, letterSpacing = 0.8.sp)
-                Spacer(modifier = Modifier.height(10.dp))
-                Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                    colorOptions.forEach { (key, color) ->
-                        Box(
-                            modifier = Modifier
-                                .size(26.dp)
-                                .clip(CircleShape)
-                                .background(color)
-                                .border(
-                                    width = if (key == colorKey) 2.dp else 1.dp,
-                                    color = if (key == colorKey) DeepSea5 else Color.Transparent,
-                                    shape = CircleShape
-                                )
-                                .clickable { colorKey = key }
+                    // Notes
+                    EditorFieldLabel("NOTES")
+                    Spacer(modifier = Modifier.height(6.dp))
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clip(RoundedCornerShape(12.dp))
+                            .background(SurfaceLowest)
+                            .padding(horizontal = 14.dp, vertical = 12.dp)
+                    ) {
+                        if (notes.isEmpty()) {
+                            Text(
+                                "Add booking notes or reminders",
+                                color = OnSurfaceVariant.copy(alpha = 0.5f),
+                                fontSize = 14.sp
+                            )
+                        }
+                        androidx.compose.foundation.text.BasicTextField(
+                            value = notes,
+                            onValueChange = { notes = it },
+                            textStyle = TextStyle(color = OnSurface, fontSize = 14.sp, lineHeight = 22.sp),
+                            cursorBrush = SolidColor(PrimaryAccent),
+                            modifier = Modifier.fillMaxWidth().height(96.dp)
                         )
                     }
-                }
 
-                if (initialPlan.existingDetails["yelp_id"].orEmpty().isNotBlank()) {
-                    Spacer(modifier = Modifier.height(18.dp))
-                    YelpReviewsSection(
-                        reviews = yelpReviews,
-                        loading = reviewsLoading,
-                        expanded = reviewsExpanded,
-                        onToggle = { reviewsExpanded = !reviewsExpanded }
-                    )
-                }
+                    Spacer(modifier = Modifier.height(20.dp))
 
-                validationMessage?.let { message ->
-                    Spacer(modifier = Modifier.height(16.dp))
-                    Text(text = message, color = Color(0xFFFFB4C7), fontSize = 13.sp)
-                }
-
-                Spacer(modifier = Modifier.height(28.dp))
-
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(10.dp)
-                ) {
-                    if (canShowAlternatives) {
-                        Button(
-                            onClick = onAlternatives,
-                            modifier = Modifier.weight(1f),
-                            shape = RoundedCornerShape(14.dp),
-                            colors = ButtonDefaults.buttonColors(containerColor = DeepSea2, contentColor = DeepSea5)
-                        ) {
-                            Text("Alternatives", fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
+                    // Label color
+                    EditorFieldLabel("LABEL COLOR")
+                    Spacer(modifier = Modifier.height(10.dp))
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clip(RoundedCornerShape(12.dp))
+                            .background(SurfaceLowest)
+                            .padding(horizontal = 14.dp, vertical = 14.dp),
+                        horizontalArrangement = Arrangement.spacedBy(10.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        colorOptions.forEach { (key, color) ->
+                            Box(
+                                modifier = Modifier
+                                    .size(28.dp)
+                                    .clip(CircleShape)
+                                    .background(color)
+                                    .then(
+                                        if (key == colorKey) Modifier.border(2.dp, OnSurface, CircleShape) else Modifier
+                                    )
+                                    .clickable { colorKey = key }
+                            )
                         }
+                        Spacer(modifier = Modifier.weight(1f))
+                        Text(
+                            text = activeColorName,
+                            color = OnSurfaceVariant,
+                            fontSize = 12.sp,
+                            fontWeight = FontWeight.Medium
+                        )
                     }
 
+                    // Yelp reviews (shown always if yelp_id exists)
+                    val yelpId = initialPlan.existingDetails["yelp_id"].orEmpty()
+                    if (yelpId.isNotBlank()) {
+                        Spacer(modifier = Modifier.height(24.dp))
+                        EditorYelpReviews(
+                            rating = initialPlan.existingDetails["rating"],
+                            reviews = yelpReviews,
+                            loading = reviewsLoading
+                        )
+                    }
+
+                    validationMessage?.let {
+                        Spacer(modifier = Modifier.height(12.dp))
+                        Text(it, color = Color(0xFFFFB4C7), fontSize = 13.sp)
+                    }
+
+                    Spacer(modifier = Modifier.height(100.dp))
+                }
+
+                // ── Sticky footer ────────────────────────────────────────────
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .background(EditorBg.copy(alpha = 0.9f))
+                        .padding(horizontal = 24.dp, vertical = 16.dp),
+                    horizontalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
                     if (initialPlan.eventId != null) {
                         Button(
                             onClick = { onDelete(initialPlan) },
                             modifier = Modifier.weight(1f),
-                            shape = RoundedCornerShape(14.dp),
+                            shape = RoundedCornerShape(50),
                             colors = ButtonDefaults.buttonColors(
-                                containerColor = Color(0xFF3B2637),
-                                contentColor = Color(0xFFFFB4C7)
-                            )
+                                containerColor = ErrorContainer,
+                                contentColor = OnErrorContainer
+                            ),
+                            contentPadding = PaddingValues(vertical = 16.dp)
                         ) {
-                            Text("Delete", fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
+                            Text(
+                                "DELETE",
+                                fontSize = 11.sp,
+                                fontWeight = FontWeight.Bold,
+                                letterSpacing = 2.sp
+                            )
                         }
                     }
 
-                    Button(
-                        onClick = {
-                            when {
-                                title.isBlank() -> validationMessage = "A title is required."
-                                date.isBlank() -> validationMessage = "Select a date for this plan."
-                                time.isBlank() -> validationMessage = "Select a time for this plan."
-                                else -> {
-                                    val mergedDetails = initialPlan.existingDetails.toMutableMap().apply {
-                                        applyPlanDetail("airline", airline, planType == "flight")
-                                        applyPlanDetail("flight_number", flightNumber, planType == "flight")
-                                        applyPlanDetail("origin_airport", originAirport, planType == "flight")
-                                        applyPlanDetail("destination_airport", destinationAirport, planType == "flight")
-                                        applyPlanDetail("total_price", totalPrice, planType == "flight")
-                                        applyPlanDetail("trip_segment", tripSegment, planType == "flight")
-                                        applyPlanDetail("hotel_name", hotelName, planType == "hotel")
-                                        applyPlanDetail("address", hotelAddress, planType == "hotel")
-                                        applyPlanDetail("rating", hotelRating, planType == "hotel")
-                                        applyPlanDetail("check_in", checkIn, planType == "hotel")
-                                        applyPlanDetail("check_out", checkOut, planType == "hotel")
-                                        applyPlanDetail("restaurant_name", restaurantName.ifBlank { title.trim() }, planType == "restaurant" || planType == "dining" || planType == "food")
-                                        applyPlanDetail("cuisine", cuisine, planType == "restaurant" || planType == "dining" || planType == "food")
-                                        applyPlanDetail("activity_name", title.trim(), planType == "activity")
-                                    }
-                                    onSave(
-                                        initialPlan.copy(
-                                            type = planType,
-                                            title = title.trim(),
-                                            date = date,
-                                            startTime = time,
-                                            endTime = endTime,
-                                            timeZoneId = timeZoneId,
-                                            location = location.trim(),
-                                            notes = notes.trim(),
-                                            colorKey = colorKey,
-                                            existingDetails = mergedDetails
+                    Box(
+                        modifier = Modifier
+                            .weight(2f)
+                            .clip(RoundedCornerShape(50))
+                            .background(GradientAccent)
+                            .clickable {
+                                when {
+                                    title.isBlank() -> validationMessage = "A title is required."
+                                    date.isBlank() -> validationMessage = "Select a date."
+                                    time.isBlank() -> validationMessage = "Select a start time."
+                                    else -> {
+                                        val mergedDetails = initialPlan.existingDetails.toMutableMap().apply {
+                                            applyPlanDetail("airline", airline, planType == "flight")
+                                            applyPlanDetail("flight_number", flightNumber, planType == "flight")
+                                            applyPlanDetail("origin_airport", originAirport, planType == "flight")
+                                            applyPlanDetail("destination_airport", destinationAirport, planType == "flight")
+                                            applyPlanDetail("total_price", totalPrice, planType == "flight")
+                                            applyPlanDetail("trip_segment", tripSegment, planType == "flight")
+                                            applyPlanDetail("hotel_name", hotelName, planType == "hotel")
+                                            applyPlanDetail("address", hotelAddress, planType == "hotel")
+                                            applyPlanDetail("rating", hotelRating, planType == "hotel")
+                                            applyPlanDetail("check_in", checkIn, planType == "hotel")
+                                            applyPlanDetail("check_out", checkOut, planType == "hotel")
+                                            applyPlanDetail("restaurant_name", restaurantName.ifBlank { title.trim() }, planType == "restaurant" || planType == "dining" || planType == "food")
+                                            applyPlanDetail("cuisine", cuisine, planType == "restaurant" || planType == "dining" || planType == "food")
+                                            applyPlanDetail("activity_name", title.trim(), planType == "activity")
+                                        }
+                                        onSave(
+                                            initialPlan.copy(
+                                                type = planType,
+                                                title = title.trim(),
+                                                date = date,
+                                                startTime = time,
+                                                endTime = endTime,
+                                                timeZoneId = timeZoneId,
+                                                location = location.trim(),
+                                                notes = notes.trim(),
+                                                colorKey = colorKey,
+                                                existingDetails = mergedDetails
+                                            )
                                         )
-                                    )
+                                    }
                                 }
                             }
-                        },
-                        modifier = Modifier.weight(1f),
-                        shape = RoundedCornerShape(14.dp),
-                        colors = ButtonDefaults.buttonColors(containerColor = DeepSea3, contentColor = DeepSea5)
+                            .padding(vertical = 16.dp),
+                        contentAlignment = Alignment.Center
                     ) {
                         Text(
-                            text = if (initialPlan.eventId == null) "Save" else "Update",
-                            fontSize = 12.sp,
-                            fontWeight = FontWeight.Bold
+                            text = if (initialPlan.eventId == null) "SAVE" else "UPDATE EVENT",
+                            color = Color(0xFF21005E),
+                            fontSize = 11.sp,
+                            fontWeight = FontWeight.Bold,
+                            letterSpacing = 2.sp
                         )
                     }
                 }
@@ -430,103 +585,133 @@ fun CurrentPlanEditorDialog(
     }
 }
 
-@Composable
-private fun PlanDetailFields(
-    textFieldColors: androidx.compose.material3.TextFieldColors,
-    fields: List<PlanDetailField>
-) {
-    fields.forEach { field ->
-        OutlinedTextField(
-            value = field.value,
-            onValueChange = field.onValueChange,
-            modifier = Modifier.fillMaxWidth(),
-            label = { Text(field.label) },
-            placeholder = { Text(field.placeholder) },
-            singleLine = true,
-            colors = textFieldColors
-        )
-        Spacer(modifier = Modifier.height(12.dp))
-    }
-}
+// ── Yelp reviews section ──────────────────────────────────────────────────────
 
 @Composable
-private fun YelpReviewsSection(
+private fun EditorYelpReviews(
+    rating: String?,
     reviews: List<YelpReview>,
-    loading: Boolean,
-    expanded: Boolean,
-    onToggle: () -> Unit
+    loading: Boolean
 ) {
-    Surface(
-        color = DeepSea2,
-        shape = RoundedCornerShape(18.dp),
-        modifier = Modifier.fillMaxWidth()
-    ) {
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(14.dp)
+    Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
         ) {
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .clickable(onClick = onToggle),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Text(
-                    text = "Yelp Reviews",
-                    color = DeepSea5,
-                    fontSize = 14.sp,
-                    fontWeight = FontWeight.SemiBold,
-                    modifier = Modifier.weight(1f)
-                )
-                Text(
-                    text = if (expanded) "Hide" else "Show",
-                    color = DeepSea4,
-                    fontSize = 12.sp
-                )
-            }
-
-            if (expanded) {
-                Spacer(modifier = Modifier.height(10.dp))
-                when {
-                    loading -> Text("Loading reviews...", color = DeepSea4, fontSize = 12.sp)
-                    reviews.isEmpty() -> Text("No reviews available.", color = DeepSea4, fontSize = 12.sp)
-                    else -> reviews.forEach { review ->
-                        Surface(
-                            color = DeepSea1,
-                            shape = RoundedCornerShape(14.dp),
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(bottom = 8.dp)
-                        ) {
-                            Column(modifier = Modifier.padding(12.dp)) {
-                                Text(
-                                    text = review.user?.name ?: "Reviewer",
-                                    color = DeepSea5,
-                                    fontSize = 12.sp,
-                                    fontWeight = FontWeight.SemiBold
-                                )
-                                Spacer(modifier = Modifier.height(4.dp))
-                                Text(text = "Rating ${review.rating}/5", color = DeepSea4, fontSize = 11.sp)
-                                Spacer(modifier = Modifier.height(6.dp))
-                                Text(
-                                    text = review.text,
-                                    color = DeepSea5,
-                                    fontSize = 12.sp,
-                                    maxLines = 4,
-                                    overflow = TextOverflow.Ellipsis
-                                )
-                            }
-                        }
+            Text(
+                "Yelp Reviews",
+                color = OnSurface,
+                fontSize = 18.sp,
+                fontWeight = FontWeight.Bold
+            )
+            if (!rating.isNullOrBlank()) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(4.dp)
+                ) {
+                    Text(rating, color = PrimaryAccent, fontSize = 13.sp, fontWeight = FontWeight.Bold)
+                    repeat(5) { i ->
+                        val filled = (rating.toDoubleOrNull() ?: 0.0) >= (i + 1)
+                        Icon(
+                            Icons.Default.Star,
+                            contentDescription = null,
+                            tint = if (filled) PrimaryAccent else OnSurfaceVariant.copy(alpha = 0.3f),
+                            modifier = Modifier.size(14.dp)
+                        )
                     }
                 }
+            }
+        }
+
+        when {
+            loading -> {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    CircularProgressIndicator(modifier = Modifier.size(14.dp), color = PrimaryAccent, strokeWidth = 2.dp)
+                    Text("Loading reviews…", color = DeepSea4, fontSize = 12.sp)
+                }
+            }
+            reviews.isEmpty() -> {
+                Text("No reviews available.", color = DeepSea4, fontSize = 13.sp)
+            }
+            else -> reviews.forEach { review ->
+                EditorReviewCard(review)
             }
         }
     }
 }
 
 @Composable
-private fun PlanPickerField(
+private fun EditorReviewCard(review: YelpReview) {
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(16.dp))
+            .background(SurfaceContainerHigh)
+            .padding(16.dp),
+        verticalArrangement = Arrangement.spacedBy(8.dp)
+    ) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Row(
+                horizontalArrangement = Arrangement.spacedBy(10.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Box(
+                    modifier = Modifier
+                        .size(32.dp)
+                        .clip(CircleShape)
+                        .background(SurfaceContainerHighest),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text(
+                        text = review.user?.name?.take(1)?.uppercase(Locale.US) ?: "R",
+                        color = PrimaryAccent,
+                        fontSize = 13.sp,
+                        fontWeight = FontWeight.Bold
+                    )
+                }
+                Column {
+                    Text(review.user?.name ?: "Reviewer", color = OnSurface, fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
+                    Text(review.timeCreated.take(10), color = OnSurfaceVariant, fontSize = 10.sp)
+                }
+            }
+            Row(horizontalArrangement = Arrangement.spacedBy(2.dp)) {
+                repeat(5) { i ->
+                    Icon(
+                        Icons.Default.Star,
+                        contentDescription = null,
+                        tint = if (i < review.rating) PrimaryAccent else OnSurfaceVariant.copy(alpha = 0.25f),
+                        modifier = Modifier.size(12.dp)
+                    )
+                }
+            }
+        }
+        Text(review.text, color = OnSurfaceVariant, fontSize = 13.sp, lineHeight = 20.sp)
+    }
+}
+
+// ── Form field helpers ────────────────────────────────────────────────────────
+
+@Composable
+private fun EditorFieldLabel(text: String) {
+    Text(
+        text = text,
+        color = OnSurfaceVariant,
+        fontSize = 10.sp,
+        fontWeight = FontWeight.Bold,
+        letterSpacing = 1.6.sp
+    )
+}
+
+@Composable
+private fun EditorPickerField(
     modifier: Modifier,
     label: String,
     value: String,
@@ -535,33 +720,81 @@ private fun PlanPickerField(
     onClick: () -> Unit
 ) {
     Column(modifier = modifier) {
-        Text(text = label, color = DeepSea4, fontSize = 12.sp, fontWeight = FontWeight.Medium)
+        EditorFieldLabel(label)
         Spacer(modifier = Modifier.height(6.dp))
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .clip(RoundedCornerShape(14.dp))
-                .background(DeepSea2)
-                .border(1.dp, DeepSea3.copy(alpha = 0.7f), RoundedCornerShape(14.dp))
+                .clip(RoundedCornerShape(12.dp))
+                .background(SurfaceLowest)
                 .clickable(onClick = onClick)
                 .padding(horizontal = 14.dp, vertical = 16.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
+            Icon(icon, contentDescription = label, tint = PrimaryAccent, modifier = Modifier.size(18.dp))
+            Spacer(modifier = Modifier.width(8.dp))
             Text(
                 text = value.ifBlank { placeholder },
-                color = if (value.isBlank()) DeepSea4.copy(alpha = 0.65f) else DeepSea5,
-                fontSize = 14.sp,
-                modifier = Modifier.weight(1f)
-            )
-            androidx.compose.material3.Icon(
-                imageVector = icon,
-                contentDescription = label,
-                tint = DeepSea4,
-                modifier = Modifier.size(18.dp)
+                color = if (value.isBlank()) OnSurfaceVariant.copy(alpha = 0.5f) else OnSurface,
+                fontSize = 13.sp,
+                fontWeight = FontWeight.Medium,
+                maxLines = 1
             )
         }
     }
 }
+
+@Composable
+private fun EditorTextField(
+    value: String,
+    onValueChange: (String) -> Unit,
+    placeholder: String,
+    modifier: Modifier = Modifier
+) {
+    BasicTextField(
+        value = value,
+        onValueChange = onValueChange,
+        singleLine = true,
+        textStyle = TextStyle(color = OnSurface, fontSize = 14.sp, fontWeight = FontWeight.Medium),
+        cursorBrush = SolidColor(PrimaryAccent),
+        keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Words),
+        decorationBox = { inner ->
+            Box(modifier = modifier) {
+                if (value.isEmpty()) {
+                    Text(placeholder, color = OnSurfaceVariant.copy(alpha = 0.5f), fontSize = 14.sp)
+                }
+                inner()
+            }
+        },
+        modifier = modifier
+    )
+}
+
+@Composable
+private fun PlanDetailFields(fields: List<PlanDetailField>) {
+    fields.forEach { field ->
+        EditorFieldLabel(field.label.uppercase(Locale.US))
+        Spacer(modifier = Modifier.height(6.dp))
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .clip(RoundedCornerShape(12.dp))
+                .background(SurfaceLowest)
+                .padding(horizontal = 14.dp, vertical = 4.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            EditorTextField(
+                value = field.value,
+                onValueChange = field.onValueChange,
+                placeholder = field.placeholder,
+                modifier = Modifier.fillMaxWidth()
+            )
+        }
+        Spacer(modifier = Modifier.height(12.dp))
+    }
+}
+
+// ── Native pickers (unchanged logic) ─────────────────────────────────────────
 
 private fun MutableMap<String, String>.applyPlanDetail(key: String, value: String, enabled: Boolean) {
     if (!enabled || value.isBlank()) remove(key) else put(key, value.trim())

@@ -24,6 +24,7 @@ fun TravelEvent.toEditablePlan(): EditablePlan {
         location = editableLocation(this),
         notes = editableNotes(this),
         colorKey = details["colorKey"] ?: defaultColorKeyForType(type),
+        imageUrl = imageUrl,
         existingDetails = details
     )
 }
