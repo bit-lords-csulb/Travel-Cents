@@ -4,6 +4,7 @@ import android.util.Log
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FieldValue
 import com.google.firebase.firestore.FirebaseFirestore
+import com.google.firebase.firestore.SetOptions
 import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlin.coroutines.resume
 import com.google.firebase.auth.GoogleAuthProvider
@@ -57,6 +58,8 @@ class AuthModel {
         lastName: String,
         username: String,
         email: String,
+        profileImageUrl: String = "",
+        profileImageSource: String = "",
         onResult: (Boolean, String?) -> Unit
     ) {
         if (uid == null) {
@@ -71,6 +74,11 @@ class AuthModel {
             "email" to email,
             "createdAt" to FieldValue.serverTimestamp()
         )
+        if (profileImageUrl.isNotBlank()) {
+            userMap["profileImageUrl"] = profileImageUrl
+            userMap["profileImageSource"] = profileImageSource
+            userMap["profileImageUpdatedAt"] = FieldValue.serverTimestamp()
+        }
         db.collection("users").document(uid)
             .set(userMap)
             .addOnSuccessListener {
@@ -177,6 +185,7 @@ class AuthModel {
                         val nameParts = fullName.split(" ", limit = 2)
                         val firstName = nameParts.getOrNull(0) ?: "Google"
                         val lastName = nameParts.getOrNull(1) ?: "User"
+                        val profileImageUrl = user.photoUrl?.toString().orEmpty()
 
                         // Generate a temporary username from email
                         val email = user.email ?: ""
@@ -188,13 +197,19 @@ class AuthModel {
                             firstName = firstName,
                             lastName = lastName,
                             username = generatedUsername,
-                            email = email
+                            email = email,
+                            profileImageUrl = profileImageUrl,
+                            profileImageSource = if (profileImageUrl.isNotBlank()) "google" else ""
                         ) { success, error ->
                             if (success) {
                                 continuation.resume(Result.success("Google account synced to Firestore!"))
                             } else {
                                 continuation.resume(Result.failure(Exception(error ?: "Firestore sync failed")))
                             }
+                        }
+                    } else if (user != null) {
+                        syncExistingGoogleProfile(user.uid, user.email.orEmpty(), user.photoUrl?.toString().orEmpty()) {
+                            continuation.resume(Result.success("Login Successful"))
                         }
                     } else {
                         continuation.resume(Result.success("Login Successful"))
@@ -203,6 +218,27 @@ class AuthModel {
                     continuation.resume(Result.failure(task.exception ?: Exception("Google Login failed")))
                 }
             }
+    }
+
+    private fun syncExistingGoogleProfile(
+        uid: String,
+        email: String,
+        profileImageUrl: String,
+        onComplete: () -> Unit
+    ) {
+        val updates = mutableMapOf<String, Any>("uid" to uid)
+        if (email.isNotBlank()) {
+            updates["email"] = email
+        }
+        if (profileImageUrl.isNotBlank()) {
+            updates["profileImageUrl"] = profileImageUrl
+            updates["profileImageSource"] = "google"
+            updates["profileImageUpdatedAt"] = FieldValue.serverTimestamp()
+        }
+
+        db.collection("users").document(uid)
+            .set(updates, SetOptions.merge())
+            .addOnCompleteListener { onComplete() }
     }
 }
 

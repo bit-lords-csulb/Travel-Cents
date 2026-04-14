@@ -41,13 +41,21 @@ data class EditablePlan(
     val location: String = "",
     val notes: String = "",
     val colorKey: String = "rose",
+    val imageUrl: String = "",
     val existingDetails: Map<String, String> = emptyMap()
+)
+
+data class TripMemberUi(
+    val uid: String,
+    val displayName: String,
+    val initial: Char
 )
 
 data class CurrentTripUiState(
     val isLoading: Boolean = true,
     val currentTripId: String? = null,
     val tripTitle: String = "Loading Trip...",
+    val destination: String = "",
     val dateFrom: String = "",
     val dateTo: String = "",
     val events: List<TravelEvent> = emptyList(),
@@ -96,6 +104,9 @@ class CurrentTripViewModel : ViewModel() {
     private val _shareTargets = MutableStateFlow<List<ShareTarget>>(emptyList())
     val shareTargets: StateFlow<List<ShareTarget>> = _shareTargets.asStateFlow()
 
+    private val _tripMembers = MutableStateFlow<List<TripMemberUi>>(emptyList())
+    val tripMembers: StateFlow<List<TripMemberUi>> = _tripMembers.asStateFlow()
+
     private val db = FirebaseFirestore.getInstance()
     private val auth = FirebaseAuth.getInstance()
     private var eventsListener: ListenerRegistration? = null
@@ -118,6 +129,7 @@ class CurrentTripViewModel : ViewModel() {
         _yelpReviews.value = emptyMap()
         _reviewsLoading.value = emptySet()
         _shareTargets.value = emptyList()
+        _tripMembers.value = emptyList()
         _uiState.value = CurrentTripUiState(
             isLoading = isLoading,
             tripTitle = tripTitle,
@@ -180,6 +192,7 @@ class CurrentTripViewModel : ViewModel() {
                 isLoading = false,
                 currentTripId = document.id,
                 tripTitle = nextTripTitle,
+                destination = currentTripDestination,
                 dateFrom = document.getString("dateFrom") ?: "",
                 dateTo = document.getString("dateTo") ?: "",
                 infoMessage = null,
@@ -188,6 +201,7 @@ class CurrentTripViewModel : ViewModel() {
         }
 
         listenToEvents(uid, document.id)
+        fetchTripMembers(document.id)
     }
 
     private fun listenToEvents(uid: String, tripId: String) {
@@ -432,6 +446,43 @@ class CurrentTripViewModel : ViewModel() {
             val reviews = YelpRepository.getBusinessReviews(yelpId)
             _yelpReviews.update { it + (yelpId to reviews) }
             _reviewsLoading.update { it - yelpId }
+        }
+    }
+
+    private fun fetchTripMembers(tripId: String) {
+        viewModelScope.launch {
+            try {
+                val groupDocs = db.collection("groups")
+                    .whereEqualTo("linkedTripId", tripId)
+                    .get()
+                    .await()
+                    .documents
+
+                val memberUids = groupDocs.firstOrNull()
+                    ?.let { doc ->
+                        @Suppress("UNCHECKED_CAST")
+                        (doc.get("members") as? List<*>)?.filterIsInstance<String>()
+                    }
+                    .orEmpty()
+
+                if (memberUids.isEmpty()) {
+                    _tripMembers.value = emptyList()
+                    return@launch
+                }
+
+                val nameMap = fetchUserNames(memberUids)
+                _tripMembers.value = memberUids.mapNotNull { uid ->
+                    val name = nameMap[uid] ?: return@mapNotNull null
+                    TripMemberUi(
+                        uid = uid,
+                        displayName = name,
+                        initial = name.firstOrNull { it.isLetter() } ?: '?'
+                    )
+                }
+            } catch (e: Exception) {
+                Log.d("CurrentTripViewModel", "Could not load trip members: ${e.message}")
+                _tripMembers.value = emptyList()
+            }
         }
     }
 

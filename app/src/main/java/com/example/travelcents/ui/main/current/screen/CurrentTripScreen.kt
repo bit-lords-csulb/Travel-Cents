@@ -18,6 +18,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.travelcents.ui.main.current.calendar.buildTripDateRange
+import com.example.travelcents.ui.main.current.header.CurrentTripHeader
 import com.example.travelcents.ui.modules.buildCalendarDates
 import com.example.travelcents.ui.modules.sortEventsForCalendar
 import com.example.travelcents.ui.modules.todayIsoDate
@@ -39,6 +40,7 @@ fun CurrentTripScreen(
     val yelpReviews by viewModel.yelpReviews.collectAsState()
     val reviewsLoading by viewModel.reviewsLoading.collectAsState()
     val shareTargets by viewModel.shareTargets.collectAsState()
+    val tripMembers by viewModel.tripMembers.collectAsState()
 
     val events = remember(uiState.events) { sortEventsForCalendar(uiState.events) }
     val eventDates = remember(events) {
@@ -115,12 +117,14 @@ fun CurrentTripScreen(
                 .padding(top = 24.dp)
         ) {
             CurrentTripHeader(
-                tripTitle = uiState.tripTitle,
-                dateRange = tripDateRange,
+                destination = uiState.destination,
+                dateFrom = uiState.dateFrom,
                 currentTripId = uiState.currentTripId,
                 allTrips = allTrips,
                 canAdd = uiState.currentTripId != null,
                 isReorderActive = displayMode == CurrentDisplayMode.ITINERARY && jiggleMode,
+                members = tripMembers,
+                onCalendarClick = { onNavigateToMode(CurrentDisplayMode.DAY) },
                 onAddClick = {
                     if (uiState.currentTripId == null) {
                         viewModel.postError("Create a trip first before adding calendar plans.")
@@ -143,21 +147,21 @@ fun CurrentTripScreen(
                     }
                     jiggleMode = !jiggleMode
                 },
-                onArchiveTrip = { currentTripId ->
+                onArchiveTrip = { tripId ->
                     jiggleMode = false
-                    viewModel.archiveTrip(currentTripId)
+                    viewModel.archiveTrip(tripId)
                 },
-                onDeleteTrip = { currentTripId ->
+                onDeleteTrip = { tripId ->
                     jiggleMode = false
-                    viewModel.deleteTrip(currentTripId)
+                    viewModel.deleteTrip(tripId)
                 },
-                onSwitchTrip = { currentTripId ->
+                onSwitchTrip = { tripId ->
                     jiggleMode = false
                     selectedEventId = null
                     optionsPanelEventId = null
                     editorPlan = null
                     deleteCandidate = null
-                    viewModel.loadTrip(currentTripId)
+                    viewModel.loadTrip(tripId)
                 },
                 onRenameTrip = viewModel::renameTrip,
                 controlsContent = {
