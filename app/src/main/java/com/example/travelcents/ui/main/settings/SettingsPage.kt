@@ -13,14 +13,8 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Person
-import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.Icon
-import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -36,6 +30,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
+import com.example.travelcents.ui.components.ProfileAvatar
 import com.example.travelcents.ui.main.newTrip.TripWizardColors
 import com.example.travelcents.ui.theme.DeepSea1
 import com.example.travelcents.ui.theme.DeepSea2
@@ -70,6 +65,7 @@ fun SettingsPage(
             displayName = userState.displayName,
             username = userState.username,
             email = userState.email,
+            profileImageUrl = userState.profileImageUrl,
             isLoading = userState.isLoading,
             onClick = { selectedTab = "Account" }
         )
@@ -101,6 +97,7 @@ private fun ProfileHeader(
     displayName: String,
     username: String,
     email: String,
+    profileImageUrl: String,
     isLoading: Boolean,
     onClick: () -> Unit
 ) {
@@ -108,29 +105,17 @@ private fun ProfileHeader(
         horizontalAlignment = Alignment.CenterHorizontally,
         modifier = Modifier.clickable(onClick = onClick)
     ) {
-        // Avatar
-        Box(contentAlignment = Alignment.Center) {
-            Surface(
-                modifier = Modifier
-                    .size(100.dp)
-                    .clip(CircleShape)
-                    .border(2.dp, DeepSea3, CircleShape),
-                color = DeepSea2
-            ) {
-                if (isLoading) {
-                    Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                        CircularProgressIndicator(color = TripWizardColors.Blue, strokeWidth = 2.dp, modifier = Modifier.size(28.dp))
-                    }
-                } else {
-                    Icon(
-                        imageVector = Icons.Default.Person,
-                        contentDescription = "Profile Picture",
-                        tint = DeepSea4,
-                        modifier = Modifier.padding(20.dp)
-                    )
-                }
-            }
-        }
+        ProfileAvatar(
+            photoUrl = profileImageUrl,
+            contentDescription = "Profile Picture",
+            modifier = Modifier.size(100.dp),
+            borderColor = DeepSea3,
+            backgroundColor = DeepSea2,
+            placeholderTint = if (isLoading) TripWizardColors.Blue else DeepSea4,
+            borderWidth = 2.dp,
+            isLoading = isLoading,
+            iconSize = 56.dp
+        )
 
         Spacer(modifier = Modifier.height(12.dp))
 

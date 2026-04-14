@@ -35,7 +35,6 @@ import androidx.compose.material.icons.filled.FlightTakeoff
 import androidx.compose.material.icons.filled.Hotel
 import androidx.compose.material.icons.filled.MoreHoriz
 import androidx.compose.material.icons.filled.Notifications
-import androidx.compose.material.icons.filled.Person
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
@@ -62,6 +61,7 @@ import coil.compose.AsyncImage
 import coil.request.ImageRequest
 import com.example.travelcents.BuildConfig
 import com.example.travelcents.data.model.Itinerary
+import com.example.travelcents.ui.components.ProfileAvatar
 import com.example.travelcents.ui.theme.DeepSea1
 import com.example.travelcents.ui.theme.DeepSea2
 import com.example.travelcents.ui.theme.DeepSea3
@@ -83,6 +83,7 @@ private val SurfaceBright = Color(0xFF243447)
 fun HomePage(
     modifier: Modifier = Modifier,
     onTripClick: (String) -> Unit = {},
+    onProfileClick: () -> Unit = {},
     homeViewModel: HomeViewModel = viewModel(),
     currencyViewModel: CurrencyViewModel = viewModel()
 ) {
@@ -94,7 +95,11 @@ fun HomePage(
             .background(DeepSea1)
             .verticalScroll(rememberScrollState())
     ) {
-        HomeHeader()
+        HomeHeader(
+            profileImageUrl = homeUiState.profile.profileImageUrl,
+            isProfileLoading = homeUiState.profile.isLoading,
+            onProfileClick = onProfileClick
+        )
 
         Spacer(modifier = Modifier.height(4.dp))
 
@@ -133,7 +138,11 @@ fun HomePage(
 // ─────────────────────────────────────────────────────────────
 
 @Composable
-private fun HomeHeader() {
+private fun HomeHeader(
+    profileImageUrl: String,
+    isProfileLoading: Boolean,
+    onProfileClick: () -> Unit
+) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -148,16 +157,17 @@ private fun HomeHeader() {
             Box(
                 modifier = Modifier
                     .size(40.dp)
-                    .clip(CircleShape)
-                    .background(DeepSea2)
-                    .border(1.5.dp, Primary.copy(alpha = 0.3f), CircleShape),
+                    .clickable(onClick = onProfileClick),
                 contentAlignment = Alignment.Center
             ) {
-                Icon(
-                    imageVector = Icons.Default.Person,
+                ProfileAvatar(
+                    photoUrl = profileImageUrl,
                     contentDescription = "Profile",
-                    tint = DeepSea4,
-                    modifier = Modifier.size(22.dp)
+                    modifier = Modifier.fillMaxSize(),
+                    borderColor = Primary.copy(alpha = 0.3f),
+                    backgroundColor = DeepSea2,
+                    placeholderTint = DeepSea4,
+                    isLoading = isProfileLoading
                 )
             }
             Text(
