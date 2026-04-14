@@ -277,6 +277,11 @@ fun MainScaffold(modifier: Modifier = Modifier, onLogout: () -> Unit = {}) {
                         onTripClick = { tripId ->
                             currentTripViewModel.loadTrip(tripId)
                             navController.navigate(MainRoutes.CURRENT_ITINERARY)
+                        },
+                        onProfileClick = {
+                            navController.navigate(MainRoutes.SETTINGS) {
+                                launchSingleTop = true
+                            }
                         }
                     )
                 }

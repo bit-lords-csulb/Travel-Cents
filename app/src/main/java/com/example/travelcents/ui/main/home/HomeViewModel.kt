@@ -3,6 +3,8 @@ package com.example.travelcents.ui.main.home
 import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.example.travelcents.data.UserProfileRepository
+import com.example.travelcents.data.model.CurrentUserProfile
 import com.example.travelcents.BuildConfig
 import com.example.travelcents.data.model.Itinerary
 import com.example.travelcents.data.remote.DestinationImageRepository
@@ -10,6 +12,7 @@ import com.example.travelcents.data.remote.WikipediaApiService
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.Query
+import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -25,6 +28,7 @@ data class HomeUiState(
     val trips: List<Itinerary> = emptyList(),
     // itinerary id -> home card image URL
     val tripImages: Map<String, String> = emptyMap(),
+    val profile: CurrentUserProfile = CurrentUserProfile(),
     val errorMessage: String? = null
 )
 
@@ -32,6 +36,7 @@ class HomeViewModel : ViewModel() {
 
     private val db = FirebaseFirestore.getInstance()
     private val auth = FirebaseAuth.getInstance()
+    private val userProfileRepository = UserProfileRepository(auth = auth, db = db)
 
     private val wikipediaClient = OkHttpClient.Builder()
         .addInterceptor { chain ->
@@ -55,16 +60,33 @@ class HomeViewModel : ViewModel() {
     val uiState: StateFlow<HomeUiState> = _uiState.asStateFlow()
 
     init {
+        observeProfile()
         loadAllTrips()
+        viewModelScope.launch {
+            userProfileRepository.syncCurrentUserGoogleProfile()
+        }
+    }
+
+    private fun observeProfile() {
+        viewModelScope.launch {
+            userProfileRepository.observeCurrentUserProfile().collect { profile ->
+                _uiState.update { currentState -> currentState.copy(profile = profile) }
+            }
+        }
     }
 
     fun loadAllTrips() {
+        val currentProfile = _uiState.value.profile
         val uid = auth.currentUser?.uid ?: run {
-            _uiState.value = HomeUiState(isLoading = false, errorMessage = "Not logged in")
+            _uiState.value = HomeUiState(
+                isLoading = false,
+                profile = currentProfile,
+                errorMessage = "Not logged in"
+            )
             return
         }
 
-        _uiState.value = HomeUiState(isLoading = true)
+        _uiState.value = HomeUiState(isLoading = true, profile = currentProfile)
 
         db.collection("users").document(uid)
             .collection("trips")
@@ -106,7 +128,8 @@ class HomeViewModel : ViewModel() {
                 _uiState.value = HomeUiState(
                     isLoading = false,
                     trips = trips,
-                    tripImages = cachedImages
+                    tripImages = cachedImages,
+                    profile = currentProfile
                 )
                 fetchDestinationImages(uid, trips.filter { it.homeImageUrl.isBlank() })
             }
@@ -114,6 +137,7 @@ class HomeViewModel : ViewModel() {
                 Log.e("HomeViewModel", "Failed to load trips: ${e.message}")
                 _uiState.value = HomeUiState(
                     isLoading = false,
+                    profile = currentProfile,
                     errorMessage = e.message ?: "Failed to load trips"
                 )
             }
