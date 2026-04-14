@@ -20,8 +20,6 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.filled.ChevronLeft
-import androidx.compose.material.icons.filled.ChevronRight
 import androidx.compose.material.icons.filled.DateRange
 import androidx.compose.material.icons.filled.DeleteOutline
 import androidx.compose.material.icons.filled.DragHandle
@@ -52,6 +50,7 @@ import androidx.compose.ui.unit.sp
 import com.example.travelcents.data.model.Itinerary
 import com.example.travelcents.ui.main.current.TripMemberUi
 import com.example.travelcents.ui.modules.formatDayOfWeekShort
+import com.example.travelcents.ui.modules.formatHeroDate
 import com.example.travelcents.ui.theme.DeepSea1
 import com.example.travelcents.ui.theme.DeepSea2
 import com.example.travelcents.ui.theme.DeepSea3
@@ -62,36 +61,17 @@ import androidx.compose.material.icons.outlined.Archive
 private val PrimaryAccent = Color(0xFFCEBDFF)
 private val SurfaceContainerHigh = Color(0xFF222A3D)
 
-private fun formatHeroDate(dateFrom: String): String {
-    val parts = dateFrom.split("-")
-    if (parts.size < 3) return dateFrom.ifBlank { "—" }
-    val month = when (parts[1].toIntOrNull()) {
-        1 -> "JAN"; 2 -> "FEB"; 3 -> "MAR"; 4 -> "APR"
-        5 -> "MAY"; 6 -> "JUN"; 7 -> "JUL"; 8 -> "AUG"
-        9 -> "SEP"; 10 -> "OCT"; 11 -> "NOV"; 12 -> "DEC"
-        else -> return dateFrom
-    }
-    val day = parts[2].toIntOrNull() ?: return dateFrom
-    val suffix = when {
-        day in 11..13 -> "TH"
-        day % 10 == 1 -> "ST"
-        day % 10 == 2 -> "ND"
-        day % 10 == 3 -> "RD"
-        else -> "TH"
-    }
-    return "$month $day$suffix"
-}
-
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun CurrentTripHeader(
     destination: String,
-    dateFrom: String,
+    heroDate: String,
     currentTripId: String?,
     allTrips: List<Itinerary>,
     canAdd: Boolean,
     isReorderActive: Boolean,
     isInCalendarMode: Boolean,
+    isWeekMode: Boolean,
     selectedDate: String,
     sortedDates: List<String>,
     onDateSelected: (String) -> Unit,
@@ -281,22 +261,27 @@ fun CurrentTripHeader(
             }
         }
 
-        // Hero section: label + big date (with nav arrows in calendar mode) + member avatars
+        // Hero section: date hero (day / week / itinerary) + member avatars
         Spacer(modifier = Modifier.height(8.dp))
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 24.dp),
+                .padding(end = 24.dp),  // no start padding — heroes control their own start
             verticalAlignment = Alignment.Bottom,
             horizontalArrangement = Arrangement.SpaceBetween
         ) {
-            if (isInCalendarMode) {
-                val activeDate = selectedDate.takeIf { it.isNotBlank() } ?: sortedDates.firstOrNull().orEmpty()
-                val activeIndex = sortedDates.indexOf(activeDate).coerceAtLeast(0)
-                val previousDate = sortedDates.getOrNull(activeIndex - 1)
-                val nextDate = sortedDates.getOrNull(activeIndex + 1)
-
-                Column {
+            when {
+                isInCalendarMode && isWeekMode -> WeekDateHero(
+                    selectedDate = selectedDate,
+                    sortedDates = sortedDates,
+                    onDateSelected = onDateSelected
+                )
+                isInCalendarMode -> DayDateHero(
+                    selectedDate = selectedDate,
+                    sortedDates = sortedDates,
+                    onDateSelected = onDateSelected
+                )
+                else -> Column(modifier = Modifier.padding(start = 24.dp)) {
                     Text(
                         text = "SCHEDULED ITINERARY",
                         color = PrimaryAccent,
@@ -304,64 +289,19 @@ fun CurrentTripHeader(
                         fontWeight = FontWeight.SemiBold,
                         letterSpacing = 2.sp
                     )
-                    Spacer(modifier = Modifier.height(2.dp))
                     Text(
-                        text = formatDayOfWeekShort(activeDate),
+                        text = formatDayOfWeekShort(heroDate),
                         color = DeepSea4,
                         fontSize = 12.sp,
                         fontWeight = FontWeight.SemiBold,
                         letterSpacing = 1.sp
                     )
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        IconButton(
-                            onClick = { previousDate?.let(onDateSelected) },
-                            enabled = previousDate != null,
-                            modifier = Modifier.size(36.dp)
-                        ) {
-                            Icon(
-                                imageVector = Icons.Default.ChevronLeft,
-                                contentDescription = "Previous day",
-                                tint = if (previousDate != null) DeepSea5 else DeepSea4.copy(alpha = 0.3f),
-                                modifier = Modifier.size(28.dp)
-                            )
-                        }
-                        Text(
-                            text = formatHeroDate(activeDate),
-                            color = DeepSea5,
-                            fontSize = 48.sp,
-                            fontWeight = FontWeight.ExtraBold,
-                            lineHeight = 52.sp
-                        )
-                        IconButton(
-                            onClick = { nextDate?.let(onDateSelected) },
-                            enabled = nextDate != null,
-                            modifier = Modifier.size(36.dp)
-                        ) {
-                            Icon(
-                                imageVector = Icons.Default.ChevronRight,
-                                contentDescription = "Next day",
-                                tint = if (nextDate != null) DeepSea5 else DeepSea4.copy(alpha = 0.3f),
-                                modifier = Modifier.size(28.dp)
-                            )
-                        }
-                    }
-                }
-            } else {
-                Column {
                     Text(
-                        text = "SCHEDULED ITINERARY",
-                        color = PrimaryAccent,
-                        fontSize = 10.sp,
-                        fontWeight = FontWeight.SemiBold,
-                        letterSpacing = 2.sp
-                    )
-                    Spacer(modifier = Modifier.height(4.dp))
-                    Text(
-                        text = formatHeroDate(dateFrom),
+                        text = formatHeroDate(heroDate),
                         color = DeepSea5,
                         fontSize = 48.sp,
                         fontWeight = FontWeight.ExtraBold,
-                        lineHeight = 52.sp
+                        lineHeight = 50.sp
                     )
                 }
             }

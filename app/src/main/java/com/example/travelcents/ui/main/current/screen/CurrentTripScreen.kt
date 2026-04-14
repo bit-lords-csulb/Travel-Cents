@@ -58,6 +58,7 @@ fun CurrentTripScreen(
     }
 
     var selectedDate by rememberSaveable { mutableStateOf("") }
+    var itineraryVisibleDate by rememberSaveable { mutableStateOf("") }
     var selectedEventId by remember { mutableStateOf<String?>(null) }
     var editorPlan by remember { mutableStateOf<EditablePlan?>(null) }
     var deleteCandidate by remember { mutableStateOf<EditablePlan?>(null) }
@@ -117,12 +118,13 @@ fun CurrentTripScreen(
         ) {
             CurrentTripHeader(
                 destination = uiState.destination,
-                dateFrom = uiState.dateFrom,
+                heroDate = itineraryVisibleDate.ifBlank { uiState.dateFrom },
                 currentTripId = uiState.currentTripId,
                 allTrips = allTrips,
                 canAdd = uiState.currentTripId != null,
                 isReorderActive = displayMode == CurrentDisplayMode.ITINERARY && jiggleMode,
                 isInCalendarMode = displayMode != CurrentDisplayMode.ITINERARY,
+                isWeekMode = displayMode == CurrentDisplayMode.WEEK,
                 selectedDate = selectedDate,
                 sortedDates = calendarDates,
                 onDateSelected = { selectedDate = it },
@@ -207,7 +209,8 @@ fun CurrentTripScreen(
                         onDeleteClick = { deleteCandidate = it.toEditablePlan() },
                         onOpenAlternatives = { optionsPanelEventId = it },
                         onMoveEvent = viewModel::moveEventLocally,
-                        onPersistEventPlacements = viewModel::persistEventPlacements
+                        onPersistEventPlacements = viewModel::persistEventPlacements,
+                        onVisibleDateChange = { itineraryVisibleDate = it }
                     )
                     displayMode == CurrentDisplayMode.WEEK -> CurrentTripWeekView(
                         events = events,
