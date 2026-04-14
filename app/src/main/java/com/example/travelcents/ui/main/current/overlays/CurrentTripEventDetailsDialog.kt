@@ -58,6 +58,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
+import androidx.core.net.toUri
 import coil.compose.AsyncImage
 import com.example.travelcents.data.model.EventOption
 import com.example.travelcents.data.model.TravelEvent
@@ -113,6 +114,7 @@ fun CurrentTripEventDetailsDialog(
         officialUrl?.let(::compactHostLabel) ?: compactHostLabel(mapsUrl)
     }
     var menuExpanded by remember { mutableStateOf(false) }
+    @Suppress("UNUSED_VALUE") // Compose state — reads happen on recomposition, IDE can't see them
     var showGallery by remember(event.eventId) { mutableStateOf(false) }
 
     Dialog(
@@ -229,10 +231,7 @@ fun CurrentTripEventDetailsDialog(
                             onOpenMaps = { uriHandler.openUri(mapsUrl) }
                         )
 
-                        DetailTextSection(
-                            title = "Experience",
-                            body = experienceText
-                        )
+                        DetailTextSection(body = experienceText)
 
                         ReviewsSection(
                             ratingLabel = ratingLabel,
@@ -657,12 +656,11 @@ private fun LocationSection(
 
 @Composable
 private fun DetailTextSection(
-    title: String,
     body: String
 ) {
     Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
         Text(
-            text = title,
+            text = "Experience",
             color = DetailOnSurface,
             fontSize = 22.sp,
             fontWeight = FontWeight.Bold
@@ -813,8 +811,8 @@ private fun ReviewCard(review: YelpReview) {
             ) {
                 if (!review.user?.imageUrl.isNullOrBlank()) {
                     AsyncImage(
-                        model = review.user?.imageUrl,
-                        contentDescription = review.user?.name ?: "Reviewer",
+                        model = review.user!!.imageUrl,
+                        contentDescription = review.user!!.name.ifBlank { "Reviewer" },
                         modifier = Modifier
                             .size(40.dp)
                             .clip(CircleShape),
@@ -980,6 +978,6 @@ private fun googleMapsDirectionsUrl(query: String): String {
 }
 
 private fun compactHostLabel(url: String): String {
-    val host = Uri.parse(url).host.orEmpty().removePrefix("www.")
+    val host = url.toUri().host.orEmpty().removePrefix("www.")
     return host.ifBlank { "Open Link" }
 }

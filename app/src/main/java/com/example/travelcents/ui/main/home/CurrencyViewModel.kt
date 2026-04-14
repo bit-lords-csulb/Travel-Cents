@@ -144,7 +144,7 @@ class CurrencyViewModel(application: Application) : AndroidViewModel(application
                 cache.saveRecentPair(fromCurrency, toCurrency)
                 result = parsedAmount * baseRate
             }
-        } catch (e: Exception) {
+        } catch (_: Exception) {
             error = "Conversion failed"
             result = null
         } finally {
