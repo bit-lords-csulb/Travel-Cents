@@ -164,7 +164,8 @@ fun CreateEventPage(
                 .fillMaxWidth()
                 .clip(RoundedCornerShape(bottomStart = 24.dp, bottomEnd = 24.dp))
                 .background(DeepSea2)
-                .padding(top = 48.dp, bottom = 20.dp)
+                .statusBarsPadding()
+                .padding(top = 8.dp, bottom = 16.dp)
         ) {
             IconButton(
                 onClick = onBackClick,

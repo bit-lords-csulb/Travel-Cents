@@ -22,8 +22,6 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.ChevronLeft
-import androidx.compose.material.icons.filled.ChevronRight
 import androidx.compose.material.icons.filled.DeleteOutline
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
@@ -55,8 +53,6 @@ import com.example.travelcents.ui.main.current.calendar.currentTimeMinutes
 import com.example.travelcents.ui.main.current.calendar.eventsForDate
 import com.example.travelcents.ui.main.current.calendar.preferredDayScrollMinutes
 import com.example.travelcents.ui.main.current.calendar.renderSpanLabel
-import com.example.travelcents.ui.modules.formatDayOfWeekShort
-import com.example.travelcents.ui.modules.formatLongDayLabel
 import com.example.travelcents.ui.modules.hourLabel
 import com.example.travelcents.ui.modules.todayIsoDate
 import com.example.travelcents.ui.theme.DeepSea2
@@ -111,14 +107,6 @@ fun CurrentTripDayView(
             .fillMaxSize()
             .padding(horizontal = 12.dp, vertical = 10.dp)
     ) {
-        DayNavigationBar(
-            dates = sortedDates,
-            activeDate = activeDate,
-            onDateSelected = onDateSelected
-        )
-
-        Spacer(modifier = Modifier.height(14.dp))
-
         Column(
             modifier = Modifier
                 .fillMaxSize()
@@ -142,92 +130,6 @@ fun CurrentTripDayView(
                     onDeleteClick = onDeleteClick,
                     onEmptySlotClick = { startMinutes -> onCreatePlan(activeDate, startMinutes) },
                     showCurrentTimeIndicator = activeDate == todayIsoDate()
-                )
-            }
-        }
-    }
-}
-
-@Composable
-private fun DayNavigationBar(
-    dates: List<String>,
-    activeDate: String,
-    onDateSelected: (String) -> Unit
-) {
-    val activeIndex = dates.indexOf(activeDate).coerceAtLeast(0)
-    val previousDate = dates.getOrNull(activeIndex - 1)
-    val nextDate = dates.getOrNull(activeIndex + 1)
-    val todayDate = todayIsoDate().takeIf { it in dates && it != activeDate }
-
-    Column(
-        modifier = Modifier
-            .fillMaxWidth()
-            .background(DeepSea2, RoundedCornerShape(18.dp))
-            .border(1.dp, DeepSea3.copy(alpha = 0.7f), RoundedCornerShape(18.dp))
-            .padding(horizontal = 12.dp, vertical = 10.dp)
-    ) {
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            IconButton(
-                onClick = { previousDate?.let(onDateSelected) },
-                enabled = previousDate != null,
-                modifier = Modifier.size(32.dp)
-            ) {
-                Icon(
-                    imageVector = Icons.Default.ChevronLeft,
-                    contentDescription = "Previous day",
-                    tint = if (previousDate != null) DeepSea5 else DeepSea4.copy(alpha = 0.35f)
-                )
-            }
-
-            Column(
-                modifier = Modifier.weight(1f),
-                horizontalAlignment = Alignment.CenterHorizontally
-            ) {
-                Text(
-                    text = formatDayOfWeekShort(activeDate),
-                    color = DeepSea4,
-                    fontSize = 11.sp,
-                    fontWeight = FontWeight.Bold,
-                    letterSpacing = 0.8.sp
-                )
-                Text(
-                    text = formatLongDayLabel(activeDate),
-                    color = DeepSea5,
-                    fontSize = 16.sp,
-                    fontWeight = FontWeight.SemiBold
-                )
-            }
-
-            IconButton(
-                onClick = { nextDate?.let(onDateSelected) },
-                enabled = nextDate != null,
-                modifier = Modifier.size(32.dp)
-            ) {
-                Icon(
-                    imageVector = Icons.Default.ChevronRight,
-                    contentDescription = "Next day",
-                    tint = if (nextDate != null) DeepSea5 else DeepSea4.copy(alpha = 0.35f)
-                )
-            }
-        }
-
-        if (todayDate != null) {
-            Spacer(modifier = Modifier.height(8.dp))
-            Box(
-                modifier = Modifier
-                    .align(Alignment.CenterHorizontally)
-                    .background(DeepSea3, RoundedCornerShape(12.dp))
-                    .clickable { onDateSelected(todayDate) }
-                    .padding(horizontal = 12.dp, vertical = 6.dp)
-            ) {
-                Text(
-                    text = "GO TO TODAY",
-                    color = DeepSea5,
-                    fontSize = 11.sp,
-                    fontWeight = FontWeight.SemiBold
                 )
             }
         }

@@ -2,6 +2,7 @@ package com.example.travelcents.ui
 
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
@@ -26,7 +27,7 @@ fun TravelCentsNavigation(modifier: Modifier = Modifier, authViewModel: AuthView
 
         composable("home") {
             MainScaffold(
-                modifier = modifier,
+                modifier = Modifier.fillMaxSize(),
                 onLogout = {
                     authViewModel.signOut()
                     navController.navigate("login") {

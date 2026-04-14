@@ -169,18 +169,19 @@ class AuthViewModel : ViewModel() {
         viewModelScope.launch {
             _isLoading.value = true
             _errorMessage.value = null
-            _statusMessage.value = "Signing in with Google..."
+            _statusMessage.value = null
 
             val result = authModel.signInWithGoogle(idToken)
 
             _isLoading.value = false
             result.fold(
                 onSuccess = {
-                    _statusMessage.value = "Google sign-in succeeded."
+                    _statusMessage.value = null
                     _isLoggedIn.value = true
                 },
                 onFailure = { error ->
                     Log.e("AuthViewModel", "Google login failed", error)
+                    _statusMessage.value = null
                     _errorMessage.value = when (error) {
                         is FirebaseNetworkException -> "Google sign-in needs a network connection."
                         is FirebaseTooManyRequestsException -> "Too many sign-in attempts. Please try again later."

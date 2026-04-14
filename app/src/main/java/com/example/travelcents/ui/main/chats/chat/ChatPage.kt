@@ -92,7 +92,8 @@ fun ChatPage(
                 .fillMaxWidth()
                 .clip(RoundedCornerShape(bottomStart = 24.dp, bottomEnd = 24.dp))
                 .background(DeepSea2)
-                .padding(top = 48.dp, bottom = 16.dp, start = 8.dp, end = 16.dp)
+                .statusBarsPadding()
+                .padding(top = 8.dp, bottom = 12.dp, start = 8.dp, end = 16.dp)
         ) {
             Row(
                 verticalAlignment = Alignment.CenterVertically,
@@ -180,8 +181,7 @@ fun ChatPage(
             modifier = Modifier
                 .fillMaxWidth()
                 .background(DeepSea2)
-                .padding(horizontal = 16.dp, vertical = 12.dp)
-                .navigationBarsPadding(),
+                .padding(horizontal = 16.dp, vertical = 12.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
             TextField(
