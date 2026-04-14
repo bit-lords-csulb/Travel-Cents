@@ -53,6 +53,7 @@ import com.example.travelcents.ui.theme.DeepSea1
 import com.example.travelcents.ui.theme.DeepSea2
 import com.example.travelcents.ui.theme.DeepSea4
 import com.example.travelcents.ui.theme.DeepSea5
+import com.example.travelcents.ui.theme.TravelCentsFonts
 
 @Composable
 fun SignUpPage(
@@ -65,7 +66,9 @@ fun SignUpPage(
     var username by remember { mutableStateOf("") }
     var email by remember { mutableStateOf("") }
     var password by remember { mutableStateOf("") }
+    var confirmPassword by remember { mutableStateOf("") }
     var isPasswordVisible by remember { mutableStateOf(false) }
+    var isConfirmPasswordVisible by remember { mutableStateOf(false) }
 
     val isLoading by authViewModel.isLoading.collectAsStateWithLifecycle()
     val isAccountCreated by authViewModel.isAccountCreated.collectAsStateWithLifecycle()
@@ -106,7 +109,8 @@ fun SignUpPage(
             text = "Sign Up",
             fontSize = 32.sp,
             fontWeight = FontWeight.Bold,
-            color = DeepSea5
+            color = DeepSea5,
+            fontFamily = TravelCentsFonts.Headline
         )
 
         Box(
@@ -124,7 +128,9 @@ fun SignUpPage(
             onValueChange = { firstName = it; authViewModel.clearError() },
             label = "First Name",
             modifier = Modifier.fillMaxWidth(),
-            keyboardOptions = KeyboardOptions(imeAction = ImeAction.Next)
+            keyboardOptions = KeyboardOptions(imeAction = ImeAction.Next),
+            textFontFamily = TravelCentsFonts.Body,
+            labelFontFamily = TravelCentsFonts.Body
         )
 
         Spacer(modifier = Modifier.height(18.dp))
@@ -134,7 +140,9 @@ fun SignUpPage(
             onValueChange = { lastName = it; authViewModel.clearError() },
             label = "Last Name",
             modifier = Modifier.fillMaxWidth(),
-            keyboardOptions = KeyboardOptions(imeAction = ImeAction.Next)
+            keyboardOptions = KeyboardOptions(imeAction = ImeAction.Next),
+            textFontFamily = TravelCentsFonts.Body,
+            labelFontFamily = TravelCentsFonts.Body
         )
 
         Spacer(modifier = Modifier.height(18.dp))
@@ -145,6 +153,8 @@ fun SignUpPage(
             label = "Username",
             modifier = Modifier.fillMaxWidth(),
             keyboardOptions = KeyboardOptions(imeAction = ImeAction.Next),
+            textFontFamily = TravelCentsFonts.Body,
+            labelFontFamily = TravelCentsFonts.Body,
             leadingIcon = {
                 Icon(
                     imageVector = Icons.Outlined.AccountCircle,
@@ -166,6 +176,9 @@ fun SignUpPage(
                 keyboardType = KeyboardType.Email,
                 imeAction = ImeAction.Next
             ),
+            textFontFamily = TravelCentsFonts.Body,
+            labelFontFamily = TravelCentsFonts.Body,
+            placeholderFontFamily = TravelCentsFonts.Body,
             leadingIcon = {
                 Icon(
                     imageVector = Icons.Outlined.Email,
@@ -184,9 +197,11 @@ fun SignUpPage(
             modifier = Modifier.fillMaxWidth(),
             keyboardOptions = KeyboardOptions(
                 keyboardType = KeyboardType.Password,
-                imeAction = ImeAction.Done
+                imeAction = ImeAction.Next
             ),
             visualTransformation = if (isPasswordVisible) VisualTransformation.None else PasswordVisualTransformation(),
+            textFontFamily = TravelCentsFonts.Body,
+            labelFontFamily = TravelCentsFonts.Body,
             leadingIcon = {
                 Icon(
                     imageVector = Icons.Outlined.Lock,
@@ -205,12 +220,45 @@ fun SignUpPage(
             }
         )
 
+        Spacer(modifier = Modifier.height(18.dp))
+
+        TcTextField(
+            value = confirmPassword,
+            onValueChange = { confirmPassword = it; authViewModel.clearError() },
+            label = "Confirm Password",
+            modifier = Modifier.fillMaxWidth(),
+            keyboardOptions = KeyboardOptions(
+                keyboardType = KeyboardType.Password,
+                imeAction = ImeAction.Done
+            ),
+            visualTransformation = if (isConfirmPasswordVisible) VisualTransformation.None else PasswordVisualTransformation(),
+            textFontFamily = TravelCentsFonts.Body,
+            labelFontFamily = TravelCentsFonts.Body,
+            leadingIcon = {
+                Icon(
+                    imageVector = Icons.Outlined.Lock,
+                    contentDescription = null,
+                    tint = TripWizardColors.Blue
+                )
+            },
+            trailingIcon = {
+                IconButton(onClick = { isConfirmPasswordVisible = !isConfirmPasswordVisible }) {
+                    Icon(
+                        imageVector = if (isConfirmPasswordVisible) Icons.Outlined.VisibilityOff else Icons.Outlined.Visibility,
+                        contentDescription = if (isConfirmPasswordVisible) "Hide confirm password" else "Show confirm password",
+                        tint = TripWizardColors.Blue
+                    )
+                }
+            }
+        )
+
         statusMessage?.let { message ->
             Text(
                 text = message,
                 color = Color.Green,
                 fontSize = 12.sp,
-                modifier = Modifier.padding(top = 14.dp)
+                modifier = Modifier.padding(top = 14.dp),
+                fontFamily = TravelCentsFonts.Body
             )
         }
 
@@ -219,14 +267,21 @@ fun SignUpPage(
                 text = message,
                 color = Color.Red,
                 fontSize = 12.sp,
-                modifier = Modifier.padding(top = 14.dp)
+                modifier = Modifier.padding(top = 14.dp),
+                fontFamily = TravelCentsFonts.Body
             )
         }
 
         Spacer(modifier = Modifier.height(28.dp))
 
         Button(
-            onClick = { authViewModel.signUp(firstName, lastName, username, email, password) },
+            onClick = {
+                if (password != confirmPassword) {
+                    authViewModel.setErrorMessage("Passwords do not match")
+                } else {
+                    authViewModel.signUp(firstName, lastName, username, email, password)
+                }
+            },
             enabled = !isLoading,
             modifier = Modifier
                 .fillMaxWidth()
@@ -241,7 +296,12 @@ fun SignUpPage(
                     strokeWidth = 2.dp
                 )
             } else {
-                Text("Sign Up", color = Color.White, fontSize = 18.sp)
+                Text(
+                    text = "Sign Up",
+                    color = Color.White,
+                    fontSize = 18.sp,
+                    fontFamily = TravelCentsFonts.Body
+                )
             }
         }
 
@@ -250,7 +310,8 @@ fun SignUpPage(
         GoogleAuthButton(
             text = "Signup with Google",
             authViewModel = authViewModel,
-            enabled = !isLoading
+            enabled = !isLoading,
+            fontFamily = TravelCentsFonts.Body
         )
 
         Spacer(modifier = Modifier.height(24.dp))
@@ -263,13 +324,15 @@ fun SignUpPage(
             Text(
                 text = "Already have an Account? ",
                 color = DeepSea5,
-                fontSize = 12.sp
+                fontSize = 12.sp,
+                fontFamily = TravelCentsFonts.Body
             )
             Text(
                 text = "Log In",
                 color = DeepSea4,
                 fontSize = 12.sp,
                 fontWeight = FontWeight.SemiBold,
+                fontFamily = TravelCentsFonts.Body,
                 modifier = Modifier.clickable(enabled = !isLoading) {
                     navController.popBackStack()
                 }
