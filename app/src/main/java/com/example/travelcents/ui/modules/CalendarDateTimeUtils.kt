@@ -128,6 +128,32 @@ fun formatMonthDayCompact(rawDate: String): String {
     return parseIsoDate(rawDate)?.format(tripDateFormatter)?.uppercase(Locale.US) ?: rawDate
 }
 
+fun formatHeroDate(rawDate: String): String {
+    val date = parseIsoDate(rawDate) ?: return rawDate.ifBlank { "—" }
+    val month = date.month.getDisplayName(java.time.format.TextStyle.SHORT, Locale.US).uppercase(Locale.US)
+    val day = date.dayOfMonth
+    val suffix = when {
+        day in 11..13 -> "TH"
+        day % 10 == 1 -> "ST"
+        day % 10 == 2 -> "ND"
+        day % 10 == 3 -> "RD"
+        else -> "TH"
+    }
+    return "$month $day$suffix"
+}
+
+fun formatWeekRangeHero(startDate: String, endDate: String): String {
+    val start = parseIsoDate(startDate) ?: return startDate.ifBlank { "—" }
+    val end = parseIsoDate(endDate) ?: return startDate.ifBlank { "—" }
+    val startMonth = start.month.getDisplayName(java.time.format.TextStyle.SHORT, Locale.US).uppercase(Locale.US)
+    val endMonth = end.month.getDisplayName(java.time.format.TextStyle.SHORT, Locale.US).uppercase(Locale.US)
+    return if (start.month == end.month) {
+        "$startMonth ${start.dayOfMonth} – ${end.dayOfMonth}"
+    } else {
+        "$startMonth ${start.dayOfMonth} – $endMonth ${end.dayOfMonth}"
+    }
+}
+
 fun buildCalendarDates(
     dateFrom: String,
     dateTo: String,

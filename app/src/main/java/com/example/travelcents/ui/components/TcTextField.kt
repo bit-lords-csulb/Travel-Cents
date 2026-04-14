@@ -21,6 +21,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -41,13 +42,30 @@ fun TcTextField(
     keyboardOptions: KeyboardOptions = KeyboardOptions.Default,
     keyboardActions: KeyboardActions = KeyboardActions.Default,
     singleLine: Boolean = true,
+    textFontFamily: FontFamily? = null,
+    labelFontFamily: FontFamily? = null,
+    placeholderFontFamily: FontFamily? = null,
 ) {
     TextField(
         value = value,
         onValueChange = onValueChange,
-        label = { Text(label, color = TripWizardColors.OnSurfaceVariant, fontSize = 12.sp) },
+        label = {
+            Text(
+                text = label,
+                color = TripWizardColors.OnSurfaceVariant,
+                fontSize = 12.sp,
+                fontFamily = labelFontFamily
+            )
+        },
         placeholder = if (placeholder.isNotEmpty()) {
-            { Text(placeholder, color = TripWizardColors.OnSurfaceVariant.copy(alpha = 0.5f), fontSize = 16.sp) }
+            {
+                Text(
+                    text = placeholder,
+                    color = TripWizardColors.OnSurfaceVariant.copy(alpha = 0.5f),
+                    fontSize = 16.sp,
+                    fontFamily = placeholderFontFamily
+                )
+            }
         } else null,
         leadingIcon = leadingIcon,
         trailingIcon = trailingIcon,
@@ -56,6 +74,11 @@ fun TcTextField(
         keyboardOptions = keyboardOptions,
         keyboardActions = keyboardActions,
         singleLine = singleLine,
+        textStyle = TextStyle(
+            color = DeepSea5,
+            fontSize = 16.sp,
+            fontFamily = textFontFamily
+        ),
         modifier = modifier,
         shape = RoundedCornerShape(16.dp),
         colors = TextFieldDefaults.colors(
