@@ -6,11 +6,13 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.AutoAwesome
@@ -20,6 +22,7 @@ import androidx.compose.material.icons.outlined.Home
 import androidx.compose.material.icons.outlined.Settings
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
+import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -101,6 +104,23 @@ private val bottomNavRoutes = setOf(
     MainRoutes.SETTINGS
 )
 
+private fun shouldShowBottomNav(route: String): Boolean {
+    return route in bottomNavRoutes ||
+        route.startsWith("${MainRoutes.CURRENT}/") ||
+        route.startsWith(MainRoutes.NEW_TRIP) ||
+        route.startsWith("final_plan")
+}
+
+private fun selectedBottomRoute(route: String): String {
+    return when {
+        route == MainRoutes.CURRENT || route.startsWith("${MainRoutes.CURRENT}/") || route.startsWith("final_plan") ->
+            MainRoutes.CURRENT
+        route == MainRoutes.NEW_TRIP || route.startsWith(MainRoutes.NEW_TRIP) || route == MainRoutes.AI_TRIP_CHAT ->
+            MainRoutes.NEW_TRIP
+        else -> route
+    }
+}
+
 private data class BottomNavItem(
     val route: String,
     val label: String,
@@ -115,20 +135,7 @@ fun MainScaffold(modifier: Modifier = Modifier, onLogout: () -> Unit = {}) {
 
     val navBackStackEntry by navController.currentBackStackEntryAsState()
     val currentRoute = navBackStackEntry?.destination?.route ?: MainRoutes.HOME
-    val selectedBottomRoute = when (currentRoute) {
-        MainRoutes.CURRENT_ITINERARY,
-        MainRoutes.CURRENT_DAY,
-        MainRoutes.CURRENT_WEEK -> MainRoutes.CURRENT
-        MainRoutes.NEW_TRIP,
-        MainRoutes.NEW_TRIP_STEP_1,
-        MainRoutes.NEW_TRIP_STEP_2,
-        MainRoutes.NEW_TRIP_STEP_3,
-        MainRoutes.NEW_TRIP_STEP_4,
-        MainRoutes.NEW_TRIP_STEP_5,
-        MainRoutes.TRIP_GENERATING,
-        MainRoutes.AI_TRIP_CHAT -> MainRoutes.NEW_TRIP
-        else -> currentRoute
-    }
+    val currentTopLevelRoute = selectedBottomRoute(currentRoute)
     val itineraryUiState by currentTripViewModel.uiState.collectAsState()
 
     // Load trip once on mount so currentTripId is available before any tab is visited
@@ -142,12 +149,35 @@ fun MainScaffold(modifier: Modifier = Modifier, onLogout: () -> Unit = {}) {
         BottomNavItem(MainRoutes.SETTINGS, "SETTINGS", Icons.Outlined.Settings)
     )
 
-    Column(
+    Scaffold(
         modifier = modifier
             .fillMaxSize()
-            .background(DeepSea1)
-    ) {
-        Box(modifier = Modifier.weight(1f).fillMaxWidth()) {
+            .background(DeepSea1),
+        containerColor = DeepSea1,
+        contentWindowInsets = WindowInsets(0, 0, 0, 0),
+        bottomBar = {
+            if (shouldShowBottomNav(currentRoute)) {
+                BottomNavBar(
+                    items = items,
+                    selectedRoute = currentTopLevelRoute,
+                    onItemSelected = { route ->
+                        navController.navigate(route) {
+                            popUpTo(navController.graph.findStartDestination().id) {
+                                saveState = true
+                            }
+                            launchSingleTop = true
+                            restoreState = true
+                        }
+                    }
+                )
+            }
+        }
+    ) { innerPadding ->
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(innerPadding)
+        ) {
             NavHost(
                 navController = navController,
                 startDestination = MainRoutes.HOME,
@@ -320,23 +350,6 @@ fun MainScaffold(modifier: Modifier = Modifier, onLogout: () -> Unit = {}) {
                 }
             }
         }
-
-        if (currentRoute in bottomNavRoutes) {
-            BottomNavBar(
-                items = items,
-                selectedRoute = selectedBottomRoute,
-                activeRoute = currentRoute,
-                onItemSelected = { route ->
-                    navController.navigate(route) {
-                        popUpTo(navController.graph.findStartDestination().id) {
-                            saveState = true
-                        }
-                        launchSingleTop = true
-                        restoreState = true
-                    }
-                }
-            )
-        }
     }
 }
 
@@ -344,10 +357,14 @@ fun MainScaffold(modifier: Modifier = Modifier, onLogout: () -> Unit = {}) {
 private fun BottomNavBar(
     items: List<BottomNavItem>,
     selectedRoute: String,
-    activeRoute: String,
     onItemSelected: (String) -> Unit
 ) {
-    Column {
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .background(DeepSea2)
+            .navigationBarsPadding()
+    ) {
         HorizontalDivider(color = DeepSea3, thickness = 1.dp)
         Row(
             modifier = Modifier
@@ -359,12 +376,11 @@ private fun BottomNavBar(
         ) {
             items.forEach { item ->
                 val selected = selectedRoute == item.route
-                val isCurrentDestination = activeRoute == item.route
                 Column(
                     modifier = Modifier
                         .weight(1f)
                         .clickable {
-                            if (!isCurrentDestination) {
+                            if (!selected) {
                                 onItemSelected(item.route)
                             }
                         }

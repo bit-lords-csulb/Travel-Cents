@@ -57,7 +57,8 @@ fun NewTripChatPage(
                 .fillMaxWidth()
                 .clip(RoundedCornerShape(bottomStart = 24.dp, bottomEnd = 24.dp))
                 .background(DeepSea2)
-                .padding(top = 48.dp, start = 12.dp, end = 20.dp, bottom = 20.dp)
+                .statusBarsPadding()
+                .padding(top = 8.dp, start = 12.dp, end = 20.dp, bottom = 16.dp)
         ) {
             Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
 

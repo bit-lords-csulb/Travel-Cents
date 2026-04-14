@@ -7,7 +7,6 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.requiredSize
 import androidx.compose.foundation.layout.width
-import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -27,10 +26,11 @@ import androidx.credentials.exceptions.GetCredentialException
 import androidx.credentials.exceptions.GetCredentialCancellationException
 import androidx.credentials.exceptions.NoCredentialException
 import com.example.travelcents.R
-import com.google.android.libraries.identity.googleid.GetGoogleIdOption
+import com.google.android.libraries.identity.googleid.GetSignInWithGoogleOption
 import com.google.android.libraries.identity.googleid.GoogleIdTokenCredential
 import kotlinx.coroutines.launch
 import androidx.compose.foundation.shape.RoundedCornerShape
+import com.example.travelcents.ui.components.TcButton
 
 private const val GOOGLE_SERVER_CLIENT_ID =
     "805994740096-d31i7240546h0701vh3m2kphrtsqqqtt.apps.googleusercontent.com"
@@ -45,18 +45,14 @@ fun GoogleAuthButton(
     val context = LocalContext.current
     val coroutineScope = rememberCoroutineScope()
 
-    Button(
+    TcButton(
         onClick = {
             authViewModel.clearMessages()
-            authViewModel.setStatusMessage("Google sign-in button pressed. Opening account picker...")
             Log.d("GoogleAuth", "Google sign-in button pressed")
             coroutineScope.launch {
                 val credentialManager = CredentialManager.create(context)
 
-                val googleIdOption = GetGoogleIdOption.Builder()
-                    .setFilterByAuthorizedAccounts(false)
-                    .setServerClientId(GOOGLE_SERVER_CLIENT_ID)
-                    .setAutoSelectEnabled(false)
+                val googleIdOption = GetSignInWithGoogleOption.Builder(GOOGLE_SERVER_CLIENT_ID)
                     .build()
 
                 val request = GetCredentialRequest.Builder()
@@ -73,17 +69,20 @@ fun GoogleAuthButton(
                     handleCredentialResult(result, authViewModel)
                 } catch (e: GetCredentialCancellationException) {
                     Log.w("GoogleAuth", "Google Sign-In canceled", e)
-                    authViewModel.setStatusMessage("Google sign-in canceled.")
+                    authViewModel.setStatusMessage(null)
                 } catch (e: NoCredentialException) {
                     Log.e("GoogleAuth", "No Google credential available", e)
-                    authViewModel.setErrorMessage("No Google account was returned. Check the picker and try again.")
+                    authViewModel.setStatusMessage(null)
+                    authViewModel.setErrorMessage("Google account picker did not open. Verify Google Play Services and your Google sign-in configuration.")
                 } catch (e: GetCredentialException) {
                     Log.e("GoogleAuth", "Google Sign-In failed", e)
                     val details = e.message?.takeIf { it.isNotBlank() } ?: e.javaClass.simpleName
+                    authViewModel.setStatusMessage(null)
                     authViewModel.setErrorMessage("Google sign-in failed before Firebase: $details")
                 } catch (t: Throwable) {
                     Log.e("GoogleAuth", "Unexpected Google Sign-In failure", t)
                     val details = t.message?.takeIf { it.isNotBlank() } ?: t.javaClass.simpleName
+                    authViewModel.setStatusMessage(null)
                     authViewModel.setErrorMessage("Unexpected Google sign-in error: $details")
                 }
             }
@@ -93,7 +92,12 @@ fun GoogleAuthButton(
             .fillMaxWidth()
             .height(48.dp),
         shape = RoundedCornerShape(12.dp),
-        colors = ButtonDefaults.buttonColors(containerColor = Color.White)
+        colors = ButtonDefaults.buttonColors(
+            containerColor = Color.White,
+            contentColor = Color.Black,
+            disabledContainerColor = Color.White,
+            disabledContentColor = Color.Black
+        )
     ) {
         Image(
             painter = painterResource(id = R.drawable.ic_google_g),
@@ -119,10 +123,12 @@ private fun handleCredentialResult(
 
     if (
         credential is CustomCredential &&
-        credential.type == GoogleIdTokenCredential.TYPE_GOOGLE_ID_TOKEN_CREDENTIAL
+        (
+            credential.type == GoogleIdTokenCredential.TYPE_GOOGLE_ID_TOKEN_CREDENTIAL ||
+                credential.type == GoogleIdTokenCredential.TYPE_GOOGLE_ID_TOKEN_SIWG_CREDENTIAL
+            )
     ) {
         val googleIdTokenCredential = GoogleIdTokenCredential.createFrom(credential.data)
-        authViewModel.setStatusMessage("Google account selected. Signing in...")
         authViewModel.logInWithGoogle(googleIdTokenCredential.idToken)
         return
     }

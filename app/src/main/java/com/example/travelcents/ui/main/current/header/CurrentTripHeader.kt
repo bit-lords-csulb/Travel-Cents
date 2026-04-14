@@ -13,11 +13,15 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.ChevronLeft
+import androidx.compose.material.icons.filled.ChevronRight
 import androidx.compose.material.icons.filled.DateRange
 import androidx.compose.material.icons.filled.DeleteOutline
 import androidx.compose.material.icons.filled.DragHandle
@@ -47,6 +51,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.travelcents.data.model.Itinerary
 import com.example.travelcents.ui.main.current.TripMemberUi
+import com.example.travelcents.ui.modules.formatDayOfWeekShort
 import com.example.travelcents.ui.theme.DeepSea1
 import com.example.travelcents.ui.theme.DeepSea2
 import com.example.travelcents.ui.theme.DeepSea3
@@ -86,8 +91,13 @@ fun CurrentTripHeader(
     allTrips: List<Itinerary>,
     canAdd: Boolean,
     isReorderActive: Boolean,
+    isInCalendarMode: Boolean,
+    selectedDate: String,
+    sortedDates: List<String>,
+    onDateSelected: (String) -> Unit,
     members: List<TripMemberUi>,
     onCalendarClick: () -> Unit,
+    onBackClick: () -> Unit,
     onAddClick: () -> Unit,
     onShareClick: () -> Unit,
     onToggleReorder: () -> Unit,
@@ -137,23 +147,19 @@ fun CurrentTripHeader(
         )
     }
 
-    Column(modifier = Modifier.fillMaxWidth()) {
-        // Top app bar: calendar icon | destination | overflow menu
-        Row(
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .statusBarsPadding()
+    ) {
+        // Top app bar: left icon | destination (centered) | overflow menu
+        Box(
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(horizontal = 8.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.SpaceBetween
+            contentAlignment = Alignment.Center
         ) {
-            IconButton(onClick = onCalendarClick) {
-                Icon(
-                    imageVector = Icons.Default.DateRange,
-                    contentDescription = "Calendar view",
-                    tint = PrimaryAccent
-                )
-            }
-
+            // Title centered in the full width
             Box {
                 Text(
                     text = destination.uppercase().ifBlank { "MY TRIP" },
@@ -188,7 +194,20 @@ fun CurrentTripHeader(
                 }
             }
 
-            Box {
+            // Left: back arrow (calendar mode) or calendar icon (itinerary landing)
+            IconButton(
+                onClick = if (isInCalendarMode) onBackClick else onCalendarClick,
+                modifier = Modifier.align(Alignment.CenterStart)
+            ) {
+                Icon(
+                    imageVector = if (isInCalendarMode) Icons.AutoMirrored.Filled.ArrowBack else Icons.Default.DateRange,
+                    contentDescription = if (isInCalendarMode) "Back to itinerary" else "Calendar view",
+                    tint = PrimaryAccent
+                )
+            }
+
+            // Right: overflow menu
+            Box(modifier = Modifier.align(Alignment.CenterEnd)) {
                 IconButton(onClick = { menuExpanded = true }) {
                     Icon(
                         imageVector = Icons.Default.MoreVert,
@@ -262,7 +281,7 @@ fun CurrentTripHeader(
             }
         }
 
-        // Hero section: label + big date + member avatars
+        // Hero section: label + big date (with nav arrows in calendar mode) + member avatars
         Spacer(modifier = Modifier.height(8.dp))
         Row(
             modifier = Modifier
@@ -271,22 +290,80 @@ fun CurrentTripHeader(
             verticalAlignment = Alignment.Bottom,
             horizontalArrangement = Arrangement.SpaceBetween
         ) {
-            Column {
-                Text(
-                    text = "SCHEDULED ITINERARY",
-                    color = PrimaryAccent,
-                    fontSize = 10.sp,
-                    fontWeight = FontWeight.SemiBold,
-                    letterSpacing = 2.sp
-                )
-                Spacer(modifier = Modifier.height(4.dp))
-                Text(
-                    text = formatHeroDate(dateFrom),
-                    color = DeepSea5,
-                    fontSize = 48.sp,
-                    fontWeight = FontWeight.ExtraBold,
-                    lineHeight = 52.sp
-                )
+            if (isInCalendarMode) {
+                val activeDate = selectedDate.takeIf { it.isNotBlank() } ?: sortedDates.firstOrNull().orEmpty()
+                val activeIndex = sortedDates.indexOf(activeDate).coerceAtLeast(0)
+                val previousDate = sortedDates.getOrNull(activeIndex - 1)
+                val nextDate = sortedDates.getOrNull(activeIndex + 1)
+
+                Column {
+                    Text(
+                        text = "SCHEDULED ITINERARY",
+                        color = PrimaryAccent,
+                        fontSize = 10.sp,
+                        fontWeight = FontWeight.SemiBold,
+                        letterSpacing = 2.sp
+                    )
+                    Spacer(modifier = Modifier.height(2.dp))
+                    Text(
+                        text = formatDayOfWeekShort(activeDate),
+                        color = DeepSea4,
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.SemiBold,
+                        letterSpacing = 1.sp
+                    )
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        IconButton(
+                            onClick = { previousDate?.let(onDateSelected) },
+                            enabled = previousDate != null,
+                            modifier = Modifier.size(36.dp)
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.ChevronLeft,
+                                contentDescription = "Previous day",
+                                tint = if (previousDate != null) DeepSea5 else DeepSea4.copy(alpha = 0.3f),
+                                modifier = Modifier.size(28.dp)
+                            )
+                        }
+                        Text(
+                            text = formatHeroDate(activeDate),
+                            color = DeepSea5,
+                            fontSize = 48.sp,
+                            fontWeight = FontWeight.ExtraBold,
+                            lineHeight = 52.sp
+                        )
+                        IconButton(
+                            onClick = { nextDate?.let(onDateSelected) },
+                            enabled = nextDate != null,
+                            modifier = Modifier.size(36.dp)
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.ChevronRight,
+                                contentDescription = "Next day",
+                                tint = if (nextDate != null) DeepSea5 else DeepSea4.copy(alpha = 0.3f),
+                                modifier = Modifier.size(28.dp)
+                            )
+                        }
+                    }
+                }
+            } else {
+                Column {
+                    Text(
+                        text = "SCHEDULED ITINERARY",
+                        color = PrimaryAccent,
+                        fontSize = 10.sp,
+                        fontWeight = FontWeight.SemiBold,
+                        letterSpacing = 2.sp
+                    )
+                    Spacer(modifier = Modifier.height(4.dp))
+                    Text(
+                        text = formatHeroDate(dateFrom),
+                        color = DeepSea5,
+                        fontSize = 48.sp,
+                        fontWeight = FontWeight.ExtraBold,
+                        lineHeight = 52.sp
+                    )
+                }
             }
 
             if (members.isNotEmpty()) {
@@ -297,11 +374,15 @@ fun CurrentTripHeader(
             }
         }
 
-        Spacer(modifier = Modifier.height(20.dp))
-        Box(modifier = Modifier.padding(horizontal = 24.dp)) {
-            controlsContent()
+        if (isInCalendarMode) {
+            Spacer(modifier = Modifier.height(20.dp))
+            Box(modifier = Modifier.padding(horizontal = 24.dp)) {
+                controlsContent()
+            }
+            Spacer(modifier = Modifier.height(16.dp))
+        } else {
+            Spacer(modifier = Modifier.height(8.dp))
         }
-        Spacer(modifier = Modifier.height(16.dp))
     }
 }
 

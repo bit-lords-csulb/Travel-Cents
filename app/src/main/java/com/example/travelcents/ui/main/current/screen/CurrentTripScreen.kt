@@ -114,7 +114,6 @@ fun CurrentTripScreen(
         Column(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(top = 24.dp)
         ) {
             CurrentTripHeader(
                 destination = uiState.destination,
@@ -123,8 +122,13 @@ fun CurrentTripScreen(
                 allTrips = allTrips,
                 canAdd = uiState.currentTripId != null,
                 isReorderActive = displayMode == CurrentDisplayMode.ITINERARY && jiggleMode,
+                isInCalendarMode = displayMode != CurrentDisplayMode.ITINERARY,
+                selectedDate = selectedDate,
+                sortedDates = calendarDates,
+                onDateSelected = { selectedDate = it },
                 members = tripMembers,
                 onCalendarClick = { onNavigateToMode(CurrentDisplayMode.DAY) },
+                onBackClick = { onNavigateToMode(CurrentDisplayMode.ITINERARY) },
                 onAddClick = {
                     if (uiState.currentTripId == null) {
                         viewModel.postError("Create a trip first before adding calendar plans.")

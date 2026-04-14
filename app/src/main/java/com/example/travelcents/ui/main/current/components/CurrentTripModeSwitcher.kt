@@ -36,7 +36,6 @@ fun CurrentTripModeSwitcher(
 ) {
     val tabs = remember {
         listOf(
-            DisplayModeOption(CurrentDisplayMode.ITINERARY, "Itinerary"),
             DisplayModeOption(CurrentDisplayMode.DAY, "Day View"),
             DisplayModeOption(CurrentDisplayMode.WEEK, "Week View")
         )

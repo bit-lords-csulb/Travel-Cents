@@ -57,7 +57,8 @@ fun EventCommentsPage(
                 .fillMaxWidth()
                 .clip(RoundedCornerShape(bottomStart = 24.dp, bottomEnd = 24.dp))
                 .background(DeepSea2)
-                .padding(top = 48.dp, bottom = 20.dp)
+                .statusBarsPadding()
+                .padding(top = 8.dp, bottom = 16.dp)
         ) {
             // Back button
             IconButton(
@@ -116,8 +117,7 @@ fun EventCommentsPage(
             modifier = Modifier
                 .fillMaxWidth()
                 .background(DeepSea2)
-                .padding(horizontal = 16.dp, vertical = 12.dp)
-                .navigationBarsPadding(),
+                .padding(horizontal = 16.dp, vertical = 12.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
             TextField(
