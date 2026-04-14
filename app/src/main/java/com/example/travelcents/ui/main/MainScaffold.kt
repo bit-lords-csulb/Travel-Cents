@@ -54,6 +54,7 @@ import com.example.travelcents.ui.main.newTrip.TripStep2DatesPage
 import com.example.travelcents.ui.main.newTrip.TripStep3TravelersPage
 import com.example.travelcents.ui.main.home.HomePage
 import com.example.travelcents.ui.main.newTrip.TripStep4BudgetPage
+import com.example.travelcents.ui.main.settings.SettingsPage
 import com.example.travelcents.ui.main.newTrip.TripStep5InterestsPage
 import com.example.travelcents.ui.theme.DeepSea1
 import com.example.travelcents.ui.theme.DeepSea2
