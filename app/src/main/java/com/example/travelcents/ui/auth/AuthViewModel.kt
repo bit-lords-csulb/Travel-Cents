@@ -1,7 +1,6 @@
 package com.example.travelcents.ui.auth
 
 import android.util.Log
-import androidx.compose.runtime.mutableStateOf
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.travelcents.data.AuthModel
@@ -109,6 +108,19 @@ class AuthViewModel : ViewModel() {
         _errorMessage.value = null
     }
 
+    fun clearMessages() {
+        _errorMessage.value = null
+        _statusMessage.value = null
+    }
+
+    fun setStatusMessage(message: String?) {
+        _statusMessage.value = message
+    }
+
+    fun setErrorMessage(message: String?) {
+        _errorMessage.value = message
+    }
+
     // Validation
 
     private fun validateSignUpInputs(
@@ -157,12 +169,16 @@ class AuthViewModel : ViewModel() {
         viewModelScope.launch {
             _isLoading.value = true
             _errorMessage.value = null
+            _statusMessage.value = "Signing in with Google..."
 
             val result = authModel.signInWithGoogle(idToken)
 
             _isLoading.value = false
             result.fold(
-                onSuccess = { _isLoggedIn.value = true },
+                onSuccess = {
+                    _statusMessage.value = "Google sign-in succeeded."
+                    _isLoggedIn.value = true
+                },
                 onFailure = { error ->
                     Log.e("AuthViewModel", "Google login failed", error)
                     _errorMessage.value = when (error) {
