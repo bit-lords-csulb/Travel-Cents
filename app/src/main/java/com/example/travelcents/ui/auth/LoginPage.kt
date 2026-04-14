@@ -59,6 +59,7 @@ import com.example.travelcents.ui.components.TcButton
 import com.example.travelcents.ui.components.TcTextField
 import com.example.travelcents.ui.theme.DeepSea1
 import com.example.travelcents.ui.theme.DeepSea4
+import com.example.travelcents.ui.theme.TravelCentsFonts
 
 private const val LOGIN_PREFS = "login_preferences"
 private const val KEY_REMEMBER_ME = "remember_me"
@@ -133,7 +134,8 @@ fun LoginPage(modifier: Modifier = Modifier, navController: NavController, authV
             text = "Log In",
             fontSize = 32.sp,
             fontWeight = FontWeight.Bold,
-            color = Color.White
+            color = Color.White,
+            fontFamily = TravelCentsFonts.Headline
         )
 
         Box(
@@ -180,7 +182,10 @@ fun LoginPage(modifier: Modifier = Modifier, navController: NavController, authV
             ),
             keyboardActions = KeyboardActions(
                 onNext = { passwordFocusRequester.requestFocus() }
-            )
+            ),
+            textFontFamily = TravelCentsFonts.Body,
+            labelFontFamily = TravelCentsFonts.Body,
+            placeholderFontFamily = TravelCentsFonts.Body
         )
 
         Spacer(modifier = Modifier.height(20.dp))
@@ -215,7 +220,10 @@ fun LoginPage(modifier: Modifier = Modifier, navController: NavController, authV
             ),
             keyboardActions = KeyboardActions(
                 onDone = { authViewModel.logIn(email, password) }
-            )
+            ),
+            textFontFamily = TravelCentsFonts.Body,
+            labelFontFamily = TravelCentsFonts.Body,
+            placeholderFontFamily = TravelCentsFonts.Body
         )
 
         // Remember Me & Forgot Password
@@ -251,11 +259,17 @@ fun LoginPage(modifier: Modifier = Modifier, navController: NavController, authV
                     text = "Remember Me",
                     color = Color.White,
                     fontSize = 12.sp,
-                    fontWeight = FontWeight.Medium
+                    fontWeight = FontWeight.Medium,
+                    fontFamily = TravelCentsFonts.Body
                 )
             }
             TextButton(onClick = { navController.navigate("forgot_password") }) {
-                Text("Forgot Password?", color = DeepSea4, fontSize = 12.sp)
+                Text(
+                    text = "Forgot Password?",
+                    color = DeepSea4,
+                    fontSize = 12.sp,
+                    fontFamily = TravelCentsFonts.Body
+                )
             }
         }
 
@@ -264,7 +278,8 @@ fun LoginPage(modifier: Modifier = Modifier, navController: NavController, authV
                 text = message,
                 color = Color.Green,
                 fontSize = 12.sp,
-                modifier = Modifier.padding(vertical = 8.dp)
+                modifier = Modifier.padding(vertical = 8.dp),
+                fontFamily = TravelCentsFonts.Body
             )
         }
 
@@ -273,7 +288,8 @@ fun LoginPage(modifier: Modifier = Modifier, navController: NavController, authV
                 text = message,
                 color = Color.Red,
                 fontSize = 12.sp,
-                modifier = Modifier.padding(vertical = 8.dp)
+                modifier = Modifier.padding(vertical = 8.dp),
+                fontFamily = TravelCentsFonts.Body
             )
         }
 
@@ -289,7 +305,12 @@ fun LoginPage(modifier: Modifier = Modifier, navController: NavController, authV
             if (isLoading) {
                 CircularProgressIndicator(color = Color.White, modifier = Modifier.requiredSize(24.dp))
             } else {
-                Text("Login", color = Color.White, fontSize = 18.sp)
+                Text(
+                    text = "Login",
+                    color = Color.White,
+                    fontSize = 18.sp,
+                    fontFamily = TravelCentsFonts.Body
+                )
             }
         }
 
@@ -298,7 +319,8 @@ fun LoginPage(modifier: Modifier = Modifier, navController: NavController, authV
         GoogleAuthButton(
             text = "Signin with Google",
             authViewModel = authViewModel,
-            enabled = !isLoading
+            enabled = !isLoading,
+            fontFamily = TravelCentsFonts.Body
         )
 
         Spacer(modifier = Modifier.height(24.dp))
@@ -311,13 +333,15 @@ fun LoginPage(modifier: Modifier = Modifier, navController: NavController, authV
             Text(
                 text = "Don't have an Account? ",
                 color = Color.White,
-                fontSize = 12.sp
+                fontSize = 12.sp,
+                fontFamily = TravelCentsFonts.Body
             )
             Text(
                 text = "Sign Up",
                 color = DeepSea4,
                 fontSize = 12.sp,
                 fontWeight = FontWeight.SemiBold,
+                fontFamily = TravelCentsFonts.Body,
                 modifier = Modifier.clickable(enabled = !isLoading) {
                     navController.navigate("signup") {
                         launchSingleTop = true
