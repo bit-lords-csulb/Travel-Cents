@@ -37,6 +37,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -505,8 +506,13 @@ private fun CurrencyDropdown(
                     if (totalItems > visibleCount && thumbAlpha > 0f) {
                         val thumbHeight = (220f * visibleCount / totalItems).coerceAtLeast(20f)
                         val maxOffset = 220f - thumbHeight
-                        val scrollProgress = listState.firstVisibleItemIndex.toFloat() /
-                            (totalItems - visibleCount).coerceAtLeast(1)
+                        // derivedStateOf avoids recomposition on every scroll frame
+                        val scrollProgress by remember(totalItems) {
+                            derivedStateOf {
+                                listState.firstVisibleItemIndex.toFloat() /
+                                    (totalItems - visibleCount).coerceAtLeast(1)
+                            }
+                        }
                         Box(
                             modifier = Modifier
                                 .align(Alignment.TopEnd)
