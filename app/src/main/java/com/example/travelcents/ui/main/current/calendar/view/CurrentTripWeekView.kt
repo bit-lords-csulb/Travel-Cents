@@ -8,7 +8,6 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -20,8 +19,6 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.ChevronLeft
-import androidx.compose.material.icons.filled.ChevronRight
 import androidx.compose.material.icons.filled.DeleteOutline
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
@@ -38,7 +35,6 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.travelcents.data.model.TravelEvent
-import com.example.travelcents.ui.main.current.calendar.buildTripDateRange
 import com.example.travelcents.ui.main.current.calendar.defaultStartMinutesForDate
 import com.example.travelcents.ui.main.current.calendar.eventSpanForDate
 import com.example.travelcents.ui.main.current.calendar.eventsForDate
@@ -80,14 +76,6 @@ fun CurrentTripWeekView(
             .fillMaxSize()
             .padding(horizontal = 12.dp, vertical = 10.dp)
     ) {
-        WeekNavigationBar(
-            allDates = sortedDates,
-            visibleDates = visibleWeekDates,
-            onDateSelected = onDateSelected
-        )
-
-        Spacer(modifier = Modifier.height(14.dp))
-
         Card(
             modifier = Modifier
                 .fillMaxWidth()
@@ -111,80 +99,6 @@ fun CurrentTripWeekView(
                         onAddClick = { onCreatePlan(date, defaultStartMinutesForDate(events, date)) }
                     )
                 }
-            }
-        }
-    }
-}
-
-@Composable
-private fun WeekNavigationBar(
-    allDates: List<String>,
-    visibleDates: List<String>,
-    onDateSelected: (String) -> Unit
-) {
-    val weekStartIndex = allDates.indexOf(visibleDates.firstOrNull()).coerceAtLeast(0)
-    val previousAnchor = allDates.getOrNull((weekStartIndex - 7).coerceAtLeast(0))
-        ?.takeIf { visibleDates.firstOrNull() != allDates.firstOrNull() }
-    val nextAnchor = allDates.getOrNull((weekStartIndex + 7).coerceAtMost(allDates.lastIndex))
-        ?.takeIf { visibleDates.lastOrNull() != allDates.lastOrNull() }
-    val weekLabel = buildTripDateRange(
-        dateFrom = visibleDates.firstOrNull().orEmpty(),
-        dateTo = visibleDates.lastOrNull().orEmpty(),
-        eventDates = visibleDates
-    )
-
-    Column(
-        modifier = Modifier
-            .fillMaxWidth()
-            .background(DeepSea2, RoundedCornerShape(18.dp))
-            .border(1.dp, DeepSea3.copy(alpha = 0.7f), RoundedCornerShape(18.dp))
-            .padding(horizontal = 12.dp, vertical = 10.dp)
-    ) {
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            IconButton(
-                onClick = { previousAnchor?.let(onDateSelected) },
-                enabled = previousAnchor != null,
-                modifier = Modifier.size(32.dp)
-            ) {
-                Icon(
-                    imageVector = Icons.Default.ChevronLeft,
-                    contentDescription = "Previous week",
-                    tint = if (previousAnchor != null) DeepSea5 else DeepSea4.copy(alpha = 0.35f)
-                )
-            }
-
-            Column(
-                modifier = Modifier.weight(1f),
-                horizontalAlignment = Alignment.CenterHorizontally
-            ) {
-                Text(
-                    text = "WEEK VIEW",
-                    color = DeepSea4,
-                    fontSize = 11.sp,
-                    fontWeight = FontWeight.Bold,
-                    letterSpacing = 0.8.sp
-                )
-                Text(
-                    text = weekLabel,
-                    color = DeepSea5,
-                    fontSize = 15.sp,
-                    fontWeight = FontWeight.SemiBold
-                )
-            }
-
-            IconButton(
-                onClick = { nextAnchor?.let(onDateSelected) },
-                enabled = nextAnchor != null,
-                modifier = Modifier.size(32.dp)
-            ) {
-                Icon(
-                    imageVector = Icons.Default.ChevronRight,
-                    contentDescription = "Next week",
-                    tint = if (nextAnchor != null) DeepSea5 else DeepSea4.copy(alpha = 0.35f)
-                )
             }
         }
     }

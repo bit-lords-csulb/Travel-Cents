@@ -44,6 +44,8 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.snapshotFlow
+import kotlinx.coroutines.flow.distinctUntilChanged
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -58,10 +60,7 @@ import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImage
 import com.example.travelcents.data.model.EventOption
 import com.example.travelcents.data.model.TravelEvent
-import com.example.travelcents.ui.modules.PhotoGalleryButton
-import com.example.travelcents.ui.modules.TripPhotoGalleryDialog
 import com.example.travelcents.ui.modules.formatDisplayTime
-import com.example.travelcents.ui.modules.galleryPhotoModels
 import com.example.travelcents.ui.modules.heroImageModel
 import com.example.travelcents.ui.modules.normalizeTime
 import com.example.travelcents.ui.theme.DeepSea1
@@ -81,7 +80,7 @@ private const val UndatedHeader = "DATE TBD"
 private sealed interface CurrentTripItineraryItem {
     val key: String
 
-    data class Header(val date: String) : CurrentTripItineraryItem { override val key = "header_$date" }
+    data class Header(val rawDate: String, val label: String) : CurrentTripItineraryItem { override val key = "header_$rawDate" }
     data class EventCard(val event: TravelEvent, val isLastInDay: Boolean, val dayIndex: Int) : CurrentTripItineraryItem {
         override val key = event.eventId
     }
@@ -98,7 +97,8 @@ fun CurrentTripItineraryContent(
     onDeleteClick: (TravelEvent) -> Unit,
     onOpenAlternatives: (String) -> Unit,
     onMoveEvent: (eventId: String, fromDate: String, toDate: String, toIndex: Int) -> Unit,
-    onPersistEventPlacements: (Set<String>) -> Unit
+    onPersistEventPlacements: (Set<String>) -> Unit,
+    onVisibleDateChange: (String) -> Unit = {}
 ) {
     if (events.isEmpty()) {
         Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
@@ -140,6 +140,23 @@ fun CurrentTripItineraryContent(
         }
     }
 
+    // Update the hero date as the user scrolls — find the last header above the top of the list
+    LaunchedEffect(lazyListState, itineraryItems, jiggleMode) {
+        snapshotFlow { lazyListState.firstVisibleItemIndex }
+            .distinctUntilChanged()
+            .collect { firstIndex ->
+                val bannerOffset = if (jiggleMode) 1 else 0
+                val adjustedIndex = (firstIndex - bannerOffset).coerceAtLeast(0)
+                for (i in adjustedIndex downTo 0) {
+                    val item = itineraryItems.getOrNull(i) as? CurrentTripItineraryItem.Header ?: continue
+                    if (item.rawDate != UndatedGroupKey) {
+                        onVisibleDateChange(item.rawDate)
+                        break
+                    }
+                }
+            }
+    }
+
     LazyColumn(
         modifier = Modifier.fillMaxSize(),
         state = lazyListState,
@@ -179,7 +196,7 @@ fun CurrentTripItineraryContent(
 
         items(itineraryItems, key = { it.key }) { item ->
             when (item) {
-                is CurrentTripItineraryItem.Header -> ItineraryDateHeader(item.date)
+                is CurrentTripItineraryItem.Header -> ItineraryDateHeader(item.label)
                 is CurrentTripItineraryItem.EventCard -> {
                     val options = eventOptions[item.event.eventId].orEmpty()
                     val rejected = rejectedOptions[item.event.eventId].orEmpty()
@@ -247,9 +264,7 @@ private fun CurrentTripItineraryCard(
     val accent = eventPalette(event).accent
     val title = eventTitle(event)
     val description = eventSubtitle(event).ifBlank { "Tap to edit details" }
-    val photos = remember(event) { event.galleryPhotoModels() }
     val heroImage = remember(event) { event.heroImageModel() }
-    var showGallery by remember(event.eventId) { mutableStateOf(false) }
 
     Row(
         modifier = Modifier
@@ -321,14 +336,6 @@ private fun CurrentTripItineraryCard(
                                     .fillMaxSize()
                                     .clip(RoundedCornerShape(topStart = 16.dp, bottomStart = 16.dp)),
                                 contentScale = ContentScale.Crop
-                            )
-
-                            PhotoGalleryButton(
-                                photoCount = photos.size,
-                                onClick = { showGallery = true },
-                                modifier = Modifier
-                                    .align(Alignment.TopStart)
-                                    .padding(8.dp)
                             )
                         }
                     } else {
@@ -459,12 +466,6 @@ private fun CurrentTripItineraryCard(
         }
     }
 
-    if (showGallery && photos.isNotEmpty()) {
-        TripPhotoGalleryDialog(
-            photos = photos,
-            onDismiss = { showGallery = false }
-        )
-    }
 }
 
 private fun buildCurrentTripItineraryItems(events: List<TravelEvent>): List<CurrentTripItineraryItem> {
@@ -481,7 +482,7 @@ private fun buildCurrentTripItineraryItems(events: List<TravelEvent>): List<Curr
 
     return buildList {
         grouped.forEach { (date, dayEvents) ->
-            add(CurrentTripItineraryItem.Header(itineraryHeaderLabel(date)))
+            add(CurrentTripItineraryItem.Header(rawDate = date, label = itineraryHeaderLabel(date)))
             dayEvents.forEachIndexed { idx, event ->
                 add(CurrentTripItineraryItem.EventCard(event, isLastInDay = idx == dayEvents.lastIndex, dayIndex = idx))
             }
