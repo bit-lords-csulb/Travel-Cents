@@ -12,7 +12,6 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.requiredSize
 import androidx.compose.foundation.layout.requiredWidth
@@ -25,8 +24,6 @@ import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
-import androidx.compose.material3.TextField
-import androidx.compose.material3.TextFieldDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -38,9 +35,11 @@ import androidx.core.content.edit
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.FocusDirection
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.key.Key
 import androidx.compose.ui.input.key.KeyEventType
 import androidx.compose.ui.input.key.isShiftPressed
@@ -50,17 +49,15 @@ import androidx.compose.ui.input.key.type
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.LocalView
-import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
-import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.NavController
+import com.example.travelcents.ui.components.TcTextField
 import com.example.travelcents.ui.theme.DeepSea1
 import com.example.travelcents.ui.theme.DeepSea2
 import com.example.travelcents.ui.theme.DeepSea4
@@ -78,6 +75,7 @@ private const val LOGIN_PREFS = "login_preferences"
 private const val KEY_REMEMBER_ME = "remember_me"
 private const val KEY_SAVED_EMAIL = "saved_email_or_username"
 private const val KEY_SAVED_PASSWORD = "saved_password"
+
 @Composable
 fun LoginPage(modifier: Modifier = Modifier, navController: NavController, authViewModel: AuthViewModel) {
     val context = LocalContext.current
@@ -99,7 +97,6 @@ fun LoginPage(modifier: Modifier = Modifier, navController: NavController, authV
         onDispose { view.importantForAutofill = previous }
     }
 
-    // Collect StateFlows as Compose state
     val isLoggedIn by authViewModel.isLoggedIn.collectAsStateWithLifecycle()
     val isLoading by authViewModel.isLoading.collectAsStateWithLifecycle()
     val errorMessage by authViewModel.errorMessage.collectAsStateWithLifecycle()
@@ -114,7 +111,6 @@ fun LoginPage(modifier: Modifier = Modifier, navController: NavController, authV
         }
     }
 
-    // Navigate to the home screen if the user is logged in
     LaunchedEffect(isLoggedIn) {
         if (isLoggedIn) {
             sharedPreferences.edit {
@@ -144,7 +140,6 @@ fun LoginPage(modifier: Modifier = Modifier, navController: NavController, authV
     ) {
         Spacer(modifier = Modifier.height(180.dp))
 
-        // LOG IN TITLE
         Text(
             text = "Log In",
             fontSize = 32.sp,
@@ -162,20 +157,13 @@ fun LoginPage(modifier: Modifier = Modifier, navController: NavController, authV
 
         Spacer(modifier = Modifier.height(40.dp))
 
-        // EMAIL / USERNAME SECTION
-        Text(text = "Email or Username", color = Color.White, fontSize = 16.sp)
-        TextField(
+        TcTextField(
             value = email,
-            onValueChange = {
-                email = it
-                authViewModel.clearError()
-            },
-            placeholder = { Text("email or username", color = Color.Gray, fontSize = 14.sp) },
-            singleLine = true,
-            textStyle = TextStyle(color = Color.White, fontSize = 15.sp),
+            onValueChange = { email = it; authViewModel.clearError() },
+            label = "Email or Username",
+            placeholder = "email or username",
             modifier = Modifier
                 .fillMaxWidth()
-                .heightIn(min = 56.dp)
                 .focusRequester(emailFocusRequester)
                 .onPreviewKeyEvent { event ->
                     when {
@@ -203,27 +191,19 @@ fun LoginPage(modifier: Modifier = Modifier, navController: NavController, authV
             ),
             keyboardActions = KeyboardActions(
                 onNext = { passwordFocusRequester.requestFocus() }
-            ),
-            colors = loginTextFieldColors()
+            )
         )
 
         Spacer(modifier = Modifier.height(20.dp))
 
-        // PASSWORD SECTION
-        Text(text = "Password", color = Color.White, fontSize = 16.sp)
-        TextField(
+        TcTextField(
             value = password,
-            onValueChange = {
-                password = it
-                authViewModel.clearError()
-            },
-            placeholder = { Text("enter password", color = Color.Gray, fontSize = 14.sp) },
+            onValueChange = { password = it; authViewModel.clearError() },
+            label = "Password",
+            placeholder = "enter password",
             visualTransformation = PasswordVisualTransformation(),
-            singleLine = true,
-            textStyle = TextStyle(color = Color.White, fontSize = 15.sp),
             modifier = Modifier
                 .fillMaxWidth()
-                .heightIn(min = 56.dp)
                 .focusRequester(passwordFocusRequester)
                 .onPreviewKeyEvent { event ->
                     when {
@@ -246,11 +226,10 @@ fun LoginPage(modifier: Modifier = Modifier, navController: NavController, authV
             ),
             keyboardActions = KeyboardActions(
                 onDone = { authViewModel.logIn(email, password) }
-            ),
-            colors = loginTextFieldColors()
+            )
         )
 
-        // REMEMBER ME & FORGOT PASSWORD
+        // Remember Me & Forgot Password
         Row(
             modifier = Modifier.fillMaxWidth().padding(top = 12.dp),
             horizontalArrangement = Arrangement.SpaceBetween,
@@ -291,7 +270,6 @@ fun LoginPage(modifier: Modifier = Modifier, navController: NavController, authV
             }
         }
 
-        // SUCCESS MESSAGE (e.g. "Account created! Please log in.")
         statusMessage?.let { message ->
             Text(
                 text = message,
@@ -301,7 +279,6 @@ fun LoginPage(modifier: Modifier = Modifier, navController: NavController, authV
             )
         }
 
-        // ERROR MESSAGE
         errorMessage?.let { message ->
             Text(
                 text = message,
@@ -313,7 +290,6 @@ fun LoginPage(modifier: Modifier = Modifier, navController: NavController, authV
 
         Spacer(modifier = Modifier.height(32.dp))
 
-        // LOGIN BUTTON
         Button(
             onClick = { authViewModel.logIn(email, password) },
             enabled = !isLoading,
@@ -369,26 +345,22 @@ fun GoogleSignInButton(authViewModel: AuthViewModel) {
             coroutineScope.launch {
                 val credentialManager = CredentialManager.create(context)
 
-                // 1. Build the Google ID Option
                 val googleIdOption = GetGoogleIdOption.Builder()
                     .setFilterByAuthorizedAccounts(false)
                     .setServerClientId("805994740096-d31i7240546h0701vh3m2kphrtsqqqtt.apps.googleusercontent.com")
                     .setAutoSelectEnabled(false)
                     .build()
 
-                // 2. Build the Credential Request
                 val request = GetCredentialRequest.Builder()
                     .addCredentialOption(googleIdOption)
                     .build()
 
                 try {
-                    // 3. Launch the Android Bottom Sheet Prompt
                     val result = credentialManager.getCredential(
                         request = request,
                         context = context,
                     )
 
-                    // 4. Extract the ID Token if successful
                     val credential = result.credential
                     if (credential is CustomCredential && credential.type == GoogleIdTokenCredential.TYPE_GOOGLE_ID_TOKEN_CREDENTIAL) {
                         val googleIdTokenCredential = GoogleIdTokenCredential.createFrom(credential.data)
@@ -411,15 +383,3 @@ fun GoogleSignInButton(authViewModel: AuthViewModel) {
         Text("Continue with Google", color = Color.Black, fontSize = 16.sp, fontWeight = FontWeight.SemiBold)
     }
 }
-
-@Composable
-private fun loginTextFieldColors() = TextFieldDefaults.colors(
-    focusedContainerColor = Color.Transparent,
-    unfocusedContainerColor = Color.Transparent,
-    disabledContainerColor = Color.Transparent,
-    focusedTextColor = Color.White,
-    unfocusedTextColor = Color.White,
-    cursorColor = Color.White,
-    focusedIndicatorColor = Color.White,
-    unfocusedIndicatorColor = DeepSea4
-)
