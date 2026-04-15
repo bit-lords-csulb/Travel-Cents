@@ -229,8 +229,12 @@ Use the 15 supported business details fully and stop planning around unsupported
 1. Expand Yelp mapping so Business Details populates all supported `attr_*` fields.
 2. Persist those attributes into Firestore on the event and option records.
 3. Reuse the existing `image_url` as the shared profile photo field.
-4. If `photoUrls` is not meaningfully richer under Base, do not create fake multi-photo complexity.
-5. Focus on richer detail cards and link/actions support rather than unsupported media assumptions.
+4. Persist returned `photos` into shared `photoUrls` when Yelp Business Details provides them.
+5. Persist an enrichment marker so already-enriched Yelp selections do not refetch every trip load.
+6. Run enrichment predictably:
+   - background after trip events/options load
+   - fallback when a Yelp-backed event details card opens and the selected place is still missing enrichment
+7. Focus on richer detail cards and link/actions support rather than unsupported media assumptions.
 
 ## Event Details Refactor Plan
 

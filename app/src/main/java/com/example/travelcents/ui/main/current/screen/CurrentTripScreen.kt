@@ -104,9 +104,9 @@ fun CurrentTripScreen(
     LaunchedEffect(selectedEventId, uiState.events) {
         val event = uiState.events.firstOrNull { it.eventId == selectedEventId }
         val yelpId = event?.details?.get("yelp_id")?.takeIf { it.isNotBlank() }
-        if (yelpId != null && event != null) {
+        if (yelpId != null) {
             viewModel.fetchYelpReviews(yelpId)
-            viewModel.fetchYelpPhotos(yelpId, event.eventId)
+            viewModel.ensureYelpEventEnriched(event.eventId)
         }
     }
 

@@ -27,14 +27,17 @@ import com.example.travelcents.data.trip.model.ATTR_PROFILE_PHOTO_URL
 import com.example.travelcents.data.trip.model.ATTR_REVIEW_COUNT
 import com.example.travelcents.data.trip.model.ATTR_STATIC_MAP_PROVIDER
 import com.example.travelcents.data.trip.model.ATTR_STATIC_MAP_URL
+import com.example.travelcents.data.trip.model.ATTR_YELP_DETAIL_ENRICHED
 import com.example.travelcents.data.trip.model.ATTR_YELP_URL
 import com.example.travelcents.data.trip.model.DETAIL_YELP_ID
+import com.example.travelcents.data.trip.model.detailValue
 import okhttp3.OkHttpClient
 import okhttp3.logging.HttpLoggingInterceptor
 import retrofit2.Retrofit
 import retrofit2.converter.gson.GsonConverterFactory
 import java.util.UUID
 import java.util.concurrent.TimeUnit
+import java.util.concurrent.ConcurrentHashMap
 import java.util.Locale
 
 object YelpRepository {
@@ -42,6 +45,14 @@ object YelpRepository {
     private const val OPTIONS_PER_EVENT = 5
     private const val SEARCH_PAGE_SIZE = 50
     private const val SEARCH_MAX_RESULTS = 240
+    private val businessDetailCache = ConcurrentHashMap<String, YelpBusiness>()
+
+    data class YelpEventEnrichmentResult(
+        val event: TravelEvent,
+        val options: List<EventOption>,
+        val updatedOptionIds: Set<String>,
+        val yelpId: String
+    )
 
     private val client = OkHttpClient.Builder()
         .addInterceptor { chain ->
@@ -322,13 +333,98 @@ object YelpRepository {
     }
 
     // Fetch full business details (photos, hours, etc.) — called lazily on first expand
-    suspend fun getBusinessDetail(yelpId: String): YelpBusiness? {
-        return try { api.getBusinessDetail(yelpId) } catch (_: Exception) { null }
+    suspend fun getBusinessDetail(
+        yelpId: String,
+        forceRefresh: Boolean = false
+    ): YelpBusiness? {
+        if (!forceRefresh) {
+            businessDetailCache[yelpId]?.let { return it }
+        }
+
+        return try {
+            val detail = api.getBusinessDetail(yelpId)
+            businessDetailCache[yelpId] = detail
+            detail
+        } catch (_: Exception) {
+            null
+        }
     }
 
     // Fetch up to 3 review snippets — called lazily on first expand
     suspend fun getBusinessReviews(yelpId: String): List<YelpReview> {
         return try { api.getBusinessReviews(yelpId, limit = 3).reviews } catch (_: Exception) { emptyList() }
+    }
+
+    fun needsEventEnrichment(
+        event: TravelEvent,
+        options: List<EventOption> = event.options
+    ): Boolean {
+        val yelpId = selectedYelpId(event, options) ?: return false
+        val eventNeedsEnrichment = event.details[ATTR_YELP_DETAIL_ENRICHED] != "true"
+        val selectedOptionNeedsEnrichment = options
+            .firstOrNull { it.selected && it.detailValue(DETAIL_YELP_ID) == yelpId }
+            ?.details
+            ?.get(ATTR_YELP_DETAIL_ENRICHED)
+            ?.let { it != "true" }
+            ?: false
+        return eventNeedsEnrichment || selectedOptionNeedsEnrichment
+    }
+
+    suspend fun enrichYelpBackedEvent(
+        event: TravelEvent,
+        options: List<EventOption> = event.options,
+        forceRefresh: Boolean = false
+    ): YelpEventEnrichmentResult? {
+        val yelpId = selectedYelpId(event, options) ?: return null
+        if (!forceRefresh && !needsEventEnrichment(event, options)) return null
+
+        val detail = getBusinessDetail(yelpId, forceRefresh = forceRefresh) ?: return null
+        return applyBusinessDetailEnrichment(event, options, detail)
+    }
+
+    internal fun applyBusinessDetailEnrichment(
+        event: TravelEvent,
+        options: List<EventOption> = event.options,
+        detail: YelpBusiness
+    ): YelpEventEnrichmentResult? {
+        val yelpId = selectedYelpId(event, options) ?: return null
+        val enrichmentDetails = businessDetailAttributes(detail) + (ATTR_YELP_DETAIL_ENRICHED to "true")
+        val enrichmentPhotos = detail.photos.orEmpty()
+            .filter { it.isNotBlank() }
+            .distinct()
+        val enrichmentImageUrl = detail.imageUrl.takeIf { it.isNotBlank() }
+
+        val updatedOptions = options.map { option ->
+            if (option.detailValue(DETAIL_YELP_ID) != yelpId) return@map option
+            val updatedDetails = option.details + enrichmentDetails
+            option.copy(
+                imageUrl = enrichmentImageUrl ?: option.imageUrl,
+                photoUrls = enrichmentPhotos.ifEmpty { option.photoUrls },
+                details = updatedDetails
+            )
+        }
+
+        val selectedOption = updatedOptions.firstOrNull { it.selected }
+        val updatedEventDetails = event.details + enrichmentDetails
+        val updatedEvent = event.copy(
+            imageUrl = enrichmentImageUrl ?: selectedOption?.imageUrl?.takeIf { it.isNotBlank() } ?: event.imageUrl,
+            photoUrls = enrichmentPhotos.ifEmpty {
+                selectedOption?.photoUrls?.takeIf { it.isNotEmpty() } ?: event.photoUrls
+            },
+            details = updatedEventDetails
+        )
+
+        val updatedOptionIds = options.zip(updatedOptions)
+            .filter { (before, after) -> before != after }
+            .map { (_, after) -> after.optionId }
+            .toSet()
+
+        return YelpEventEnrichmentResult(
+            event = updatedEvent,
+            options = updatedOptions,
+            updatedOptionIds = updatedOptionIds,
+            yelpId = yelpId
+        )
     }
 
     internal fun mapBusinessToEventOption(
@@ -523,6 +619,16 @@ object YelpRepository {
                 }
             }
             .firstOrNull()
+    }
+
+    private fun selectedYelpId(
+        event: TravelEvent,
+        options: List<EventOption>
+    ): String? {
+        return options.firstOrNull { it.selected }
+            ?.detailValue(DETAIL_YELP_ID)
+            ?.takeIf { it.isNotBlank() }
+            ?: event.detailValue(DETAIL_YELP_ID)?.takeIf { it.isNotBlank() }
     }
 }
 
