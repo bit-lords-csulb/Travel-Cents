@@ -49,36 +49,36 @@ Related plan: [EVENT_DETAILS_MEDIA_REFACTOR_PLAN.md](C:\Users\Zaher503\AndroidSt
 
 ### Checklist
 
-- [ ] Standardize hotel detail keys in `SerpRepository.kt` to `attr_*` names where appropriate
-- [ ] Standardize Yelp detail keys in `YelpRepository.kt` to `attr_*`
-- [ ] Persist these Yelp Base-plan fields on events and options:
-  - [ ] `attr_business_name`
-  - [ ] `attr_business_address`
-  - [ ] `attr_categories`
-  - [ ] `attr_phone`
-  - [ ] `attr_hours_summary`
-  - [ ] `attr_hours_raw`
-  - [ ] `attr_average_rating`
-  - [ ] `attr_review_count`
-  - [ ] `attr_is_closed`
-  - [ ] `attr_yelp_url`
-  - [ ] `attr_profile_photo_url`
-  - [ ] `attr_has_reservations`
-  - [ ] `attr_has_waitlist`
-  - [ ] `attr_has_request_a_quote`
-  - [ ] `attr_has_food_order`
-  - [ ] `attr_menu_url`
-- [ ] Persist static map metadata fields:
-  - [ ] `attr_latitude`
-  - [ ] `attr_longitude`
-  - [ ] `attr_static_map_url`
-  - [ ] `attr_static_map_provider`
-- [ ] Audit `TravelEvent.toFirestoreMap()` usage and decide whether `localImagePath` should stop being written as shared state
-- [ ] Audit `EventOption.toMap()` usage and decide whether `localImagePath` should stop being written as shared state
-- [ ] Verify Firestore load paths still deserialize:
-  - [ ] current-trip flow
-  - [ ] itinerary flow
-  - [ ] Serp cache flow
+- [x] Standardize hotel detail keys in `SerpRepository.kt` to `attr_*` names where appropriate
+- [x] Standardize Yelp detail keys in `YelpRepository.kt` to `attr_*`
+- [x] Persist these Yelp Base-plan fields on events and options:
+  - [x] `attr_business_name`
+  - [x] `attr_business_address`
+  - [x] `attr_categories`
+  - [x] `attr_phone`
+  - [x] `attr_hours_summary`
+  - [x] `attr_hours_raw`
+  - [x] `attr_average_rating`
+  - [x] `attr_review_count`
+  - [x] `attr_is_closed`
+  - [x] `attr_yelp_url`
+  - [x] `attr_profile_photo_url`
+  - [x] `attr_has_reservations`
+  - [x] `attr_has_waitlist`
+  - [x] `attr_has_request_a_quote`
+  - [x] `attr_has_food_order`
+  - [x] `attr_menu_url`
+- [x] Persist static map metadata fields:
+  - [x] `attr_latitude`
+  - [x] `attr_longitude`
+  - [x] `attr_static_map_url`
+  - [x] `attr_static_map_provider`
+- [x] Audit `TravelEvent.toFirestoreMap()` usage and decide whether `localImagePath` should stop being written as shared state
+- [x] Audit `EventOption.toMap()` usage and decide whether `localImagePath` should stop being written as shared state
+- [x] Verify Firestore load paths still deserialize:
+  - [x] current-trip flow
+  - [x] itinerary flow
+  - [x] Serp cache flow
 
 ## Phase 2: Yelp Pooling And Generation Fixes
 
@@ -86,22 +86,31 @@ Related plan: [EVENT_DETAILS_MEDIA_REFACTOR_PLAN.md](C:\Users\Zaher503\AndroidSt
 
 - Restore intended `days * 5` behavior.
 - Stop wasting fetched businesses through overlapping alternatives.
+- Preserve every loaded Yelp business as a saved backup option for the relevant generated events.
+- Respect Yelp Search paging limits when trip size requires more than one request.
 
 ### Checklist
 
-- [ ] Replace restaurant distribution logic with chunked 5-per-day grouping
-- [ ] Replace activity distribution logic with chunked 5-per-day grouping
-- [ ] Change activity pool request from fixed `20` to `tripDates.size * 5`
-- [ ] Reuse paged `fetchBusinessPool()` logic for activities
-- [ ] Ensure restaurant pool still requests `tripDates.size * 5`
-- [ ] Ensure later days do not unnecessarily reuse earlier businesses as alternatives
+- [x] Replace restaurant distribution logic with chunked 5-per-day grouping
+- [x] Replace activity distribution logic with chunked 5-per-day grouping
+- [x] Change activity pool request from fixed `20` to `tripDates.size * 5`
+- [x] Reuse paged `fetchBusinessPool()` logic for activities
+- [x] Ensure restaurant pool still requests `tripDates.size * 5`
+- [x] Ensure later days do not unnecessarily reuse earlier businesses as alternatives
+- [x] Preserve all loaded restaurant businesses as saved options on each generated restaurant event
+- [x] Preserve all loaded activity businesses as saved options on each generated activity event
+- [x] Confirm Yelp Search paging assumptions for large trips:
+  - [x] max `50` results per individual request
+  - [x] page additional results with `offset`
+  - [x] cap a single originating query at `240` total results
+- [x] Split oversized restaurant/activity pool loads across multiple Yelp Search requests when target count exceeds one page
 - [ ] Add fallback behavior for undersized pools:
   - [ ] smaller option groups allowed
   - [ ] duplication only when unavoidable
 - [ ] Verify 7-day trip target behavior:
   - [ ] restaurants request about 35 businesses
   - [ ] activities request about 35 businesses
-  - [ ] generated per-day option sets are mostly unique
+  - [ ] generated default selections stay varied by day while full backup pools remain available
 
 ## Phase 3: Yelp Detail Enrichment
 

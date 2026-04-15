@@ -85,6 +85,7 @@ Updated: 2026-04-15
 - Restaurants still request `tripDates.size * 5`, but distribution wastes a large part of the pool by reusing alternatives.
 - Activities no longer request `tripDates.size * 5`; they currently use a fixed pool of `20`.
 - For a week-long trip, the intended behavior is roughly `35 restaurant businesses + 35 activity businesses`, but the current implementation does not reliably produce that.
+- Loaded Yelp businesses that are fetched for generation should be retained as backup options instead of being discarded after the initial default picks are chosen.
 
 ## Media Storage Model
 
@@ -370,6 +371,7 @@ For a 7-day trip:
 
 - restaurants target around `35` businesses
 - activities target around `35` businesses
+- each generated restaurant/activity event keeps the full loaded pool as switchable options
 
 ### Current restaurant issue
 
@@ -383,24 +385,35 @@ For a 7-day trip:
 
 ### New distribution logic
 
-Replace the current overlapping alternative logic with chunked groups.
+Use chunked defaults plus full backup retention.
 
 For each day:
 
-- day 1 gets businesses `0..4`
-- day 2 gets businesses `5..9`
-- day 3 gets businesses `10..14`
+- the default selected place comes from that day's preferred chunk
+- the rest of that preferred chunk appears first in the option list
+- the remainder of the loaded pool is still saved behind it as backup options
+
+For example:
+
+- day 1 defaults to businesses `0..4`
+- day 2 defaults to businesses `5..9`
+- day 3 defaults to businesses `10..14`
 
 Each day becomes one event with:
 
 - one selected primary place
-- four unique alternatives
+- a day-specific preferred chunk near the top
+- all other loaded Yelp businesses still available as saved alternatives
 
 ### Request changes
 
 - Restaurants: keep `days * 5`
 - Activities: change to `days * 5`
 - Use the same paged pool fetch logic for both
+- Yelp Search paging must respect the current API limits:
+  - up to `50` businesses per individual request
+  - use `offset` to page further results
+  - do not assume more than `240` total businesses from one originating search query
 
 ### Fallback handling
 
