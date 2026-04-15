@@ -20,8 +20,6 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.DeleteOutline
-import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.Text
@@ -76,16 +74,14 @@ fun CurrentTripWeekView(
             .fillMaxSize()
             .padding(horizontal = 12.dp, vertical = 10.dp)
     ) {
-        Card(
+        CurrentTripPageSurface(
             modifier = Modifier
                 .fillMaxWidth()
-                .weight(1f),
-            shape = RoundedCornerShape(20.dp),
-            colors = CardDefaults.cardColors(containerColor = DeepSea2)
+                .weight(1f)
         ) {
             LazyColumn(
                 modifier = Modifier.fillMaxSize(),
-                contentPadding = PaddingValues(horizontal = 10.dp, vertical = 10.dp),
+                contentPadding = PaddingValues(horizontal = 12.dp, vertical = 12.dp),
                 verticalArrangement = Arrangement.spacedBy(8.dp)
             ) {
                 items(visibleWeekDates, key = { it }) { date ->
@@ -117,11 +113,11 @@ private fun WeekOverviewDayRow(
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .background(if (selected) DeepSea3.copy(alpha = 0.88f) else DeepSea1.copy(alpha = 0.42f), RoundedCornerShape(18.dp))
+            .background(if (selected) DeepSea3.copy(alpha = 0.88f) else DeepSea1.copy(alpha = 0.42f), CurrentTripInnerShape)
             .border(
                 width = 1.dp,
                 color = if (selected) DeepSea4.copy(alpha = 0.45f) else DeepSea3.copy(alpha = 0.6f),
-                shape = RoundedCornerShape(18.dp)
+                shape = CurrentTripInnerShape
             )
             .padding(horizontal = 12.dp, vertical = 10.dp),
         horizontalArrangement = Arrangement.spacedBy(12.dp),

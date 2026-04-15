@@ -19,10 +19,10 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.example.travelcents.ui.theme.DeepSea2
 import com.example.travelcents.ui.theme.DeepSea3
 import com.example.travelcents.ui.theme.DeepSea4
 import com.example.travelcents.ui.theme.DeepSea5
+import com.example.travelcents.ui.theme.TravelCentsFonts
 
 private data class DisplayModeOption(
     val mode: CurrentDisplayMode,
@@ -41,30 +41,34 @@ fun CurrentTripModeSwitcher(
         )
     }
 
-    Row(
+    CurrentTripPageSurface(
         modifier = Modifier
             .fillMaxWidth()
-            .background(DeepSea2, RoundedCornerShape(12.dp))
-            .padding(4.dp),
-        horizontalArrangement = Arrangement.SpaceEvenly
+            .clip(RoundedCornerShape(16.dp))
     ) {
-        tabs.forEach { tab ->
-            val isSelected = selectedMode == tab.mode
-            Box(
-                modifier = Modifier
-                    .weight(1f)
-                    .height(42.dp)
-                    .clip(RoundedCornerShape(8.dp))
-                    .background(if (isSelected) DeepSea3 else Color.Transparent)
-                    .clickable(enabled = !isSelected) { onModeSelected(tab.mode) },
-                contentAlignment = Alignment.Center
-            ) {
-                Text(
-                    text = tab.label,
-                    color = if (isSelected) DeepSea5 else DeepSea4,
-                    fontSize = 14.sp,
-                    fontWeight = if (isSelected) FontWeight.SemiBold else FontWeight.Normal
-                )
+        Row(
+            modifier = Modifier.padding(4.dp),
+            horizontalArrangement = Arrangement.SpaceEvenly
+        ) {
+            tabs.forEach { tab ->
+                val isSelected = selectedMode == tab.mode
+                Box(
+                    modifier = Modifier
+                        .weight(1f)
+                        .height(42.dp)
+                        .clip(RoundedCornerShape(12.dp))
+                        .background(if (isSelected) DeepSea3.copy(alpha = 0.92f) else Color.Transparent)
+                        .clickable(enabled = !isSelected) { onModeSelected(tab.mode) },
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text(
+                        text = tab.label,
+                        color = if (isSelected) DeepSea5 else DeepSea4,
+                        fontSize = 14.sp,
+                        fontWeight = if (isSelected) FontWeight.SemiBold else FontWeight.Medium,
+                        fontFamily = TravelCentsFonts.Body
+                    )
+                }
             }
         }
     }

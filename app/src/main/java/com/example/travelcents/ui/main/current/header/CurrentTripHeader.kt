@@ -10,7 +10,6 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
@@ -23,8 +22,11 @@ import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.DateRange
 import androidx.compose.material.icons.filled.DeleteOutline
 import androidx.compose.material.icons.filled.DragHandle
+import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.Share
+import androidx.compose.material.icons.filled.SwapVert
+import androidx.compose.material.icons.outlined.Archive
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
@@ -34,8 +36,11 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
+import androidx.compose.material3.TextField
+import androidx.compose.material3.TextFieldDefaults
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -45,26 +50,27 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.travelcents.data.trip.model.Itinerary
 import com.example.travelcents.ui.main.current.TripMemberUi
-import com.example.travelcents.ui.modules.formatDayOfWeekShort
+import com.example.travelcents.ui.modules.formatDayOfWeekFull
 import com.example.travelcents.ui.modules.formatHeroDate
 import com.example.travelcents.ui.theme.DeepSea1
 import com.example.travelcents.ui.theme.DeepSea2
 import com.example.travelcents.ui.theme.DeepSea3
 import com.example.travelcents.ui.theme.DeepSea4
 import com.example.travelcents.ui.theme.DeepSea5
-import androidx.compose.material.icons.outlined.Archive
+import com.example.travelcents.ui.theme.TravelCentsFonts
 
-private val PrimaryAccent = Color(0xFFCEBDFF)
 private val SurfaceContainerHigh = Color(0xFF222A3D)
+private val SwitcherButtonShape = RoundedCornerShape(10.dp)
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun CurrentTripHeader(
-    destination: String,
+    tripTitle: String,
     heroDate: String,
     currentTripId: String?,
     allTrips: List<Itinerary>,
@@ -90,7 +96,29 @@ fun CurrentTripHeader(
     var menuExpanded by remember { mutableStateOf(false) }
     var switcherExpanded by remember { mutableStateOf(false) }
     var showDeleteDialog by remember { mutableStateOf(false) }
+    var showRenameDialog by remember { mutableStateOf(false) }
     var showMembersSheet by remember { mutableStateOf(false) }
+    var editableTitle by remember { mutableStateOf(tripTitle) }
+    val displayTitle = tripTitle.ifBlank { "My Trip" }
+
+    LaunchedEffect(tripTitle, showRenameDialog) {
+        if (!showRenameDialog) {
+            editableTitle = tripTitle
+        }
+    }
+
+    fun submitTitleEdit() {
+        val trimmed = editableTitle.trim()
+        if (trimmed.isBlank()) {
+            editableTitle = displayTitle
+            return
+        }
+
+        editableTitle = trimmed
+        if (trimmed != tripTitle) {
+            onRenameTrip(trimmed)
+        }
+    }
 
     if (showDeleteDialog && currentTripId != null) {
         AlertDialog(
@@ -99,7 +127,7 @@ fun CurrentTripHeader(
             title = { Text("Delete trip?", color = DeepSea5, fontWeight = FontWeight.Bold) },
             text = {
                 Text(
-                    text = "This trip and all its events will be permanently deleted.",
+                    text = "\"$displayTitle\" and all its events will be permanently deleted.",
                     color = DeepSea4,
                     fontSize = 14.sp
                 )
@@ -120,6 +148,61 @@ fun CurrentTripHeader(
         )
     }
 
+    if (showRenameDialog) {
+        AlertDialog(
+            onDismissRequest = {
+                showRenameDialog = false
+                editableTitle = tripTitle
+            },
+            containerColor = DeepSea2,
+            title = { Text("Rename trip", color = DeepSea5, fontWeight = FontWeight.Bold) },
+            text = {
+                TextField(
+                    value = editableTitle,
+                    onValueChange = { newValue ->
+                        editableTitle = newValue.filter { it != '\n' && it != '\t' }
+                    },
+                    singleLine = true,
+                    placeholder = {
+                        Text(
+                            text = displayTitle,
+                            color = DeepSea4
+                        )
+                    },
+                    colors = TextFieldDefaults.colors(
+                        focusedTextColor = DeepSea5,
+                        unfocusedTextColor = DeepSea5,
+                        focusedContainerColor = SurfaceContainerHigh,
+                        unfocusedContainerColor = SurfaceContainerHigh,
+                        disabledContainerColor = SurfaceContainerHigh,
+                        focusedIndicatorColor = CurrentTripHeroAccent,
+                        unfocusedIndicatorColor = DeepSea3,
+                        cursorColor = CurrentTripHeroAccent
+                    )
+                )
+            },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        submitTitleEdit()
+                        showRenameDialog = false
+                    },
+                    enabled = editableTitle.trim().isNotBlank()
+                ) {
+                    Text("Save", color = CurrentTripHeroAccent, fontWeight = FontWeight.Bold)
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = {
+                    showRenameDialog = false
+                    editableTitle = tripTitle
+                }) {
+                    Text("Cancel", color = DeepSea4)
+                }
+            }
+        )
+    }
+
     if (showMembersSheet && members.isNotEmpty()) {
         MemberListSheet(
             members = members,
@@ -132,23 +215,51 @@ fun CurrentTripHeader(
             .fillMaxWidth()
             .statusBarsPadding()
     ) {
-        // Top app bar: left icon | destination (centered) | overflow menu
         Box(
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(horizontal = 8.dp),
             contentAlignment = Alignment.Center
         ) {
-            // Title centered in the full width
-            Box {
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 52.dp),
+                contentAlignment = Alignment.Center
+            ) {
                 Text(
-                    text = destination.uppercase().ifBlank { "MY TRIP" },
-                    color = PrimaryAccent,
-                    fontSize = 16.sp,
+                    text = displayTitle,
+                    color = CurrentTripHeroAccent,
+                    fontSize = 18.sp,
                     fontWeight = FontWeight.ExtraBold,
-                    letterSpacing = 2.sp,
-                    modifier = Modifier.clickable(enabled = allTrips.size > 1) { switcherExpanded = true }
+                    fontFamily = TravelCentsFonts.Headline,
+                    maxLines = 1,
+                    softWrap = false,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(end = if (allTrips.size > 1) 40.dp else 0.dp)
                 )
+
+                if (allTrips.size > 1) {
+                    IconButton(
+                        onClick = { switcherExpanded = true },
+                        modifier = Modifier
+                            .align(Alignment.CenterEnd)
+                            .size(34.dp)
+                            .clip(SwitcherButtonShape)
+                            .background(SurfaceContainerHigh)
+                            .border(1.dp, DeepSea3.copy(alpha = 0.75f), SwitcherButtonShape)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.SwapVert,
+                            contentDescription = "Switch trip",
+                            tint = DeepSea5,
+                            modifier = Modifier.size(16.dp)
+                        )
+                    }
+                }
+
                 DropdownMenu(
                     expanded = switcherExpanded,
                     onDismissRequest = { switcherExpanded = false },
@@ -167,14 +278,15 @@ fun CurrentTripHeader(
                             },
                             onClick = {
                                 switcherExpanded = false
-                                if (trip.itineraryId != currentTripId) onSwitchTrip(trip.itineraryId)
+                                if (trip.itineraryId != currentTripId) {
+                                    onSwitchTrip(trip.itineraryId)
+                                }
                             }
                         )
                     }
                 }
             }
 
-            // Left: back arrow (calendar mode) or calendar icon (itinerary landing)
             IconButton(
                 onClick = if (isInCalendarMode) onBackClick else onCalendarClick,
                 modifier = Modifier.align(Alignment.CenterStart)
@@ -182,11 +294,10 @@ fun CurrentTripHeader(
                 Icon(
                     imageVector = if (isInCalendarMode) Icons.AutoMirrored.Filled.ArrowBack else Icons.Default.DateRange,
                     contentDescription = if (isInCalendarMode) "Back to itinerary" else "Calendar view",
-                    tint = PrimaryAccent
+                    tint = CurrentTripHeroAccent
                 )
             }
 
-            // Right: overflow menu
             Box(modifier = Modifier.align(Alignment.CenterEnd)) {
                 IconButton(onClick = { menuExpanded = true }) {
                     Icon(
@@ -233,10 +344,11 @@ fun CurrentTripHeader(
                     )
                     DropdownMenuItem(
                         text = { Text("Rename Trip", color = DeepSea5, fontWeight = FontWeight.Medium) },
+                        leadingIcon = { Icon(Icons.Default.Edit, contentDescription = null, tint = DeepSea4) },
                         onClick = {
                             menuExpanded = false
-                            // Rename via a simple dialog could be added; for now trigger with empty to surface rename affordance
-                            onRenameTrip(destination)
+                            editableTitle = displayTitle
+                            showRenameDialog = true
                         }
                     )
                     DropdownMenuItem(
@@ -261,48 +373,48 @@ fun CurrentTripHeader(
             }
         }
 
-        // Hero section: date hero (day / week / itinerary) + member avatars
         Spacer(modifier = Modifier.height(8.dp))
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(end = 24.dp),  // no start padding — heroes control their own start
+                .padding(end = if (members.isNotEmpty()) 24.dp else 0.dp),
             verticalAlignment = Alignment.Bottom,
-            horizontalArrangement = Arrangement.SpaceBetween
+            horizontalArrangement = Arrangement.spacedBy(16.dp)
         ) {
-            when {
-                isInCalendarMode && isWeekMode -> WeekDateHero(
-                    selectedDate = selectedDate,
-                    sortedDates = sortedDates,
-                    onDateSelected = onDateSelected
-                )
-                isInCalendarMode -> DayDateHero(
-                    selectedDate = selectedDate,
-                    sortedDates = sortedDates,
-                    onDateSelected = onDateSelected
-                )
-                else -> Column(modifier = Modifier.padding(start = 24.dp)) {
-                    Text(
-                        text = "SCHEDULED ITINERARY",
-                        color = PrimaryAccent,
-                        fontSize = 10.sp,
-                        fontWeight = FontWeight.SemiBold,
-                        letterSpacing = 2.sp
+            Box(
+                modifier = Modifier.weight(1f),
+                contentAlignment = Alignment.BottomStart
+            ) {
+                when {
+                    isInCalendarMode && isWeekMode -> WeekDateHero(
+                        selectedDate = selectedDate,
+                        sortedDates = sortedDates,
+                        onDateSelected = onDateSelected
                     )
-                    Text(
-                        text = formatDayOfWeekShort(heroDate),
-                        color = DeepSea4,
-                        fontSize = 12.sp,
-                        fontWeight = FontWeight.SemiBold,
-                        letterSpacing = 1.sp
+                    isInCalendarMode -> DayDateHero(
+                        selectedDate = selectedDate,
+                        sortedDates = sortedDates,
+                        onDateSelected = onDateSelected
                     )
-                    Text(
-                        text = formatHeroDate(heroDate),
-                        color = DeepSea5,
-                        fontSize = 48.sp,
-                        fontWeight = FontWeight.ExtraBold,
-                        lineHeight = 50.sp
-                    )
+                    else -> CurrentTripHeroLayout {
+                        Text(
+                            text = formatDayOfWeekFull(heroDate),
+                            color = DeepSea4,
+                            fontSize = 15.sp,
+                            fontWeight = FontWeight.SemiBold,
+                            letterSpacing = 0.8.sp,
+                            lineHeight = 16.sp,
+                            fontFamily = TravelCentsFonts.Body
+                        )
+                        Text(
+                            text = formatHeroDate(heroDate),
+                            color = DeepSea5,
+                            fontSize = 48.sp,
+                            fontWeight = FontWeight.ExtraBold,
+                            lineHeight = 50.sp,
+                            fontFamily = TravelCentsFonts.Headline
+                        )
+                    }
                 }
             }
 
@@ -347,7 +459,7 @@ private fun MemberAvatarRow(members: List<TripMemberUi>, onClick: () -> Unit) {
             ) {
                 Text(
                     text = member.initial.uppercaseChar().toString(),
-                    color = PrimaryAccent,
+                    color = CurrentTripHeroAccent,
                     fontSize = 15.sp,
                     fontWeight = FontWeight.Bold
                 )
@@ -364,7 +476,7 @@ private fun MemberAvatarRow(members: List<TripMemberUi>, onClick: () -> Unit) {
             ) {
                 Text(
                     text = "+$overflow",
-                    color = PrimaryAccent,
+                    color = CurrentTripHeroAccent,
                     fontSize = 11.sp,
                     fontWeight = FontWeight.Bold
                 )
@@ -390,7 +502,7 @@ private fun MemberListSheet(members: List<TripMemberUi>, onDismiss: () -> Unit) 
         ) {
             Text(
                 text = "TRIP MEMBERS",
-                color = PrimaryAccent,
+                color = CurrentTripHeroAccent,
                 fontSize = 10.sp,
                 fontWeight = FontWeight.Bold,
                 letterSpacing = 2.sp
@@ -412,7 +524,7 @@ private fun MemberListSheet(members: List<TripMemberUi>, onDismiss: () -> Unit) 
                     ) {
                         Text(
                             text = member.initial.uppercaseChar().toString(),
-                            color = PrimaryAccent,
+                            color = CurrentTripHeroAccent,
                             fontSize = 14.sp,
                             fontWeight = FontWeight.Bold
                         )
@@ -429,4 +541,3 @@ private fun MemberListSheet(members: List<TripMemberUi>, onDismiss: () -> Unit) 
         }
     }
 }
-

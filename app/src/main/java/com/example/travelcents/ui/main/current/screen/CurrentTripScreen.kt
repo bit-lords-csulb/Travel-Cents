@@ -6,6 +6,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.material3.ProvideTextStyle
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
@@ -15,6 +16,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.travelcents.ui.main.current.calendar.buildTripDateRange
@@ -23,6 +25,7 @@ import com.example.travelcents.ui.modules.buildCalendarDates
 import com.example.travelcents.ui.modules.sortEventsForCalendar
 import com.example.travelcents.ui.modules.todayIsoDate
 import com.example.travelcents.ui.theme.DeepSea1
+import com.example.travelcents.ui.theme.TravelCentsFonts
 
 @Composable
 fun CurrentTripScreen(
@@ -107,170 +110,171 @@ fun CurrentTripScreen(
         }
     }
 
-    Box(
-        modifier = modifier
-            .fillMaxSize()
-            .background(DeepSea1)
-    ) {
-        Column(
-            modifier = Modifier
+    ProvideTextStyle(value = TextStyle(fontFamily = TravelCentsFonts.Body)) {
+        Box(
+            modifier = modifier
                 .fillMaxSize()
+                .background(DeepSea1)
         ) {
-            CurrentTripHeader(
-                destination = uiState.destination,
-                heroDate = itineraryVisibleDate.ifBlank { uiState.dateFrom },
-                currentTripId = uiState.currentTripId,
-                allTrips = allTrips,
-                canAdd = uiState.currentTripId != null,
-                isReorderActive = displayMode == CurrentDisplayMode.ITINERARY && jiggleMode,
-                isInCalendarMode = displayMode != CurrentDisplayMode.ITINERARY,
-                isWeekMode = displayMode == CurrentDisplayMode.WEEK,
-                selectedDate = selectedDate,
-                sortedDates = calendarDates,
-                onDateSelected = { selectedDate = it },
-                members = tripMembers,
-                onCalendarClick = { onNavigateToMode(CurrentDisplayMode.DAY) },
-                onBackClick = { onNavigateToMode(CurrentDisplayMode.ITINERARY) },
-                onAddClick = {
-                    if (uiState.currentTripId == null) {
-                        viewModel.postError("Create a trip first before adding calendar plans.")
-                    } else {
-                        editorPlan = newEditablePlan(
-                            date = selectedDate.ifBlank {
-                                calendarDates.firstOrNull() ?: uiState.dateFrom.ifBlank { todayIsoDate() }
-                            },
-                            startMinutes = 9 * 60
+            Column(
+                modifier = Modifier
+                    .fillMaxSize()
+            ) {
+                CurrentTripHeader(
+                    tripTitle = uiState.tripTitle,
+                    heroDate = itineraryVisibleDate.ifBlank { uiState.dateFrom },
+                    currentTripId = uiState.currentTripId,
+                    allTrips = allTrips,
+                    canAdd = uiState.currentTripId != null,
+                    isReorderActive = displayMode == CurrentDisplayMode.ITINERARY && jiggleMode,
+                    isInCalendarMode = displayMode != CurrentDisplayMode.ITINERARY,
+                    isWeekMode = displayMode == CurrentDisplayMode.WEEK,
+                    selectedDate = selectedDate,
+                    sortedDates = calendarDates,
+                    onDateSelected = { selectedDate = it },
+                    members = tripMembers,
+                    onCalendarClick = { onNavigateToMode(CurrentDisplayMode.DAY) },
+                    onBackClick = { onNavigateToMode(CurrentDisplayMode.ITINERARY) },
+                    onAddClick = {
+                        if (uiState.currentTripId == null) {
+                            viewModel.postError("Create a trip first before adding calendar plans.")
+                        } else {
+                            editorPlan = newEditablePlan(
+                                date = selectedDate.ifBlank {
+                                    calendarDates.firstOrNull() ?: uiState.dateFrom.ifBlank { todayIsoDate() }
+                                },
+                                startMinutes = 9 * 60
+                            )
+                        }
+                    },
+                    onShareClick = {
+                        viewModel.fetchShareTargets()
+                        showShareSheet = true
+                    },
+                    onToggleReorder = {
+                        if (displayMode != CurrentDisplayMode.ITINERARY) {
+                            onNavigateToMode(CurrentDisplayMode.ITINERARY)
+                        }
+                        jiggleMode = !jiggleMode
+                    },
+                    onArchiveTrip = { tripId ->
+                        jiggleMode = false
+                        viewModel.archiveTrip(tripId)
+                    },
+                    onDeleteTrip = { tripId ->
+                        jiggleMode = false
+                        viewModel.deleteTrip(tripId)
+                    },
+                    onSwitchTrip = { tripId ->
+                        jiggleMode = false
+                        selectedEventId = null
+                        optionsPanelEventId = null
+                        editorPlan = null
+                        deleteCandidate = null
+                        viewModel.loadTrip(tripId)
+                    },
+                    onRenameTrip = viewModel::renameTrip,
+                    controlsContent = {
+                        CurrentTripModeSwitcher(
+                            selectedMode = displayMode,
+                            onModeSelected = {
+                                jiggleMode = false
+                                onNavigateToMode(it)
+                            }
                         )
                     }
-                },
-                onShareClick = {
-                    viewModel.fetchShareTargets()
-                    showShareSheet = true
-                },
-                onToggleReorder = {
-                    if (displayMode != CurrentDisplayMode.ITINERARY) {
-                        onNavigateToMode(CurrentDisplayMode.ITINERARY)
-                    }
-                    jiggleMode = !jiggleMode
-                },
-                onArchiveTrip = { tripId ->
-                    jiggleMode = false
-                    viewModel.archiveTrip(tripId)
-                },
-                onDeleteTrip = { tripId ->
-                    jiggleMode = false
-                    viewModel.deleteTrip(tripId)
-                },
-                onSwitchTrip = { tripId ->
-                    jiggleMode = false
-                    selectedEventId = null
-                    optionsPanelEventId = null
-                    editorPlan = null
-                    deleteCandidate = null
-                    viewModel.loadTrip(tripId)
-                },
-                onRenameTrip = viewModel::renameTrip,
-                controlsContent = {
-                    CurrentTripModeSwitcher(
-                        selectedMode = displayMode,
-                        onModeSelected = {
-                            jiggleMode = false
-                            onNavigateToMode(it)
-                        }
-                    )
-                }
-            )
-
-            if (uiState.infoMessage != null || uiState.errorMessage != null) {
-                CurrentTripMessageCard(
-                    message = uiState.errorMessage ?: uiState.infoMessage.orEmpty(),
-                    isError = uiState.errorMessage != null,
-                    onDismiss = viewModel::clearMessages
                 )
-            }
 
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .weight(1f)
-            ) {
-                when {
-                    uiState.isLoading -> CurrentTripLoadingState()
-                    uiState.currentTripId == null -> CurrentTripEmptyState(
-                        title = "No Trip Yet",
-                        body = uiState.infoMessage ?: "Create a trip from the New Trip tab to populate this calendar."
-                    )
-                    displayMode == CurrentDisplayMode.ITINERARY -> CurrentTripItineraryContent(
-                        events = events,
-                        eventOptions = eventOptions,
-                        rejectedOptions = rejectedOptions,
-                        jiggleMode = jiggleMode,
-                        onEventClick = { selectedEventId = it.eventId },
-                        onDeleteClick = { deleteCandidate = it.toEditablePlan() },
-                        onOpenAlternatives = { optionsPanelEventId = it },
-                        onMoveEvent = viewModel::moveEventLocally,
-                        onPersistEventPlacements = viewModel::persistEventPlacements,
-                        onVisibleDateChange = { itineraryVisibleDate = it }
-                    )
-                    displayMode == CurrentDisplayMode.WEEK -> CurrentTripWeekView(
-                        events = events,
-                        sortedDates = calendarDates,
-                        selectedDate = selectedDate,
-                        onDateSelected = { selectedDate = it },
-                        onEventClick = { selectedEventId = it.eventId },
-                        onDeleteClick = { deleteCandidate = it.toEditablePlan() },
-                        onCreatePlan = { date, startMinutes ->
-                            editorPlan = newEditablePlan(date, startMinutes)
-                        }
-                    )
-                    else -> CurrentTripDayView(
-                        events = events,
-                        sortedDates = calendarDates,
-                        selectedDate = selectedDate,
-                        onDateSelected = { selectedDate = it },
-                        onEventClick = { selectedEventId = it.eventId },
-                        onDeleteClick = { deleteCandidate = it.toEditablePlan() },
-                        onCreatePlan = { date, startMinutes ->
-                            editorPlan = newEditablePlan(date, startMinutes)
-                        }
+                if (uiState.infoMessage != null || uiState.errorMessage != null) {
+                    CurrentTripMessageCard(
+                        message = uiState.errorMessage ?: uiState.infoMessage.orEmpty(),
+                        isError = uiState.errorMessage != null,
+                        onDismiss = viewModel::clearMessages
                     )
                 }
+
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .weight(1f)
+                ) {
+                    when {
+                        uiState.isLoading -> CurrentTripLoadingState()
+                        uiState.currentTripId == null -> CurrentTripEmptyState(
+                            title = "No Trip Yet",
+                            body = uiState.infoMessage ?: "Create a trip from the New Trip tab to populate this calendar."
+                        )
+                        displayMode == CurrentDisplayMode.ITINERARY -> CurrentTripItineraryContent(
+                            events = events,
+                            eventOptions = eventOptions,
+                            rejectedOptions = rejectedOptions,
+                            jiggleMode = jiggleMode,
+                            onEventClick = { selectedEventId = it.eventId },
+                            onDeleteClick = { deleteCandidate = it.toEditablePlan() },
+                            onOpenAlternatives = { optionsPanelEventId = it },
+                            onMoveEvent = viewModel::moveEventLocally,
+                            onPersistEventPlacements = viewModel::persistEventPlacements,
+                            onVisibleDateChange = { itineraryVisibleDate = it }
+                        )
+                        displayMode == CurrentDisplayMode.WEEK -> CurrentTripWeekView(
+                            events = events,
+                            sortedDates = calendarDates,
+                            selectedDate = selectedDate,
+                            onDateSelected = { selectedDate = it },
+                            onEventClick = { selectedEventId = it.eventId },
+                            onDeleteClick = { deleteCandidate = it.toEditablePlan() },
+                            onCreatePlan = { date, startMinutes ->
+                                editorPlan = newEditablePlan(date, startMinutes)
+                            }
+                        )
+                        else -> CurrentTripDayView(
+                            events = events,
+                            sortedDates = calendarDates,
+                            selectedDate = selectedDate,
+                            onDateSelected = { selectedDate = it },
+                            onEventClick = { selectedEventId = it.eventId },
+                            onDeleteClick = { deleteCandidate = it.toEditablePlan() },
+                            onCreatePlan = { date, startMinutes ->
+                                editorPlan = newEditablePlan(date, startMinutes)
+                            }
+                        )
+                    }
+                }
             }
+            CurrentTripOverlayHost(
+                uiState = uiState,
+                eventOptions = eventOptions,
+                rejectedOptions = rejectedOptions,
+                yelpReviews = yelpReviews,
+                reviewsLoading = reviewsLoading,
+                shareTargets = shareTargets,
+                selectedEventId = selectedEventId,
+                editorPlan = editorPlan,
+                deleteCandidate = deleteCandidate,
+                optionsPanelEventId = optionsPanelEventId,
+                showShareSheet = showShareSheet,
+                shareConfirmation = shareConfirmation,
+                onSelectedEventIdChange = { selectedEventId = it },
+                onEditorPlanChange = { editorPlan = it },
+                onDeleteCandidateChange = { deleteCandidate = it },
+                onOptionsPanelEventIdChange = { optionsPanelEventId = it },
+                onShowShareSheetChange = { showShareSheet = it },
+                onShareConfirmationChange = { shareConfirmation = it },
+                onSavePlan = viewModel::upsertPlan,
+                onDeletePlan = { plan ->
+                    viewModel.deletePlan(plan)
+                    if (editorPlan?.eventId == plan.eventId) {
+                        editorPlan = null
+                    }
+                    if (selectedEventId == plan.eventId) {
+                        selectedEventId = null
+                    }
+                },
+                onShareTrip = viewModel::shareTripToChat,
+                onSelectOption = viewModel::selectOption,
+                onRejectOption = viewModel::rejectOption
+            )
         }
     }
-
-    CurrentTripOverlayHost(
-        uiState = uiState,
-        eventOptions = eventOptions,
-        rejectedOptions = rejectedOptions,
-        yelpReviews = yelpReviews,
-        reviewsLoading = reviewsLoading,
-        shareTargets = shareTargets,
-        selectedEventId = selectedEventId,
-        editorPlan = editorPlan,
-        deleteCandidate = deleteCandidate,
-        optionsPanelEventId = optionsPanelEventId,
-        showShareSheet = showShareSheet,
-        shareConfirmation = shareConfirmation,
-        onSelectedEventIdChange = { selectedEventId = it },
-        onEditorPlanChange = { editorPlan = it },
-        onDeleteCandidateChange = { deleteCandidate = it },
-        onOptionsPanelEventIdChange = { optionsPanelEventId = it },
-        onShowShareSheetChange = { showShareSheet = it },
-        onShareConfirmationChange = { shareConfirmation = it },
-        onSavePlan = viewModel::upsertPlan,
-        onDeletePlan = { plan ->
-            viewModel.deletePlan(plan)
-            if (editorPlan?.eventId == plan.eventId) {
-                editorPlan = null
-            }
-            if (selectedEventId == plan.eventId) {
-                selectedEventId = null
-            }
-        },
-        onShareTrip = viewModel::shareTripToChat,
-        onSelectOption = viewModel::selectOption,
-        onRejectOption = viewModel::rejectOption
-    )
 }
 

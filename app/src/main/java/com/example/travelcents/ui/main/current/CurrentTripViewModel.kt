@@ -7,6 +7,7 @@ import com.example.travelcents.data.trip.model.EventOption
 import com.example.travelcents.data.trip.model.Itinerary
 import com.example.travelcents.data.trip.model.TravelEvent
 import com.example.travelcents.data.trip.model.YelpReview
+import com.example.travelcents.data.trip.model.resolveTripName
 import com.example.travelcents.data.trip.remote.YelpRepository
 import com.example.travelcents.ui.modules.defaultPlanTimeZoneId
 import com.example.travelcents.ui.modules.normalizeDate
@@ -185,7 +186,8 @@ class CurrentTripViewModel : ViewModel() {
 
     private fun handleTripDocument(uid: String, document: DocumentSnapshot) {
         currentTripDestination = document.getString("destination") ?: ""
-        val nextTripTitle = document.getString("tripName") ?: "Unnamed Trip"
+        val storedTripTitle = document.getString("tripName")
+        val nextTripTitle = resolveTripName(storedTripTitle, currentTripDestination)
         _tripTitle.value = nextTripTitle
         _uiState.update {
             it.copy(
@@ -198,6 +200,17 @@ class CurrentTripViewModel : ViewModel() {
                 infoMessage = null,
                 errorMessage = null
             )
+        }
+
+        if (nextTripTitle != storedTripTitle.orEmpty().trim()) {
+            viewModelScope.launch {
+                runCatching {
+                    db.collection("users").document(uid)
+                        .collection("trips").document(document.id)
+                        .update("tripName", nextTripTitle)
+                        .await()
+                }
+            }
         }
 
         listenToEvents(uid, document.id)
@@ -899,7 +912,10 @@ class CurrentTripViewModel : ViewModel() {
                         Itinerary(
                             itineraryId = doc.id,
                             userId = uid,
-                            tripName = doc.getString("tripName") ?: "Unnamed Trip",
+                            tripName = resolveTripName(
+                                doc.getString("tripName"),
+                                doc.getString("destination") ?: ""
+                            ),
                             destination = doc.getString("destination") ?: "",
                             origin = doc.getString("origin") ?: "",
                             originIata = doc.getString("originIata") ?: "",
