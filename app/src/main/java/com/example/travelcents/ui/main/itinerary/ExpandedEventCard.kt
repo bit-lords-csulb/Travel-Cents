@@ -31,6 +31,25 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import coil.compose.AsyncImage
+import com.example.travelcents.data.trip.model.ATTR_AMENITIES
+import com.example.travelcents.data.trip.model.ATTR_AVERAGE_RATING
+import com.example.travelcents.data.trip.model.ATTR_BOOKING_URL
+import com.example.travelcents.data.trip.model.ATTR_BUSINESS_ADDRESS
+import com.example.travelcents.data.trip.model.ATTR_CATEGORIES
+import com.example.travelcents.data.trip.model.ATTR_CHECK_IN_TIME
+import com.example.travelcents.data.trip.model.ATTR_CHECK_OUT_TIME
+import com.example.travelcents.data.trip.model.ATTR_GROUP_RATE_PER_NIGHT
+import com.example.travelcents.data.trip.model.ATTR_HOTEL_CLASS
+import com.example.travelcents.data.trip.model.ATTR_HOTEL_NAME
+import com.example.travelcents.data.trip.model.ATTR_HOTEL_RATING
+import com.example.travelcents.data.trip.model.ATTR_MENU_URL
+import com.example.travelcents.data.trip.model.ATTR_PHONE
+import com.example.travelcents.data.trip.model.ATTR_PRICE_TIER
+import com.example.travelcents.data.trip.model.ATTR_RATE_PER_NIGHT
+import com.example.travelcents.data.trip.model.ATTR_REVIEW_COUNT
+import com.example.travelcents.data.trip.model.ATTR_ROOMS_NEEDED
+import com.example.travelcents.data.trip.model.displayName
+import com.example.travelcents.data.trip.model.firstNonBlank
 import com.example.travelcents.data.trip.model.TravelEvent
 import com.example.travelcents.data.trip.model.YelpReview
 import com.example.travelcents.ui.modules.galleryPhotoModels
@@ -78,11 +97,10 @@ fun ExpandedEventCard(
 
     // Editable fields pre-filled from event
     val existingTitle = when (event.type.lowercase()) {
-        "hotel" -> event.details["hotel_name"] ?: event.details["title"] ?: event.details["name"]
-        "restaurant", "dining", "food" -> event.details["restaurant_name"] ?: event.details["title"] ?: event.details["name"]
+        "hotel" -> event.displayName() ?: event.details["title"]
+        "restaurant", "dining", "food" -> event.displayName() ?: event.details["title"]
         else -> event.details["title"]
-            ?: event.details["activity_name"]
-            ?: event.details["restaurant_name"]
+            ?: event.displayName()
             ?: event.details["name"]
     } ?: event.type.replaceFirstChar { it.uppercase() }
     val existingNotes = event.details["description"] ?: event.details["notes"] ?: ""
@@ -400,26 +418,29 @@ private fun FlightDetails(event: TravelEvent) {
 private fun HotelDetails(event: TravelEvent) {
     val d = event.details
     DetailGroup("HOTEL INFO") {
-        DetailRow("Name", d["hotel_name"] ?: d["title"] ?: "—")
-        if (d["hotel_class"] != null) DetailRow("Class", "${"★".repeat((d["hotel_class"]!!.toIntOrNull() ?: 0).coerceIn(0, 5))} ${d["hotel_class"]}-Star")
-        DetailRow("Rating", d["overall_rating"]?.let { "★$it" } ?: "—")
-        DetailRow("Reviews", d["reviews"] ?: "—")
+        DetailRow("Name", d.firstNonBlank(ATTR_HOTEL_NAME, "hotel_name", "title") ?: "—")
+        d.firstNonBlank(ATTR_HOTEL_CLASS, "hotel_class")?.let { hotelClass ->
+            DetailRow("Class", "${"★".repeat((hotelClass.toIntOrNull() ?: 0).coerceIn(0, 5))} ${hotelClass}-Star")
+        }
+        DetailRow("Rating", d.firstNonBlank(ATTR_HOTEL_RATING, ATTR_AVERAGE_RATING, "overall_rating", "rating")?.let { "★$it" } ?: "—")
+        DetailRow("Reviews", d.firstNonBlank(ATTR_REVIEW_COUNT, "reviews", "review_count") ?: "—")
         if (d["eco_certified"] == "true") DetailRow("Eco certified", "Yes", valueColor = GreenAccent)
-        if (d["check_in_time"] != null) DetailRow("Check-in", d["check_in_time"]!!)
-        if (d["check_out_time"] != null) DetailRow("Check-out", d["check_out_time"]!!)
+        d.firstNonBlank(ATTR_CHECK_IN_TIME, "check_in_time", "check_in")?.let { DetailRow("Check-in", it) }
+        d.firstNonBlank(ATTR_CHECK_OUT_TIME, "check_out_time", "check_out")?.let { DetailRow("Check-out", it) }
     }
     DetailGroup("PRICING") {
-        DetailRow("Per room/night", d["rate_per_night"]?.let { "\$$it" } ?: "—")
-        if (d["rooms_needed"] != null && (d["rooms_needed"]!!.toIntOrNull() ?: 0) > 1) {
-            DetailRow("Rooms needed", d["rooms_needed"]!!)
-            DetailRow("Group total/night", d["group_rate_per_night"]?.let { "\$$it" } ?: "—")
+        DetailRow("Per room/night", d.firstNonBlank(ATTR_RATE_PER_NIGHT, "rate_per_night")?.let { "\$$it" } ?: "—")
+        val roomsNeeded = d.firstNonBlank(ATTR_ROOMS_NEEDED, "rooms_needed")
+        if (roomsNeeded != null && (roomsNeeded.toIntOrNull() ?: 0) > 1) {
+            DetailRow("Rooms needed", roomsNeeded)
+            DetailRow("Group total/night", d.firstNonBlank(ATTR_GROUP_RATE_PER_NIGHT, "group_rate_per_night")?.let { "\$$it" } ?: "—")
         }
         if (d["deal"] != null) DetailRow("Deal", d["deal"]!!, valueColor = GreenAccent)
-        if (d["booking_url"] != null) {
+        d.firstNonBlank(ATTR_BOOKING_URL, "booking_url")?.let { bookingUrl ->
             val uriHandler = LocalUriHandler.current
             Spacer(modifier = Modifier.height(8.dp))
             OutlinedButton(
-                onClick = { uriHandler.openUri(d["booking_url"]!!) },
+                onClick = { uriHandler.openUri(bookingUrl) },
                 colors = ButtonDefaults.outlinedButtonColors(contentColor = BlueAccent),
                 border = androidx.compose.foundation.BorderStroke(1.dp, BlueAccent.copy(alpha = 0.5f)),
                 shape = RoundedCornerShape(8.dp),
@@ -431,9 +452,9 @@ private fun HotelDetails(event: TravelEvent) {
             }
         }
     }
-    if (d["amenities"] != null) {
+    d.firstNonBlank(ATTR_AMENITIES, "amenities")?.let { amenities ->
         DetailGroup("AMENITIES") {
-            Text(text = d["amenities"]!!, color = OnSurfaceVar, fontSize = 12.sp, lineHeight = 18.sp)
+            Text(text = amenities, color = OnSurfaceVar, fontSize = 12.sp, lineHeight = 18.sp)
         }
     }
 }
@@ -447,14 +468,14 @@ private fun RestaurantDetails(
 ) {
     val d = event.details
     DetailGroup("RESTAURANT INFO") {
-        DetailRow("Price", d["price_tier"] ?: "Not listed")
-        DetailRow("Rating", d["rating"]?.let { "★$it" } ?: "—")
-        DetailRow("Reviews", d["review_count"] ?: "—")
-        if (d["address"] != null) DetailRow("Address", d["address"]!!)
-        if (d["categories"] != null) DetailRow("Cuisine", d["categories"]!!)
-        if (d["phone"] != null) DetailRow("Phone", d["phone"]!!)
+        DetailRow("Price", d.firstNonBlank(ATTR_PRICE_TIER, "price_tier") ?: "Not listed")
+        DetailRow("Rating", d.firstNonBlank(ATTR_AVERAGE_RATING, "rating")?.let { "★$it" } ?: "—")
+        DetailRow("Reviews", d.firstNonBlank(ATTR_REVIEW_COUNT, "review_count") ?: "—")
+        d.firstNonBlank(ATTR_BUSINESS_ADDRESS, "address")?.let { DetailRow("Address", it) }
+        d.firstNonBlank(ATTR_CATEGORIES, "categories")?.let { DetailRow("Cuisine", it) }
+        d.firstNonBlank(ATTR_PHONE, "phone")?.let { DetailRow("Phone", it) }
         if (d["delivery"] == "true") DetailRow("Delivery", "Available", valueColor = GreenAccent)
-        if (d["yelp_menu_url"] != null) {
+        d.firstNonBlank(ATTR_MENU_URL, "yelp_menu_url")?.let { menuUrl ->
             Spacer(modifier = Modifier.height(8.dp))
             Text(
                 text = "View Menu →",
@@ -462,7 +483,7 @@ private fun RestaurantDetails(
                 fontSize = 13.sp,
                 fontWeight = FontWeight.SemiBold,
                 textDecoration = TextDecoration.Underline,
-                modifier = Modifier.clickable { uriHandler.openUri(d["yelp_menu_url"]!!) }
+                modifier = Modifier.clickable { uriHandler.openUri(menuUrl) }
             )
         }
     }
@@ -485,13 +506,13 @@ private fun ActivityDetails(
             isFree -> "Free"
             cost.isNotBlank() && costMax.isNotBlank() -> "\$$cost – \$$costMax"
             cost.isNotBlank() -> "\$$cost"
-            d["price_tier"] != null -> d["price_tier"]!!
+            d.firstNonBlank(ATTR_PRICE_TIER, "price_tier") != null -> d.firstNonBlank(ATTR_PRICE_TIER, "price_tier")!!
             else -> "—"
         })
-        if (d["rating"] != null) DetailRow("Rating", "★${d["rating"]}")
-        if (d["review_count"] != null) DetailRow("Reviews", d["review_count"]!!)
-        if (d["address"] != null) DetailRow("Address", d["address"]!!)
-        if (d["categories"] != null) DetailRow("Categories", d["categories"]!!)
+        d.firstNonBlank(ATTR_AVERAGE_RATING, "rating")?.let { DetailRow("Rating", "★$it") }
+        d.firstNonBlank(ATTR_REVIEW_COUNT, "review_count")?.let { DetailRow("Reviews", it) }
+        d.firstNonBlank(ATTR_BUSINESS_ADDRESS, "address")?.let { DetailRow("Address", it) }
+        d.firstNonBlank(ATTR_CATEGORIES, "categories")?.let { DetailRow("Categories", it) }
         if (d["tickets_url"] != null) {
             Spacer(modifier = Modifier.height(8.dp))
             Text(

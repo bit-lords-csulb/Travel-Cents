@@ -22,6 +22,16 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImage
+import com.example.travelcents.data.trip.model.ATTR_AVERAGE_RATING
+import com.example.travelcents.data.trip.model.ATTR_BUSINESS_NAME
+import com.example.travelcents.data.trip.model.ATTR_HOTEL_NAME
+import com.example.travelcents.data.trip.model.ATTR_HOTEL_RATING
+import com.example.travelcents.data.trip.model.ATTR_PRICE_TIER
+import com.example.travelcents.data.trip.model.ATTR_RATE_PER_NIGHT
+import com.example.travelcents.data.trip.model.ATTR_REVIEW_COUNT
+import com.example.travelcents.data.trip.model.ATTR_ROOMS_NEEDED
+import com.example.travelcents.data.trip.model.displayName
+import com.example.travelcents.data.trip.model.firstNonBlank
 import com.example.travelcents.data.trip.model.EventOption
 import com.example.travelcents.data.trip.model.TravelEvent
 
@@ -63,9 +73,9 @@ private fun formatOptionSubtitle(event: TravelEvent, opt: EventOption): String {
             ).joinToString(" · ")
         }
         "hotel" -> {
-            val rate = opt.details["rate_per_night"] ?: ""
-            val rating = opt.details["overall_rating"] ?: opt.details["rating"] ?: ""
-            val rooms = opt.details["rooms_needed"] ?: ""
+            val rate = opt.details.firstNonBlank(ATTR_RATE_PER_NIGHT, "rate_per_night") ?: ""
+            val rating = opt.details.firstNonBlank(ATTR_HOTEL_RATING, ATTR_AVERAGE_RATING, "overall_rating", "rating") ?: ""
+            val rooms = opt.details.firstNonBlank(ATTR_ROOMS_NEEDED, "rooms_needed") ?: ""
             listOfNotNull(
                 if (rate.isNotBlank()) "\$$rate/night" else null,
                 if (rating.isNotBlank()) "★$rating" else null,
@@ -73,9 +83,9 @@ private fun formatOptionSubtitle(event: TravelEvent, opt: EventOption): String {
             ).joinToString(" · ")
         }
         "restaurant", "dining", "food" -> {
-            val tier = opt.details["price_tier"] ?: ""
-            val rating = opt.details["rating"] ?: ""
-            val reviews = opt.details["review_count"] ?: ""
+            val tier = opt.details.firstNonBlank(ATTR_PRICE_TIER, "price_tier") ?: ""
+            val rating = opt.details.firstNonBlank(ATTR_AVERAGE_RATING, "rating") ?: ""
+            val reviews = opt.details.firstNonBlank(ATTR_REVIEW_COUNT, "review_count") ?: ""
             listOfNotNull(
                 tier.ifBlank { null },
                 if (rating.isNotBlank()) "★$rating" else null,
@@ -86,8 +96,8 @@ private fun formatOptionSubtitle(event: TravelEvent, opt: EventOption): String {
             val isFree = opt.details["is_free"] == "true"
             val cost = opt.details["cost"] ?: ""
             val costMax = opt.details["cost_max"] ?: ""
-            val tier = opt.details["price_tier"] ?: ""
-            val rating = opt.details["rating"] ?: ""
+            val tier = opt.details.firstNonBlank(ATTR_PRICE_TIER, "price_tier") ?: ""
+            val rating = opt.details.firstNonBlank(ATTR_AVERAGE_RATING, "rating") ?: ""
             listOfNotNull(
                 when {
                     isFree -> "Free"
@@ -112,9 +122,9 @@ private fun optionName(event: TravelEvent, opt: EventOption): String {
             ).joinToString(" ").takeIf { it.isNotBlank() }
         ).firstOrNull()
 
-        "hotel" -> opt.details["hotel_name"] ?: opt.details["name"]
-        "restaurant", "dining", "food" -> opt.details["restaurant_name"] ?: opt.details["name"]
-        else -> opt.details["activity_name"] ?: opt.details["title"] ?: opt.details["name"]
+        "hotel" -> opt.displayName(event.type) ?: opt.details.firstNonBlank(ATTR_HOTEL_NAME, "hotel_name", "name")
+        "restaurant", "dining", "food" -> opt.displayName(event.type) ?: opt.details.firstNonBlank(ATTR_BUSINESS_NAME, "restaurant_name", "name")
+        else -> opt.displayName(event.type) ?: opt.details.firstNonBlank(ATTR_BUSINESS_NAME, "activity_name", "title", "name")
     } ?: "Option"
 }
 

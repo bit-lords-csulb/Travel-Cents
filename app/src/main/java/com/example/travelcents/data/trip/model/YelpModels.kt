@@ -13,6 +13,7 @@ data class YelpBusiness(
     val id: String = "",
     val name: String = "",
     @SerializedName("image_url") val imageUrl: String = "",
+    val url: String? = null,
     val rating: Double = 0.0,
     @SerializedName("review_count") val reviewCount: Int = 0,
     val price: String? = null,
