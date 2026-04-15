@@ -25,8 +25,16 @@ android {
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
 
         buildConfigField(
-            "String", "GROQ_API_KEY",
-            "\"${localProperties.getProperty("GROQ_API_KEY") ?: ""}\""
+            "String", "LLM_API_KEY",
+            "\"${localProperties.getProperty("LLM_API_KEY") ?: localProperties.getProperty("GROQ_API_KEY") ?: ""}\""
+        )
+        buildConfigField(
+            "String", "LLM_BASE_URL",
+            "\"${localProperties.getProperty("LLM_BASE_URL") ?: "https://api.groq.com/openai/v1/"}\""
+        )
+        buildConfigField(
+            "String", "LLM_MODEL",
+            "\"${localProperties.getProperty("LLM_MODEL") ?: "llama-3.3-70b-versatile"}\""
         )
         buildConfigField(
             "String", "SERP_API_KEY",
@@ -80,7 +88,7 @@ dependencies {
     // Coroutines support for Firebase Tasks (.await())
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-play-services:1.8.1")
 
-    // Retrofit + OkHttp for Groq API
+    // Retrofit + OkHttp for AI provider integrations
     implementation("com.squareup.retrofit2:retrofit:2.11.0")
     implementation("com.squareup.retrofit2:converter-gson:2.11.0")
     implementation("com.squareup.okhttp3:okhttp:4.12.0")
