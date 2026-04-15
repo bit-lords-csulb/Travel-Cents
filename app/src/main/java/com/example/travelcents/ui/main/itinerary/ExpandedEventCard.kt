@@ -52,6 +52,13 @@ private fun expandedTypeColor(type: String): Color = when (type.lowercase()) {
     else -> Color(0xFFD5E3FB)
 }
 
+private fun formatFlightDuration(minStr: String?): String {
+    val min = minStr?.toIntOrNull() ?: return "—"
+    val h = min / 60
+    val m = min % 60
+    return if (m == 0) "${h}h" else "${h}h ${m}m"
+}
+
 @Suppress("ASSIGNED_BUT_NEVER_ACCESSED_VARIABLE")
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -357,13 +364,21 @@ private fun InlineEditField(
 @Composable
 private fun FlightDetails(event: TravelEvent) {
     val d = event.details
+    val carbonDiff = d["carbon_emissions_diff_pct"] ?: d["carbon_diff_percent"]
     DetailGroup("FLIGHT INFO") {
         DetailRow("Airline", d["airline"] ?: "—")
         DetailRow("Flight", d["flight_number"] ?: "—")
         DetailRow("Route", "${d["origin_airport"] ?: "—"} → ${d["destination_airport"] ?: "—"}")
-        DetailRow("Departs", d["departure_time"] ?: d["startTime"] ?: "—")
-        DetailRow("Arrives", d["arrival_time"] ?: d["endTime"] ?: "—")
-        DetailRow("Duration", d["duration"] ?: "—")
+        DetailRow("Departs", event.startTime.ifBlank { d["departure_time"] ?: "—" })
+        DetailRow("Arrives", buildString {
+            val arrivalDate = d["arrival_date"]
+            if (!arrivalDate.isNullOrBlank() && arrivalDate != event.date) {
+                append(arrivalDate)
+                append("  ")
+            }
+            append(d["arrival_time"] ?: event.endTime.ifBlank { "—" })
+        })
+        DetailRow("Duration", formatFlightDuration(d["flight_duration_min"] ?: d["total_duration"]))
         DetailRow("Aircraft", d["aircraft"] ?: "—")
         DetailRow("Cabin", d["cabin_class"] ?: "Economy")
         if (d["legroom"] != null) DetailRow("Legroom", d["legroom"]!!)
@@ -373,8 +388,8 @@ private fun FlightDetails(event: TravelEvent) {
     }
     DetailGroup("PRICE") {
         DetailRow("Total (round-trip)", d["total_price"]?.let { "\$$it" } ?: "—")
-        if (d["carbon_emissions_diff_pct"] != null) {
-            val pct = d["carbon_emissions_diff_pct"]!!.toIntOrNull() ?: 0
+        if (carbonDiff != null) {
+            val pct = carbonDiff.toIntOrNull() ?: 0
             DetailRow("Carbon vs. typical", "${if (pct >= 0) "+$pct" else "$pct"}%",
                 valueColor = if (pct < 0) GreenAccent else ErrorRed)
         }

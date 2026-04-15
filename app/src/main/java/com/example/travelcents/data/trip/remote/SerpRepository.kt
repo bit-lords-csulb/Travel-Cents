@@ -7,6 +7,7 @@ import com.example.travelcents.data.trip.model.SerpFlightOption
 import com.example.travelcents.data.trip.model.SerpHotelProperty
 import com.example.travelcents.data.trip.model.TravelEvent
 import com.example.travelcents.data.trip.model.TravelRequest
+import com.example.travelcents.data.trip.local.AirportTimeZones
 import com.example.travelcents.BuildConfig
 import okhttp3.OkHttpClient
 import okhttp3.logging.HttpLoggingInterceptor
@@ -104,6 +105,14 @@ object SerpRepository {
             FlightSegment.OUTBOUND -> "Flight to $resolvedDestination"
             FlightSegment.RETURN -> "Return to $resolvedDestination"
         }
+    }
+
+    private fun FlightSegment.timeZoneId(itinerary: Itinerary): String {
+        val airportCode = when (this) {
+            FlightSegment.OUTBOUND -> itinerary.destinationIata
+            FlightSegment.RETURN -> itinerary.originIata
+        }
+        return AirportTimeZones.zoneIdForIata(airportCode).id
     }
 
     // Returns outbound + return TravelEvents, each with flight options as alternatives.
@@ -313,6 +322,7 @@ object SerpRepository {
             eventId = eventId,
             type = "flight",
             itineraryId = itinerary.itineraryId,
+            tz = segment.timeZoneId(itinerary),
             date = departureTimestamp.datePart(defaultDate),
             startTime = departureTimestamp.timePart(),
             endTime = arrivalTimestamp.timePart(),
@@ -328,8 +338,10 @@ object SerpRepository {
                 }
                 lastLeg?.let {
                     put("destination_airport", it.arrivalAirport.id)
-                    put("arrival_time", arrivalTimestamp)
+                    put("arrival_date", arrivalTimestamp.datePart(defaultDate))
+                    put("arrival_time", arrivalTimestamp.timePart())
                 }
+                put("flight_duration_min", selectedOption.totalDuration.toString())
                 put("total_price", selectedOption.price.toString())
                 put("price_level", priceLevel)
                 put("stops", (selectedOption.flights.size - 1).toString())
@@ -359,6 +371,7 @@ object SerpRepository {
             eventId = UUID.randomUUID().toString(),
             type = "flight",
             itineraryId = itinerary.itineraryId,
+            tz = segment.timeZoneId(itinerary),
             date = date,
             details = buildMap {
                 put("trip_segment", segment.key)
@@ -391,11 +404,17 @@ object SerpRepository {
             details = buildMap {
                 val departureTimestamp = firstLeg?.departureTimestamp().orEmpty()
                 val arrivalTimestamp = lastLeg?.arrivalTimestamp().orEmpty()
+                val fallbackArrivalDate = when (segment) {
+                    FlightSegment.OUTBOUND -> itinerary.dateFrom
+                    FlightSegment.RETURN -> itinerary.dateTo
+                }
                 put("trip_segment", segment.key)
                 put("title", buildFlightTitle(segment, destinationAirport, itinerary))
                 put("price", option.price.toString())
+                put("total_price", option.price.toString())
                 put("price_level", priceLevel)
                 put("total_duration", option.totalDuration.toString())
+                put("flight_duration_min", option.totalDuration.toString())
                 put("stops", (option.flights.size - 1).toString())
                 firstLeg?.let {
                     put("airline", it.airline)
@@ -407,7 +426,8 @@ object SerpRepository {
                 }
                 lastLeg?.let {
                     put("destination_airport", it.arrivalAirport.id)
-                    put("arrival_time", arrivalTimestamp)
+                    put("arrival_date", arrivalTimestamp.datePart(fallbackArrivalDate))
+                    put("arrival_time", arrivalTimestamp.timePart())
                 }
                 option.carbonEmissions?.differencePercent?.let {
                     put("carbon_diff_percent", it.toString())

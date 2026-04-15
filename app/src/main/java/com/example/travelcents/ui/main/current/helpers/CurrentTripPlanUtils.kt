@@ -12,6 +12,14 @@ data class EventPalette(
     val accent: androidx.compose.ui.graphics.Color
 )
 
+private fun formatFlightDuration(minStr: String?): String? {
+    val min = minStr?.toIntOrNull() ?: return null
+    if (min <= 0) return null
+    val h = min / 60
+    val m = min % 60
+    return if (m == 0) "${h}h" else "${h}h ${m}m"
+}
+
 fun TravelEvent.toEditablePlan(): EditablePlan {
     return EditablePlan(
         eventId = eventId,
@@ -75,6 +83,7 @@ fun eventSubtitle(event: TravelEvent): String {
                 event.details["origin_airport"]?.takeIf { it.isNotBlank() },
                 event.details["destination_airport"]?.takeIf { it.isNotBlank() }
             ).takeIf { it.isNotEmpty() }?.joinToString(" to "),
+            formatFlightDuration(event.details["flight_duration_min"] ?: event.details["total_duration"]),
             event.details["total_price"]?.takeIf { it.isNotBlank() }?.let { "\$$it" }
         ).joinToString(" · ")
         "hotel" -> listOfNotNull(

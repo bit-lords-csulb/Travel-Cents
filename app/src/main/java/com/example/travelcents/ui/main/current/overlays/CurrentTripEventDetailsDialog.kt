@@ -917,13 +917,37 @@ private fun eventExperienceText(event: TravelEvent): String {
         ?: "Open the editor to add notes, links, and more context for this event."
 }
 
+private fun formatFlightDuration(minStr: String?): String? {
+    val min = minStr?.toIntOrNull() ?: return null
+    if (min <= 0) return null
+    val h = min / 60
+    val m = min % 60
+    return if (m == 0) "${h}h" else "${h}h ${m}m"
+}
+
 private fun eventTimeSummary(event: TravelEvent): String {
+    if (event.type.equals("flight", ignoreCase = true)) {
+        val datePrefix = event.date.takeIf { it.isNotBlank() }?.let { "$it  " }.orEmpty()
+        val departure = formatDisplayTime(event.startTime)
+        val arrival = formatDisplayTime(event.endTime)
+        val arrivalDate = event.details["arrival_date"]?.takeIf { it.isNotBlank() }
+        return if (!arrivalDate.isNullOrBlank() && arrivalDate != event.date) {
+            "$datePrefix$departure - $arrivalDate  $arrival"
+        } else {
+            "$datePrefix$departure - $arrival"
+        }
+    }
+
     val datePrefix = event.date.takeIf { it.isNotBlank() }?.let { "$it  " }.orEmpty()
     return datePrefix + formatDisplayTimeRange(event.startTime, event.endTime)
 }
 
 private fun eventDurationSummary(event: TravelEvent): String {
-    val explicitDuration = event.details["duration"]?.takeIf { it.isNotBlank() }
+    val explicitDuration = formatFlightDuration(
+        event.details["flight_duration_min"]
+            ?: event.details["total_duration"]
+            ?: event.details["duration"]
+    )
     if (explicitDuration != null) {
         return "Duration: $explicitDuration"
     }
