@@ -1,17 +1,41 @@
 package com.example.travelcents.data.trip.remote
 
 import com.example.travelcents.BuildConfig
+import com.example.travelcents.data.media.StaticMapUrlFactory
 import com.example.travelcents.data.trip.model.EventOption
 import com.example.travelcents.data.trip.model.TravelEvent
 import com.example.travelcents.data.trip.model.YelpBusiness
 import com.example.travelcents.data.trip.model.YelpEvent
 import com.example.travelcents.data.trip.model.YelpReview
+import com.example.travelcents.data.trip.model.ATTR_AVERAGE_RATING
+import com.example.travelcents.data.trip.model.ATTR_BUSINESS_ADDRESS
+import com.example.travelcents.data.trip.model.ATTR_BUSINESS_NAME
+import com.example.travelcents.data.trip.model.ATTR_CATEGORIES
+import com.example.travelcents.data.trip.model.ATTR_HAS_FOOD_ORDER
+import com.example.travelcents.data.trip.model.ATTR_HAS_REQUEST_A_QUOTE
+import com.example.travelcents.data.trip.model.ATTR_HAS_RESERVATIONS
+import com.example.travelcents.data.trip.model.ATTR_HAS_WAITLIST
+import com.example.travelcents.data.trip.model.ATTR_HOURS_RAW
+import com.example.travelcents.data.trip.model.ATTR_HOURS_SUMMARY
+import com.example.travelcents.data.trip.model.ATTR_IS_CLOSED
+import com.example.travelcents.data.trip.model.ATTR_LATITUDE
+import com.example.travelcents.data.trip.model.ATTR_LONGITUDE
+import com.example.travelcents.data.trip.model.ATTR_MENU_URL
+import com.example.travelcents.data.trip.model.ATTR_PHONE
+import com.example.travelcents.data.trip.model.ATTR_PRICE_TIER
+import com.example.travelcents.data.trip.model.ATTR_PROFILE_PHOTO_URL
+import com.example.travelcents.data.trip.model.ATTR_REVIEW_COUNT
+import com.example.travelcents.data.trip.model.ATTR_STATIC_MAP_PROVIDER
+import com.example.travelcents.data.trip.model.ATTR_STATIC_MAP_URL
+import com.example.travelcents.data.trip.model.ATTR_YELP_URL
+import com.example.travelcents.data.trip.model.DETAIL_YELP_ID
 import okhttp3.OkHttpClient
 import okhttp3.logging.HttpLoggingInterceptor
 import retrofit2.Retrofit
 import retrofit2.converter.gson.GsonConverterFactory
 import java.util.UUID
 import java.util.concurrent.TimeUnit
+import java.util.Locale
 
 object YelpRepository {
 
@@ -60,7 +84,7 @@ object YelpRepository {
 
             val eventId = UUID.randomUUID().toString()
             val options = response.businesses.mapIndexed { idx, biz ->
-                businessToEventOption(biz, eventId, isSelected = idx == 0, source = "yelp")
+                mapBusinessToEventOption(biz, eventId, isSelected = idx == 0, source = "yelp")
             }
             val selected = response.businesses.first()
 
@@ -72,15 +96,7 @@ object YelpRepository {
                 startTime = "19:00",
                 endTime = "21:00",
                 imageUrl = selected.imageUrl,
-                details = buildMap {
-                    put("restaurant_name", selected.name)
-                    selected.price?.let { put("price_tier", it) }
-                    put("rating", selected.rating.toString())
-                    put("review_count", selected.reviewCount.toString())
-                    selected.location?.displayAddress?.joinToString(", ")?.let { put("address", it) }
-                    put("categories", selected.categories.joinToString(", ") { it.title })
-                    put("yelp_id", selected.id)
-                },
+                details = businessEventDetails(selected),
                 options = options
             )
         } catch (_: Exception) {
@@ -107,7 +123,7 @@ object YelpRepository {
 
             val eventId = UUID.randomUUID().toString()
             val options = response.businesses.mapIndexed { idx, biz ->
-                businessToEventOption(biz, eventId, isSelected = idx == 0, source = "yelp")
+                mapBusinessToEventOption(biz, eventId, isSelected = idx == 0, source = "yelp")
             }
             val selected = response.businesses.first()
 
@@ -119,15 +135,7 @@ object YelpRepository {
                 startTime = "10:00",
                 endTime = "12:00",
                 imageUrl = selected.imageUrl,
-                details = buildMap {
-                    put("activity_name", selected.name)
-                    selected.price?.let { put("price_tier", it) }
-                    put("rating", selected.rating.toString())
-                    put("review_count", selected.reviewCount.toString())
-                    selected.location?.displayAddress?.joinToString(", ")?.let { put("address", it) }
-                    put("categories", selected.categories.joinToString(", ") { it.title })
-                    put("yelp_id", selected.id)
-                },
+                details = businessEventDetails(selected),
                 options = options
             )
         } catch (_: Exception) {
@@ -179,16 +187,18 @@ object YelpRepository {
         }
     }
 
-    // Single pooled fetch for activities (limit=20). Use distributePoolToEvents to assign across days.
-    suspend fun fetchActivityPool(location: String): List<YelpBusiness> {
+    // Single pooled fetch for activities. Size the pool to the itinerary, paging as needed.
+    suspend fun fetchActivityPool(
+        location: String,
+        targetCount: Int = OPTIONS_PER_EVENT
+    ): List<YelpBusiness> {
         return try {
-            val params = mapOf(
-                "location" to location,
-                "categories" to "arts,museums,tours,landmarks",
-                "limit" to "20",
-                "sort_by" to "rating"
+            fetchBusinessPool(
+                location = location,
+                categories = "arts,museums,tours,landmarks",
+                targetCount = targetCount,
+                sortBy = "rating"
             )
-            api.searchBusinesses(params).businesses
         } catch (_: Exception) {
             emptyList()
         }
@@ -235,9 +245,10 @@ object YelpRepository {
         return businesses
     }
 
-    // Distribute a Yelp business pool across trip days round-robin.
-    // Day i gets pool[i] as primary; alternatives are up to 4 other businesses from the pool.
-    // Days beyond pool size are skipped (returns fewer events than dates if pool is small).
+    // Distribute a Yelp business pool across trip days.
+    // Each day keeps the full loaded pool as switchable options so no fetched business is discarded.
+    // The day's preferred 5-business chunk is ordered first to preserve varied defaults across days.
+    // Days beyond pool size are skipped until undersized-pool duplication behavior is implemented.
     fun distributePoolToEvents(
         pool: List<YelpBusiness>,
         dates: List<String>,
@@ -245,18 +256,19 @@ object YelpRepository {
         itineraryId: String
     ): List<TravelEvent> {
         if (pool.isEmpty() || dates.isEmpty()) return emptyList()
-        val nameKey = if (type == "restaurant") "restaurant_name" else "activity_name"
         val (startTime, endTime) = if (type == "restaurant") "19:00" to "21:00" else "10:00" to "12:00"
 
         return dates.mapIndexedNotNull { dayIndex, date ->
-            if (dayIndex >= pool.size) return@mapIndexedNotNull null
-            val primary = pool[dayIndex]
+            val primary = selectPrimaryBusiness(pool, dayIndex) ?: return@mapIndexedNotNull null
             val eventId = UUID.randomUUID().toString()
-            val alternatives = pool.filterIndexed { i, _ -> i != dayIndex }.take(OPTIONS_PER_EVENT - 1)
-            val options = listOf(
-                businessToEventOption(primary, eventId, isSelected = true, source = "yelp")
-            ) + alternatives.map {
-                businessToEventOption(it, eventId, isSelected = false, source = "yelp")
+            val orderedBusinesses = orderedBusinessesForDay(pool, dayIndex, primary)
+            val options = orderedBusinesses.mapIndexed { optionIndex, business ->
+                mapBusinessToEventOption(
+                    biz = business,
+                    eventId = eventId,
+                    isSelected = optionIndex == 0,
+                    source = "yelp"
+                )
             }
             TravelEvent(
                 eventId = eventId,
@@ -266,18 +278,47 @@ object YelpRepository {
                 startTime = startTime,
                 endTime = endTime,
                 imageUrl = primary.imageUrl,
-                details = buildMap {
-                    put(nameKey, primary.name)
-                    primary.price?.let { put("price_tier", it) }
-                    put("rating", primary.rating.toString())
-                    put("review_count", primary.reviewCount.toString())
-                    primary.location?.displayAddress?.joinToString(", ")?.let { put("address", it) }
-                    put("categories", primary.categories.joinToString(", ") { it.title })
-                    put("yelp_id", primary.id)
-                },
+                details = businessEventDetails(primary),
                 options = options
             )
         }
+    }
+
+    private fun selectPrimaryBusiness(
+        pool: List<YelpBusiness>,
+        dayIndex: Int
+    ): YelpBusiness? {
+        val preferredGroup = pool.drop(dayIndex * OPTIONS_PER_EVENT).take(OPTIONS_PER_EVENT)
+        return when {
+            preferredGroup.isNotEmpty() -> preferredGroup.first()
+            dayIndex < pool.size -> pool[dayIndex]
+            else -> null
+        }
+    }
+
+    private fun orderedBusinessesForDay(
+        pool: List<YelpBusiness>,
+        dayIndex: Int,
+        primary: YelpBusiness
+    ): List<YelpBusiness> {
+        val preferredIds = linkedSetOf(primary.id)
+        val ordered = mutableListOf(primary)
+
+        pool.drop(dayIndex * OPTIONS_PER_EVENT)
+            .take(OPTIONS_PER_EVENT)
+            .forEach { business ->
+                if (preferredIds.add(business.id)) {
+                    ordered += business
+                }
+            }
+
+        pool.forEach { business ->
+            if (preferredIds.add(business.id)) {
+                ordered += business
+            }
+        }
+
+        return ordered
     }
 
     // Fetch full business details (photos, hours, etc.) — called lazily on first expand
@@ -290,7 +331,7 @@ object YelpRepository {
         return try { api.getBusinessReviews(yelpId, limit = 3).reviews } catch (_: Exception) { emptyList() }
     }
 
-    private fun businessToEventOption(
+    internal fun mapBusinessToEventOption(
         biz: YelpBusiness,
         eventId: String,
         isSelected: Boolean,
@@ -301,20 +342,74 @@ object YelpRepository {
         source = source,
         selected = isSelected,
         imageUrl = biz.imageUrl,
-        details = buildMap {
-            put("name", biz.name)
-            biz.price?.let { put("price_tier", it) }
-            put("rating", biz.rating.toString())
-            put("review_count", biz.reviewCount.toString())
-            biz.location?.displayAddress?.joinToString(", ")?.let { put("address", it) }
-            put("categories", biz.categories.joinToString(", ") { it.title })
-            put("yelp_id", biz.id)
-            biz.phone?.let { put("phone", it) }
-            biz.distance?.let { put("distance_m", it.toString()) }
-            if (biz.transactions.contains("delivery")) put("delivery", "true")
-            if (biz.transactions.contains("pickup")) put("pickup", "true")
-        }
+        details = businessDetailAttributes(biz)
     )
+
+    internal fun businessEventDetails(biz: YelpBusiness): Map<String, String> {
+        return businessDetailAttributes(biz)
+    }
+
+    internal fun businessDetailAttributes(biz: YelpBusiness): Map<String, String> = buildMap {
+        put(DETAIL_YELP_ID, biz.id)
+        put(ATTR_BUSINESS_NAME, biz.name)
+        biz.price?.let { put(ATTR_PRICE_TIER, it) }
+        put(ATTR_AVERAGE_RATING, biz.rating.toString())
+        put(ATTR_REVIEW_COUNT, biz.reviewCount.toString())
+        put(ATTR_IS_CLOSED, biz.isClosed.toString())
+        biz.location?.displayAddress
+            ?.joinToString(", ")
+            ?.takeIf { it.isNotBlank() }
+            ?.let { put(ATTR_BUSINESS_ADDRESS, it) }
+        biz.categories
+            .joinToString(", ") { it.title }
+            .takeIf { it.isNotBlank() }
+            ?.let { put(ATTR_CATEGORIES, it) }
+        biz.phone?.takeIf { it.isNotBlank() }?.let { put(ATTR_PHONE, it) }
+        biz.url?.takeIf { it.isNotBlank() }?.let { put(ATTR_YELP_URL, it) }
+        biz.imageUrl.takeIf { it.isNotBlank() }?.let { put(ATTR_PROFILE_PHOTO_URL, it) }
+        biz.coordinates?.latitude?.let { put(ATTR_LATITUDE, it.toString()) }
+        biz.coordinates?.longitude?.let { put(ATTR_LONGITUDE, it.toString()) }
+        buildStaticMapMetadata(biz)?.forEach { (key, value) -> put(key, value) }
+        formatHoursSummary(biz)?.let { put(ATTR_HOURS_SUMMARY, it) }
+        encodeHoursRaw(biz)?.let { put(ATTR_HOURS_RAW, it) }
+
+        val attributes = biz.attributes.orEmpty()
+        extractStringAttribute(
+            attributes,
+            "menu_url",
+            "menuUrl"
+        )?.let { put(ATTR_MENU_URL, it) }
+
+        extractBooleanAttribute(
+            attributes,
+            "restaurants_reservations",
+            "restaurant_reservation"
+        )?.let { put(ATTR_HAS_RESERVATIONS, it.toString()) }
+        extractStringAttribute(attributes, "reservation_url")
+            ?.let { put(ATTR_HAS_RESERVATIONS, "true") }
+
+        extractBooleanAttribute(
+            attributes,
+            "waitlist_reservation",
+            "waitlist"
+        )?.let { put(ATTR_HAS_WAITLIST, it.toString()) }
+
+        extractBooleanAttribute(
+            attributes,
+            "request_a_quote",
+            "request_a_quote_enabled",
+            "request_quote"
+        )?.let { put(ATTR_HAS_REQUEST_A_QUOTE, it.toString()) }
+        extractStringAttribute(attributes, "request_a_quote_url")
+            ?.let { put(ATTR_HAS_REQUEST_A_QUOTE, "true") }
+
+        extractBooleanAttribute(
+            attributes,
+            "food_ordering",
+            "food_order",
+            "restaurant_ordering"
+        )?.let { put(ATTR_HAS_FOOD_ORDER, it.toString()) }
+    }
 
     private fun yelpEventToTravelEvent(event: YelpEvent, itineraryId: String): TravelEvent? {
         val date = event.timeStart.substringBefore("T").ifBlank { return null }
@@ -356,6 +451,78 @@ object YelpRepository {
         } catch (_: Exception) {
             0L
         }
+    }
+
+    private fun buildStaticMapMetadata(biz: YelpBusiness): Map<String, String>? {
+        val latitude = biz.coordinates?.latitude ?: return null
+        val longitude = biz.coordinates?.longitude ?: return null
+        return mapOf(
+            ATTR_STATIC_MAP_URL to StaticMapUrlFactory.buildUrl(latitude, longitude),
+            ATTR_STATIC_MAP_PROVIDER to StaticMapUrlFactory.PROVIDER
+        )
+    }
+
+    private fun formatHoursSummary(biz: YelpBusiness): String? {
+        val periods = biz.hours.orEmpty().flatMap { it.open.orEmpty() }
+        if (periods.isEmpty()) return null
+        return periods.joinToString("; ") { period ->
+            "${dayLabel(period.day)} ${period.start}-${period.end}"
+        }
+    }
+
+    private fun encodeHoursRaw(biz: YelpBusiness): String? {
+        val periods = biz.hours.orEmpty().flatMap { it.open.orEmpty() }
+        if (periods.isEmpty()) return null
+        return periods.joinToString("|") { period ->
+            listOf(
+                period.day.toString(),
+                period.start,
+                period.end,
+                period.isOvernight.toString()
+            ).joinToString(",")
+        }
+    }
+
+    private fun dayLabel(day: Int): String {
+        return when (day) {
+            0 -> "Mon"
+            1 -> "Tue"
+            2 -> "Wed"
+            3 -> "Thu"
+            4 -> "Fri"
+            5 -> "Sat"
+            6 -> "Sun"
+            else -> day.toString()
+        }
+    }
+
+    private fun extractStringAttribute(attributes: Map<String, Any>, vararg keys: String): String? {
+        return keys.asSequence()
+            .mapNotNull { key ->
+                val value = attributes[key] ?: return@mapNotNull null
+                when (value) {
+                    is String -> value.takeIf { it.isNotBlank() }
+                    else -> value.toString().takeIf { it.isNotBlank() }
+                }
+            }
+            .firstOrNull()
+    }
+
+    private fun extractBooleanAttribute(attributes: Map<String, Any>, vararg keys: String): Boolean? {
+        return keys.asSequence()
+            .mapNotNull { key ->
+                when (val value = attributes[key]) {
+                    is Boolean -> value
+                    is Number -> value.toInt() != 0
+                    is String -> when (value.lowercase(Locale.US)) {
+                        "true", "1", "yes" -> true
+                        "false", "0", "no" -> false
+                        else -> null
+                    }
+                    else -> null
+                }
+            }
+            .firstOrNull()
     }
 }
 

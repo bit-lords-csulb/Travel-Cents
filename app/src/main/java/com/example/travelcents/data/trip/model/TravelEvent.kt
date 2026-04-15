@@ -17,7 +17,7 @@ data class TravelEvent(
     // options are stored as a Firestore subcollection; populated in-memory only
     val options: List<EventOption> = emptyList()
 ) {
-    // options go in their own subcollection — not included here
+    // Device-local cache paths are not shared/canonical Firestore state.
     fun toFirestoreMap(): Map<String, Any> = buildMap {
         put("eventId", eventId)
         put("type", type)
@@ -27,7 +27,6 @@ data class TravelEvent(
         put("startTime", startTime)
         put("endTime", endTime)
         put("imageUrl", imageUrl)
-        put("localImagePath", localImagePath)
         put("photoUrls", photoUrls)
         putAll(details)
     }
@@ -46,27 +45,65 @@ data class TravelEvent(
             "startTime", "endTime", "imageUrl", "localImagePath", "photoUrls", "options"
         )
 
+        fun fromFirestoreMap(
+            map: Map<String, Any>,
+            documentId: String,
+            fallbackItineraryId: String
+        ): TravelEvent {
+            return fromStoredMap(
+                map = map,
+                fallbackEventId = documentId,
+                fallbackItineraryId = fallbackItineraryId,
+                options = emptyList()
+            )
+        }
+
         fun fromCacheMap(map: Map<String, Any>): TravelEvent {
             @Suppress("UNCHECKED_CAST")
             val opts = (map["options"] as? List<Map<String, Any>>)
                 ?.map { EventOption.fromMap(it) }
                 ?: emptyList()
+
+            return fromStoredMap(
+                map = map,
+                fallbackEventId = UUID.randomUUID().toString(),
+                fallbackItineraryId = "",
+                options = opts
+            )
+        }
+
+        private fun fromStoredMap(
+            map: Map<String, Any>,
+            fallbackEventId: String,
+            fallbackItineraryId: String,
+            options: List<EventOption>
+        ): TravelEvent {
             val photos = (map["photoUrls"] as? List<*>)?.filterIsInstance<String>() ?: emptyList()
+            val rawImageUrl = map["imageUrl"] as? String ?: ""
+            val rawLocalImagePath = map["localImagePath"] as? String ?: ""
+            val localImagePath = rawLocalImagePath.ifBlank {
+                rawImageUrl.takeIf(::looksLikeLocalImagePath).orEmpty()
+            }
+            val imageUrl = rawImageUrl.takeUnless(::looksLikeLocalImagePath).orEmpty()
 
             return TravelEvent(
-                eventId = map["eventId"] as? String ?: UUID.randomUUID().toString(),
+                eventId = map["eventId"] as? String ?: fallbackEventId,
                 type = map["type"] as? String ?: "",
-                itineraryId = "",
+                itineraryId = map["itineraryId"] as? String ?: fallbackItineraryId,
                 tz = map["tz"] as? String ?: "",
                 date = map["date"] as? String ?: "",
                 startTime = map["startTime"] as? String ?: "",
                 endTime = map["endTime"] as? String ?: "",
-                imageUrl = map["imageUrl"] as? String ?: "",
-                localImagePath = map["localImagePath"] as? String ?: "",
+                imageUrl = imageUrl,
+                localImagePath = localImagePath,
                 photoUrls = photos,
                 details = map.filterKeys { it !in RESERVED }.mapValues { it.value.toString() },
-                options = opts
+                options = options
             )
+        }
+
+        private fun looksLikeLocalImagePath(value: String): Boolean {
+            return value.startsWith("/") || value.startsWith("file:/")
         }
     }
 }

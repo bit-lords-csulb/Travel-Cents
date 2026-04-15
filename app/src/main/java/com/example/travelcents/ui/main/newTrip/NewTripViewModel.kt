@@ -161,7 +161,8 @@ class NewTripViewModel(application: Application) : AndroidViewModel(application)
                 val minimumStartTime = minimumActivityStartTime(outboundFlight, request.dateFrom)
                 val tripDates = generateActivityDates(request.dateFrom, request.dateTo, flightArrivalDate)
 
-                // Step 3: Yelp restaurants — 1 pooled call, distributed round-robin across days
+                // Step 3: Yelp restaurants — paged pooled fetch sized to the itinerary.
+                // Each day keeps the full loaded pool as options, with its preferred 5-business chunk first.
                 _generationStep.value = GenerationStep.FINDING_RESTAURANTS
                 _uiState.value = TripUiState.Loading(YELP_RESTAURANTS_MESSAGES.random())
                 val restaurantEvents = if (tripDates.isEmpty()) {
@@ -181,7 +182,7 @@ class NewTripViewModel(application: Application) : AndroidViewModel(application)
                     )
                 }
 
-                // Step 4: Yelp activities (1 pooled call) + Yelp events (full trip range), in parallel
+                // Step 4: Yelp activities (paged pooled fetch) + Yelp events (full trip range), in parallel
                 _generationStep.value = GenerationStep.FINDING_ACTIVITIES
                 _uiState.value = TripUiState.Loading(YELP_ACTIVITIES_MESSAGES.random())
                 val activityEvents: List<TravelEvent>
@@ -190,7 +191,13 @@ class NewTripViewModel(application: Application) : AndroidViewModel(application)
                     activityEvents = emptyList()
                     localEvents = emptyList()
                 } else {
-                    val activityPoolDeferred = async { YelpRepository.fetchActivityPool(itinerary.destination) }
+                    val activityPoolTarget = tripDates.size * 5
+                    val activityPoolDeferred = async {
+                        YelpRepository.fetchActivityPool(
+                            location = itinerary.destination,
+                            targetCount = activityPoolTarget
+                        )
+                    }
                     val yelpEventsDeferred = async {
                         YelpRepository.searchEvents(
                             location = itinerary.destination,

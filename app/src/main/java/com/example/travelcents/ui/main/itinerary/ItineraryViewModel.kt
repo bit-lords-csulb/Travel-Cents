@@ -7,6 +7,9 @@ import com.example.travelcents.data.trip.model.EventOption
 import com.example.travelcents.data.trip.model.Itinerary
 import com.example.travelcents.data.trip.model.TravelEvent
 import com.example.travelcents.data.trip.model.YelpReview
+import com.example.travelcents.data.trip.model.ATTR_BUSINESS_NAME
+import com.example.travelcents.data.trip.model.ATTR_HOTEL_NAME
+import com.example.travelcents.data.trip.model.detailValue
 import com.example.travelcents.data.trip.remote.YelpRepository
 import com.example.travelcents.ui.main.current.CurrentTripUiState
 import com.example.travelcents.ui.modules.normalizeDate
@@ -160,44 +163,11 @@ class ItineraryViewModel : ViewModel() {
 
                 val docs = snapshot?.documents ?: emptyList()
                 val fetchedEvents = docs.mapNotNull { doc ->
-                    val allData = doc.data ?: emptyMap()
-                    val coreKeys = setOf(
-                        "eventId",
-                        "type",
-                        "itineraryId",
-                        "tz",
-                        "date",
-                        "startTime",
-                        "endTime",
-                        "imageUrl",
-                        "localImagePath",
-                        "photoUrls"
-                    )
-
-                    @Suppress("UNCHECKED_CAST")
-                    val photoUrls = (doc.get("photoUrls") as? List<*>)
-                        ?.filterIsInstance<String>() ?: emptyList()
-                    val rawImageUrl = doc.getString("imageUrl") ?: ""
-                    val rawLocalImagePath = doc.getString("localImagePath") ?: ""
-                    val localImagePath = rawLocalImagePath.ifBlank {
-                        rawImageUrl.takeIf(::looksLikeLocalImagePath).orEmpty()
-                    }
-                    val imageUrl = rawImageUrl.takeUnless(::looksLikeLocalImagePath).orEmpty()
-
-                    TravelEvent(
-                        eventId = doc.getString("eventId") ?: doc.id,
-                        type = doc.getString("type") ?: "unknown",
-                        itineraryId = doc.getString("itineraryId") ?: tripId,
-                        tz = doc.getString("tz") ?: "",
-                        date = doc.getString("date") ?: "",
-                        startTime = doc.getString("startTime") ?: "",
-                        endTime = doc.getString("endTime") ?: "",
-                        imageUrl = imageUrl,
-                        localImagePath = localImagePath,
-                        photoUrls = photoUrls,
-                        details = allData
-                            .filterKeys { it !in coreKeys }
-                            .mapValues { it.value.toString() }
+                    val data = doc.data ?: return@mapNotNull null
+                    TravelEvent.fromFirestoreMap(
+                        map = data,
+                        documentId = doc.id,
+                        fallbackItineraryId = tripId
                     )
                 }
 
@@ -730,19 +700,25 @@ class ItineraryViewModel : ViewModel() {
             putAll(option.details)
             when (event.type.lowercase()) {
                 "hotel" -> {
-                    val hotelName = option.details["hotel_name"] ?: option.details["name"]
+                    val hotelName = option.detailValue(ATTR_HOTEL_NAME, "hotel_name", "name")
                     if (!hotelName.isNullOrBlank()) {
-                        put("hotel_name", hotelName)
+                        put(ATTR_HOTEL_NAME, hotelName)
                         put("title", hotelName)
                     }
                 }
                 "restaurant", "dining", "food" -> {
-                    val name = option.details["restaurant_name"] ?: option.details["name"]
-                    if (!name.isNullOrBlank()) put("restaurant_name", name)
+                    val name = option.detailValue(ATTR_BUSINESS_NAME, "restaurant_name", "name")
+                    if (!name.isNullOrBlank()) {
+                        put(ATTR_BUSINESS_NAME, name)
+                        put("title", name)
+                    }
                 }
                 "activity" -> {
-                    val name = option.details["activity_name"] ?: option.details["title"] ?: option.details["name"]
-                    if (!name.isNullOrBlank()) put("activity_name", name)
+                    val name = option.detailValue(ATTR_BUSINESS_NAME, "activity_name", "title", "name")
+                    if (!name.isNullOrBlank()) {
+                        put(ATTR_BUSINESS_NAME, name)
+                        put("title", name)
+                    }
                 }
                 "flight" -> option.details["title"]?.let { put("title", it) }
             }
@@ -758,11 +734,6 @@ class ItineraryViewModel : ViewModel() {
             details = mergedDetails
         )
     }
-
-    private fun looksLikeLocalImagePath(value: String): Boolean {
-        return value.startsWith("/") || value.startsWith("file:/")
-    }
-
     private fun sortPlanEvents(events: List<TravelEvent>): List<TravelEvent> {
         return events.sortedWith(
             compareBy<TravelEvent>(

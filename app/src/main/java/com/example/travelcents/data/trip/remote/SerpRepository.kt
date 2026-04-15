@@ -7,7 +7,23 @@ import com.example.travelcents.data.trip.model.SerpFlightOption
 import com.example.travelcents.data.trip.model.SerpHotelProperty
 import com.example.travelcents.data.trip.model.TravelEvent
 import com.example.travelcents.data.trip.model.TravelRequest
+import com.example.travelcents.data.trip.model.ATTR_AMENITIES
+import com.example.travelcents.data.trip.model.ATTR_BOOKING_URL
+import com.example.travelcents.data.trip.model.ATTR_CHECK_IN_TIME
+import com.example.travelcents.data.trip.model.ATTR_CHECK_OUT_TIME
+import com.example.travelcents.data.trip.model.ATTR_GROUP_RATE_PER_NIGHT
+import com.example.travelcents.data.trip.model.ATTR_HOTEL_CLASS
+import com.example.travelcents.data.trip.model.ATTR_HOTEL_NAME
+import com.example.travelcents.data.trip.model.ATTR_HOTEL_RATING
+import com.example.travelcents.data.trip.model.ATTR_LATITUDE
+import com.example.travelcents.data.trip.model.ATTR_LONGITUDE
+import com.example.travelcents.data.trip.model.ATTR_RATE_PER_NIGHT
+import com.example.travelcents.data.trip.model.ATTR_REVIEW_COUNT
+import com.example.travelcents.data.trip.model.ATTR_ROOMS_NEEDED
+import com.example.travelcents.data.trip.model.ATTR_STATIC_MAP_PROVIDER
+import com.example.travelcents.data.trip.model.ATTR_STATIC_MAP_URL
 import com.example.travelcents.data.trip.local.AirportTimeZones
+import com.example.travelcents.data.media.StaticMapUrlFactory
 import com.example.travelcents.BuildConfig
 import okhttp3.OkHttpClient
 import okhttp3.logging.HttpLoggingInterceptor
@@ -450,6 +466,58 @@ object SerpRepository {
         )
     }
 
+    internal fun mapHotelPhotos(hotel: SerpHotelProperty): List<String> {
+        return hotel.images?.mapNotNull { it.originalImage ?: it.thumbnail } ?: emptyList()
+    }
+
+    internal fun mapHotelSearchResultToEvent(
+        request: TravelRequest,
+        itinerary: Itinerary,
+        properties: List<SerpHotelProperty>
+    ): TravelEvent {
+        val roomsNeeded = maxOf(1, request.adults / 2)
+        val eventId = UUID.randomUUID().toString()
+        val selectedHotel = properties.firstOrNull()
+        val eventOptions = properties.mapIndexed { idx, hotel ->
+            hotelToEventOption(hotel, eventId, isSelected = idx == 0, roomsNeeded = roomsNeeded)
+        }
+        val selectedPhotos = selectedHotel?.let(::mapHotelPhotos).orEmpty()
+
+        return TravelEvent(
+            eventId = eventId,
+            type = "hotel",
+            itineraryId = itinerary.itineraryId,
+            date = request.dateFrom,
+            startTime = selectedHotel?.checkInTime ?: "15:00",
+            endTime = selectedHotel?.checkOutTime ?: "11:00",
+            imageUrl = selectedPhotos.firstOrNull() ?: "",
+            photoUrls = selectedPhotos,
+            details = buildMap {
+                selectedHotel?.let { hotel ->
+                    put(ATTR_HOTEL_NAME, hotel.name)
+                    put("check_in_date", request.dateFrom)
+                    put("check_out_date", request.dateTo)
+                    hotel.overallRating?.let { put(ATTR_HOTEL_RATING, it.toString()) }
+                    hotel.reviews?.let { put(ATTR_REVIEW_COUNT, it.toString()) }
+                    hotel.hotelClass?.let { put(ATTR_HOTEL_CLASS, it) }
+                    hotel.checkInTime?.let { put(ATTR_CHECK_IN_TIME, it) }
+                    hotel.checkOutTime?.let { put(ATTR_CHECK_OUT_TIME, it) }
+                    hotel.ratePerNight?.extractedLowest?.let { rate ->
+                        put(ATTR_RATE_PER_NIGHT, rate.toString())
+                        put(ATTR_GROUP_RATE_PER_NIGHT, (rate * roomsNeeded).toString())
+                        put(ATTR_ROOMS_NEEDED, roomsNeeded.toString())
+                    }
+                    bestBookingUrlFor(hotel)?.let { put(ATTR_BOOKING_URL, it) }
+                    hotel.amenities?.take(5)?.let { put(ATTR_AMENITIES, it.joinToString(", ")) }
+                    hotel.gpsCoordinates?.latitude?.let { put(ATTR_LATITUDE, it.toString()) }
+                    hotel.gpsCoordinates?.longitude?.let { put(ATTR_LONGITUDE, it.toString()) }
+                    buildStaticMapMetadata(hotel)?.forEach { (key, value) -> put(key, value) }
+                }
+            },
+            options = eventOptions
+        )
+    }
+
     // Returns a single TravelEvent with all hotel options as EventOption alternatives.
     // sort_by=8 (highest rated). Prices are per-room; group pricing computed client-side.
     suspend fun searchHotels(
@@ -477,48 +545,10 @@ object SerpRepository {
             }
 
             val response = api.searchHotels(params)
-            val properties = response.properties ?: emptyList()
-            val roomsNeeded = maxOf(1, request.adults / 2)
-
-            val eventId = UUID.randomUUID().toString()
-            val selectedHotel = properties.firstOrNull()
-
-            val eventOptions = properties.mapIndexed { idx, hotel ->
-                hotelToEventOption(hotel, eventId, isSelected = idx == 0, roomsNeeded = roomsNeeded)
-            }
-
-            val selectedPhotos = selectedHotel?.images
-                ?.mapNotNull { it.originalImage ?: it.thumbnail }
-                ?: emptyList()
-
-            TravelEvent(
-                eventId = eventId,
-                type = "hotel",
-                itineraryId = itinerary.itineraryId,
-                date = request.dateFrom,
-                startTime = selectedHotel?.checkInTime ?: "15:00",
-                endTime = selectedHotel?.checkOutTime ?: "11:00",
-                imageUrl = selectedPhotos.firstOrNull() ?: "",
-                photoUrls = selectedPhotos,
-                details = buildMap {
-                    selectedHotel?.let { hotel ->
-                        put("hotel_name", hotel.name)
-                        put("check_in_date", request.dateFrom)
-                        put("check_out_date", request.dateTo)
-                        hotel.overallRating?.let { put("rating", it.toString()) }
-                        hotel.reviews?.let { put("review_count", it.toString()) }
-                        hotel.hotelClass?.let { put("hotel_class", it) }
-                        hotel.ratePerNight?.extractedLowest?.let { rate ->
-                            put("rate_per_night", rate.toString())
-                            put("group_rate_per_night", (rate * roomsNeeded).toString())
-                            put("rooms_needed", roomsNeeded.toString())
-                        }
-                        hotel.ratePerNight?.lowest?.let { put("rate_per_night_display", it) }
-                        hotel.deal?.let { put("deal", it) }
-                        hotel.amenities?.take(5)?.let { put("amenities", it.joinToString(", ")) }
-                    }
-                },
-                options = eventOptions
+            mapHotelSearchResultToEvent(
+                request = request,
+                itinerary = itinerary,
+                properties = response.properties ?: emptyList()
             )
         } catch (_: Exception) {
             TravelEvent(
@@ -526,7 +556,7 @@ object SerpRepository {
                 type = "hotel",
                 itineraryId = itinerary.itineraryId,
                 date = request.dateFrom,
-                details = mapOf("hotel_name" to "No hotels found")
+                details = mapOf(ATTR_HOTEL_NAME to "No hotels found")
             )
         }
 
@@ -547,7 +577,7 @@ object SerpRepository {
             ?.minByOrNull { it.ratePerNight?.extractedLowest ?: Double.MAX_VALUE }
             ?.link
 
-        val photos = hotel.images?.mapNotNull { it.originalImage ?: it.thumbnail } ?: emptyList()
+        val photos = mapHotelPhotos(hotel)
         return EventOption(
             optionId = UUID.randomUUID().toString(),
             eventId = eventId,
@@ -556,29 +586,39 @@ object SerpRepository {
             imageUrl = photos.firstOrNull() ?: "",
             photoUrls = photos,
             details = buildMap {
-                put("hotel_name", hotel.name)
-                hotel.overallRating?.let { put("rating", it.toString()) }
-                hotel.reviews?.let { put("review_count", it.toString()) }
-                hotel.hotelClass?.let { put("hotel_class", it) }
-                hotel.extractedHotelClass?.let { put("hotel_class_int", it.toString()) }
-                hotel.locationRating?.let { put("location_rating", it.toString()) }
-                hotel.deal?.let { put("deal", it) }
-                hotel.dealDescription?.let { put("deal_description", it) }
-                hotel.checkInTime?.let { put("check_in_time", it) }
-                hotel.checkOutTime?.let { put("check_out_time", it) }
-                hotel.ecoCertified?.let { if (it) put("eco_certified", "true") }
-                hotel.amenities?.take(8)?.let { put("amenities", it.joinToString(", ")) }
+                put(ATTR_HOTEL_NAME, hotel.name)
+                hotel.overallRating?.let { put(ATTR_HOTEL_RATING, it.toString()) }
+                hotel.reviews?.let { put(ATTR_REVIEW_COUNT, it.toString()) }
+                hotel.hotelClass?.let { put(ATTR_HOTEL_CLASS, it) }
+                hotel.checkInTime?.let { put(ATTR_CHECK_IN_TIME, it) }
+                hotel.checkOutTime?.let { put(ATTR_CHECK_OUT_TIME, it) }
+                hotel.amenities?.take(8)?.let { put(ATTR_AMENITIES, it.joinToString(", ")) }
                 if (ratePerNight > 0) {
-                    put("rate_per_night", ratePerNight.toString())
-                    put("group_rate_per_night", groupRatePerNight.toString())
-                    put("rooms_needed", roomsNeeded.toString())
+                    put(ATTR_RATE_PER_NIGHT, ratePerNight.toString())
+                    put(ATTR_GROUP_RATE_PER_NIGHT, groupRatePerNight.toString())
+                    put(ATTR_ROOMS_NEEDED, roomsNeeded.toString())
                 }
-                hotel.ratePerNight?.lowest?.let { put("rate_per_night_display", it) }
-                hotel.totalRate?.lowest?.let { put("total_rate_display", it) }
-                bestBookingUrl?.let { put("booking_url", it) }
-                hotel.images?.firstOrNull()?.originalImage?.let { put("image_original", it) }
+                bestBookingUrl?.let { put(ATTR_BOOKING_URL, it) }
+                hotel.gpsCoordinates?.latitude?.let { put(ATTR_LATITUDE, it.toString()) }
+                hotel.gpsCoordinates?.longitude?.let { put(ATTR_LONGITUDE, it.toString()) }
+                buildStaticMapMetadata(hotel)?.forEach { (key, value) -> put(key, value) }
             }
         )
+    }
+
+    private fun buildStaticMapMetadata(hotel: SerpHotelProperty): Map<String, String>? {
+        val latitude = hotel.gpsCoordinates?.latitude ?: return null
+        val longitude = hotel.gpsCoordinates?.longitude ?: return null
+        return mapOf(
+            ATTR_STATIC_MAP_URL to StaticMapUrlFactory.buildUrl(latitude, longitude),
+            ATTR_STATIC_MAP_PROVIDER to StaticMapUrlFactory.PROVIDER
+        )
+    }
+
+    private fun bestBookingUrlFor(hotel: SerpHotelProperty): String? {
+        return hotel.prices
+            ?.minByOrNull { it.ratePerNight?.extractedLowest ?: Double.MAX_VALUE }
+            ?.link
     }
 }
 

@@ -22,7 +22,6 @@ data class EventOption(
         put("selected", selected)
         put("votes", votes)
         put("imageUrl", imageUrl)
-        put("localImagePath", localImagePath)
         put("photoUrls", photoUrls)
         putAll(details)
     }
@@ -36,17 +35,27 @@ data class EventOption(
         fun fromMap(map: Map<String, Any>): EventOption {
             val votes = (map["votes"] as? Map<String, String>) ?: emptyMap()
             val photos = (map["photoUrls"] as? List<*>)?.filterIsInstance<String>() ?: emptyList()
+            val rawImageUrl = map["imageUrl"] as? String ?: ""
+            val rawLocalImagePath = map["localImagePath"] as? String ?: ""
+            val localImagePath = rawLocalImagePath.ifBlank {
+                rawImageUrl.takeIf(::looksLikeLocalImagePath).orEmpty()
+            }
+            val imageUrl = rawImageUrl.takeUnless(::looksLikeLocalImagePath).orEmpty()
             return EventOption(
                 optionId = map["optionId"] as? String ?: UUID.randomUUID().toString(),
                 eventId = map["eventId"] as? String ?: "",
                 source = map["source"] as? String ?: "",
                 selected = map["selected"] as? Boolean ?: false,
                 votes = votes,
-                imageUrl = map["imageUrl"] as? String ?: "",
-                localImagePath = map["localImagePath"] as? String ?: "",
+                imageUrl = imageUrl,
+                localImagePath = localImagePath,
                 photoUrls = photos,
                 details = map.filterKeys { it !in RESERVED }.mapValues { it.value.toString() }
             )
+        }
+
+        private fun looksLikeLocalImagePath(value: String): Boolean {
+            return value.startsWith("/") || value.startsWith("file:/")
         }
     }
 }
