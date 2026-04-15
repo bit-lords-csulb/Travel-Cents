@@ -8,7 +8,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.Scaffold
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.compose.ui.Modifier
@@ -103,7 +102,6 @@ fun MainScaffold(modifier: Modifier = Modifier, onLogout: () -> Unit = {}) {
     val navBackStackEntry by navController.currentBackStackEntryAsState()
     val currentRoute = navBackStackEntry?.destination?.route ?: MainRoutes.HOME
     val currentTopLevelRoute = selectedBottomRoute(currentRoute)
-    val itineraryUiState by currentTripViewModel.uiState.collectAsState()
 
     // Load trip once on mount so currentTripId is available before any tab is visited
     LaunchedEffect(Unit) { currentTripViewModel.loadTrip() }
@@ -195,10 +193,7 @@ fun MainScaffold(modifier: Modifier = Modifier, onLogout: () -> Unit = {}) {
                     NewTripLandingPage(
                         modifier = Modifier.fillMaxSize(),
                         onPlanTripClick = { navController.navigate(MainRoutes.NEW_TRIP_STEP_1) },
-                        onAiChatClick = { navController.navigate(MainRoutes.AI_TRIP_CHAT) },
-                        onViewLastTripClick = if (itineraryUiState.currentTripId != null) {
-                            { navController.navigate(MainRoutes.CURRENT_ITINERARY) }
-                        } else null
+                        onAiChatClick = { navController.navigate(MainRoutes.AI_TRIP_CHAT) }
                     )
                 }
                 composable(MainRoutes.NEW_TRIP_STEP_1) {

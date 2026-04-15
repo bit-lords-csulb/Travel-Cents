@@ -5,7 +5,7 @@ import java.util.UUID
 data class EventOption(
     val optionId: String = UUID.randomUUID().toString(),
     val eventId: String = "",
-    // "serp", "yelp", "groq"
+    // "serp", "yelp", "llm"
     val source: String = "",
     val selected: Boolean = false,
     // userId -> vote value; session-only rejection state lives in ViewModel, not here

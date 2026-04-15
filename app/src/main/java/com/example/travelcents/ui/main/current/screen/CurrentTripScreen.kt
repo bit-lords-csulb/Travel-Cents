@@ -99,12 +99,12 @@ fun CurrentTripScreen(
     }
 
     LaunchedEffect(selectedEventId, uiState.events) {
-        uiState.events
-            .firstOrNull { it.eventId == selectedEventId }
-            ?.details
-            ?.get("yelp_id")
-            ?.takeIf { it.isNotBlank() }
-            ?.let(viewModel::fetchYelpReviews)
+        val event = uiState.events.firstOrNull { it.eventId == selectedEventId }
+        val yelpId = event?.details?.get("yelp_id")?.takeIf { it.isNotBlank() }
+        if (yelpId != null && event != null) {
+            viewModel.fetchYelpReviews(yelpId)
+            viewModel.fetchYelpPhotos(yelpId, event.eventId)
+        }
     }
 
     Box(

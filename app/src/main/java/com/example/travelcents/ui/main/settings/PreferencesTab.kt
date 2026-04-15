@@ -77,8 +77,8 @@ private fun AboutSection() {
     SettingCard {
         SettingRow(label = "Version", value = "1.0.0")
         SettingRow(label = "Build", value = "2026.04 (beta)")
-        SettingRow(label = "Team", value = "Bit Lords — CSULB")
-        SettingRow(label = "Powered by", value = "Groq · Firebase", showDivider = false)
+        SettingRow(label = "Team", value = "Bit Lords - CSULB")
+        SettingRow(label = "Powered by", value = "AI planner + Firebase", showDivider = false)
     }
     Spacer(modifier = Modifier.height(8.dp))
     Text(
