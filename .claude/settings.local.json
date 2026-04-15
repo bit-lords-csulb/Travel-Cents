@@ -8,7 +8,8 @@
       "Bash(cd:*)",
       "mcp__ide__getDiagnostics",
       "Read(//mnt/c/Users/Zaher503/AndroidStudioProjects/**)",
-      "Bash(./gradlew assembleDebug)"
+      "Bash(./gradlew assembleDebug)",
+      "Bash(./gradlew :app:compileDebugKotlin)"
     ]
   }
 }

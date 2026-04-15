@@ -206,42 +206,62 @@ fun CurrentTripEventDetailsDialog(
                         onOpenGallery = if (photos.isNotEmpty()) ({ showGallery = true }) else null
                     )
 
-                    Column(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(horizontal = 24.dp, vertical = 24.dp),
-                        verticalArrangement = Arrangement.spacedBy(26.dp)
-                    ) {
-                        QuickActionsSection(
-                            onDirections = { uriHandler.openUri(directionsUrl) },
-                            onEdit = onEdit
-                        )
+                    if (event.type.equals("flight", ignoreCase = true)) {
+                        Column(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(horizontal = 24.dp, vertical = 24.dp),
+                            verticalArrangement = Arrangement.spacedBy(26.dp)
+                        ) {
+                            QuickActionsSection(
+                                onDirections = { uriHandler.openUri(directionsUrl) },
+                                onEdit = onEdit
+                            )
 
-                        HighlightGrid(
-                            timeSummary = timeSummary,
-                            durationSummary = durationSummary,
-                            websiteLabel = websiteLabel,
-                            officialUrl = officialUrl ?: mapsUrl,
-                            hasOfficialSite = officialUrl != null
-                        )
+                            FlightRouteCard(event = event)
 
-                        LocationSection(
-                            heroImage = heroImage,
-                            locationLabel = locationLabel,
-                            onOpenMaps = { uriHandler.openUri(mapsUrl) }
-                        )
+                            FlightInfoGrid(event = event)
 
-                        DetailTextSection(body = experienceText)
+                            Spacer(modifier = Modifier.height(18.dp))
+                        }
+                    } else {
+                        Column(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(horizontal = 24.dp, vertical = 24.dp),
+                            verticalArrangement = Arrangement.spacedBy(26.dp)
+                        ) {
+                            QuickActionsSection(
+                                onDirections = { uriHandler.openUri(directionsUrl) },
+                                onEdit = onEdit
+                            )
 
-                        ReviewsSection(
-                            ratingLabel = ratingLabel,
-                            reviewCountLabel = reviewCountLabel,
-                            reviews = yelpReviews,
-                            reviewsLoading = reviewsLoading,
-                            onReadAll = reviewUrl?.let { { uriHandler.openUri(it) } }
-                        )
+                            HighlightGrid(
+                                timeSummary = timeSummary,
+                                durationSummary = durationSummary,
+                                websiteLabel = websiteLabel,
+                                officialUrl = officialUrl ?: mapsUrl,
+                                hasOfficialSite = officialUrl != null
+                            )
 
-                        Spacer(modifier = Modifier.height(18.dp))
+                            LocationSection(
+                                heroImage = heroImage,
+                                locationLabel = locationLabel,
+                                onOpenMaps = { uriHandler.openUri(mapsUrl) }
+                            )
+
+                            DetailTextSection(body = experienceText)
+
+                            ReviewsSection(
+                                ratingLabel = ratingLabel,
+                                reviewCountLabel = reviewCountLabel,
+                                reviews = yelpReviews,
+                                reviewsLoading = reviewsLoading,
+                                onReadAll = reviewUrl?.let { { uriHandler.openUri(it) } }
+                            )
+
+                            Spacer(modifier = Modifier.height(18.dp))
+                        }
                     }
                 }
             }
@@ -422,7 +442,9 @@ private fun QuickActionButton(
             text = label,
             color = if (filled) DetailBackground else DetailPrimary,
             fontSize = 15.sp,
-            fontWeight = FontWeight.Bold
+            fontWeight = FontWeight.Bold,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis
         )
     }
 }
