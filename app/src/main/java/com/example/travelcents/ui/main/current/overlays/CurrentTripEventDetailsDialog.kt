@@ -63,6 +63,17 @@ import coil.compose.AsyncImage
 import com.example.travelcents.data.trip.model.EventOption
 import com.example.travelcents.data.trip.model.TravelEvent
 import com.example.travelcents.data.trip.model.YelpReview
+import com.example.travelcents.data.trip.model.ATTR_AVERAGE_RATING
+import com.example.travelcents.data.trip.model.ATTR_BOOKING_URL
+import com.example.travelcents.data.trip.model.ATTR_BUSINESS_ADDRESS
+import com.example.travelcents.data.trip.model.ATTR_BUSINESS_NAME
+import com.example.travelcents.data.trip.model.ATTR_CATEGORIES
+import com.example.travelcents.data.trip.model.ATTR_HOTEL_NAME
+import com.example.travelcents.data.trip.model.ATTR_HOTEL_RATING
+import com.example.travelcents.data.trip.model.ATTR_MENU_URL
+import com.example.travelcents.data.trip.model.ATTR_REVIEW_COUNT
+import com.example.travelcents.data.trip.model.ATTR_YELP_URL
+import com.example.travelcents.data.trip.model.detailValue
 import com.example.travelcents.ui.modules.PhotoGalleryButton
 import com.example.travelcents.ui.modules.TripPhotoGalleryDialog
 import com.example.travelcents.ui.modules.formatDisplayTime
@@ -895,9 +906,10 @@ private fun ReviewCard(review: YelpReview) {
 
 private fun eventOfficialUrl(event: TravelEvent): String? {
     return listOf(
-        event.details["booking_url"],
+        event.detailValue(ATTR_BOOKING_URL, "booking_url"),
         event.details["tickets_url"],
-        event.details["yelp_menu_url"],
+        event.detailValue(ATTR_MENU_URL, "yelp_menu_url"),
+        event.detailValue(ATTR_YELP_URL),
         event.details["website"],
         event.details["url"]
     ).firstOrNull { !it.isNullOrBlank() }
@@ -905,12 +917,11 @@ private fun eventOfficialUrl(event: TravelEvent): String? {
 
 private fun eventMapsQuery(event: TravelEvent): String {
     return listOf(
-        event.details["address"],
+        event.detailValue(ATTR_BUSINESS_ADDRESS, "address"),
         event.details["location"],
         event.details["destination_airport"],
-        event.details["hotel_name"],
-        event.details["restaurant_name"],
-        event.details["activity_name"],
+        event.detailValue(ATTR_HOTEL_NAME, "hotel_name"),
+        event.detailValue(ATTR_BUSINESS_NAME, "restaurant_name", "activity_name"),
         event.details["title"],
         eventTitle(event)
     ).firstOrNull { !it.isNullOrBlank() } ?: eventTitle(event)
@@ -918,12 +929,12 @@ private fun eventMapsQuery(event: TravelEvent): String {
 
 private fun eventLocationLabel(event: TravelEvent): String {
     return listOf(
-        event.details["address"],
+        event.detailValue(ATTR_BUSINESS_ADDRESS, "address"),
         event.details["location"],
         event.details["destination_airport"],
         event.details["origin_airport"],
-        event.details["hotel_name"],
-        event.details["restaurant_name"]
+        event.detailValue(ATTR_HOTEL_NAME, "hotel_name"),
+        event.detailValue(ATTR_BUSINESS_NAME, "restaurant_name")
     ).firstOrNull { !it.isNullOrBlank() } ?: "Location information unavailable"
 }
 
@@ -932,7 +943,7 @@ private fun eventExperienceText(event: TravelEvent): String {
         event.details["description"],
         event.details["notes"],
         eventSubtitle(event).takeIf { it != "Tap to edit details" },
-        event.details["categories"],
+        event.detailValue(ATTR_CATEGORIES, "categories"),
         event.details["cuisine"]
     ).firstOrNull { !it.isNullOrBlank() }
         ?: "Open the editor to add notes, links, and more context for this event."
@@ -999,8 +1010,7 @@ private fun eventDurationSummary(event: TravelEvent): String {
 }
 
 private fun eventRatingLabel(event: TravelEvent, reviews: List<YelpReview>): String {
-    return event.details["overall_rating"]
-        ?: event.details["rating"]
+    return event.detailValue(ATTR_HOTEL_RATING, ATTR_AVERAGE_RATING, "overall_rating", "rating")
         ?: if (reviews.isNotEmpty()) {
             "%.1f".format(Locale.US, reviews.map { it.rating }.average())
         } else {
@@ -1009,7 +1019,7 @@ private fun eventRatingLabel(event: TravelEvent, reviews: List<YelpReview>): Str
 }
 
 private fun eventReviewCountLabel(event: TravelEvent, reviews: List<YelpReview>): String {
-    return event.details["review_count"]
+    return event.detailValue(ATTR_REVIEW_COUNT, "review_count")
         ?: event.details["reviews"]
         ?: if (reviews.isNotEmpty()) reviews.size.toString() else ""
 }

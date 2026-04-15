@@ -63,6 +63,15 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import coil.compose.AsyncImage
+import com.example.travelcents.data.trip.model.ATTR_AVERAGE_RATING
+import com.example.travelcents.data.trip.model.ATTR_BUSINESS_ADDRESS
+import com.example.travelcents.data.trip.model.ATTR_BUSINESS_NAME
+import com.example.travelcents.data.trip.model.ATTR_CHECK_IN_TIME
+import com.example.travelcents.data.trip.model.ATTR_CHECK_OUT_TIME
+import com.example.travelcents.data.trip.model.ATTR_HOTEL_NAME
+import com.example.travelcents.data.trip.model.ATTR_HOTEL_RATING
+import com.example.travelcents.data.trip.model.DETAIL_YELP_ID
+import com.example.travelcents.data.trip.model.firstNonBlank
 import com.example.travelcents.data.trip.model.EventOption
 import com.example.travelcents.data.trip.model.YelpReview
 import com.example.travelcents.ui.modules.defaultPlanTimeZoneId
@@ -131,12 +140,12 @@ fun CurrentPlanEditorDialog(
     var destinationAirport by remember(initialPlan) { mutableStateOf(initialPlan.existingDetails["destination_airport"].orEmpty()) }
     var totalPrice by remember(initialPlan) { mutableStateOf(initialPlan.existingDetails["total_price"].orEmpty()) }
     var tripSegment by remember(initialPlan) { mutableStateOf(initialPlan.existingDetails["trip_segment"].orEmpty()) }
-    var hotelName by remember(initialPlan) { mutableStateOf(initialPlan.existingDetails["hotel_name"].orEmpty()) }
-    var hotelAddress by remember(initialPlan) { mutableStateOf(initialPlan.existingDetails["address"].orEmpty()) }
-    var hotelRating by remember(initialPlan) { mutableStateOf(initialPlan.existingDetails["rating"].orEmpty()) }
-    var checkIn by remember(initialPlan) { mutableStateOf(initialPlan.existingDetails["check_in"].orEmpty()) }
-    var checkOut by remember(initialPlan) { mutableStateOf(initialPlan.existingDetails["check_out"].orEmpty()) }
-    var restaurantName by remember(initialPlan) { mutableStateOf(initialPlan.existingDetails["restaurant_name"].orEmpty()) }
+    var hotelName by remember(initialPlan) { mutableStateOf(initialPlan.existingDetails.firstNonBlank(ATTR_HOTEL_NAME, "hotel_name").orEmpty()) }
+    var hotelAddress by remember(initialPlan) { mutableStateOf(initialPlan.existingDetails.firstNonBlank(ATTR_BUSINESS_ADDRESS, "address").orEmpty()) }
+    var hotelRating by remember(initialPlan) { mutableStateOf(initialPlan.existingDetails.firstNonBlank(ATTR_HOTEL_RATING, ATTR_AVERAGE_RATING, "rating").orEmpty()) }
+    var checkIn by remember(initialPlan) { mutableStateOf(initialPlan.existingDetails.firstNonBlank(ATTR_CHECK_IN_TIME, "check_in", "check_in_time").orEmpty()) }
+    var checkOut by remember(initialPlan) { mutableStateOf(initialPlan.existingDetails.firstNonBlank(ATTR_CHECK_OUT_TIME, "check_out", "check_out_time").orEmpty()) }
+    var restaurantName by remember(initialPlan) { mutableStateOf(initialPlan.existingDetails.firstNonBlank(ATTR_BUSINESS_NAME, "restaurant_name").orEmpty()) }
     var cuisine by remember(initialPlan) { mutableStateOf(initialPlan.existingDetails["cuisine"].orEmpty()) }
 
     val canShowAlternatives = initialPlan.eventId != null && currentOptions.size > 1
@@ -478,11 +487,11 @@ fun CurrentPlanEditorDialog(
                     }
 
                     // Yelp reviews (shown always if yelp_id exists)
-                    val yelpId = initialPlan.existingDetails["yelp_id"].orEmpty()
+                    val yelpId = initialPlan.existingDetails[DETAIL_YELP_ID].orEmpty()
                     if (yelpId.isNotBlank()) {
                         Spacer(modifier = Modifier.height(24.dp))
                         EditorYelpReviews(
-                            rating = initialPlan.existingDetails["rating"],
+                            rating = initialPlan.existingDetails.firstNonBlank(ATTR_AVERAGE_RATING, ATTR_HOTEL_RATING, "rating"),
                             reviews = yelpReviews,
                             loading = reviewsLoading
                         )
@@ -542,14 +551,14 @@ fun CurrentPlanEditorDialog(
                                             applyPlanDetail("destination_airport", destinationAirport, planType == "flight")
                                             applyPlanDetail("total_price", totalPrice, planType == "flight")
                                             applyPlanDetail("trip_segment", tripSegment, planType == "flight")
-                                            applyPlanDetail("hotel_name", hotelName, planType == "hotel")
-                                            applyPlanDetail("address", hotelAddress, planType == "hotel")
-                                            applyPlanDetail("rating", hotelRating, planType == "hotel")
-                                            applyPlanDetail("check_in", checkIn, planType == "hotel")
-                                            applyPlanDetail("check_out", checkOut, planType == "hotel")
-                                            applyPlanDetail("restaurant_name", restaurantName.ifBlank { title.trim() }, planType == "restaurant" || planType == "dining" || planType == "food")
+                                            applyPlanDetail(ATTR_HOTEL_NAME, hotelName, planType == "hotel")
+                                            applyPlanDetail(ATTR_BUSINESS_ADDRESS, hotelAddress, planType == "hotel")
+                                            applyPlanDetail(ATTR_HOTEL_RATING, hotelRating, planType == "hotel")
+                                            applyPlanDetail(ATTR_CHECK_IN_TIME, checkIn, planType == "hotel")
+                                            applyPlanDetail(ATTR_CHECK_OUT_TIME, checkOut, planType == "hotel")
+                                            applyPlanDetail(ATTR_BUSINESS_NAME, restaurantName.ifBlank { title.trim() }, planType == "restaurant" || planType == "dining" || planType == "food")
                                             applyPlanDetail("cuisine", cuisine, planType == "restaurant" || planType == "dining" || planType == "food")
-                                            applyPlanDetail("activity_name", title.trim(), planType == "activity")
+                                            applyPlanDetail(ATTR_BUSINESS_NAME, title.trim(), planType == "activity")
                                         }
                                         onSave(
                                             initialPlan.copy(

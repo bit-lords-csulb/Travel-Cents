@@ -12,6 +12,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.example.travelcents.data.trip.model.displayName
 import com.example.travelcents.ui.theme.DeepSea2
 import com.example.travelcents.ui.theme.DeepSea3
 import com.example.travelcents.ui.theme.DeepSea5
@@ -120,12 +121,7 @@ fun CurrentTripOverlayHost(
                 .filter { it.eventId != eventId && it.type.equals(event.type, ignoreCase = true) }
                 .mapNotNull { other ->
                     eventOptions[other.eventId].orEmpty().firstOrNull { it.selected }?.let { opt ->
-                        when (other.type.lowercase(Locale.US)) {
-                            "hotel" -> opt.details["hotel_name"] ?: opt.details["name"]
-                            "restaurant", "dining", "food" -> opt.details["restaurant_name"] ?: opt.details["name"]
-                            "flight" -> null
-                            else -> opt.details["activity_name"] ?: opt.details["title"] ?: opt.details["name"]
-                        }
+                        if (other.type.lowercase(Locale.US) == "flight") null else opt.displayName(other.type)
                     }
                 }
                 .toSet()
