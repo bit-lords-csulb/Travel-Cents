@@ -120,18 +120,40 @@ Examples:
 - `com.example.travelcents.data.remote.SerpRepository` -> `com.example.travelcents.data.trip.remote.SerpRepository`
 - `com.example.travelcents.data.remote.LlmClient` -> `com.example.travelcents.data.ai.remote.LlmClient`
 
+Phase 2 follow-up:
+
+- `com.example.travelcents.data.auth.AuthModel` -> `com.example.travelcents.data.auth.AuthRepository`
+- `com.example.travelcents.data.social.FirestoreRepository` -> focused classes under `com.example.travelcents.data.social.repository`
+
 ## Phase 2 Candidates
 
 Do this only after Phase 1 compiles cleanly:
 
-- Rename `AuthModel` to `AuthRepository`
-- Split `FirestoreRepository` by domain:
+- [x] Rename `AuthModel` to `AuthRepository`
+- [x] Split `FirestoreRepository` by domain:
   - friends
   - groups
   - direct messages
-- Move UI packages from `ui/main/...` to `ui/feature/...`
-- Extract `Friend` from `FriendsPage.kt` into a proper social model package
-- Delete or replace legacy trip files after confirmed unused
+- [ ] Add a small shared social user repository for user display-name lookups used by chats
+- [ ] Move UI packages from `ui/main/...` to `ui/feature/...`
+- [x] Extract `Friend` from `FriendsPage.kt` into a proper social model package
+- [ ] Delete or replace legacy trip files after confirmed unused
+
+## Phase 2 Progress
+
+Completed in repo:
+
+- `data/auth/AuthRepository.kt` now replaces `AuthModel`
+- `data/social/repository/FriendsRepository.kt` owns friend-request and friend-list operations
+- `data/social/repository/GroupsRepository.kt` owns group and group-message operations
+- `data/social/repository/DirectMessagesRepository.kt` owns direct-chat and DM message operations
+- `data/social/repository/SocialUserRepository.kt` owns lightweight user display-name lookups for chat flows
+- Chat and friends view models were updated off the old monolithic repository
+- `data/social/FirestoreRepository.kt` was removed after imports were updated
+
+Verification:
+
+- `.\gradlew.bat :app:compileDebugKotlin` succeeded on April 14, 2026
 
 ## Done Criteria For Phase 1
 

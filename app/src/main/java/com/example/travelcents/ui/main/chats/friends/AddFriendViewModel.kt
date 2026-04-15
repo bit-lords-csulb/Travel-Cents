@@ -3,6 +3,7 @@ package com.example.travelcents.ui.main.chats.friends
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.travelcents.data.social.model.Friend
+import com.example.travelcents.data.social.repository.FriendsRepository
 import com.google.firebase.Firebase
 import com.google.firebase.auth.auth
 import com.google.firebase.firestore.firestore
@@ -15,6 +16,7 @@ class AddFriendViewModel : ViewModel() {
 
     private val auth = Firebase.auth
     private val db   = Firebase.firestore
+    private val friendsRepository = FriendsRepository()
 
     val currentUid: String get() = auth.currentUser?.uid ?: ""
 
@@ -130,36 +132,21 @@ class AddFriendViewModel : ViewModel() {
 
     private fun loadSentRequests() {
         if (currentUid.isEmpty()) return
-        db.collection("users").document(currentUid).collection("friends")
-            .whereEqualTo("direction", "sent")
-            .whereEqualTo("status", "pending")
-            .addSnapshotListener { snap, _ ->
-                _sentRequestUids.value = snap?.documents?.map { it.id }?.toSet() ?: emptySet()
-            }
+        friendsRepository.listenToSentRequests(currentUid) { sentRequestUids ->
+            _sentRequestUids.value = sentRequestUids
+        }
     }
 
     fun sendFriendRequest(theirUid: String) {
         if (currentUid.isEmpty()) return
-        val batch = db.batch()
-        batch.set(
-            db.collection("users").document(currentUid).collection("friends").document(theirUid),
-            mapOf("status" to "pending", "direction" to "sent")
-        )
-        batch.set(
-            db.collection("users").document(theirUid).collection("friends").document(currentUid),
-            mapOf("status" to "pending", "direction" to "received")
-        )
-        batch.commit().addOnSuccessListener {
+        friendsRepository.sendFriendRequest(currentUid, theirUid) {
             _sentRequestUids.value += theirUid
         }
     }
 
     fun cancelFriendRequest(theirUid: String) {
         if (currentUid.isEmpty()) return
-        val batch = db.batch()
-        batch.delete(db.collection("users").document(currentUid).collection("friends").document(theirUid))
-        batch.delete(db.collection("users").document(theirUid).collection("friends").document(currentUid))
-        batch.commit().addOnSuccessListener {
+        friendsRepository.cancelFriendRequest(currentUid, theirUid) {
             _sentRequestUids.value -= theirUid
         }
     }

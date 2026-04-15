@@ -2,9 +2,10 @@ package com.example.travelcents.ui.main.chats.chat
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
-import com.example.travelcents.data.social.FirestoreRepository
-import com.example.travelcents.data.social.model.Message
 import com.example.travelcents.data.social.model.Friend
+import com.example.travelcents.data.social.model.Message
+import com.example.travelcents.data.social.repository.DirectMessagesRepository
+import com.example.travelcents.data.social.repository.SocialUserRepository
 import com.google.firebase.Firebase
 import com.google.firebase.auth.auth
 import com.google.firebase.firestore.ListenerRegistration
@@ -14,7 +15,8 @@ import kotlinx.coroutines.flow.asStateFlow
 
 class DirectChatViewModel(
     private val friend: Friend,
-    private val repository: FirestoreRepository = FirestoreRepository()
+    private val userRepository: SocialUserRepository = SocialUserRepository(),
+    private val directMessagesRepository: DirectMessagesRepository = DirectMessagesRepository()
 ) : ViewModel() {
 
     private val auth = Firebase.auth
@@ -38,13 +40,13 @@ class DirectChatViewModel(
 
     private fun fetchCurrentUserName() {
         if (currentUid.isEmpty()) return
-        repository.fetchUser(currentUid) { name -> _currentName.value = name }
+        userRepository.fetchUserDisplayName(currentUid) { name -> _currentName.value = name }
     }
 
     // Find existing direct chat or create a new one, then start listening
     private fun resolveDirectChat() {
         if (currentUid.isEmpty()) return
-        repository.getOrCreateDirectChat(
+        directMessagesRepository.getOrCreateDirectChat(
             myUid = currentUid,
             theirUid = friend.uid
         ) { chatId ->
@@ -55,7 +57,7 @@ class DirectChatViewModel(
 
     private fun startListeningToMessages(chatId: String) {
         messagesListener?.remove()
-        messagesListener = repository.listenToDirectMessages(chatId) { messages ->
+        messagesListener = directMessagesRepository.listenToDirectMessages(chatId) { messages ->
             _messages.value = messages
         }
     }
@@ -67,7 +69,7 @@ class DirectChatViewModel(
         val chatId = _chatId.value
         if (text.isEmpty() || _currentName.value.isEmpty() || chatId.isEmpty()) return
 
-        repository.sendDirectMessage(
+        directMessagesRepository.sendDirectMessage(
             chatId     = chatId,
             text       = text,
             senderId   = currentUid,

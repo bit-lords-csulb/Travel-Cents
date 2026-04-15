@@ -2,9 +2,10 @@ package com.example.travelcents.ui.main.chats.chat
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.example.travelcents.data.social.FirestoreRepository
 import com.example.travelcents.data.social.model.DirectChatPreview
 import com.example.travelcents.data.social.model.Group
+import com.example.travelcents.data.social.repository.DirectMessagesRepository
+import com.example.travelcents.data.social.repository.GroupsRepository
 import com.google.firebase.Firebase
 import com.google.firebase.auth.auth
 import com.google.firebase.firestore.ListenerRegistration
@@ -17,7 +18,8 @@ import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.stateIn
 
 class ChatsViewModel(
-    private val repository: FirestoreRepository = FirestoreRepository()
+    private val groupsRepository: GroupsRepository = GroupsRepository(),
+    private val directMessagesRepository: DirectMessagesRepository = DirectMessagesRepository()
 ) : ViewModel() {
 
     private val auth = Firebase.auth
@@ -66,12 +68,12 @@ class ChatsViewModel(
         if (currentUid.isEmpty()) return
 
         groupsListener?.remove()
-        groupsListener = repository.listenToGroups(currentUid) { groups ->
+        groupsListener = groupsRepository.listenToGroups(currentUid) { groups ->
             _groups.value = groups
         }
 
         directChatsListener?.remove()
-        directChatsListener = repository.listenToDirectChatPreviews(currentUid) { chats ->
+        directChatsListener = directMessagesRepository.listenToDirectChatPreviews(currentUid) { chats ->
             android.util.Log.d("DirectChats", "got ${chats.size} chats")
             _directChats.value = chats
         }

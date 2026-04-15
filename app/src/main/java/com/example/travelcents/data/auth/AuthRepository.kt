@@ -2,23 +2,21 @@ package com.example.travelcents.data.auth
 
 import android.util.Log
 import com.google.firebase.auth.FirebaseAuth
+import com.google.firebase.auth.GoogleAuthProvider
 import com.google.firebase.firestore.FieldValue
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.SetOptions
 import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlin.coroutines.resume
-import com.google.firebase.auth.GoogleAuthProvider
 
-
-class AuthModel {
+class AuthRepository {
     private val auth: FirebaseAuth by lazy { FirebaseAuth.getInstance() }
     private val db = FirebaseFirestore.getInstance()
 
     companion object {
-        private const val TAG = "AuthModel"
+        private const val TAG = "AuthRepository"
     }
 
-    // Create a new account with email and password
     suspend fun createAccountWithEmailAndPassword(
         firstName: String,
         lastName: String,
@@ -51,7 +49,6 @@ class AuthModel {
             }
     }
 
-    // Save the user's information to Firestore DB
     private fun saveUserToFirestore(
         uid: String?,
         firstName: String,
@@ -90,7 +87,6 @@ class AuthModel {
             .addOnFailureListener { e -> onResult(false, e.message) }
     }
 
-    // Log in with email or username
     suspend fun signInWithEmailOrUsername(
         emailOrUsername: String,
         password: String
@@ -103,13 +99,9 @@ class AuthModel {
         return signInWithEmailAndPassword(email, password)
     }
 
-    // Resolve username to email — checks public usernames collection first,
-    // falls back to authenticated users collection for pre-migration accounts
-    // and writes the missing usernames entry on success.
     private suspend fun lookupEmailByUsername(username: String): Result<String> {
         val normalized = username.trim().lowercase()
 
-        // 1. Check the public usernames collection (works unauthenticated)
         val publicResult = suspendCancellableCoroutine<Result<String>> { continuation ->
             db.collection("usernames").document(normalized)
                 .get()
@@ -118,7 +110,7 @@ class AuthModel {
                     if (email != null) {
                         continuation.resume(Result.success(email))
                     } else {
-                        continuation.resume(Result.success(""))  // not found, signal fallback
+                        continuation.resume(Result.success(""))
                     }
                 }
                 .addOnFailureListener { e -> continuation.resume(Result.failure(e)) }
@@ -127,7 +119,6 @@ class AuthModel {
         publicResult.getOrNull()?.takeIf { it.isNotEmpty() }?.let { return Result.success(it) }
         if (publicResult.isFailure) return publicResult
 
-        // 2. Fallback: query authenticated users collection (existing accounts pre-migration)
         return suspendCancellableCoroutine { continuation ->
             db.collection("users")
                 .whereEqualTo("username", normalized)
@@ -136,7 +127,6 @@ class AuthModel {
                 .addOnSuccessListener { snapshot ->
                     val email = snapshot.documents.firstOrNull()?.getString("email")
                     if (email != null) {
-                        // Self-heal: write the missing usernames entry for next time
                         db.collection("usernames").document(normalized)
                             .set(mapOf("email" to email))
                         continuation.resume(Result.success(email))
@@ -150,7 +140,6 @@ class AuthModel {
         }
     }
 
-    // Log In
     suspend fun signInWithEmailAndPassword(
         email: String,
         password: String
@@ -165,11 +154,10 @@ class AuthModel {
             }
     }
 
-    // Sign out
     fun signOut() {
         auth.signOut()
     }
-    // Log in with Google ID Token
+
     suspend fun signInWithGoogle(idToken: String): Result<String> = suspendCancellableCoroutine { continuation ->
         val credential = GoogleAuthProvider.getCredential(idToken, null)
 
@@ -180,18 +168,15 @@ class AuthModel {
                     val isNewUser = task.result?.additionalUserInfo?.isNewUser ?: false
 
                     if (isNewUser && user != null) {
-                        // Extract names from Google Profile
                         val fullName = user.displayName ?: ""
                         val nameParts = fullName.split(" ", limit = 2)
                         val firstName = nameParts.getOrNull(0) ?: "Google"
                         val lastName = nameParts.getOrNull(1) ?: "User"
                         val profileImageUrl = user.photoUrl?.toString().orEmpty()
 
-                        // Generate a temporary username from email
                         val email = user.email ?: ""
                         val generatedUsername = email.substringBefore("@")
 
-                        // Save to Firestore using your existing helper
                         saveUserToFirestore(
                             uid = user.uid,
                             firstName = firstName,
@@ -241,10 +226,3 @@ class AuthModel {
             .addOnCompleteListener { onComplete() }
     }
 }
-
-
-
-
-
-
-

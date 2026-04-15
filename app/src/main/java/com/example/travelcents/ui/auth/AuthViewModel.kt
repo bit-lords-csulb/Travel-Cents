@@ -3,7 +3,7 @@ package com.example.travelcents.ui.auth
 import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.example.travelcents.data.auth.AuthModel
+import com.example.travelcents.data.auth.AuthRepository
 import com.google.firebase.FirebaseNetworkException
 import com.google.firebase.FirebaseTooManyRequestsException
 import com.google.firebase.auth.FirebaseAuthInvalidCredentialsException
@@ -16,7 +16,7 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 
 class AuthViewModel : ViewModel() {
-    private val authModel = AuthModel()
+    private val authRepository = AuthRepository()
 
     companion object {
         private const val MIN_PASSWORD_LENGTH = 8
@@ -51,7 +51,7 @@ class AuthViewModel : ViewModel() {
             _errorMessage.value = null
             _statusMessage.value = null
 
-            val result = authModel.createAccountWithEmailAndPassword(firstName, lastName, username, email, password)
+            val result = authRepository.createAccountWithEmailAndPassword(firstName, lastName, username, email, password)
 
             _isLoading.value = false
             result.fold(
@@ -75,7 +75,7 @@ class AuthViewModel : ViewModel() {
             _isLoading.value = true
             _errorMessage.value = null
 
-            val result = authModel.signInWithEmailOrUsername(emailOrUsername, password)
+            val result = authRepository.signInWithEmailOrUsername(emailOrUsername, password)
 
             _isLoading.value = false
             result.fold(
@@ -90,7 +90,7 @@ class AuthViewModel : ViewModel() {
 
     // Log out and reset all state
     fun signOut() {
-        authModel.signOut()
+        authRepository.signOut()
         _isLoggedIn.value = false
         _isAccountCreated.value = false
         _errorMessage.value = null
@@ -171,7 +171,7 @@ class AuthViewModel : ViewModel() {
             _errorMessage.value = null
             _statusMessage.value = null
 
-            val result = authModel.signInWithGoogle(idToken)
+            val result = authRepository.signInWithGoogle(idToken)
 
             _isLoading.value = false
             result.fold(
