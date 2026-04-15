@@ -121,16 +121,16 @@ Related plan: [EVENT_DETAILS_MEDIA_REFACTOR_PLAN.md](C:\Users\Zaher503\AndroidSt
 
 ### Checklist
 
-- [ ] Expand `YelpBusiness` mapping usage to read supported Base-plan fields from Business Details
-- [ ] Add a shared enrichment function for Yelp-backed events
+- [x] Expand `YelpBusiness` mapping usage to read supported Base-plan fields from Business Details
+- [x] Add a shared enrichment function for Yelp-backed events
 - [ ] Use that shared enrichment path in:
-  - [ ] `CurrentTripViewModel`
-  - [ ] `ItineraryViewModel`
-- [ ] Persist enriched Yelp attributes back to Firestore
-- [ ] Persist any supported shared media fields back to Firestore
+  - [x] `CurrentTripViewModel`
+  - [x] `ItineraryViewModel`
+- [x] Persist enriched Yelp attributes back to Firestore
+- [x] Persist any supported shared media fields back to Firestore
 - [ ] Ensure enrichment happens from a predictable trigger:
-  - [ ] background on trip load for visible Yelp events
-  - [ ] fallback on card open if missing
+  - [x] background on trip load for visible Yelp events
+  - [x] fallback on card open if missing
 - [ ] Verify enrichment survives:
   - [ ] app reload
   - [ ] trip switch

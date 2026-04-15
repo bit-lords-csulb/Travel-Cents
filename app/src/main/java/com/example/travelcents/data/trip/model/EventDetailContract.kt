@@ -33,6 +33,7 @@ const val ATTR_LONGITUDE = "attr_longitude"
 const val ATTR_STATIC_MAP_URL = "attr_static_map_url"
 const val ATTR_STATIC_MAP_PROVIDER = "attr_static_map_provider"
 const val ATTR_PRICE_TIER = "attr_price_tier"
+const val ATTR_YELP_DETAIL_ENRICHED = "attr_yelp_detail_enriched"
 const val DETAIL_YELP_ID = "yelp_id"
 
 fun Map<String, String>.firstNonBlank(vararg keys: String): String? {

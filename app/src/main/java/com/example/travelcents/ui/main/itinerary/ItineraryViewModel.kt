@@ -9,6 +9,7 @@ import com.example.travelcents.data.trip.model.TravelEvent
 import com.example.travelcents.data.trip.model.YelpReview
 import com.example.travelcents.data.trip.model.ATTR_BUSINESS_NAME
 import com.example.travelcents.data.trip.model.ATTR_HOTEL_NAME
+import com.example.travelcents.data.trip.model.DETAIL_YELP_ID
 import com.example.travelcents.data.trip.model.detailValue
 import com.example.travelcents.data.trip.remote.YelpRepository
 import com.example.travelcents.ui.main.current.CurrentTripUiState
@@ -57,6 +58,7 @@ class ItineraryViewModel : ViewModel() {
 
     private val _reviewsLoading = MutableStateFlow<Set<String>>(emptySet())
     val reviewsLoading: StateFlow<Set<String>> = _reviewsLoading.asStateFlow()
+    private val _yelpEnrichmentInFlight = MutableStateFlow<Set<String>>(emptySet())
 
     private val _shareTargets = MutableStateFlow<List<ShareTarget>>(emptyList())
     val shareTargets: StateFlow<List<ShareTarget>> = _shareTargets.asStateFlow()
@@ -82,6 +84,7 @@ class ItineraryViewModel : ViewModel() {
         _rejectedOptions.value = emptyMap()
         _yelpReviews.value = emptyMap()
         _reviewsLoading.value = emptySet()
+        _yelpEnrichmentInFlight.value = emptySet()
         _shareTargets.value = emptyList()
         _uiState.value = CurrentTripUiState(
             isLoading = isLoading,
@@ -206,6 +209,7 @@ class ItineraryViewModel : ViewModel() {
                     _uiState.update { state ->
                         state.copy(events = enrichedEvents)
                     }
+                    prefetchYelpEnrichment(enrichedEvents)
                 }
             }
     }
@@ -253,6 +257,99 @@ class ItineraryViewModel : ViewModel() {
             _yelpReviews.update { it + (yelpId to reviews) }
             _reviewsLoading.update { it - yelpId }
         }
+    }
+
+    fun ensureYelpEventEnriched(
+        eventId: String,
+        forceRefresh: Boolean = false
+    ) {
+        val uid = auth.currentUser?.uid ?: return
+        val tripId = _uiState.value.currentTripId ?: return
+        val event = _uiState.value.events.firstOrNull { it.eventId == eventId } ?: return
+        val options = _eventOptions.value[eventId].orEmpty()
+        val yelpId = options.firstOrNull { it.selected }
+            ?.detailValue(DETAIL_YELP_ID)
+            ?.takeIf { it.isNotBlank() }
+            ?: event.detailValue(DETAIL_YELP_ID)?.takeIf { it.isNotBlank() }
+            ?: return
+
+        if (!forceRefresh && yelpId in _yelpEnrichmentInFlight.value) return
+        if (!forceRefresh && !YelpRepository.needsEventEnrichment(event, options)) return
+
+        _yelpEnrichmentInFlight.update { it + yelpId }
+        viewModelScope.launch {
+            try {
+                val result = YelpRepository.enrichYelpBackedEvent(
+                    event = event,
+                    options = options,
+                    forceRefresh = forceRefresh
+                ) ?: return@launch
+
+                applyEnrichedEventState(eventId, result.event, result.options)
+                persistYelpEnrichment(uid, tripId, eventId, result)
+            } catch (e: Exception) {
+                Log.e("ItineraryViewModel", "Failed to enrich Yelp event", e)
+            } finally {
+                _yelpEnrichmentInFlight.update { it - yelpId }
+            }
+        }
+    }
+
+    private fun prefetchYelpEnrichment(events: List<TravelEvent>) {
+        events.forEach { event ->
+            ensureYelpEventEnriched(event.eventId)
+        }
+    }
+
+    private fun applyEnrichedEventState(
+        eventId: String,
+        enrichedEvent: TravelEvent,
+        enrichedOptions: List<EventOption>
+    ) {
+        val selectedOption = enrichedOptions.firstOrNull { it.selected }
+        val eventWithOptions = enrichedEvent.copy(options = enrichedOptions)
+        val mergedEvent = if (selectedOption != null) {
+            applySelectedOption(eventWithOptions, selectedOption).copy(options = enrichedOptions)
+        } else {
+            eventWithOptions
+        }
+
+        _eventOptions.update { it + (eventId to enrichedOptions) }
+        _uiState.update { state ->
+            state.copy(
+                events = sortPlanEvents(
+                    state.events.map { event ->
+                        if (event.eventId == eventId) mergedEvent else event
+                    }
+                )
+            )
+        }
+    }
+
+    private suspend fun persistYelpEnrichment(
+        uid: String,
+        tripId: String,
+        eventId: String,
+        result: YelpRepository.YelpEventEnrichmentResult
+    ) {
+        val eventRef = db.collection("users")
+            .document(uid)
+            .collection("trips")
+            .document(tripId)
+            .collection("events")
+            .document(eventId)
+
+        db.runBatch { batch ->
+            batch.set(eventRef, result.event.toFirestoreMap())
+            result.options
+                .filter { it.optionId in result.updatedOptionIds }
+                .forEach { option ->
+                    batch.set(
+                        eventRef.collection("options").document(option.optionId),
+                        option.toMap()
+                    )
+                }
+        }.await()
     }
 
     fun fetchShareTargets() {
@@ -405,7 +502,10 @@ class ItineraryViewModel : ViewModel() {
             } catch (e: Exception) {
                 Log.e("ItineraryViewModel", "Failed to select option", e)
                 _uiState.update { it.copy(errorMessage = e.message ?: "Failed to update selection.") }
+                return@launch
             }
+
+            ensureYelpEventEnriched(eventId)
         }
     }
 
