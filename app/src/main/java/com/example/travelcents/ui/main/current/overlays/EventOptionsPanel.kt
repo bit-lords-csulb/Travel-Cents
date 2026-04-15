@@ -40,7 +40,11 @@ private fun formatDurationMinutes(rawMinutes: String?): String? {
     if (totalMinutes <= 0) return null
     val hours = totalMinutes / 60
     val minutes = totalMinutes % 60
-    return if (hours > 0) "${hours}h ${minutes}m" else "${minutes}m"
+    return when {
+        hours <= 0 -> "${minutes}m"
+        minutes == 0 -> "${hours}h"
+        else -> "${hours}h ${minutes}m"
+    }
 }
 
 // Format price/rating for each event type
@@ -49,7 +53,9 @@ private fun formatOptionSubtitle(event: TravelEvent, opt: EventOption): String {
         "flight" -> {
             val price = opt.details["total_price"] ?: opt.details["price"] ?: ""
             val cabin = opt.details["cabin_class"] ?: "Economy"
-            val duration = formatDurationMinutes(opt.details["total_duration"] ?: opt.details["duration"]) ?: ""
+            val duration = formatDurationMinutes(
+                opt.details["flight_duration_min"] ?: opt.details["total_duration"] ?: opt.details["duration"]
+            ) ?: ""
             listOfNotNull(
                 if (price.isNotBlank()) "\$$price" else null,
                 cabin,

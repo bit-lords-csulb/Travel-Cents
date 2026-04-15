@@ -17,6 +17,7 @@ private val displayHourFormatter: DateTimeFormatter = DateTimeFormatter.ofPatter
 private val tripDateFormatter: DateTimeFormatter = DateTimeFormatter.ofPattern("MMM d", Locale.US)
 private val itineraryHeaderFormatter: DateTimeFormatter = DateTimeFormatter.ofPattern("EEEE, MMMM d", Locale.US)
 private val longDayFormatter: DateTimeFormatter = DateTimeFormatter.ofPattern("MMMM d", Locale.US)
+private val fullDayFormatter: DateTimeFormatter = DateTimeFormatter.ofPattern("EEEE", Locale.US)
 private val shortDayFormatter: DateTimeFormatter = DateTimeFormatter.ofPattern("EEE", Locale.US)
 
 private val flexibleTimeFormatters: List<DateTimeFormatter> = listOf(
@@ -122,6 +123,10 @@ fun formatLongDayLabel(rawDate: String): String {
 
 fun formatDayOfWeekShort(rawDate: String): String {
     return parseIsoDate(rawDate)?.format(shortDayFormatter)?.uppercase(Locale.US) ?: rawDate
+}
+
+fun formatDayOfWeekFull(rawDate: String): String {
+    return parseIsoDate(rawDate)?.format(fullDayFormatter)?.uppercase(Locale.US) ?: rawDate
 }
 
 fun formatMonthDayCompact(rawDate: String): String {

@@ -22,6 +22,10 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.tasks.await
+import java.time.Duration
+import java.time.LocalDate
+import java.time.LocalTime
+import java.time.format.DateTimeFormatter
 
 enum class GenerationStep {
     IDLE,
@@ -150,36 +154,64 @@ class NewTripViewModel(application: Application) : AndroidViewModel(application)
                 val hotelTotal = hotelPerNight * itinerary.durationDays
                 val remainingBudget = if (budget > 0) maxOf(0.0, budget - flightPrice - hotelTotal) else 0.0
 
-                val tripDates = generateTripDates(request.dateFrom, itinerary.durationDays)
+                val outboundFlight = realFlights.firstOrNull { it.details["trip_segment"] == "outbound" }
+                val flightArrivalDate = outboundFlight?.details?.get("arrival_date")
+                    ?.takeIf { it.isNotBlank() }
+                    ?: request.dateFrom
+                val minimumStartTime = minimumActivityStartTime(outboundFlight, request.dateFrom)
+                val tripDates = generateActivityDates(request.dateFrom, request.dateTo, flightArrivalDate)
 
                 // Step 3: Yelp restaurants — 1 pooled call, distributed round-robin across days
                 _generationStep.value = GenerationStep.FINDING_RESTAURANTS
                 _uiState.value = TripUiState.Loading(YELP_RESTAURANTS_MESSAGES.random())
-                val restaurantPoolTarget = tripDates.size * 5
-                val restaurantPool = YelpRepository.fetchRestaurantPool(
-                    location = itinerary.destination,
-                    targetCount = restaurantPoolTarget
-                )
-                val restaurantEvents = YelpRepository.distributePoolToEvents(
-                    restaurantPool, tripDates, "restaurant", itinerary.itineraryId
-                )
+                val restaurantEvents = if (tripDates.isEmpty()) {
+                    emptyList()
+                } else {
+                    val restaurantPoolTarget = tripDates.size * 5
+                    val restaurantPool = YelpRepository.fetchRestaurantPool(
+                        location = itinerary.destination,
+                        targetCount = restaurantPoolTarget
+                    )
+                    deferSyntheticEvents(
+                        YelpRepository.distributePoolToEvents(
+                        restaurantPool, tripDates, "restaurant", itinerary.itineraryId
+                        ),
+                        flightArrivalDate,
+                        minimumStartTime
+                    )
+                }
 
                 // Step 4: Yelp activities (1 pooled call) + Yelp events (full trip range), in parallel
                 _generationStep.value = GenerationStep.FINDING_ACTIVITIES
                 _uiState.value = TripUiState.Loading(YELP_ACTIVITIES_MESSAGES.random())
-                val activityPoolDeferred = async { YelpRepository.fetchActivityPool(itinerary.destination) }
-                val yelpEventsDeferred = async {
-                    YelpRepository.searchEvents(
-                        location = itinerary.destination,
-                        startDate = request.dateFrom,
-                        endDate = request.dateTo,
-                        itineraryId = itinerary.itineraryId
+                val activityEvents: List<TravelEvent>
+                val localEvents: List<TravelEvent>
+                if (tripDates.isEmpty()) {
+                    activityEvents = emptyList()
+                    localEvents = emptyList()
+                } else {
+                    val activityPoolDeferred = async { YelpRepository.fetchActivityPool(itinerary.destination) }
+                    val yelpEventsDeferred = async {
+                        YelpRepository.searchEvents(
+                            location = itinerary.destination,
+                            startDate = flightArrivalDate,
+                            endDate = request.dateTo,
+                            itineraryId = itinerary.itineraryId
+                        )
+                    }
+                    activityEvents = deferSyntheticEvents(
+                        YelpRepository.distributePoolToEvents(
+                            activityPoolDeferred.await(), tripDates, "activity", itinerary.itineraryId
+                        ),
+                        flightArrivalDate,
+                        minimumStartTime
+                    )
+                    localEvents = filterEventsBeforeTime(
+                        yelpEventsDeferred.await(),
+                        flightArrivalDate,
+                        minimumStartTime
                     )
                 }
-                val activityEvents = YelpRepository.distributePoolToEvents(
-                    activityPoolDeferred.await(), tripDates, "activity", itinerary.itineraryId
-                )
-                val localEvents = yelpEventsDeferred.await()
 
                 val allEvents = realFlights + realHotels + restaurantEvents + activityEvents + localEvents
                 val linkedItinerary = itinerary.copy(eventIds = allEvents.map { it.eventId })
@@ -248,28 +280,89 @@ class NewTripViewModel(application: Application) : AndroidViewModel(application)
         interests = if (item in interests) interests - item else interests + item
     }
 
-    // Generates a list of YYYY-MM-DD strings for each day of the trip
-    private fun generateTripDates(dateFrom: String, durationDays: Int): List<String> {
-        return try {
-            val parts = dateFrom.split("-")
-            val year = parts[0].toInt()
-            val month = parts[1].toInt() - 1 // Calendar months are 0-based
-            val day = parts[2].toInt()
-            val cal = java.util.Calendar.getInstance()
-            cal.set(year, month, day)
-            (0 until durationDays).map {
-                val y = cal.get(java.util.Calendar.YEAR)
-                val m = cal.get(java.util.Calendar.MONTH) + 1
-                val d = cal.get(java.util.Calendar.DAY_OF_MONTH)
-                cal.add(java.util.Calendar.DAY_OF_MONTH, 1)
-                "%04d-%02d-%02d".format(y, m, d)
+    private fun generateActivityDates(
+        dateFrom: String,
+        dateTo: String,
+        firstActivityDate: String
+    ): List<String> {
+        val tripStart = parseTripDate(dateFrom) ?: return emptyList()
+        val tripEnd = parseTripDate(dateTo) ?: return emptyList()
+        if (tripEnd.isBefore(tripStart)) return emptyList()
+
+        val requestedStart = parseTripDate(firstActivityDate) ?: tripStart
+        val activityStart = if (requestedStart.isBefore(tripStart)) tripStart else requestedStart
+        if (activityStart.isAfter(tripEnd)) return emptyList()
+
+        return generateSequence(activityStart) { current ->
+            current.plusDays(1).takeIf { !it.isAfter(tripEnd) }
+        }.map { it.format(DateTimeFormatter.ISO_LOCAL_DATE) }
+            .toList()
+    }
+
+    private fun parseTripDate(rawDate: String): LocalDate? {
+        return runCatching { LocalDate.parse(rawDate, DateTimeFormatter.ISO_LOCAL_DATE) }.getOrNull()
+    }
+
+    private fun minimumActivityStartTime(outboundFlight: TravelEvent?, departureDate: String): String? {
+        if (outboundFlight == null) return null
+        val arrivalDate = outboundFlight.details["arrival_date"]
+            ?.takeIf { it.isNotBlank() }
+            ?: outboundFlight.date
+        if (arrivalDate != departureDate) return null
+
+        val arrivalTime = outboundFlight.details["arrival_time"]
+            ?.takeIf { it.isNotBlank() }
+            ?: outboundFlight.endTime.takeIf { it.isNotBlank() }
+            ?: return null
+
+        return parseTripTime(arrivalTime)
+            ?.plusHours(2)
+            ?.format(TRIP_TIME_FORMATTER)
+    }
+
+    private fun deferSyntheticEvents(
+        events: List<TravelEvent>,
+        targetDate: String,
+        minimumStartTime: String?
+    ): List<TravelEvent> {
+        val minTime = parseTripTime(minimumStartTime) ?: return events
+        return events.map { event ->
+            if (event.date != targetDate) return@map event
+
+            val start = parseTripTime(event.startTime) ?: return@map event
+            if (!start.isBefore(minTime)) return@map event
+
+            val end = parseTripTime(event.endTime)
+            val durationMinutes = if (end != null && end.isAfter(start)) {
+                Duration.between(start, end).toMinutes()
+            } else {
+                120L
             }
-        } catch (_: Exception) {
-            emptyList()
+            event.copy(
+                startTime = minTime.format(TRIP_TIME_FORMATTER),
+                endTime = minTime.plusMinutes(durationMinutes).format(TRIP_TIME_FORMATTER)
+            )
         }
     }
 
+    private fun filterEventsBeforeTime(
+        events: List<TravelEvent>,
+        targetDate: String,
+        minimumStartTime: String?
+    ): List<TravelEvent> {
+        val minTime = parseTripTime(minimumStartTime) ?: return events
+        return events.filterNot { event ->
+            event.date == targetDate && (parseTripTime(event.startTime)?.isBefore(minTime) == true)
+        }
+    }
+
+    private fun parseTripTime(rawTime: String?): LocalTime? {
+        val value = rawTime?.takeIf { it.isNotBlank() } ?: return null
+        return runCatching { LocalTime.parse(value, TRIP_TIME_FORMATTER) }.getOrNull()
+    }
+
     companion object {
+        private val TRIP_TIME_FORMATTER = DateTimeFormatter.ofPattern("HH:mm")
         private val LLM_ITINERARY_MESSAGES = listOf(
             "Asking the AI planner to map out your trip...",
             "The AI planner is crafting your itinerary...",

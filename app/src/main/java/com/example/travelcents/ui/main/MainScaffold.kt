@@ -12,12 +12,10 @@ import androidx.compose.runtime.getValue
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.compose.ui.Modifier
 import androidx.navigation.NavGraph.Companion.findStartDestination
-import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
-import androidx.navigation.navArgument
 import com.example.travelcents.ui.components.MainBottomNavBar
 import com.example.travelcents.ui.main.aichat.AiTripChatPage
 import com.example.travelcents.ui.main.chats.chat.ChatsScreen
@@ -54,8 +52,6 @@ object MainRoutes {
     const val SETTINGS = "settings"
 
     const val AI_TRIP_CHAT = "ai_trip_chat"
-    const val FINAL_PLAN = "final_plan"
-    const val FINAL_PLAN_BY_ID = "final_plan/{tripId}"
 }
 
 private val bottomNavRoutes = setOf(
@@ -79,13 +75,12 @@ private val bottomNavRoutes = setOf(
 private fun shouldShowBottomNav(route: String): Boolean {
     return route in bottomNavRoutes ||
         route.startsWith("${MainRoutes.CURRENT}/") ||
-        route.startsWith(MainRoutes.NEW_TRIP) ||
-        route.startsWith("final_plan")
+        route.startsWith(MainRoutes.NEW_TRIP)
 }
 
 private fun selectedBottomRoute(route: String): String {
     return when {
-        route == MainRoutes.CURRENT || route.startsWith("${MainRoutes.CURRENT}/") || route.startsWith("final_plan") ->
+        route == MainRoutes.CURRENT || route.startsWith("${MainRoutes.CURRENT}/") ->
             MainRoutes.CURRENT
         route == MainRoutes.NEW_TRIP || route.startsWith(MainRoutes.NEW_TRIP) || route == MainRoutes.AI_TRIP_CHAT ->
             MainRoutes.NEW_TRIP
@@ -280,26 +275,6 @@ fun MainScaffold(modifier: Modifier = Modifier, onLogout: () -> Unit = {}) {
                         modifier = Modifier.fillMaxSize(),
                         onBackClick = { navController.popBackStack() }
                     )
-                }
-                composable(MainRoutes.FINAL_PLAN) {
-                    LaunchedEffect(Unit) {
-                        currentTripViewModel.loadTrip()
-                        navController.navigate(MainRoutes.CURRENT_ITINERARY) {
-                            popUpTo(MainRoutes.HOME) { inclusive = false }
-                        }
-                    }
-                }
-                composable(
-                    route = MainRoutes.FINAL_PLAN_BY_ID,
-                    arguments = listOf(navArgument("tripId") { type = NavType.StringType })
-                ) { backStackEntry ->
-                    val tripId = backStackEntry.arguments?.getString("tripId")
-                    LaunchedEffect(tripId) {
-                        currentTripViewModel.loadTrip(tripId)
-                        navController.navigate(MainRoutes.CURRENT_ITINERARY) {
-                            popUpTo(MainRoutes.HOME) { inclusive = false }
-                        }
-                    }
                 }
             }
         }
