@@ -449,6 +449,29 @@ class CurrentTripViewModel : ViewModel() {
         }
     }
 
+    // Set of yelpIds whose photos have already been fetched this session
+    private val _photosFetchedYelpIds = MutableStateFlow<Set<String>>(emptySet())
+
+    fun fetchYelpPhotos(yelpId: String, eventId: String) {
+        if (yelpId.isBlank() || yelpId in _photosFetchedYelpIds.value) return
+        val event = _uiState.value.events.firstOrNull { it.eventId == eventId } ?: return
+        // Skip if the event already has multiple photos
+        if (event.photoUrls.size > 1) return
+
+        _photosFetchedYelpIds.update { it + yelpId }
+        viewModelScope.launch {
+            val detail = YelpRepository.getBusinessDetail(yelpId) ?: return@launch
+            val photos = detail.photos.orEmpty().filter { it.isNotBlank() }
+            if (photos.isEmpty()) return@launch
+
+            val updatedEvents = _uiState.value.events.map { e ->
+                if (e.eventId == eventId) e.copy(photoUrls = photos) else e
+            }
+            _events.value = updatedEvents
+            _uiState.update { it.copy(events = updatedEvents) }
+        }
+    }
+
     private fun fetchTripMembers(tripId: String) {
         viewModelScope.launch {
             try {

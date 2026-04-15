@@ -11,8 +11,8 @@ import com.example.travelcents.data.ImageCacheManager
 import com.example.travelcents.data.model.Itinerary
 import com.example.travelcents.data.model.TravelEvent
 import com.example.travelcents.data.model.TravelRequest
-import com.example.travelcents.data.remote.GroqRepository
 import com.example.travelcents.data.remote.SerpRepository
+import com.example.travelcents.data.remote.TripPlannerRepository
 import com.example.travelcents.data.remote.YelpRepository
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FirebaseFirestore
@@ -129,10 +129,10 @@ class NewTripViewModel(application: Application) : AndroidViewModel(application)
 
         viewModelScope.launch {
             try {
-                // Step 1: Groq generates itinerary metadata + IATA codes
+                // Step 1: AI planner generates itinerary metadata + IATA codes
                 _generationStep.value = GenerationStep.CRAFTING_ITINERARY
-                _uiState.value = TripUiState.Loading(GROQ_ITINERARY_MESSAGES.random())
-                val itinerary = GroqRepository.generateItinerary(request)
+                _uiState.value = TripUiState.Loading(LLM_ITINERARY_MESSAGES.random())
+                val itinerary = TripPlannerRepository.generateItinerary(request)
 
                 // Step 2: Flights + hotels in parallel
                 _generationStep.value = GenerationStep.SEARCHING_FLIGHTS
@@ -270,11 +270,11 @@ class NewTripViewModel(application: Application) : AndroidViewModel(application)
     }
 
     companion object {
-        private val GROQ_ITINERARY_MESSAGES = listOf(
-            "Asking Groq to plan your trip...",
-            "Groq is crafting your itinerary...",
-            "Generating trip structure with Groq...",
-            "Consulting Groq for travel ideas..."
+        private val LLM_ITINERARY_MESSAGES = listOf(
+            "Asking the AI planner to map out your trip...",
+            "The AI planner is crafting your itinerary...",
+            "Generating trip structure with the itinerary model...",
+            "Consulting the AI planner for travel ideas..."
         )
         private val SERP_FLIGHTS_MESSAGES = listOf(
             "Checking flight availability...",
