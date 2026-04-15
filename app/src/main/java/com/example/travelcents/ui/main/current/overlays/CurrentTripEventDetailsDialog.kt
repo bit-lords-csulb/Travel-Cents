@@ -428,7 +428,7 @@ private fun QuickActionButton(
             .then(containerModifier)
             .clip(CircleShape)
             .clickable(onClick = onClick)
-            .padding(horizontal = 18.dp, vertical = 16.dp),
+            .padding(horizontal = 12.dp, vertical = 14.dp),
         horizontalArrangement = Arrangement.Center,
         verticalAlignment = Alignment.CenterVertically
     ) {
@@ -437,14 +437,13 @@ private fun QuickActionButton(
             contentDescription = null,
             tint = if (filled) DetailBackground else DetailPrimary
         )
-        Spacer(modifier = Modifier.width(8.dp))
+        Spacer(modifier = Modifier.width(6.dp))
         Text(
             text = label,
             color = if (filled) DetailBackground else DetailPrimary,
-            fontSize = 15.sp,
+            fontSize = 13.sp,
             fontWeight = FontWeight.Bold,
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis
+            softWrap = false
         )
     }
 }
