@@ -2,9 +2,9 @@ package com.example.travelcents.ui.main.chats.chat
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
-import com.example.travelcents.data.FirestoreRepository
-import com.example.travelcents.data.model.Message
-import com.example.travelcents.data.model.Group
+import com.example.travelcents.data.social.FirestoreRepository
+import com.example.travelcents.data.social.model.Message
+import com.example.travelcents.data.social.model.Group
 import com.google.firebase.Firebase
 import com.google.firebase.auth.auth
 import com.google.firebase.firestore.ListenerRegistration

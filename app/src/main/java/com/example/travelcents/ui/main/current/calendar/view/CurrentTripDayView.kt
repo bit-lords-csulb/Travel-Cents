@@ -44,7 +44,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.example.travelcents.data.model.TravelEvent
+import com.example.travelcents.data.trip.model.TravelEvent
 import com.example.travelcents.ui.main.current.calendar.EventLayoutInfo
 import com.example.travelcents.ui.main.current.calendar.ScheduleWindow
 import com.example.travelcents.ui.main.current.calendar.buildEventLayouts
@@ -378,3 +378,4 @@ private fun BoxScope.ScheduleEventCard(
         }
     }
 }
+

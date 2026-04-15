@@ -1,6 +1,6 @@
 package com.example.travelcents.ui.modules
 
-import com.example.travelcents.data.model.TravelEvent
+import com.example.travelcents.data.trip.model.TravelEvent
 import java.time.LocalDate
 import java.time.LocalTime
 import java.time.ZoneId
@@ -208,3 +208,4 @@ fun sortEventsForCalendar(events: List<TravelEvent>): List<TravelEvent> {
         )
     )
 }
+

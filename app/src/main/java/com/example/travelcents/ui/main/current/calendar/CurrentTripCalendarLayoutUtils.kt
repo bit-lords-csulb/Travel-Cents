@@ -1,6 +1,6 @@
 package com.example.travelcents.ui.main.current.calendar
 
-import com.example.travelcents.data.model.TravelEvent
+import com.example.travelcents.data.trip.model.TravelEvent
 import com.example.travelcents.ui.main.current.eventTitle
 import com.example.travelcents.ui.modules.formatMinutes
 import com.example.travelcents.ui.modules.formatTripDate
@@ -276,3 +276,4 @@ fun buildScheduleWindow(
         endHour = max(endHour, startHour + 6)
     )
 }
+

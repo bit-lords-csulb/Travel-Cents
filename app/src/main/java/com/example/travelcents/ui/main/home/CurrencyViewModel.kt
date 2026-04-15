@@ -6,8 +6,8 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
-import com.example.travelcents.data.local.CurrencyRateCache
-import com.example.travelcents.data.remote.CurrencyApiService
+import com.example.travelcents.data.trip.local.CurrencyRateCache
+import com.example.travelcents.data.trip.remote.CurrencyApiService
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch

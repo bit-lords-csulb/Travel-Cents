@@ -3,11 +3,11 @@ package com.example.travelcents.ui.main.current
 import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.example.travelcents.data.model.EventOption
-import com.example.travelcents.data.model.Itinerary
-import com.example.travelcents.data.model.TravelEvent
-import com.example.travelcents.data.model.YelpReview
-import com.example.travelcents.data.remote.YelpRepository
+import com.example.travelcents.data.trip.model.EventOption
+import com.example.travelcents.data.trip.model.Itinerary
+import com.example.travelcents.data.trip.model.TravelEvent
+import com.example.travelcents.data.trip.model.YelpReview
+import com.example.travelcents.data.trip.remote.YelpRepository
 import com.example.travelcents.ui.modules.defaultPlanTimeZoneId
 import com.example.travelcents.ui.modules.normalizeDate
 import com.example.travelcents.ui.modules.normalizeTime
@@ -1031,3 +1031,4 @@ class CurrentTripViewModel : ViewModel() {
         super.onCleared()
     }
 }
+

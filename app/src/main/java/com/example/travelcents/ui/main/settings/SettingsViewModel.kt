@@ -2,7 +2,7 @@ package com.example.travelcents.ui.main.settings
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.example.travelcents.data.UserProfileRepository
+import com.example.travelcents.data.user.UserProfileRepository
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FirebaseFirestore
 import kotlinx.coroutines.flow.collect
@@ -88,3 +88,4 @@ class SettingsViewModel : ViewModel() {
             .addOnFailureListener { e -> onError(e.message ?: "Delete failed") }
     }
 }
+

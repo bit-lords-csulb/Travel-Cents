@@ -60,9 +60,9 @@ import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import androidx.core.net.toUri
 import coil.compose.AsyncImage
-import com.example.travelcents.data.model.EventOption
-import com.example.travelcents.data.model.TravelEvent
-import com.example.travelcents.data.model.YelpReview
+import com.example.travelcents.data.trip.model.EventOption
+import com.example.travelcents.data.trip.model.TravelEvent
+import com.example.travelcents.data.trip.model.YelpReview
 import com.example.travelcents.ui.modules.PhotoGalleryButton
 import com.example.travelcents.ui.modules.TripPhotoGalleryDialog
 import com.example.travelcents.ui.modules.formatDisplayTime
@@ -981,3 +981,4 @@ private fun compactHostLabel(url: String): String {
     val host = url.toUri().host.orEmpty().removePrefix("www.")
     return host.ifBlank { "Open Link" }
 }
+

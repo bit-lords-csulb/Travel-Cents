@@ -1,6 +1,7 @@
 package com.example.travelcents.ui.main.chats.friends
 
 import androidx.lifecycle.ViewModel
+import com.example.travelcents.data.social.model.Friend
 import com.google.firebase.Firebase
 import com.google.firebase.auth.auth
 import com.google.firebase.firestore.FieldPath

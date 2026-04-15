@@ -47,8 +47,8 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import coil.compose.AsyncImage
-import com.example.travelcents.data.model.Itinerary
-import com.example.travelcents.data.model.TravelEvent
+import com.example.travelcents.data.trip.model.Itinerary
+import com.example.travelcents.data.trip.model.TravelEvent
 import com.example.travelcents.ui.main.current.EventOptionsPanel
 import com.example.travelcents.ui.modules.PhotoGalleryButton
 import com.example.travelcents.ui.modules.TripPhotoGalleryDialog
@@ -984,3 +984,4 @@ fun FinalPlanPreview() {
         FinalPlanPage(viewModel = viewModel())
     }
 }
+

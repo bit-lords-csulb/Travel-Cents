@@ -1,6 +1,6 @@
 package com.example.travelcents.ui.main.current
 
-import com.example.travelcents.data.model.TravelEvent
+import com.example.travelcents.data.trip.model.TravelEvent
 import com.example.travelcents.ui.modules.defaultPlanTimeZoneId
 import com.example.travelcents.ui.modules.formatDisplayTime
 import com.example.travelcents.ui.modules.formatMinutes
@@ -150,3 +150,4 @@ fun defaultColorKeyForType(type: String): String {
         else -> "plum"
     }
 }
+

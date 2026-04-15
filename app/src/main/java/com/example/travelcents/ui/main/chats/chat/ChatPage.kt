@@ -25,8 +25,8 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import coil.compose.AsyncImage
-import com.example.travelcents.data.model.Message
-import com.example.travelcents.data.model.Group
+import com.example.travelcents.data.social.model.Message
+import com.example.travelcents.data.social.model.Group
 import com.example.travelcents.ui.theme.*
 import com.google.firebase.Timestamp
 import java.text.SimpleDateFormat
@@ -363,3 +363,4 @@ private fun TripCardBubble(
         }
     }
 }
+

@@ -1,13 +1,13 @@
 package com.example.travelcents.ui.main.chats.chat
 
-import com.example.travelcents.ui.main.chats.friends.Friend
+import com.example.travelcents.data.social.model.Friend
 import com.example.travelcents.ui.main.chats.friends.AddFriendPage
+import com.example.travelcents.data.social.model.DirectChatPreview
+import com.example.travelcents.ui.main.chats.groups.NewTripChatPage
+import com.example.travelcents.data.social.model.Group
+import com.example.travelcents.data.trip.model.Event
 import com.example.travelcents.ui.main.chats.friends.FriendRequestsPage
 import com.example.travelcents.ui.main.chats.friends.FriendsPage
-import com.example.travelcents.data.model.DirectChatPreview
-import com.example.travelcents.ui.main.chats.groups.NewTripChatPage
-import com.example.travelcents.data.model.Group
-import com.example.travelcents.data.model.Event
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
@@ -317,3 +317,4 @@ fun ChatsScreen(modifier: Modifier = Modifier) {
         )
     }
 }
+

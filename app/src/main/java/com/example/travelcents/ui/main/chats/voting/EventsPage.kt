@@ -26,8 +26,8 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import coil.compose.AsyncImage
-import com.example.travelcents.data.model.Event
-import com.example.travelcents.data.model.Group
+import com.example.travelcents.data.trip.model.Event
+import com.example.travelcents.data.social.model.Group
 import com.example.travelcents.ui.theme.*
 
 @OptIn(ExperimentalFoundationApi::class, ExperimentalMaterial3Api::class)
@@ -586,3 +586,4 @@ fun VotingSideBar(
         }
     }
 }
+

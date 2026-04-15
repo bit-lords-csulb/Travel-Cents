@@ -44,3 +44,4 @@ fun TravelCentsNavigation(modifier: Modifier = Modifier, authViewModel: AuthView
     })
 
 }
+

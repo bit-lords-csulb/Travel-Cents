@@ -27,7 +27,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
-import com.example.travelcents.data.model.Group
+import com.example.travelcents.data.social.model.Group
 import com.example.travelcents.ui.theme.*
 
 @Composable
@@ -256,3 +256,4 @@ fun LabeledTextField(
         )
     }
 }
+
