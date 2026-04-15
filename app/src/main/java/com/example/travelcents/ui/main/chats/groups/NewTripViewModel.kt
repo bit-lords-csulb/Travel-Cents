@@ -3,17 +3,19 @@ package com.example.travelcents.ui.main.chats.groups
 import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.example.travelcents.data.social.FirestoreRepository
-import com.example.travelcents.data.social.model.Group
-import com.example.travelcents.data.trip.model.TripPreview
 import com.example.travelcents.data.social.model.Friend
+import com.example.travelcents.data.social.model.Group
+import com.example.travelcents.data.social.repository.FriendsRepository
+import com.example.travelcents.data.social.repository.GroupsRepository
+import com.example.travelcents.data.trip.model.TripPreview
 import com.google.firebase.Firebase
 import com.google.firebase.auth.auth
 import com.google.firebase.firestore.firestore
 import kotlinx.coroutines.flow.*
 
 class NewTripViewModel(
-    private val repository: FirestoreRepository = FirestoreRepository()
+    private val friendsRepository: FriendsRepository = FriendsRepository(),
+    private val groupsRepository: GroupsRepository = GroupsRepository()
 ) : ViewModel() {
 
     private val auth = Firebase.auth
@@ -61,7 +63,7 @@ class NewTripViewModel(
 
     private fun loadFriends() {
         if (currentUid.isEmpty()) return
-        repository.fetchFriends(currentUid) { friends ->
+        friendsRepository.fetchFriends(currentUid) { friends ->
             _allFriends.value = friends
         }
     }
@@ -123,14 +125,14 @@ class NewTripViewModel(
         val emoji = _selectedTrip.value?.emoji ?: "✈️"
 
         // Create Group in Firestore
-        repository.createGroup(
+        groupsRepository.createGroup(
             name = finalGroupName,
             members = members,
             destinationEmoji = emoji,
             linkedTripId = linkedTripId,           // Passes the specific trip ID
             linkedTripOwnerId = linkedTripOwnerId, // Passes the owner's UID
             onSuccess = { groupId ->
-                repository.fetchGroup(groupId) { group ->
+                groupsRepository.fetchGroup(groupId) { group ->
                     _isCreating.value = false
                     if (group != null) onSuccess(group)
                 }

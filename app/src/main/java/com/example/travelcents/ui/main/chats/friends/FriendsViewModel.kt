@@ -2,8 +2,9 @@ package com.example.travelcents.ui.main.chats.friends
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.example.travelcents.data.social.FirestoreRepository
 import com.example.travelcents.data.social.model.Friend
+import com.example.travelcents.data.social.repository.DirectMessagesRepository
+import com.example.travelcents.data.social.repository.FriendsRepository
 import com.google.firebase.Firebase
 import com.google.firebase.auth.auth
 import com.google.firebase.firestore.DocumentSnapshot
@@ -18,7 +19,8 @@ import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.stateIn
 
 class FriendsViewModel(
-    private val repository: FirestoreRepository = FirestoreRepository()
+    private val friendsRepository: FriendsRepository = FriendsRepository(),
+    private val directMessagesRepository: DirectMessagesRepository = DirectMessagesRepository()
 ) : ViewModel() {
 
     private val auth = Firebase.auth
@@ -128,17 +130,14 @@ class FriendsViewModel(
     // Removes friend relationship and deletes the DM chat
     fun removeFriend(friendUid: String) {
         if (currentUid.isEmpty()) return
-        val batch = db.batch()
-        batch.delete(db.collection("users").document(currentUid).collection("friends").document(friendUid))
-        batch.delete(db.collection("users").document(friendUid).collection("friends").document(currentUid))
-        batch.commit().addOnSuccessListener {
+        friendsRepository.removeFriend(currentUid, friendUid, onSuccess = {
             android.util.Log.d("FriendsViewModel", "Friend removed, now deleting DM with $friendUid")
-            repository.deleteDirectChat(currentUid, friendUid) {
+            directMessagesRepository.deleteDirectChat(currentUid, friendUid) {
                 android.util.Log.d("FriendsViewModel", "DM delete completed")
             }
-        }.addOnFailureListener {
-            android.util.Log.e("FriendsViewModel", "Batch failed: ${it.message}")
-        }
+        }, onFailure = {
+            android.util.Log.e("FriendsViewModel", "Friend removal batch failed")
+        })
     }
 
     fun onSearchQueryChange(query: String) { _searchQuery.value = query }
