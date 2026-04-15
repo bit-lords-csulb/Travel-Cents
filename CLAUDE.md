@@ -34,8 +34,6 @@ SERP_API_KEY=your-key-here
 YELP_API_KEY=your-key-here
 ```
 
-`GROQ_API_KEY` is still accepted as a fallback for older local setups.
-
 All values are injected as `BuildConfig` fields at build time via `app/build.gradle.kts`.
 
 ## Package Root
@@ -46,49 +44,100 @@ All values are injected as `BuildConfig` fields at build time via `app/build.gra
 
 ### Shared UI Components
 - `ui/components/TcTextField.kt` — **standard text field for the whole app**. Rounded filled style matching the NewTrip wizard. Use this everywhere instead of raw `TextField`. Params: `value`, `onValueChange`, `label`, `placeholder`, `enabled`, `leadingIcon`, `trailingIcon`, `visualTransformation`, `keyboardOptions`, `keyboardActions`.
+- `ui/components/Button.kt` — shared button component
+- `ui/components/ProfileAvatar.kt` — avatar component
+- `ui/modules/TripPhotoGallery.kt` — photo gallery dialog + helpers
+- `ui/modules/CalendarDateTimeUtils.kt` — shared date/time formatting utilities
 
 ### Auth
 - `ui/auth/AuthViewModel.kt` — signUp / logIn / signOut, StateFlow state
 - `ui/auth/LoginPage.kt` / `SignUpPage.kt` — login + registration forms (both use `TcTextField`)
-- `data/AuthModel.kt` — Firebase Auth + Firestore user creation
+- `ui/auth/GoogleAuthButton.kt` — Google sign-in button
+- `data/auth/AuthRepository.kt` — Firebase Auth + Firestore user creation
 
 ### Trip Planning (AI Pipeline)
 - `ui/main/newTrip/NewTripLandingPage.kt` — landing with options (plan, AI chat, last trip)
-- `ui/main/newTrip/TripStep1–5*.kt` — 5-step wizard pages
+- `ui/main/newTrip/TripStep1DestinationPage.kt` through `TripStep5InterestsPage.kt` — 5-step wizard pages
+- `ui/main/newTrip/TripGeneratingPage.kt` — loading screen shown during generation
 - `ui/main/newTrip/NewTripViewModel.kt` — wizard state + AI itinerary pipeline + Firestore save
 - `ui/main/newTrip/TripWizardColors.kt` — color palette used by the wizard and `TcTextField`
-- `data/remote/TripPlannerRepository.kt` — LLM-backed itinerary metadata generation
-- `data/remote/LlmClient.kt` — shared OpenAI-compatible AI client
-- `data/model/LlmModels.kt` — shared request/response models for AI completions
-- `data/model/TravelRequest.kt` / `Itinerary.kt` / `TravelEvent.kt` — data models
+- `data/ai/repository/TripPlannerRepository.kt` — LLM-backed itinerary metadata generation
+- `data/ai/remote/LlmClient.kt` — shared OpenAI-compatible AI client
+- `data/ai/remote/LlmApiService.kt` — Retrofit interface for LLM completions
+- `data/ai/remote/LlmConfig.kt` — reads `BuildConfig.LLM_*` values
+- `data/ai/model/LlmModels.kt` — shared request/response DTOs for AI completions
+- `data/trip/model/TravelRequest.kt` / `Itinerary.kt` / `TravelEvent.kt` / `EventOption.kt` — core trip data models
+- `data/trip/model/TripPreview.kt` — lightweight trip summary for list views
+- `data/trip/remote/SerpRepository.kt` — Google Flights + Hotels search via SerpAPI
+- `data/trip/remote/SerpApiService.kt` / `SerpCache.kt` — Retrofit interface + in-memory cache
+- `data/trip/model/SerpModels.kt` — SerpAPI response DTOs
+- `data/trip/remote/YelpRepository.kt` — restaurant + activity search via Yelp Fusion
+- `data/trip/remote/YelpApiService.kt` — Retrofit interface for Yelp
+- `data/trip/model/YelpModels.kt` — Yelp response DTOs
+- `data/trip/remote/DestinationImageRepository.kt` — hero image fetching for destinations
+- `data/trip/remote/CurrencyApiService.kt` — exchange rate API
+- `data/trip/local/CurrencyRateCache.kt` — persisted currency rate cache
+- `data/media/ImageCacheManager.kt` — downloads and caches trip images locally
 
 ### Current Trip / Itinerary
-- `ui/main/current/screen/CurrentTripScreen.kt` — main itinerary/day/week views
-- `ui/main/current/CurrentTripViewModel.kt` — loads trip, exposes events + display mode
-- `ui/main/itinerary/FinalPlan.kt` — full itinerary card view
+- `ui/main/current/screen/CurrentTripScreen.kt` — top-level screen; composes all current-trip views
+- `ui/main/current/CurrentTripViewModel.kt` — loads active trip, exposes events + display mode
+- `ui/main/current/navigation/CurrentTripRoutes.kt` — route constants for current trip sub-nav
+- `ui/main/current/itinerary/CurrentTripItineraryContent.kt` — itinerary list view (event cards)
+- `ui/main/current/calendar/view/CurrentTripDayView.kt` — single-day calendar view
+- `ui/main/current/calendar/view/CurrentTripWeekView.kt` — week calendar view
+- `ui/main/current/calendar/CurrentTripCalendarLayoutUtils.kt` — layout math for calendar grid
+- `ui/main/current/header/CurrentTripHeader.kt` / `CurrentTripHeroLayout.kt` / `DayDateHero.kt` / `WeekDateHero.kt` — header components per mode
+- `ui/main/current/components/CurrentTripChrome.kt` / `CurrentTripModeSwitcher.kt` / `CurrentTripStatusViews.kt` — shared chrome, mode toggle, empty/error states
+- `ui/main/current/overlays/CurrentTripEventDetailsDialog.kt` / `CurrentTripOverlayHost.kt` / `EventOptionsPanel.kt` — event detail overlays
+- `ui/main/current/editor/CurrentPlanEditorDialog.kt` — inline event editor
+- `ui/main/current/helpers/CurrentTripPlanUtils.kt` — utility functions for plan manipulation
+- `ui/main/current/sharing/CurrentTripShareSheet.kt` — share sheet for exporting a trip
 - `ui/main/itinerary/ItineraryViewModel.kt` — real-time Firestore listener; exposes `events`, `tripTitle`, `currentTripId`
+- `ui/main/itinerary/ExpandedEventCard.kt` — full-detail bottom sheet for a single event
+- `ui/main/itinerary/SharedTripHeader.kt` — shared header used by itinerary views
+
+### Home
+- `ui/main/home/HomePage.kt` — home screen: saved trips, quick actions
+- `ui/main/home/HomeViewModel.kt` — loads trip previews from Firestore
+- `ui/main/home/CurrencyConverterCard.kt` — inline currency converter widget
+- `ui/main/home/CurrencyViewModel.kt` — fetches live exchange rates
 
 ### AI Chat
 - `ui/main/aichat/AiTripChatPage.kt` — conversational travel assistant UI
 - `ui/main/aichat/AiChatViewModel.kt` — AI multi-turn chat **(NOT the group chat ViewModel)**
-- `data/remote/LlmClient.kt` — shared OpenAI-compatible client used by both itinerary generation and AI chat
+- `data/ai/ChatMessage.kt` — `ChatMessage(text, isFromUser)` data class
 
 ### Group Chats
 - `ui/main/chats/chat/ChatsPage.kt` / `ChatPage.kt` — group list + message thread
 - `ui/main/chats/chat/ChatsViewModel.kt` / `ChatViewModel.kt` — Firestore listeners **(different from AI ChatViewModel)**
-- `data/FirestoreRepository.kt` — all Firestore ops: users, friends, groups, messages
+- `ui/main/chats/chat/DirectChatPage.kt` / `DirectChatViewModel.kt` — 1:1 direct messages
+- `ui/main/chats/friends/FriendsPage.kt` / `AddFriendPage.kt` / `FriendRequestsPage.kt` — friends management
+- `ui/main/chats/friends/FriendsViewModel.kt` / `AddFriendViewModel.kt` / `FriendRequestsViewModel.kt`
+- `ui/main/chats/voting/EventsPage.kt` / `CreateEventPage.kt` / `EventCommentsPage.kt` — group trip voting
+- `ui/main/chats/voting/EventsViewModel.kt` / `CreateEventViewModel.kt` / `EventCommentsViewModel.kt`
+- `data/social/repository/FriendsRepository.kt` — friend requests + accepted friends
+- `data/social/repository/GroupsRepository.kt` — group CRUD + membership
+- `data/social/repository/DirectMessagesRepository.kt` — 1:1 DM threads
+- `data/social/repository/SocialUserRepository.kt` — user search and profile lookups
+- `data/social/repository/SocialRepositoryMappers.kt` — Firestore ↔ model conversions
+- `data/social/model/Friend.kt` / `Group.kt` / `Message.kt` / `DirectChatPreview.kt`
 
 ### Settings
 - `ui/main/settings/SettingsPage.kt` — entry point: profile header (tappable → Account tab) + tab selector. Default tab: Account.
 - `ui/main/settings/SettingsViewModel.kt` — `SettingsUserState` (firstName, lastName, username, email). Actions: `loadUser`, `updateProfile`, `signOut`, `deleteAccount`.
 - `ui/main/settings/AccountTab.kt` — profile info card, inline edit form, Danger Zone (logout + delete)
-- `ui/main/settings/SecurityTab.kt` — change password (3 independent visibility toggles) + Privacy & Security (data toggle + info)
+- `ui/main/settings/SecurityTab.kt` — change password (3 independent visibility toggles) + Privacy & Security
 - `ui/main/settings/PreferencesTab.kt` — notifications, display, About section
 - `ui/main/settings/SettingsComponents.kt` — shared: `SettingCard`, `SettingHeader`, `SwitchSettingItem`, `SettingRow`
 
+### User Profile
+- `data/user/UserProfileRepository.kt` — read/write user profile in Firestore
+- `data/user/model/CurrentUserProfile.kt` — in-memory user profile model
+
 ### Navigation
 - `TravelCentsNavigation.kt` — top-level: login → signup → home (MainScaffold)
-- `ui/main/MainScaffold.kt` — bottom nav (5 tabs) + inner NavHost
+- `ui/main/MainScaffold.kt` — bottom nav (5 tabs) + inner NavHost; route constants in `MainRoutes`
 
 ## Navigation Structure
 
@@ -102,12 +151,18 @@ forgot_password → ForgotPassword (not implemented)
 
 ### MainScaffold Inner NavHost
 ```
-current      → CurrentTripScreen (itinerary / day / week modes)
-new_trip     → NewTripLandingPage → TripStep1–5 → TripGeneratingPage
-home         → HomePage
-chats        → ChatsScreen
-settings     → SettingsPage
-ai_trip_chat → AiTripChatPage (bottom nav hidden on this route)
+current / current_itinerary / current_day / current_week → CurrentTripScreen (mode-switched)
+new_trip        → NewTripLandingPage
+new_trip_step1  → TripStep1DestinationPage
+new_trip_step2  → TripStep2DatesPage
+new_trip_step3  → TripStep3TravelersPage
+new_trip_step4  → TripStep4BudgetPage
+new_trip_step5  → TripStep5InterestsPage
+trip_generating → TripGeneratingPage
+home            → HomePage
+chats           → ChatsScreen
+settings        → SettingsPage
+ai_trip_chat    → AiTripChatPage
 ```
 
 ## Firestore Structure
@@ -118,11 +173,17 @@ users/{uid}
 
 users/{uid}/trips/{itineraryId}
     itineraryId, userId, tripName, destination, origin
+    originIata, destinationIata
     dateFrom, dateTo, durationDays, currency, travelStyle, adults, children
+    createdAt, status, eventIds[]
 
 users/{uid}/trips/{itineraryId}/events/{eventId}
-    eventId, type, itineraryId, date, startTime, endTime, title, location, notes
-    + type-specific fields: airline, flight_number, hotel_name, cuisine, etc.
+    eventId, type, itineraryId, tz, date, startTime, endTime
+    imageUrl, localImagePath, photoUrls[]
+    + all details fields flattened (airline, flight_number, hotel_name, cuisine, etc.)
+
+users/{uid}/trips/{itineraryId}/events/{eventId}/options/{optionId}
+    optionId, eventId, source, selected, imageUrl, photoUrls[], details{}
 
 users/{uid}/friends/{friendUid}
     status: "pending" | "accepted" | "rejected"
@@ -141,7 +202,7 @@ groups/{groupId}/messages/{msgId}
   ```kotlin
   sealed class TripUiState {
       data object Idle : TripUiState()
-      data object Loading : TripUiState()
+      data class Loading(val statusMessage: String = "Getting things ready...") : TripUiState()
       data class Success(val itinerary: Itinerary, val events: List<TravelEvent>) : TripUiState()
       data class Error(val message: String) : TripUiState()
   }
@@ -154,17 +215,16 @@ groups/{groupId}/messages/{msgId}
 
 | Layer | File | Purpose |
 |---|---|---|
-| Shared transport | `LlmClient.kt` + `LlmApiService.kt` | OpenAI-compatible chat completions |
-| Itinerary generation | `TripPlannerRepository.kt` | Prompting + JSON parsing for itinerary metadata |
-| AI chat | `AiChatViewModel.kt` | Multi-turn chat completions via the shared AI client |
+| Shared transport | `data/ai/remote/LlmClient.kt` + `LlmApiService.kt` | OpenAI-compatible chat completions |
+| Config | `data/ai/remote/LlmConfig.kt` | Reads `BuildConfig.LLM_*` at runtime |
+| Itinerary generation | `data/ai/repository/TripPlannerRepository.kt` | Prompts + JSON parsing for itinerary metadata |
+| AI chat | `ui/main/aichat/AiChatViewModel.kt` | Multi-turn chat completions via the shared AI client |
 
 The default provider is Groq, but the app is wired through `LLM_BASE_URL` and `LLM_API_KEY` so compatible providers can be swapped without changing Kotlin code.
 
-The itinerary system prompt remains: `"You are a travel planner. Always respond with valid JSON only. No markdown, no extra text."`
+The itinerary system prompt: `"You are a travel planner. Always respond with valid JSON only. No markdown, no extra text."`
 
 ## Naming Collision Warning
-
-There is still a naming collision around `NewTripViewModel.kt`, but the AI chat ViewModel has been renamed to avoid confusion:
 
 | File | Package | Purpose |
 |---|---|---|
@@ -175,22 +235,24 @@ There is still a naming collision around `NewTripViewModel.kt`, but the AI chat 
 
 Always check the package when importing.
 
-## ItineraryScreen — Event Cards
+## Event Cards
 
-Events are dispatched by type in `EventCardDispatcher`:
+Events are rendered by type. Color scheme in `FinalPlan.kt` / `ExpandedEventCard.kt`:
 
-| Type | Accent | Key Fields |
+| Type | Accent | Key `details` Fields |
 |---|---|---|
-| `flight` | Pink `#EC4899` | airline, flight_number |
-| `hotel` | Cyan `#06B6D4` | hotel_name, check-in time |
-| `restaurant` | Yellow `#EAB308` | cuisine |
-| `activity` | Purple `#8B5CF6` | location |
+| `flight` | Blue `#64B5F6` | airline, flight_number, origin_airport, destination_airport, departure_time, arrival_time, total_price, flight_duration_min |
+| `hotel` | Purple `#B5A0FF` | hotel_name, check_in_date, check_out_date, rate_per_night |
+| `restaurant` / `dining` / `food` | Red `#FF716C` | restaurant_name, cuisine |
+| `activity` (default) | Light blue `#D5E3FB` | activity_name, title, location |
 
-Title resolution (all cards): `details["title"]` → `details["activity_name"]` → type-specific fallback.
+Title resolution order (all types): `details["title"]` → `details["activity_name"]` → `details["restaurant_name"]` → `details["hotel_name"]` → type string.
+
+`TravelEvent.details` is a flat `Map<String, String>` — all type-specific fields live here. `TravelEvent.options` is a `List<EventOption>` stored in a Firestore subcollection (not in the main document).
 
 ## Theme
 
-`DeepSea` palette defined in `ui/theme/`:
+`DeepSea` palette defined in `ui/theme/Color.kt`:
 ```
 DeepSea1 = 0xFF0D1B2A  // background
 DeepSea2 = 0xFF1B263B  // cards / bottom nav
@@ -203,5 +265,4 @@ DeepSea5 = 0xFFE0E1DD  // primary text
 
 ## Known Gaps
 
-- `HomePage.kt` — placeholder, not fully implemented
 - `ForgotPassword.kt` — not implemented
