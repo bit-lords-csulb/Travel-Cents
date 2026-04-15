@@ -100,124 +100,131 @@ fun CurrentTripItineraryContent(
     onPersistEventPlacements: (Set<String>) -> Unit,
     onVisibleDateChange: (String) -> Unit = {}
 ) {
-    if (events.isEmpty()) {
-        Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-            Text(
-                text = "Tap the + button to create your first reservation or activity.",
-                color = DeepSea4,
-                fontSize = 14.sp
-            )
-        }
-        return
-    }
-
-    val itineraryItems = remember(events) { buildCurrentTripItineraryItems(events) }
-    val lazyListState = rememberLazyListState()
-    var affectedDragDates by remember { mutableStateOf<Set<String>>(emptySet()) }
-
-    val infiniteTransition = rememberInfiniteTransition(label = "trip_itinerary_jiggle")
-    val wobbleAngle by infiniteTransition.animateFloat(
-        initialValue = -0.5f,
-        targetValue = 0.5f,
-        animationSpec = infiniteRepeatable(tween(160, easing = LinearEasing), RepeatMode.Reverse),
-        label = "trip_itinerary_wobble"
-    )
-    val cardRotation = if (jiggleMode) wobbleAngle else 0f
-
-    val reorderState = rememberReorderableLazyListState(lazyListState) { from, to ->
-        val fromItem = itineraryItems.firstOrNull { it.key == from.key } as? CurrentTripItineraryItem.EventCard
-            ?: return@rememberReorderableLazyListState
-        val toItem = itineraryItems.firstOrNull { it.key == to.key } as? CurrentTripItineraryItem.EventCard
-            ?: return@rememberReorderableLazyListState
-        affectedDragDates = affectedDragDates + setOf(fromItem.event.date, toItem.event.date)
-        onMoveEvent(fromItem.event.eventId, fromItem.event.date, toItem.event.date, toItem.dayIndex)
-    }
-
-    LaunchedEffect(reorderState.isAnyItemDragging) {
-        if (!reorderState.isAnyItemDragging && affectedDragDates.isNotEmpty()) {
-            onPersistEventPlacements(affectedDragDates)
-            affectedDragDates = emptySet()
-        }
-    }
-
-    // Update the hero date as the user scrolls — find the last header above the top of the list
-    LaunchedEffect(lazyListState, itineraryItems, jiggleMode) {
-        snapshotFlow { lazyListState.firstVisibleItemIndex }
-            .distinctUntilChanged()
-            .collect { firstIndex ->
-                val bannerOffset = if (jiggleMode) 1 else 0
-                val adjustedIndex = (firstIndex - bannerOffset).coerceAtLeast(0)
-                for (i in adjustedIndex downTo 0) {
-                    val item = itineraryItems.getOrNull(i) as? CurrentTripItineraryItem.Header ?: continue
-                    if (item.rawDate != UndatedGroupKey) {
-                        onVisibleDateChange(item.rawDate)
-                        break
-                    }
-                }
-            }
-    }
-
-    LazyColumn(
-        modifier = Modifier.fillMaxSize(),
-        state = lazyListState,
-        contentPadding = PaddingValues(horizontal = 20.dp, vertical = 16.dp)
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .padding(horizontal = 12.dp, vertical = 10.dp)
     ) {
-        if (jiggleMode) {
-            item {
-                Surface(
-                    color = DeepSea2,
-                    shape = RoundedCornerShape(14.dp),
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(bottom = 14.dp)
-                ) {
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(horizontal = 14.dp, vertical = 12.dp),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.DragHandle,
-                            contentDescription = null,
-                            tint = DeepSea4,
-                            modifier = Modifier.size(18.dp)
-                        )
-                        Spacer(modifier = Modifier.width(10.dp))
-                        Text(
-                            text = "Drag cards to reorder events.",
-                            color = DeepSea4,
-                            fontSize = 13.sp
-                        )
-                    }
+        CurrentTripPageSurface(modifier = Modifier.fillMaxSize()) {
+            if (events.isEmpty()) {
+                Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                    Text(
+                        text = "Tap the + button to create your first reservation or activity.",
+                        color = DeepSea4,
+                        fontSize = 14.sp
+                    )
+                }
+                return@CurrentTripPageSurface
+            }
+
+            val itineraryItems = remember(events) { buildCurrentTripItineraryItems(events) }
+            val lazyListState = rememberLazyListState()
+            var affectedDragDates by remember { mutableStateOf<Set<String>>(emptySet()) }
+
+            val infiniteTransition = rememberInfiniteTransition(label = "trip_itinerary_jiggle")
+            val wobbleAngle by infiniteTransition.animateFloat(
+                initialValue = -0.5f,
+                targetValue = 0.5f,
+                animationSpec = infiniteRepeatable(tween(160, easing = LinearEasing), RepeatMode.Reverse),
+                label = "trip_itinerary_wobble"
+            )
+            val cardRotation = if (jiggleMode) wobbleAngle else 0f
+
+            val reorderState = rememberReorderableLazyListState(lazyListState) { from, to ->
+                val fromItem = itineraryItems.firstOrNull { it.key == from.key } as? CurrentTripItineraryItem.EventCard
+                    ?: return@rememberReorderableLazyListState
+                val toItem = itineraryItems.firstOrNull { it.key == to.key } as? CurrentTripItineraryItem.EventCard
+                    ?: return@rememberReorderableLazyListState
+                affectedDragDates = affectedDragDates + setOf(fromItem.event.date, toItem.event.date)
+                onMoveEvent(fromItem.event.eventId, fromItem.event.date, toItem.event.date, toItem.dayIndex)
+            }
+
+            LaunchedEffect(reorderState.isAnyItemDragging) {
+                if (!reorderState.isAnyItemDragging && affectedDragDates.isNotEmpty()) {
+                    onPersistEventPlacements(affectedDragDates)
+                    affectedDragDates = emptySet()
                 }
             }
-        }
 
-        items(itineraryItems, key = { it.key }) { item ->
-            when (item) {
-                is CurrentTripItineraryItem.Header -> ItineraryDateHeader(item.label)
-                is CurrentTripItineraryItem.EventCard -> {
-                    val options = eventOptions[item.event.eventId].orEmpty()
-                    val rejected = rejectedOptions[item.event.eventId].orEmpty()
-                    val activeOptionCount = options.count { it.optionId !in rejected }
-                    ReorderableItem(reorderState, key = item.event.eventId) { isDragging ->
-                        CurrentTripItineraryCard(
-                            event = item.event,
-                            isLast = item.isLastInDay,
-                            hasAlternatives = activeOptionCount > 1,
-                            isDragging = isDragging,
-                            jiggleMode = jiggleMode,
-                            wobbleAngle = cardRotation,
-                            modifier = Modifier.draggableHandle(enabled = jiggleMode),
-                            onCardClick = { onEventClick(item.event) },
-                            onDeleteClick = { onDeleteClick(item.event) },
-                            onAlternativesClick = { onOpenAlternatives(item.event.eventId) }
-                        )
+            LaunchedEffect(lazyListState, itineraryItems, jiggleMode) {
+                snapshotFlow { lazyListState.firstVisibleItemIndex }
+                    .distinctUntilChanged()
+                    .collect { firstIndex ->
+                        val bannerOffset = if (jiggleMode) 1 else 0
+                        val adjustedIndex = (firstIndex - bannerOffset).coerceAtLeast(0)
+                        for (i in adjustedIndex downTo 0) {
+                            val item = itineraryItems.getOrNull(i) as? CurrentTripItineraryItem.Header ?: continue
+                            if (item.rawDate != UndatedGroupKey) {
+                                onVisibleDateChange(item.rawDate)
+                                break
+                            }
+                        }
+                    }
+            }
+
+            LazyColumn(
+                modifier = Modifier.fillMaxSize(),
+                state = lazyListState,
+                contentPadding = PaddingValues(horizontal = 16.dp, vertical = 16.dp)
+            ) {
+                if (jiggleMode) {
+                    item {
+                        Surface(
+                            color = DeepSea2,
+                            shape = RoundedCornerShape(14.dp),
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(bottom = 14.dp)
+                        ) {
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(horizontal = 14.dp, vertical = 12.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.DragHandle,
+                                    contentDescription = null,
+                                    tint = DeepSea4,
+                                    modifier = Modifier.size(18.dp)
+                                )
+                                Spacer(modifier = Modifier.width(10.dp))
+                                Text(
+                                    text = "Drag cards to reorder events.",
+                                    color = DeepSea4,
+                                    fontSize = 13.sp
+                                )
+                            }
+                        }
                     }
                 }
 
-                is CurrentTripItineraryItem.DaySpacer -> Spacer(modifier = Modifier.height(2.dp))
+                items(itineraryItems, key = { it.key }) { item ->
+                    when (item) {
+                        is CurrentTripItineraryItem.Header -> ItineraryDateHeader(item.label)
+                        is CurrentTripItineraryItem.EventCard -> {
+                            val options = eventOptions[item.event.eventId].orEmpty()
+                            val rejected = rejectedOptions[item.event.eventId].orEmpty()
+                            val activeOptionCount = options.count { it.optionId !in rejected }
+                            ReorderableItem(reorderState, key = item.event.eventId) { isDragging ->
+                                CurrentTripItineraryCard(
+                                    event = item.event,
+                                    isLast = item.isLastInDay,
+                                    hasAlternatives = activeOptionCount > 1,
+                                    isDragging = isDragging,
+                                    jiggleMode = jiggleMode,
+                                    wobbleAngle = cardRotation,
+                                    modifier = Modifier.draggableHandle(enabled = jiggleMode),
+                                    onCardClick = { onEventClick(item.event) },
+                                    onDeleteClick = { onDeleteClick(item.event) },
+                                    onAlternativesClick = { onOpenAlternatives(item.event.eventId) }
+                                )
+                            }
+                        }
+
+                        is CurrentTripItineraryItem.DaySpacer -> Spacer(modifier = Modifier.height(2.dp))
+                    }
+                }
             }
         }
     }

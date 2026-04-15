@@ -1,27 +1,14 @@
 package com.example.travelcents.ui.main.current.header
 
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.size
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.KeyboardArrowLeft
-import androidx.compose.material.icons.filled.KeyboardArrowRight
-import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.ui.Alignment
-import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.example.travelcents.ui.modules.formatDayOfWeekShort
+import com.example.travelcents.ui.modules.formatDayOfWeekFull
 import com.example.travelcents.ui.modules.formatHeroDate
 import com.example.travelcents.ui.theme.DeepSea4
 import com.example.travelcents.ui.theme.DeepSea5
-
-private val PrimaryAccent = Color(0xFFCEBDFF)
+import com.example.travelcents.ui.theme.TravelCentsFonts
 
 @Composable
 fun DayDateHero(
@@ -34,58 +21,35 @@ fun DayDateHero(
     val previousDate = sortedDates.getOrNull(activeIndex - 1)
     val nextDate = sortedDates.getOrNull(activeIndex + 1)
 
-    Column {
-        Text(
-            text = "SCHEDULED ITINERARY",
-            color = PrimaryAccent,
-            fontSize = 10.sp,
-            fontWeight = FontWeight.SemiBold,
-            letterSpacing = 2.sp
+    CurrentTripHeroLayout(
+        previousAction = CurrentTripHeroNavAction(
+            enabled = previousDate != null,
+            contentDescription = "Previous day",
+            onClick = { previousDate?.let(onDateSelected) }
+        ),
+        nextAction = CurrentTripHeroNavAction(
+            enabled = nextDate != null,
+            contentDescription = "Next day",
+            onClick = { nextDate?.let(onDateSelected) }
         )
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            // Left arrow sits in the 24dp margin (button size = 24dp, starts at screen edge)
-            IconButton(
-                onClick = { previousDate?.let(onDateSelected) },
-                enabled = previousDate != null,
-                modifier = Modifier.size(24.dp)
-            ) {
-                Icon(
-                    imageVector = Icons.Default.KeyboardArrowLeft,
-                    contentDescription = "Previous day",
-                    tint = if (previousDate != null) DeepSea5 else DeepSea4.copy(alpha = 0.3f),
-                    modifier = Modifier.size(22.dp)
-                )
-            }
-            Column {
-                Text(
-                    text = formatDayOfWeekShort(activeDate),
-                    color = DeepSea4,
-                    fontSize = 12.sp,
-                    fontWeight = FontWeight.SemiBold,
-                    letterSpacing = 1.sp,
-                    lineHeight = 14.sp
-                )
-                Text(
-                    text = formatHeroDate(activeDate),
-                    color = DeepSea5,
-                    fontSize = 48.sp,
-                    fontWeight = FontWeight.ExtraBold,
-                    lineHeight = 50.sp
-                )
-            }
-            IconButton(
-                onClick = { nextDate?.let(onDateSelected) },
-                enabled = nextDate != null,
-                modifier = Modifier.size(24.dp)
-            ) {
-                Icon(
-                    imageVector = Icons.Default.KeyboardArrowRight,
-                    contentDescription = "Next day",
-                    tint = if (nextDate != null) DeepSea5 else DeepSea4.copy(alpha = 0.3f),
-                    modifier = Modifier.size(22.dp)
-                )
-            }
-        }
+    ) {
+        Text(
+            text = formatDayOfWeekFull(activeDate),
+            color = DeepSea4,
+            fontSize = 15.sp,
+            fontWeight = FontWeight.SemiBold,
+            letterSpacing = 0.8.sp,
+            lineHeight = 16.sp,
+            fontFamily = TravelCentsFonts.Body
+        )
+        Text(
+            text = formatHeroDate(activeDate),
+            color = DeepSea5,
+            fontSize = 48.sp,
+            fontWeight = FontWeight.ExtraBold,
+            lineHeight = 50.sp,
+            fontFamily = TravelCentsFonts.Headline
+        )
     }
 }
 

@@ -107,30 +107,33 @@ fun CurrentTripDayView(
             .fillMaxSize()
             .padding(horizontal = 12.dp, vertical = 10.dp)
     ) {
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .verticalScroll(verticalScroll)
-        ) {
-            Row(modifier = Modifier.fillMaxWidth()) {
-                TimeAxis(
-                    scheduleWindow = scheduleWindow,
-                    hourHeight = hourHeight
-                )
+        CurrentTripPageSurface(modifier = Modifier.fillMaxSize()) {
+            Column(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(horizontal = 12.dp, vertical = 12.dp)
+                    .verticalScroll(verticalScroll)
+            ) {
+                Row(modifier = Modifier.fillMaxWidth()) {
+                    TimeAxis(
+                        scheduleWindow = scheduleWindow,
+                        hourHeight = hourHeight
+                    )
 
-                Spacer(modifier = Modifier.width(8.dp))
+                    Spacer(modifier = Modifier.width(8.dp))
 
-                ScheduleDayColumn(
-                    modifier = Modifier.weight(1f),
-                    date = activeDate,
-                    events = dayEvents,
-                    scheduleWindow = scheduleWindow,
-                    hourHeight = hourHeight,
-                    onEventClick = onEventClick,
-                    onDeleteClick = onDeleteClick,
-                    onEmptySlotClick = { startMinutes -> onCreatePlan(activeDate, startMinutes) },
-                    showCurrentTimeIndicator = activeDate == todayIsoDate()
-                )
+                    ScheduleDayColumn(
+                        modifier = Modifier.weight(1f),
+                        date = activeDate,
+                        events = dayEvents,
+                        scheduleWindow = scheduleWindow,
+                        hourHeight = hourHeight,
+                        onEventClick = onEventClick,
+                        onDeleteClick = onDeleteClick,
+                        onEmptySlotClick = { startMinutes -> onCreatePlan(activeDate, startMinutes) },
+                        showCurrentTimeIndicator = activeDate == todayIsoDate()
+                    )
+                }
             }
         }
     }
@@ -173,7 +176,7 @@ private fun ScheduleDayColumn(
     showCurrentTimeIndicator: Boolean = false
 ) {
     val gridHeight = hourHeight * (scheduleWindow.endHour - scheduleWindow.startHour).toFloat()
-    val cardShape = RoundedCornerShape(20.dp)
+    val cardShape = CurrentTripInnerShape
     val eventLayouts = remember(events, date, scheduleWindow) {
         buildEventLayouts(
             date = date,
