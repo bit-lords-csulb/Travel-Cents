@@ -36,13 +36,12 @@ import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.LocationOn
 import androidx.compose.material.icons.filled.MyLocation
 import androidx.compose.material.icons.filled.Search
-import androidx.compose.material3.Button
-import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MenuDefaults
+import androidx.compose.material3.ProvideTextStyle
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextField
 import androidx.compose.material3.TextFieldDefaults
@@ -60,6 +59,7 @@ import androidx.compose.foundation.Image
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
@@ -67,8 +67,10 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.PopupProperties
 import androidx.core.content.ContextCompat
 import com.example.travelcents.R
+import com.example.travelcents.ui.components.TcButton
 import com.example.travelcents.ui.theme.DeepSea1
 import com.example.travelcents.ui.theme.DeepSea5
+import com.example.travelcents.ui.theme.TravelCentsFonts
 import com.google.android.gms.location.LocationServices
 import com.google.android.gms.location.Priority
 import com.google.android.gms.tasks.CancellationTokenSource
@@ -110,11 +112,12 @@ fun TripStep1DestinationPage(
         }
     }
 
-    Column(
-        modifier = modifier
-            .fillMaxSize()
-            .background(DeepSea1)
-    ) {
+    ProvideTextStyle(value = TextStyle(fontFamily = TravelCentsFonts.Body)) {
+        Column(
+            modifier = modifier
+                .fillMaxSize()
+                .background(DeepSea1)
+        ) {
         // Top bar + progress strip
         Column(
             modifier = Modifier
@@ -184,7 +187,8 @@ fun TripStep1DestinationPage(
                         fontSize = 40.sp,
                         fontWeight = FontWeight.ExtraBold,
                         color = DeepSea5,
-                        letterSpacing = (-1.5).sp
+                        letterSpacing = (-1.5).sp,
+                        fontFamily = TravelCentsFonts.Headline
                     )
                     Spacer(modifier = Modifier.height(6.dp))
                     Text(
@@ -383,24 +387,16 @@ fun TripStep1DestinationPage(
                 .background(DeepSea1)
                 .padding(horizontal = 16.dp, vertical = 12.dp)
         ) {
-            Button(
+            TcButton(
                 onClick = onContinueClick,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(52.dp),
-                enabled = viewModel.destination.isNotBlank() && viewModel.origin.isNotBlank(),
-                colors = ButtonDefaults.buttonColors(
-                    containerColor = TripWizardColors.Blue,
-                    contentColor = Color(0xFF001627),
-                    disabledContainerColor = TripWizardColors.Blue.copy(alpha = 0.25f),
-                    disabledContentColor = DeepSea5.copy(alpha = 0.3f)
-                ),
-                shape = RoundedCornerShape(16.dp)
+                modifier = Modifier.fillMaxWidth(),
+                enabled = viewModel.destination.isNotBlank() && viewModel.origin.isNotBlank()
             ) {
                 Text(text = "Continue", fontSize = 16.sp, fontWeight = FontWeight.Bold)
             }
         }
     }
+}
 }
 
 private fun hasLocationPermission(context: Context): Boolean {

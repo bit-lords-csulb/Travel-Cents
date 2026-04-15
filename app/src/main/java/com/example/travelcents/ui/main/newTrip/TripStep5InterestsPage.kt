@@ -30,10 +30,9 @@ import androidx.compose.material.icons.automirrored.filled.ArrowForward
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Search
-import androidx.compose.material3.Button
-import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.ProvideTextStyle
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextField
 import androidx.compose.material3.TextFieldDefaults
@@ -51,12 +50,15 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.foundation.Image
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.travelcents.R
+import com.example.travelcents.ui.components.TcButton
 import com.example.travelcents.ui.theme.DeepSea1
 import com.example.travelcents.ui.theme.DeepSea5
+import com.example.travelcents.ui.theme.TravelCentsFonts
 
 private data class InterestItem(val key: String, val label: String, val imageRes: Int)
 
@@ -115,11 +117,12 @@ fun TripStep5InterestsPage(
     var searchQuery by remember { mutableStateOf("") }
     var customInterests by remember { mutableStateOf(listOf<String>()) }
 
-    Column(
-        modifier = modifier
-            .fillMaxSize()
-            .background(DeepSea1)
-    ) {
+    ProvideTextStyle(value = TextStyle(fontFamily = TravelCentsFonts.Body)) {
+        Column(
+            modifier = modifier
+                .fillMaxSize()
+                .background(DeepSea1)
+        ) {
         // Top bar
         Column(
             modifier = Modifier
@@ -184,7 +187,8 @@ fun TripStep5InterestsPage(
                         fontSize = 28.sp,
                         fontWeight = FontWeight.ExtraBold,
                         color = DeepSea5,
-                        letterSpacing = (-1).sp
+                        letterSpacing = (-1).sp,
+                        fontFamily = TravelCentsFonts.Headline
                     )
                     Spacer(Modifier.height(4.dp))
                     Row(
@@ -329,21 +333,14 @@ fun TripStep5InterestsPage(
                 .background(DeepSea1)
                 .padding(horizontal = 16.dp, vertical = 12.dp)
         ) {
-            Button(
+            TcButton(
                 onClick = {
                     if (viewModel.origin.isBlank()) viewModel.origin = "Not specified"
                     viewModel.generateTrip()
                     onTripGenerated()
                 },
-                modifier = Modifier.fillMaxWidth().height(56.dp),
-                enabled = viewModel.interests.isNotEmpty(),
-                colors = ButtonDefaults.buttonColors(
-                    containerColor = TripWizardColors.Blue,
-                    contentColor = Color(0xFF001627),
-                    disabledContainerColor = TripWizardColors.Blue.copy(alpha = 0.25f),
-                    disabledContentColor = DeepSea5.copy(alpha = 0.3f)
-                ),
-                shape = RoundedCornerShape(999.dp)
+                modifier = Modifier.fillMaxWidth(),
+                enabled = viewModel.interests.isNotEmpty()
             ) {
                 Row(
                     horizontalArrangement = Arrangement.spacedBy(8.dp),
@@ -355,6 +352,7 @@ fun TripStep5InterestsPage(
             }
         }
     }
+}
 }
 
 @Composable

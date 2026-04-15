@@ -26,10 +26,9 @@ import androidx.compose.material.icons.filled.ChildCare
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Pets
 import androidx.compose.material.icons.filled.Remove
-import androidx.compose.material3.Button
-import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.ProvideTextStyle
 import androidx.compose.material3.Switch
 import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
@@ -44,12 +43,15 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.example.travelcents.ui.components.TcButton
 import com.example.travelcents.ui.theme.DeepSea1
 import com.example.travelcents.ui.theme.DeepSea5
+import com.example.travelcents.ui.theme.TravelCentsFonts
 
 
 @Composable
@@ -63,11 +65,12 @@ fun TripStep3TravelersPage(
     var hasChildren by remember { mutableStateOf(viewModel.children > 0) }
     var hasPets by remember { mutableStateOf(viewModel.pets > 0) }
 
-    Column(
-        modifier = modifier
-            .fillMaxSize()
-            .background(DeepSea1)
-    ) {
+    ProvideTextStyle(value = TextStyle(fontFamily = TravelCentsFonts.Body)) {
+        Column(
+            modifier = modifier
+                .fillMaxSize()
+                .background(DeepSea1)
+        ) {
         // Top bar
         Column(
             modifier = Modifier
@@ -128,7 +131,8 @@ fun TripStep3TravelersPage(
                 fontWeight = FontWeight.ExtraBold,
                 color = DeepSea5,
                 textAlign = TextAlign.Center,
-                letterSpacing = (-1).sp
+                letterSpacing = (-1).sp,
+                fontFamily = TravelCentsFonts.Headline
             )
             Spacer(Modifier.height(32.dp))
 
@@ -253,14 +257,9 @@ fun TripStep3TravelersPage(
                 .background(DeepSea1)
                 .padding(horizontal = 16.dp, vertical = 12.dp)
         ) {
-            Button(
+            TcButton(
                 onClick = onContinueClick,
-                modifier = Modifier.fillMaxWidth().height(56.dp),
-                colors = ButtonDefaults.buttonColors(
-                    containerColor = TripWizardColors.Blue,
-                    contentColor = Color(0xFF001627)
-                ),
-                shape = RoundedCornerShape(16.dp)
+                modifier = Modifier.fillMaxWidth()
             ) {
                 Row(
                     horizontalArrangement = Arrangement.spacedBy(8.dp),
@@ -272,6 +271,7 @@ fun TripStep3TravelersPage(
             }
         }
     }
+}
 }
 
 @Composable
