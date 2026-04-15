@@ -21,10 +21,9 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.RadioButtonChecked
 import androidx.compose.material.icons.filled.RadioButtonUnchecked
-import androidx.compose.material3.Button
-import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
+import androidx.compose.material3.ProvideTextStyle
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
@@ -33,9 +32,12 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.example.travelcents.ui.components.TcButton
+import com.example.travelcents.ui.theme.TravelCentsFonts
 
 private val GenBackground = Color(0xFF010E24)
 private val GenSurface = Color(0xFF0B203D)
@@ -64,18 +66,20 @@ fun TripGeneratingPage(
     val currentStep by viewModel.generationStep.collectAsState()
     val uiState by viewModel.uiState.collectAsState()
 
-    Column(
-        modifier = modifier
-            .fillMaxSize()
-            .background(GenBackground),
-        verticalArrangement = Arrangement.Center,
-        horizontalAlignment = Alignment.CenterHorizontally
-    ) {
+    ProvideTextStyle(value = TextStyle(fontFamily = TravelCentsFonts.Body)) {
+        Column(
+            modifier = modifier
+                .fillMaxSize()
+                .background(GenBackground),
+            verticalArrangement = Arrangement.Center,
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
         Text(
             text = "Generating Your Trip",
             fontSize = 24.sp,
             fontWeight = FontWeight.ExtraBold,
-            color = GenOnSurface
+            color = GenOnSurface,
+            fontFamily = TravelCentsFonts.Headline
         )
         Text(
             text = "Sit tight while we plan your adventure",
@@ -124,29 +128,24 @@ fun TripGeneratingPage(
             enter = fadeIn(),
             exit = fadeOut()
         ) {
-            Button(
+            TcButton(
                 onClick = {
                     viewModel.resetState()
                     onTripReady()
                 },
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(56.dp)
-                    .padding(horizontal = 24.dp),
-                shape = RoundedCornerShape(999.dp),
-                colors = ButtonDefaults.buttonColors(
-                    containerColor = GenBlue,
-                    contentColor = Color(0xFF001627)
-                )
+                    .padding(horizontal = 24.dp)
             ) {
                 Text(
-                    text = "View My Trip →",
+                    text = "View My Trip",
                     fontSize = 16.sp,
                     fontWeight = FontWeight.Bold
                 )
             }
         }
     }
+}
 }
 
 @Composable

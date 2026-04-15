@@ -32,10 +32,9 @@ import androidx.compose.material.icons.filled.ChevronRight
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.Button
-import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.ProvideTextStyle
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -49,12 +48,15 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.example.travelcents.ui.components.TcButton
 import com.example.travelcents.ui.theme.DeepSea1
 import com.example.travelcents.ui.theme.DeepSea5
+import com.example.travelcents.ui.theme.TravelCentsFonts
 import java.util.Calendar
 
 
@@ -128,11 +130,12 @@ fun TripStep2DatesPage(
         else displayMonth++
     }
 
-    Column(
-        modifier = modifier
-            .fillMaxSize()
-            .background(DeepSea1)
-    ) {
+    ProvideTextStyle(value = TextStyle(fontFamily = TravelCentsFonts.Body)) {
+        Column(
+            modifier = modifier
+                .fillMaxSize()
+                .background(DeepSea1)
+        ) {
         // Top bar
         Column(
             modifier = Modifier
@@ -182,7 +185,8 @@ fun TripStep2DatesPage(
                 fontSize = 30.sp,
                 fontWeight = FontWeight.ExtraBold,
                 color = DeepSea5,
-                letterSpacing = (-1).sp
+                letterSpacing = (-1).sp,
+                fontFamily = TravelCentsFonts.Headline
             )
             Spacer(Modifier.height(6.dp))
             Text(
@@ -392,17 +396,10 @@ fun TripStep2DatesPage(
                 .background(DeepSea1)
                 .padding(horizontal = 16.dp, vertical = 12.dp)
         ) {
-            Button(
+            TcButton(
                 onClick = onContinueClick,
-                modifier = Modifier.fillMaxWidth().height(52.dp),
-                enabled = startDate != null && endDate != null,
-                colors = ButtonDefaults.buttonColors(
-                    containerColor = TripWizardColors.Blue,
-                    contentColor = Color(0xFF001627),
-                    disabledContainerColor = TripWizardColors.Blue.copy(alpha = 0.25f),
-                    disabledContentColor = DeepSea5.copy(alpha = 0.3f)
-                ),
-                shape = RoundedCornerShape(16.dp)
+                modifier = Modifier.fillMaxWidth(),
+                enabled = startDate != null && endDate != null
             ) {
                 Row(
                     horizontalArrangement = Arrangement.spacedBy(8.dp),
@@ -414,6 +411,7 @@ fun TripStep2DatesPage(
             }
         }
     }
+}
 }
 
 @Composable
