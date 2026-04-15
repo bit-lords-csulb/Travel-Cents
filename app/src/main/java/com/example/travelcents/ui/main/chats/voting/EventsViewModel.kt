@@ -3,8 +3,8 @@ package com.example.travelcents.ui.main.chats.voting
 import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
-import com.example.travelcents.data.model.Event
-import com.example.travelcents.data.model.Group
+import com.example.travelcents.data.trip.model.Event
+import com.example.travelcents.data.social.model.Group
 import com.google.firebase.Firebase
 import com.google.firebase.auth.auth
 import com.google.firebase.firestore.FieldValue

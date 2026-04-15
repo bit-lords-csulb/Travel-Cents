@@ -59,7 +59,7 @@ private val ChatBlue = Color(0xFF64B5F6)
 fun AiTripChatPage(
     modifier: Modifier = Modifier,
     onBackClick: () -> Unit = {},
-    viewModel: ChatViewModel = viewModel()
+    viewModel: AiChatViewModel = viewModel()
 ) {
     val messages = viewModel.messages
     val isLoading by viewModel.isLoading.collectAsState()
@@ -258,3 +258,4 @@ private fun TypingIndicator() {
         )
     }
 }
+

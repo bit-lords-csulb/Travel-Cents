@@ -138,3 +138,4 @@ private fun handleCredentialResult(
 
     authViewModel.setErrorMessage("Google sign-in returned an unsupported credential: ${credential.type}")
 }
+

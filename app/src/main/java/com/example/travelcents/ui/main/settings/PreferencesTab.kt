@@ -89,3 +89,4 @@ private fun AboutSection() {
         modifier = Modifier.padding(horizontal = 4.dp)
     )
 }
+

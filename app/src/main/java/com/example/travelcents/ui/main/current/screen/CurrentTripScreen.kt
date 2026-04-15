@@ -273,3 +273,4 @@ fun CurrentTripScreen(
         onRejectOption = viewModel::rejectOption
     )
 }
+

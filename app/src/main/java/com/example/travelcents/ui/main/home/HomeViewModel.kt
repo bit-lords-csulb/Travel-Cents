@@ -3,12 +3,12 @@ package com.example.travelcents.ui.main.home
 import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.example.travelcents.data.UserProfileRepository
-import com.example.travelcents.data.model.CurrentUserProfile
+import com.example.travelcents.data.user.UserProfileRepository
+import com.example.travelcents.data.user.model.CurrentUserProfile
 import com.example.travelcents.BuildConfig
-import com.example.travelcents.data.model.Itinerary
-import com.example.travelcents.data.remote.DestinationImageRepository
-import com.example.travelcents.data.remote.WikipediaApiService
+import com.example.travelcents.data.trip.model.Itinerary
+import com.example.travelcents.data.trip.remote.DestinationImageRepository
+import com.example.travelcents.data.trip.remote.WikipediaApiService
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.Query
@@ -186,3 +186,4 @@ class HomeViewModel : ViewModel() {
             "TravelCents/${BuildConfig.VERSION_NAME} (Android app; $WIKIMEDIA_CONTACT_URL)"
     }
 }
+

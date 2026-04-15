@@ -34,7 +34,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.example.travelcents.data.model.TravelEvent
+import com.example.travelcents.data.trip.model.TravelEvent
 import com.example.travelcents.ui.main.current.calendar.defaultStartMinutesForDate
 import com.example.travelcents.ui.main.current.calendar.eventSpanForDate
 import com.example.travelcents.ui.main.current.calendar.eventsForDate
@@ -254,3 +254,4 @@ private fun WeekOverviewEventRow(
         }
     }
 }
+

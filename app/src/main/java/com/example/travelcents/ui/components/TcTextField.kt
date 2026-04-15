@@ -157,3 +157,4 @@ fun TcCompactTextField(
         trailingIcon?.invoke()
     }
 }
+

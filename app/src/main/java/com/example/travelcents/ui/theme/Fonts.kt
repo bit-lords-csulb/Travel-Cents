@@ -8,3 +8,4 @@ object TravelCentsFonts {
     val Headline = FontFamily(Font(R.font.manrope))
     val Body = FontFamily(Font(R.font.plus_jakarta_sans))
 }
+

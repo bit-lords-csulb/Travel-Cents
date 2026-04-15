@@ -61,7 +61,7 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import coil.compose.AsyncImage
 import coil.request.ImageRequest
 import com.example.travelcents.BuildConfig
-import com.example.travelcents.data.model.Itinerary
+import com.example.travelcents.data.trip.model.Itinerary
 import com.example.travelcents.ui.components.ProfileAvatar
 import com.example.travelcents.ui.theme.DeepSea1
 import com.example.travelcents.ui.theme.DeepSea2
@@ -736,3 +736,4 @@ private fun DocumentsWidget() {
 private const val WIKIMEDIA_CONTACT_URL = "https://github.com/bit-lords-csulb/Travel-Cents"
 private val WIKIMEDIA_IMAGE_USER_AGENT =
     "TravelCents/${BuildConfig.VERSION_NAME} (Android app; $WIKIMEDIA_CONTACT_URL)"
+

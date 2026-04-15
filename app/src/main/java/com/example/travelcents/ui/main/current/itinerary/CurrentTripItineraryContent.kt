@@ -58,8 +58,8 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImage
-import com.example.travelcents.data.model.EventOption
-import com.example.travelcents.data.model.TravelEvent
+import com.example.travelcents.data.trip.model.EventOption
+import com.example.travelcents.data.trip.model.TravelEvent
 import com.example.travelcents.ui.modules.formatDisplayTime
 import com.example.travelcents.ui.modules.heroImageModel
 import com.example.travelcents.ui.modules.normalizeTime
@@ -514,3 +514,4 @@ private fun formatItineraryHeaderDate(dateStr: String): String {
         dateStr
     }
 }
+

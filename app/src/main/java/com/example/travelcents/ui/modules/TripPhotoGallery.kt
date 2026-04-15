@@ -25,7 +25,7 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import coil.compose.AsyncImage
-import com.example.travelcents.data.model.TravelEvent
+import com.example.travelcents.data.trip.model.TravelEvent
 
 fun TravelEvent.heroImageModel(): String =
     localImagePath.ifBlank { imageUrl.ifBlank { details["imageUrl"] ?: details["image_url"] ?: "" } }
@@ -141,3 +141,4 @@ fun TripPhotoGalleryDialog(
         }
     }
 }
+

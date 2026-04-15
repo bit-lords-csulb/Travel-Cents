@@ -22,7 +22,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.travelcents.ui.main.chats.chat.DirectChatViewModel
-import com.example.travelcents.ui.main.chats.friends.Friend
+import com.example.travelcents.data.social.model.Friend
 import com.example.travelcents.ui.theme.*
 import com.google.firebase.Timestamp
 
@@ -171,3 +171,4 @@ fun DirectChatPage(
         }
     }
 }
+

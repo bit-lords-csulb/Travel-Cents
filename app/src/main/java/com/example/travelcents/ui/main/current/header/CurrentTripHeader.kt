@@ -47,7 +47,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.example.travelcents.data.model.Itinerary
+import com.example.travelcents.data.trip.model.Itinerary
 import com.example.travelcents.ui.main.current.TripMemberUi
 import com.example.travelcents.ui.modules.formatDayOfWeekShort
 import com.example.travelcents.ui.modules.formatHeroDate
@@ -429,3 +429,4 @@ private fun MemberListSheet(members: List<TripMemberUi>, onDismiss: () -> Unit) 
         }
     }
 }
+

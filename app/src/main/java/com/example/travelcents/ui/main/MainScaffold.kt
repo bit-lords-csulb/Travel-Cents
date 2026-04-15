@@ -305,3 +305,4 @@ fun MainScaffold(modifier: Modifier = Modifier, onLogout: () -> Unit = {}) {
         }
     }
 }
+

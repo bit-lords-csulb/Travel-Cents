@@ -31,8 +31,8 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import coil.compose.AsyncImage
-import com.example.travelcents.data.model.TravelEvent
-import com.example.travelcents.data.model.YelpReview
+import com.example.travelcents.data.trip.model.TravelEvent
+import com.example.travelcents.data.trip.model.YelpReview
 import com.example.travelcents.ui.modules.galleryPhotoModels
 
 private val SurfaceCard = Color(0xFF0B203D)
@@ -598,3 +598,4 @@ private fun PriceLevelBadge(level: String) {
         )
     }
 }
+

@@ -371,3 +371,4 @@ private fun S4ProgressWidget(stepsComplete: Int) {
         }
     }
 }
+

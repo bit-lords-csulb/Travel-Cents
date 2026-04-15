@@ -22,8 +22,8 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImage
-import com.example.travelcents.data.model.EventOption
-import com.example.travelcents.data.model.TravelEvent
+import com.example.travelcents.data.trip.model.EventOption
+import com.example.travelcents.data.trip.model.TravelEvent
 
 private val BgColor = Color(0xFF010E24)
 private val SurfaceHigh = Color(0xFF0B203D)
@@ -389,3 +389,4 @@ private fun OptionRow(
         }
     }
 }
+

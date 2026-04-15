@@ -7,13 +7,13 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
-import com.example.travelcents.data.ImageCacheManager
-import com.example.travelcents.data.model.Itinerary
-import com.example.travelcents.data.model.TravelEvent
-import com.example.travelcents.data.model.TravelRequest
-import com.example.travelcents.data.remote.SerpRepository
-import com.example.travelcents.data.remote.TripPlannerRepository
-import com.example.travelcents.data.remote.YelpRepository
+import com.example.travelcents.data.media.ImageCacheManager
+import com.example.travelcents.data.trip.model.Itinerary
+import com.example.travelcents.data.trip.model.TravelEvent
+import com.example.travelcents.data.trip.model.TravelRequest
+import com.example.travelcents.data.trip.remote.SerpRepository
+import com.example.travelcents.data.ai.repository.TripPlannerRepository
+import com.example.travelcents.data.trip.remote.YelpRepository
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FirebaseFirestore
 import kotlinx.coroutines.async
@@ -315,3 +315,4 @@ sealed class TripUiState {
     data class Success(val itinerary: Itinerary, val events: List<TravelEvent>) : TripUiState()
     data class Error(val message: String) : TripUiState()
 }
+

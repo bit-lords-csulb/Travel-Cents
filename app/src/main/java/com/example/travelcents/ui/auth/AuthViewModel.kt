@@ -3,7 +3,7 @@ package com.example.travelcents.ui.auth
 import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.example.travelcents.data.AuthModel
+import com.example.travelcents.data.auth.AuthModel
 import com.google.firebase.FirebaseNetworkException
 import com.google.firebase.FirebaseTooManyRequestsException
 import com.google.firebase.auth.FirebaseAuthInvalidCredentialsException
@@ -221,4 +221,5 @@ class AuthViewModel : ViewModel() {
         }
     }
 }
+
 

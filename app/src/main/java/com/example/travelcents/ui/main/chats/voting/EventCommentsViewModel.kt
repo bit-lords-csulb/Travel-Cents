@@ -2,7 +2,7 @@ package com.example.travelcents.ui.main.chats.voting
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
-import com.example.travelcents.data.model.EventComment
+import com.example.travelcents.data.trip.model.EventComment
 import com.google.firebase.Firebase
 import com.google.firebase.auth.auth
 import com.google.firebase.firestore.FieldValue

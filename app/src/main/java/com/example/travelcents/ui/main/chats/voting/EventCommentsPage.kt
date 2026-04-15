@@ -22,8 +22,8 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
-import com.example.travelcents.data.model.Event
-import com.example.travelcents.data.model.EventComment
+import com.example.travelcents.data.trip.model.Event
+import com.example.travelcents.data.trip.model.EventComment
 import com.example.travelcents.ui.theme.*
 import java.text.SimpleDateFormat
 import java.util.*
@@ -219,3 +219,4 @@ fun CommentBubble(comment: EventComment, isMe: Boolean) {
         }
     }
 }
+

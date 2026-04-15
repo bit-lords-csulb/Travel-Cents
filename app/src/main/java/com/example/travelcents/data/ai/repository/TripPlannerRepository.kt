@@ -1,0 +1,87 @@
+package com.example.travelcents.data.ai.repository
+
+import com.example.travelcents.data.trip.model.Itinerary
+import com.example.travelcents.data.ai.model.LlmMessage
+import com.example.travelcents.data.ai.remote.LlmClient
+import com.example.travelcents.data.trip.model.TravelRequest
+import com.google.gson.Gson
+import com.google.gson.JsonObject
+import java.util.UUID
+
+object TripPlannerRepository {
+
+    private val gson = Gson()
+
+    private const val SYSTEM_PROMPT =
+        "You are a travel planner. Always respond with valid JSON only. No markdown, no extra text."
+
+    suspend fun generateItinerary(request: TravelRequest): Itinerary {
+        val raw = LlmClient.complete(
+            messages = listOf(
+                LlmMessage(role = "system", content = SYSTEM_PROMPT),
+                LlmMessage(role = "user", content = buildItineraryPrompt(request))
+            ),
+            maxTokens = 4096,
+            responseFormat = mapOf("type" to "json_object")
+        )
+        return parseItinerary(raw, request.userId)
+    }
+
+    private fun buildItineraryPrompt(request: TravelRequest): String {
+        val requestJson = gson.toJson(request)
+        return """
+A user submitted this travel request:
+$requestJson
+
+Return a single JSON object with these fields only:
+{
+  "itinerary_id": "<uuid>",
+  "user_id": "${request.userId}",
+  "trip_name": "<short title>",
+  "destination": "<city, country>",
+  "origin": "<city, country>",
+  "origin_iata": "<IATA airport code for origin city, e.g. LAX>",
+  "destination_iata": "<IATA airport code for destination city, e.g. CDG>",
+  "date_from": "<YYYY-MM-DD>",
+  "date_to": "<YYYY-MM-DD>",
+  "duration_days": <int>,
+  "currency": "<ISO 4217>",
+  "travel_style": "<budget|comfort|luxury>",
+  "travelers": {"adults": <int>, "children": <int>},
+  "created_at": "<ISO 8601 timestamp>",
+  "status": "draft"
+}
+        """.trimIndent()
+    }
+
+    private fun parseItinerary(raw: String, userId: String): Itinerary {
+        val json = gson.fromJson(raw, JsonObject::class.java)
+
+        val travelers = json.getAsJsonObject("travelers")
+        val itineraryId = json.get("itinerary_id")?.asString
+            ?.takeIf { !it.contains("uuid", ignoreCase = true) }
+            ?: UUID.randomUUID().toString()
+
+        return Itinerary(
+            itineraryId = itineraryId,
+            userId = userId,
+            tripName = json.get("trip_name")?.asString ?: "My Trip",
+            destination = json.get("destination")?.asString ?: "",
+            origin = json.get("origin")?.asString ?: "",
+            originIata = json.get("origin_iata")?.asString?.uppercase() ?: "",
+            destinationIata = json.get("destination_iata")?.asString?.uppercase() ?: "",
+            dateFrom = json.get("date_from")?.asString ?: "",
+            dateTo = json.get("date_to")?.asString ?: "",
+            durationDays = json.get("duration_days")?.asInt ?: 0,
+            currency = json.get("currency")?.asString ?: "USD",
+            travelStyle = json.get("travel_style")?.asString ?: "comfort",
+            adults = travelers?.get("adults")?.asInt ?: 1,
+            children = travelers?.get("children")?.asInt ?: 0,
+            createdAt = json.get("created_at")?.asString ?: java.time.Instant.now().toString(),
+            status = json.get("status")?.asString ?: "draft",
+            eventIds = emptyList()
+        )
+    }
+}
+
+

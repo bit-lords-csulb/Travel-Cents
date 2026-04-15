@@ -21,9 +21,9 @@ import java.util.Locale
 @Composable
 fun CurrentTripOverlayHost(
     uiState: CurrentTripUiState,
-    eventOptions: Map<String, List<com.example.travelcents.data.model.EventOption>>,
+    eventOptions: Map<String, List<com.example.travelcents.data.trip.model.EventOption>>,
     rejectedOptions: Map<String, Set<String>>,
-    yelpReviews: Map<String, List<com.example.travelcents.data.model.YelpReview>>,
+    yelpReviews: Map<String, List<com.example.travelcents.data.trip.model.YelpReview>>,
     reviewsLoading: Set<String>,
     shareTargets: List<ShareTarget>,
     selectedEventId: String?,
@@ -179,3 +179,4 @@ fun CurrentTripOverlayHost(
         }
     }
 }
+

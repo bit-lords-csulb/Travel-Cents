@@ -63,8 +63,8 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import coil.compose.AsyncImage
-import com.example.travelcents.data.model.EventOption
-import com.example.travelcents.data.model.YelpReview
+import com.example.travelcents.data.trip.model.EventOption
+import com.example.travelcents.data.trip.model.YelpReview
 import com.example.travelcents.ui.modules.defaultPlanTimeZoneId
 import com.example.travelcents.ui.modules.formatDisplayTime
 import com.example.travelcents.ui.modules.formatTimeZoneLabel
@@ -838,3 +838,4 @@ private fun showPlanTimePicker(
         false
     ).show()
 }
+
