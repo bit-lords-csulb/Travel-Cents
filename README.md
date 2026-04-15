@@ -6,8 +6,8 @@ An AI-powered travel planning Android app built with Jetpack Compose and Kotlin.
 
 ## What It Does
 
-- **Generate a full trip itinerary** — fill out a form and the app calls Groq AI to produce a day-by-day schedule with flights, hotels, restaurants, and activities.
-- **Chat with an AI travel assistant** — conversational planning powered by Groq.
+- **Generate a full trip itinerary** — fill out a form and the app uses an OpenAI-compatible LLM for itinerary metadata, then enriches the trip with live flights, hotels, restaurants, and activities.
+- **Chat with an AI travel assistant** — conversational planning powered by a configurable AI provider.
 - **View and edit your itinerary** — type-specific event cards grouped by day, with inline edit/delete and a sleek timeline view.
 - **Group chats** — real-time messaging with friends in a trip group.
 - **Direct messages** — 1-on-1 chat with any friend.
@@ -22,7 +22,7 @@ An AI-powered travel planning Android app built with Jetpack Compose and Kotlin.
 
 - Android Studio Hedgehog or newer.
 - Android device or emulator (API 24+).
-- A Groq API key (free).
+- An AI provider API key for any OpenAI-compatible endpoint.
 - A [SerpAPI key](https://serpapi.com/) for live flight and hotel prices.
 - A Yelp Fusion API key for activity suggestions.
 - A Firebase project with **Authentication** (email/password) and **Firestore** enabled.
@@ -36,10 +36,14 @@ An AI-powered travel planning Android app built with Jetpack Compose and Kotlin.
 
 2. Add your API keys to `local.properties` (git-ignored, create if it doesn't exist):
    ```
-   GROQ_API_KEY=your-groq-key
+   LLM_API_KEY=your-llm-key
+   LLM_BASE_URL=https://api.groq.com/openai/v1/
+   LLM_MODEL=llama-3.3-70b-versatile
    SERP_API_KEY=your-serpapi-key
    YELP_API_KEY=your-yelp-key
    ```
+
+   `GROQ_API_KEY` is still accepted as a fallback for older local setups.
 
 3. Add your Firebase config:
    - Download `google-services.json` from your Firebase console.
@@ -58,9 +62,10 @@ An AI-powered travel planning Android app built with Jetpack Compose and Kotlin.
 
 ### Trip Planning
 - Form: origin, destination, dates, adults/children, travel style, budget + currency, dietary preferences, interests, special requests.
-- Two-call Groq pipeline:
-  1. Generates trip metadata (name, dates, duration).
-  2. Generates full event list (flights, hotels, restaurants, activities).
+- AI itinerary pipeline:
+  1. Generates trip metadata (name, dates, duration, IATA codes).
+  2. Uses SerpAPI for flights and hotels.
+  3. Uses Yelp for restaurants, activities, and local events.
 - SerpAPI enriches results with real flight and hotel pricing.
 - Saves itinerary + all events to Firestore.
 
@@ -72,7 +77,7 @@ An AI-powered travel planning Android app built with Jetpack Compose and Kotlin.
 - **Final Plan** view for a polished, read-only or shareable summary of the trip.
 
 ### AI Chat
-- Conversational travel assistant (Groq).
+- Conversational travel assistant powered by the configured AI provider.
 - Full multi-turn chat history.
 - Typing indicator for a more responsive feel.
 
@@ -100,11 +105,11 @@ An AI-powered travel planning Android app built with Jetpack Compose and Kotlin.
 | Navigation | Jetpack Navigation Compose |
 | Auth | Firebase Authentication |
 | Database | Firebase Firestore |
-| AI | Groq API (`llama-3.3-70b-versatile`) |
+| AI | Configurable OpenAI-compatible provider |
 | Flight & Hotel Data | SerpAPI |
 | Activity Search | Yelp Fusion API |
 | Activity Descriptions | Wikipedia REST API |
-| HTTP (Groq/Serp) | Retrofit 2 + OkHttp 4 |
+| HTTP (AI/Serp) | Retrofit 2 + OkHttp 4 |
 | HTTP (Yelp/Wikipedia) | Ktor Client |
 | Serialization | Gson |
 | Images | Coil |
@@ -125,11 +130,13 @@ Travel-Cents/
 │       │   │   ├── MainActivity.kt      # Entry point activity
 │       │   │   ├── data/                # Data layer: Repositories, APIs, and Core Models
 │       │   │   │   ├── model/           # DTOs and internal data structures (Itinerary, TravelEvent, etc.)
-│       │   │   │   ├── remote/          # API services (Groq, Serp) and their respective repositories
+│       │   │   │   ├── remote/          # API services (AI provider, Serp, Yelp) and their repositories
 │       │   │   │   ├── AuthModel.kt     # Data structures for user authentication
 │       │   │   │   ├── ChatMessage.kt   # Model for chat messages
 │       │   │   │   ├── FirestoreRepository.kt # Central hub for Firebase Firestore operations
-│       │   │   │   ├── GroqApi.kt       # Interface for Groq AI endpoints
+│       │   │   │   ├── model/LlmModels.kt       # Shared request/response models for the AI provider
+│       │   │   │   ├── remote/LlmClient.kt      # Shared OpenAI-compatible AI client
+│       │   │   │   ├── remote/TripPlannerRepository.kt # Itinerary metadata generation prompts/parsing
 │       │   │   │   ├── Trip.kt          # Main Trip data class
 │       │   │   │   └── TripEvent.kt     # Model for individual trip events
 │       │   │   └── ui/                  # UI layer: Composables and ViewModels

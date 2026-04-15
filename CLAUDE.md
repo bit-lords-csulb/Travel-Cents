@@ -27,12 +27,16 @@ Run these from the repo root. On Windows use `gradlew.bat` or `.\gradlew` in Pow
 
 In `local.properties` (never commit):
 ```
-GROQ_API_KEY=your-key-here
+LLM_API_KEY=your-key-here
+LLM_BASE_URL=https://api.groq.com/openai/v1/
+LLM_MODEL=llama-3.3-70b-versatile
 SERP_API_KEY=your-key-here
 YELP_API_KEY=your-key-here
 ```
 
-All three are injected as `BuildConfig` fields at build time via `app/build.gradle.kts`.
+`GROQ_API_KEY` is still accepted as a fallback for older local setups.
+
+All values are injected as `BuildConfig` fields at build time via `app/build.gradle.kts`.
 
 ## Package Root
 
@@ -51,10 +55,11 @@ All three are injected as `BuildConfig` fields at build time via `app/build.grad
 ### Trip Planning (AI Pipeline)
 - `ui/main/newTrip/NewTripLandingPage.kt` — landing with options (plan, AI chat, last trip)
 - `ui/main/newTrip/TripStep1–5*.kt` — 5-step wizard pages
-- `ui/main/newTrip/NewTripViewModel.kt` — wizard state + Groq pipeline + Firestore save
+- `ui/main/newTrip/NewTripViewModel.kt` — wizard state + AI itinerary pipeline + Firestore save
 - `ui/main/newTrip/TripWizardColors.kt` — color palette used by the wizard and `TcTextField`
-- `data/remote/GroqRepository.kt` — two-call Groq pipeline: `generateItinerary()` + `generateEvents()`
-- `data/remote/GroqApiService.kt` — Retrofit interface for trip pipeline
+- `data/remote/TripPlannerRepository.kt` — LLM-backed itinerary metadata generation
+- `data/remote/LlmClient.kt` — shared OpenAI-compatible AI client
+- `data/model/LlmModels.kt` — shared request/response models for AI completions
 - `data/model/TravelRequest.kt` / `Itinerary.kt` / `TravelEvent.kt` — data models
 
 ### Current Trip / Itinerary
@@ -65,8 +70,8 @@ All three are injected as `BuildConfig` fields at build time via `app/build.grad
 
 ### AI Chat
 - `ui/main/aichat/AiTripChatPage.kt` — conversational travel assistant UI
-- `ui/main/aichat/ChatViewModel.kt` — Groq multi-turn chat **(NOT the group chat ViewModel)**
-- `data/GroqApi.kt` — separate Retrofit instance for chat (different base URL from pipeline)
+- `ui/main/aichat/AiChatViewModel.kt` — AI multi-turn chat **(NOT the group chat ViewModel)**
+- `data/remote/LlmClient.kt` — shared OpenAI-compatible client used by both itinerary generation and AI chat
 
 ### Group Chats
 - `ui/main/chats/chat/ChatsPage.kt` / `ChatPage.kt` — group list + message thread
@@ -142,29 +147,30 @@ groups/{groupId}/messages/{msgId}
   }
   ```
 - Firebase imports: `com.google.firebase.Firebase` — **not** `.ktx.Firebase` (removed in SDK 32+)
-- Groq API key: `BuildConfig.GROQ_API_KEY` sourced from `local.properties`
+- AI provider config: `BuildConfig.LLM_API_KEY`, `BuildConfig.LLM_BASE_URL`, `BuildConfig.LLM_MODEL`
 - Firestore listeners are deferred until auth is confirmed
 
-## Groq API — Two Separate Retrofit Instances
+## AI Provider Architecture
 
-| Instance | File | Base URL | Purpose |
-|---|---|---|---|
-| Trip pipeline | `GroqApiService.kt` + `GroqRepository.kt` | `https://api.groq.com/openai/v1/` | generateItinerary + generateEvents |
-| AI chat | `GroqApi.kt` | `https://api.groq.com/openai/` | Multi-turn chat completions |
+| Layer | File | Purpose |
+|---|---|---|
+| Shared transport | `LlmClient.kt` + `LlmApiService.kt` | OpenAI-compatible chat completions |
+| Itinerary generation | `TripPlannerRepository.kt` | Prompting + JSON parsing for itinerary metadata |
+| AI chat | `AiChatViewModel.kt` | Multi-turn chat completions via the shared AI client |
 
-Both use model `llama-3.3-70b-versatile` with `Authorization: Bearer ${BuildConfig.GROQ_API_KEY}`.
+The default provider is Groq, but the app is wired through `LLM_BASE_URL` and `LLM_API_KEY` so compatible providers can be swapped without changing Kotlin code.
 
-The pipeline system prompt: `"You are a travel planner. Always respond with valid JSON only. No markdown, no extra text."`
+The itinerary system prompt remains: `"You are a travel planner. Always respond with valid JSON only. No markdown, no extra text."`
 
 ## Naming Collision Warning
 
-There are **two files named `ChatViewModel.kt`** and **two named `NewTripViewModel.kt`**:
+There is still a naming collision around `NewTripViewModel.kt`, but the AI chat ViewModel has been renamed to avoid confusion:
 
 | File | Package | Purpose |
 |---|---|---|
-| `ui/main/aichat/ChatViewModel.kt` | `ui.main.aichat` | AI chat (Groq, multi-turn) |
+| `ui/main/aichat/AiChatViewModel.kt` | `ui.main.aichat` | AI chat (LLM, multi-turn) |
 | `ui/main/chats/chat/ChatViewModel.kt` | `ui.main.chats.chat` | Group chat (Firestore) |
-| `ui/main/newTrip/NewTripViewModel.kt` | `ui.main.newTrip` | Groq pipeline + Firestore save |
+| `ui/main/newTrip/NewTripViewModel.kt` | `ui.main.newTrip` | AI itinerary pipeline + Firestore save |
 | `ui/main/chats/groups/NewTripViewModel.kt` | `ui.main.chats.groups` | Group creation ViewModel |
 
 Always check the package when importing.
