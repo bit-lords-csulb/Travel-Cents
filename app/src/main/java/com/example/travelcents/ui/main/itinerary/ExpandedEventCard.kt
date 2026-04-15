@@ -14,11 +14,14 @@ import androidx.compose.material.icons.automirrored.filled.OpenInNew
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.GridView
+import androidx.compose.material.icons.filled.LocationOn
+import androidx.compose.material.icons.filled.Map
 import androidx.compose.material.icons.filled.SwapHoriz
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.layout.ContentScale
@@ -53,6 +56,7 @@ import com.example.travelcents.data.trip.model.firstNonBlank
 import com.example.travelcents.data.trip.model.TravelEvent
 import com.example.travelcents.data.trip.model.YelpReview
 import com.example.travelcents.ui.modules.galleryPhotoModels
+import com.example.travelcents.ui.modules.rememberStaticMapModel
 
 private val SurfaceCard = Color(0xFF0B203D)
 private val SurfaceHighest = Color(0xFF102645)
@@ -110,6 +114,7 @@ fun ExpandedEventCard(
     var editNotes by remember(event.eventId, existingNotes) { mutableStateOf(existingNotes) }
     var isEditing by remember { mutableStateOf(false) }
     val uriHandler = LocalUriHandler.current
+    val staticMapModel = rememberStaticMapModel(event)
 
     ModalBottomSheet(
         onDismissRequest = {
@@ -249,6 +254,17 @@ fun ExpandedEventCard(
                     "hotel" -> HotelDetails(event)
                     "restaurant", "dining", "food" -> RestaurantDetails(event, yelpReviews, isLoadingReviews, uriHandler)
                     else -> ActivityDetails(event, yelpReviews, isLoadingReviews, uriHandler)
+                }
+
+                eventLocationLabel(event)?.let { locationLabel ->
+                    Spacer(modifier = Modifier.height(16.dp))
+                    HorizontalDivider(color = OutlineVar.copy(alpha = 0.3f))
+                    Spacer(modifier = Modifier.height(16.dp))
+                    StaticMapSection(
+                        staticMapModel = staticMapModel,
+                        locationLabel = locationLabel,
+                        onOpenMaps = { uriHandler.openUri(googleMapsSearchUrl(locationLabel)) }
+                    )
                 }
 
                 // Notes (editable)
@@ -526,6 +542,95 @@ private fun ActivityDetails(
         }
     }
     ReviewsSection(reviews, isLoadingReviews)
+}
+
+@Composable
+private fun StaticMapSection(
+    staticMapModel: String?,
+    locationLabel: String,
+    onOpenMaps: () -> Unit
+) {
+    DetailGroup("LOCATION") {
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(170.dp)
+                .clip(RoundedCornerShape(14.dp))
+                .background(SurfaceHighest)
+        ) {
+            if (!staticMapModel.isNullOrBlank()) {
+                AsyncImage(
+                    model = staticMapModel,
+                    contentDescription = locationLabel,
+                    modifier = Modifier.fillMaxSize(),
+                    contentScale = ContentScale.Crop
+                )
+            } else {
+                Column(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .padding(horizontal = 16.dp, vertical = 18.dp),
+                    verticalArrangement = Arrangement.Center,
+                    horizontalAlignment = Alignment.CenterHorizontally
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.LocationOn,
+                        contentDescription = null,
+                        tint = BlueAccent,
+                        modifier = Modifier.size(28.dp)
+                    )
+                    Spacer(modifier = Modifier.height(10.dp))
+                    Text(
+                        text = "Map preview unavailable",
+                        color = OnSurface,
+                        fontSize = 13.sp,
+                        fontWeight = FontWeight.SemiBold
+                    )
+                }
+            }
+        }
+        Spacer(modifier = Modifier.height(10.dp))
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Icon(
+                imageVector = Icons.Default.Map,
+                contentDescription = null,
+                tint = OnSurfaceVar,
+                modifier = Modifier.size(16.dp)
+            )
+            Spacer(modifier = Modifier.width(8.dp))
+            Text(
+                text = locationLabel,
+                color = OnSurfaceVar,
+                fontSize = 12.sp,
+                modifier = Modifier.weight(1f)
+            )
+        }
+        Spacer(modifier = Modifier.height(8.dp))
+        Text(
+            text = "Open in Maps →",
+            color = BlueAccent,
+            fontSize = 13.sp,
+            fontWeight = FontWeight.SemiBold,
+            textDecoration = TextDecoration.Underline,
+            modifier = Modifier.clickable { onOpenMaps() }
+        )
+    }
+}
+
+private fun eventLocationLabel(event: TravelEvent): String? {
+    return listOf(
+        event.details.firstNonBlank(ATTR_BUSINESS_ADDRESS, "address"),
+        event.details.firstNonBlank(ATTR_HOTEL_NAME, "hotel_name"),
+        event.details["location"],
+        event.details["title"]
+    ).firstOrNull { !it.isNullOrBlank() }
+}
+
+private fun googleMapsSearchUrl(query: String): String {
+    return "https://www.google.com/maps/search/?api=1&query=${java.net.URLEncoder.encode(query, "UTF-8")}"
 }
 
 @Composable

@@ -48,8 +48,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.ColorFilter
-import androidx.compose.ui.graphics.ColorMatrix
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.text.font.FontWeight
@@ -81,6 +79,7 @@ import com.example.travelcents.ui.modules.formatDisplayTimeRange
 import com.example.travelcents.ui.modules.galleryPhotoModels
 import com.example.travelcents.ui.modules.heroImageModel
 import com.example.travelcents.ui.modules.parseFlexibleTime
+import com.example.travelcents.ui.modules.rememberStaticMapModel
 import java.time.Duration
 import java.util.Locale
 
@@ -116,6 +115,7 @@ fun CurrentTripEventDetailsDialog(
     val mapsUrl = remember(mapsQuery) { googleMapsSearchUrl(mapsQuery) }
     val directionsUrl = remember(mapsQuery) { googleMapsDirectionsUrl(mapsQuery) }
     val locationLabel = remember(event) { eventLocationLabel(event) }
+    val staticMapModel = rememberStaticMapModel(event)
     val experienceText = remember(event) { eventExperienceText(event) }
     val timeSummary = remember(event) { eventTimeSummary(event) }
     val durationSummary = remember(event) { eventDurationSummary(event) }
@@ -256,7 +256,7 @@ fun CurrentTripEventDetailsDialog(
                             )
 
                             LocationSection(
-                                heroImage = heroImage,
+                                staticMapModel = staticMapModel,
                                 locationLabel = locationLabel,
                                 onOpenMaps = { uriHandler.openUri(mapsUrl) }
                             )
@@ -573,7 +573,7 @@ private fun HighlightCard(
 
 @Composable
 private fun LocationSection(
-    heroImage: String?,
+    staticMapModel: String?,
     locationLabel: String,
     onOpenMaps: () -> Unit
 ) {
@@ -624,43 +624,61 @@ private fun LocationSection(
                     .clip(RoundedCornerShape(16.dp))
                     .background(DetailSurfaceHigh)
             ) {
-                if (!heroImage.isNullOrBlank()) {
+                if (!staticMapModel.isNullOrBlank()) {
                     AsyncImage(
-                        model = heroImage,
+                        model = staticMapModel,
                         contentDescription = locationLabel,
                         modifier = Modifier.fillMaxSize(),
-                        contentScale = ContentScale.Crop,
-                        colorFilter = ColorFilter.colorMatrix(
-                            ColorMatrix().apply { setToSaturation(0f) }
-                        ),
-                        alpha = 0.48f
+                        contentScale = ContentScale.Crop
                     )
-                }
-                Box(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .background(
-                            brush = Brush.linearGradient(
-                                colors = listOf(
-                                    DetailBackground.copy(alpha = 0.15f),
-                                    DetailSurfaceHigh.copy(alpha = 0.75f)
+                    Box(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .background(
+                                brush = Brush.verticalGradient(
+                                    colors = listOf(
+                                        Color.Transparent,
+                                        DetailBackground.copy(alpha = 0.22f),
+                                        DetailSurfaceHigh.copy(alpha = 0.52f)
+                                    )
                                 )
                             )
-                        )
-                )
-                Box(
-                    modifier = Modifier
-                        .size(56.dp)
-                        .align(Alignment.Center)
-                        .background(DetailPrimary.copy(alpha = 0.18f), CircleShape),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.LocationOn,
-                        contentDescription = null,
-                        tint = DetailPrimary,
-                        modifier = Modifier.size(30.dp)
                     )
+                } else {
+                    Column(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .padding(horizontal = 18.dp, vertical = 16.dp),
+                        verticalArrangement = Arrangement.Center,
+                        horizontalAlignment = Alignment.CenterHorizontally
+                    ) {
+                        Box(
+                            modifier = Modifier
+                                .size(56.dp)
+                                .background(DetailPrimary.copy(alpha = 0.18f), CircleShape),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.LocationOn,
+                                contentDescription = null,
+                                tint = DetailPrimary,
+                                modifier = Modifier.size(30.dp)
+                            )
+                        }
+                        Spacer(modifier = Modifier.height(12.dp))
+                        Text(
+                            text = "Map preview unavailable",
+                            color = DetailOnSurface,
+                            fontSize = 14.sp,
+                            fontWeight = FontWeight.SemiBold
+                        )
+                        Spacer(modifier = Modifier.height(4.dp))
+                        Text(
+                            text = "Using address details instead.",
+                            color = DetailOnSurfaceVariant,
+                            fontSize = 12.sp
+                        )
+                    }
                 }
             }
 

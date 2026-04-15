@@ -180,6 +180,7 @@ Replace the current fake location background with a real static map image.
 ### Approach
 
 - Use an OSM-based static map provider.
+- Keep provider attribution at the metadata/config level: store `attr_static_map_provider = osm_staticmap` with the generated URL so future UI attribution or provider swaps stay explicit.
 - Build a map image URL from stored coordinates.
 - Save that URL in Firestore so all devices can render the same location preview.
 - Download/cache the map image locally the same way other media is cached.

@@ -54,9 +54,23 @@ object ImageCacheManager {
         File(context.filesDir, "trip_images/$tripId").deleteRecursively()
     }
 
+    fun localPathForUrl(
+        context: Context,
+        tripId: String,
+        url: String
+    ): String? {
+        if (tripId.isBlank() || url.isBlank()) return null
+        val file = File(context.filesDir, "trip_images/$tripId/${urlToFileName(url)}")
+        return file.absolutePath.takeIf { file.exists() }
+    }
+
     private fun urlToFileName(url: String): String {
         val hash = url.hashCode().toString().replace("-", "n")
-        val ext = url.substringAfterLast(".", "jpg").take(4).lowercase()
+        val sanitizedUrl = url.substringBefore('?').substringBefore('#')
+        val extCandidate = sanitizedUrl.substringAfterLast('.', "")
+            .lowercase()
+            .takeLast(4)
+        val ext = extCandidate.takeIf { it.matches(Regex("[a-z0-9]{2,4}")) } ?: "img"
         return "${hash}.${ext}"
     }
 }
