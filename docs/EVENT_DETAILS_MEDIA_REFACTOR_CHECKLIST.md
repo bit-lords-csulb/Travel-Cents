@@ -144,17 +144,17 @@ Related plan: [EVENT_DETAILS_MEDIA_REFACTOR_PLAN.md](C:\Users\Zaher503\AndroidSt
 
 ### Checklist
 
-- [ ] Choose static map provider and document attribution requirements
-- [ ] Add static map URL builder utility
+- [x] Choose static map provider and document attribution requirements
+- [x] Add static map URL builder utility
 - [ ] Use existing coordinates from:
-  - [ ] Yelp businesses
-  - [ ] Serp hotels
-- [ ] Persist `attr_static_map_url` on events/options where coordinates exist
-- [ ] Add address-only fallback when coordinates are missing
-- [ ] Download/cache static map images locally per device
+  - [x] Yelp businesses
+  - [x] Serp hotels
+- [x] Persist `attr_static_map_url` on events/options where coordinates exist
+- [x] Add address-only fallback when coordinates are missing
+- [x] Download/cache static map images locally per device
 - [ ] Verify static maps render in:
-  - [ ] current-trip event details
-  - [ ] itinerary event details
+  - [x] current-trip event details
+  - [x] itinerary event details
 - [ ] Verify a second device can display the same static map from Firestore metadata
 
 ## Phase 5: Hotel Media Everywhere
