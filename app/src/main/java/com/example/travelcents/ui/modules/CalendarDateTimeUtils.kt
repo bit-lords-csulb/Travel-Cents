@@ -1,6 +1,9 @@
 package com.example.travelcents.ui.modules
 
 import com.example.travelcents.data.trip.model.TravelEvent
+import com.example.travelcents.data.trip.model.ATTR_BUSINESS_NAME
+import com.example.travelcents.data.trip.model.ATTR_HOTEL_NAME
+import com.example.travelcents.data.trip.model.firstNonBlank
 import java.time.LocalDate
 import java.time.LocalTime
 import java.time.ZoneId
@@ -203,11 +206,15 @@ fun sortEventsForCalendar(events: List<TravelEvent>): List<TravelEvent> {
             { parseTimeToMinutes(it.startTime) ?: Int.MAX_VALUE },
             { parseTimeToMinutes(it.endTime) ?: Int.MAX_VALUE },
             {
-                it.details["title"]
-                    ?: it.details["activity_name"]
-                    ?: it.details["restaurant_name"]
-                    ?: it.details["hotel_name"]
-                    ?: it.details["name"]
+                it.details.firstNonBlank(
+                    "title",
+                    ATTR_BUSINESS_NAME,
+                    ATTR_HOTEL_NAME,
+                    "activity_name",
+                    "restaurant_name",
+                    "hotel_name",
+                    "name"
+                )
                     ?: it.type
             }
         )

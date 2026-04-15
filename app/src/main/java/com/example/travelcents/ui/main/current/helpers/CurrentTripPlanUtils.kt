@@ -1,6 +1,14 @@
 package com.example.travelcents.ui.main.current
 
 import com.example.travelcents.data.trip.model.TravelEvent
+import com.example.travelcents.data.trip.model.ATTR_AVERAGE_RATING
+import com.example.travelcents.data.trip.model.ATTR_BUSINESS_ADDRESS
+import com.example.travelcents.data.trip.model.ATTR_BUSINESS_NAME
+import com.example.travelcents.data.trip.model.ATTR_HOTEL_NAME
+import com.example.travelcents.data.trip.model.ATTR_HOTEL_RATING
+import com.example.travelcents.data.trip.model.ATTR_REVIEW_COUNT
+import com.example.travelcents.data.trip.model.displayName
+import com.example.travelcents.data.trip.model.firstNonBlank
 import com.example.travelcents.ui.modules.defaultPlanTimeZoneId
 import com.example.travelcents.ui.modules.formatDisplayTime
 import com.example.travelcents.ui.modules.formatMinutes
@@ -66,9 +74,9 @@ fun eventTitle(event: TravelEvent): String {
                 event.details["flight_number"]?.takeIf { it.isNotBlank() }
             ).joinToString(" ").takeIf { it.isNotBlank() }
         ).firstOrNull()
-        "hotel" -> event.details["hotel_name"] ?: event.details["name"] ?: "Hotel Check-in"
-        "restaurant", "dining", "food" -> event.details["restaurant_name"] ?: event.details["name"] ?: "Dinner Reservation"
-        else -> event.details["activity_name"] ?: event.details["title"] ?: event.details["name"]
+        "hotel" -> event.displayName() ?: "Hotel Check-in"
+        "restaurant", "dining", "food" -> event.displayName() ?: "Dinner Reservation"
+        else -> event.displayName()
     } ?: event.type.replaceFirstChar { it.uppercase(Locale.US) }
 }
 
@@ -87,27 +95,27 @@ fun eventSubtitle(event: TravelEvent): String {
             event.details["total_price"]?.takeIf { it.isNotBlank() }?.let { "\$$it" }
         ).joinToString(" · ")
         "hotel" -> listOfNotNull(
-            event.details["address"]?.takeIf { it.isNotBlank() },
-            event.details["rating"]?.takeIf { it.isNotBlank() }?.let { "★$it" }
+            event.details.firstNonBlank(ATTR_BUSINESS_ADDRESS, "address")?.takeIf { it.isNotBlank() },
+            event.details.firstNonBlank(ATTR_HOTEL_RATING, ATTR_AVERAGE_RATING, "rating")?.takeIf { it.isNotBlank() }?.let { "★$it" }
         ).joinToString(" · ")
         "restaurant", "dining", "food" -> listOfNotNull(
             event.details["cuisine"]?.takeIf { it.isNotBlank() },
             event.details["location"]?.takeIf { it.isNotBlank() },
-            event.details["address"]?.takeIf { it.isNotBlank() }
+            event.details.firstNonBlank(ATTR_BUSINESS_ADDRESS, "address")?.takeIf { it.isNotBlank() }
         ).joinToString(" · ")
         else -> listOfNotNull(
             event.details["description"]?.takeIf { it.isNotBlank() },
             event.details["location"]?.takeIf { it.isNotBlank() },
-            event.details["address"]?.takeIf { it.isNotBlank() }
+            event.details.firstNonBlank(ATTR_BUSINESS_ADDRESS, "address")?.takeIf { it.isNotBlank() }
         ).firstOrNull().orEmpty()
     }.ifBlank { "Tap to edit details" }
 }
 
 fun editableLocation(event: TravelEvent): String {
     return event.details["location"]
-        ?: event.details["address"]
-        ?: event.details["hotel_name"]
-        ?: event.details["restaurant_name"]
+        ?: event.details.firstNonBlank(ATTR_BUSINESS_ADDRESS, "address")
+        ?: event.details.firstNonBlank(ATTR_HOTEL_NAME, "hotel_name")
+        ?: event.details.firstNonBlank(ATTR_BUSINESS_NAME, "restaurant_name", "activity_name")
         ?: event.details["origin_airport"]
         ?: event.details["destination_airport"]
         ?: ""
