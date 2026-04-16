@@ -4,16 +4,13 @@ import android.app.Application
 import android.util.Log
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
-import com.example.travelcents.data.media.prefetchSelectedHotelGalleries
 import com.example.travelcents.data.trip.model.EventOption
 import com.example.travelcents.data.trip.model.Itinerary
 import com.example.travelcents.data.trip.model.TravelEvent
 import com.example.travelcents.data.trip.model.YelpReview
-import com.example.travelcents.data.trip.model.DETAIL_YELP_ID
-import com.example.travelcents.data.trip.model.detailValue
-import com.example.travelcents.data.trip.model.withSelectedOption
 import com.example.travelcents.data.trip.remote.YelpRepository
 import com.example.travelcents.ui.main.current.CurrentTripUiState
+import com.example.travelcents.ui.main.shared.TripMediaDetailPipeline
 import com.example.travelcents.ui.modules.normalizeDate
 import com.example.travelcents.ui.modules.normalizeTime
 import com.google.firebase.auth.FirebaseAuth
@@ -71,6 +68,7 @@ class ItineraryViewModel(application: Application) : AndroidViewModel(applicatio
     private val auth = FirebaseAuth.getInstance()
     private var eventsListener: ListenerRegistration? = null
     private var currentTripDestination: String = ""
+    private val mediaDetailPipeline = TripMediaDetailPipeline(application)
 
     private fun resetTripState(
         isLoading: Boolean = false,
@@ -191,17 +189,10 @@ class ItineraryViewModel(application: Application) : AndroidViewModel(applicatio
 
                 viewModelScope.launch {
                     val optionsByEvent = loadOptionsForEvents(uid, tripId, sortedEvents)
-                    val enrichedEvents = sortPlanEvents(
-                        sortedEvents.map { event ->
-                            val options = optionsByEvent[event.eventId].orEmpty()
-                            val baseEvent = event.copy(options = options)
-                            val selectedOption = options.firstOrNull { it.selected }
-                            if (selectedOption != null) {
-                                baseEvent.withSelectedOption(selectedOption).copy(options = options)
-                            } else {
-                                baseEvent
-                            }
-                        }
+                    val enrichedEvents = mediaDetailPipeline.applySelectedOptions(
+                        events = sortedEvents,
+                        optionsByEvent = optionsByEvent,
+                        sortEvents = ::sortPlanEvents
                     )
                     _eventOptions.value = optionsByEvent
                     _rejectedOptions.update { current ->
@@ -210,7 +201,7 @@ class ItineraryViewModel(application: Application) : AndroidViewModel(applicatio
                     _uiState.update { state ->
                         state.copy(events = enrichedEvents)
                     }
-                    prefetchHotelGalleries(enrichedEvents)
+                    prefetchSharedEventMedia(enrichedEvents)
                     prefetchYelpEnrichment(enrichedEvents)
                 }
             }
@@ -269,14 +260,13 @@ class ItineraryViewModel(application: Application) : AndroidViewModel(applicatio
         val tripId = _uiState.value.currentTripId ?: return
         val event = _uiState.value.events.firstOrNull { it.eventId == eventId } ?: return
         val options = _eventOptions.value[eventId].orEmpty()
-        val yelpId = options.firstOrNull { it.selected }
-            ?.detailValue(DETAIL_YELP_ID)
-            ?.takeIf { it.isNotBlank() }
-            ?: event.detailValue(DETAIL_YELP_ID)?.takeIf { it.isNotBlank() }
+        val yelpId = mediaDetailPipeline.yelpEnrichmentTargetId(
+            event = event,
+            options = options,
+            inFlightIds = _yelpEnrichmentInFlight.value,
+            forceRefresh = forceRefresh
+        )
             ?: return
-
-        if (!forceRefresh && yelpId in _yelpEnrichmentInFlight.value) return
-        if (!forceRefresh && !YelpRepository.needsEventEnrichment(event, options)) return
 
         _yelpEnrichmentInFlight.update { it + yelpId }
         viewModelScope.launch {
@@ -308,13 +298,7 @@ class ItineraryViewModel(application: Application) : AndroidViewModel(applicatio
         enrichedEvent: TravelEvent,
         enrichedOptions: List<EventOption>
     ) {
-        val selectedOption = enrichedOptions.firstOrNull { it.selected }
-        val eventWithOptions = enrichedEvent.copy(options = enrichedOptions)
-        val mergedEvent = if (selectedOption != null) {
-            eventWithOptions.withSelectedOption(selectedOption).copy(options = enrichedOptions)
-        } else {
-            eventWithOptions
-        }
+        val mergedEvent = mediaDetailPipeline.mergeEventWithOptions(enrichedEvent, enrichedOptions)
 
         _eventOptions.update { it + (eventId to enrichedOptions) }
         _uiState.update { state ->
@@ -469,7 +453,7 @@ class ItineraryViewModel(application: Application) : AndroidViewModel(applicatio
         val event = _uiState.value.events.firstOrNull { it.eventId == eventId } ?: return
 
         val updatedOptions = options.map { it.copy(selected = it.optionId == optionId) }
-        val updatedEvent = event.withSelectedOption(selectedOption).copy(options = updatedOptions)
+        val updatedEvent = mediaDetailPipeline.mergeEventWithOptions(event, updatedOptions)
         val updatedEvents = sortPlanEvents(
             _uiState.value.events.map {
                 if (it.eventId == eventId) updatedEvent else it
@@ -482,7 +466,7 @@ class ItineraryViewModel(application: Application) : AndroidViewModel(applicatio
             current + (eventId to nextRejected)
         }
         _uiState.update { it.copy(events = updatedEvents) }
-        prefetchHotelGalleries(listOf(updatedEvent))
+        prefetchSharedEventMedia(listOf(updatedEvent))
 
         viewModelScope.launch {
             try {
@@ -798,16 +782,12 @@ class ItineraryViewModel(application: Application) : AndroidViewModel(applicatio
         super.onCleared()
     }
 
-    private fun prefetchHotelGalleries(events: List<TravelEvent>) {
-        if (events.none { it.type.equals("hotel", ignoreCase = true) && it.itineraryId.isNotBlank() }) {
-            return
-        }
-
+    private fun prefetchSharedEventMedia(events: List<TravelEvent>) {
         viewModelScope.launch {
             runCatching {
-                prefetchSelectedHotelGalleries(getApplication<Application>(), events)
+                mediaDetailPipeline.prefetchSharedMedia(events)
             }.onFailure { error ->
-                Log.w("ItineraryViewModel", "Failed to prefetch hotel galleries", error)
+                Log.w("ItineraryViewModel", "Failed to prefetch shared event media", error)
             }
         }
     }

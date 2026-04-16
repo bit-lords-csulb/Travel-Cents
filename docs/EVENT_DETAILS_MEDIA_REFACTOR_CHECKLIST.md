@@ -247,13 +247,13 @@ Related plan: [EVENT_DETAILS_MEDIA_REFACTOR_PLAN.md](C:\Users\Zaher503\AndroidSt
 
 ### Checklist
 
-- [ ] Current-trip flow uses shared media/detail enrichment pipeline
-- [ ] Itinerary flow uses shared media/detail enrichment pipeline
-- [ ] Current-trip flow uses shared static-map handling
-- [ ] Itinerary flow uses shared static-map handling
-- [ ] Current-trip flow supports hotel gallery prefetch
-- [ ] Itinerary flow supports hotel gallery prefetch
-- [ ] Verify no screen is left on the old one-image-only path
+- [x] Current-trip flow uses shared media/detail enrichment pipeline
+- [x] Itinerary flow uses shared media/detail enrichment pipeline
+- [x] Current-trip flow uses shared static-map handling
+- [x] Itinerary flow uses shared static-map handling
+- [x] Current-trip flow supports hotel gallery prefetch
+- [x] Itinerary flow supports hotel gallery prefetch
+- [x] Verify no screen is left on the old one-image-only path
 
 ## Phase 9: Firestore And Performance Cleanup
 
