@@ -18,10 +18,13 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImage
+import com.example.travelcents.data.media.ImageCacheManager
+import com.example.travelcents.data.media.remoteMediaUrls
 import com.example.travelcents.data.trip.model.ATTR_AVERAGE_RATING
 import com.example.travelcents.data.trip.model.ATTR_BUSINESS_NAME
 import com.example.travelcents.data.trip.model.ATTR_HOTEL_NAME
@@ -34,6 +37,7 @@ import com.example.travelcents.data.trip.model.displayName
 import com.example.travelcents.data.trip.model.firstNonBlank
 import com.example.travelcents.data.trip.model.EventOption
 import com.example.travelcents.data.trip.model.TravelEvent
+import com.example.travelcents.ui.modules.heroImageModel
 
 private val BgColor = Color(0xFF010E24)
 private val SurfaceHigh = Color(0xFF0B203D)
@@ -146,12 +150,23 @@ fun EventOptionsPanel(
     onDismiss: () -> Unit,
     selectedNamesElsewhere: Set<String> = emptySet()
 ) {
+    val context = LocalContext.current
     val typeColor = eventTypeColor(event.type)
     val activeOptions = options.filter { opt ->
         opt.optionId !in rejectedIds && !opt.selected
     }
     val rejectedOptions = options.filter { it.optionId in rejectedIds }
     var rejectedExpanded by remember { mutableStateOf(false) }
+    var cacheRefreshToken by remember(event.eventId, options) { mutableIntStateOf(0) }
+
+    LaunchedEffect(event.itineraryId, options) {
+        if (event.itineraryId.isBlank()) return@LaunchedEffect
+        val urls = options.flatMap { it.remoteMediaUrls() }.distinct()
+        if (urls.isNotEmpty()) {
+            ImageCacheManager.cacheTripMedia(context, event.itineraryId, urls)
+            cacheRefreshToken += 1
+        }
+    }
 
     ModalBottomSheet(
         onDismissRequest = onDismiss,
@@ -223,6 +238,8 @@ fun EventOptionsPanel(
                         OptionRow(
                             event = event,
                             opt = opt,
+                            tripId = event.itineraryId,
+                            cacheRefreshToken = cacheRefreshToken,
                             typeColor = typeColor,
                             isSelected = opt.selected,
                             isRejected = false,
@@ -270,6 +287,8 @@ fun EventOptionsPanel(
                             OptionRow(
                                 event = event,
                                 opt = opt,
+                                tripId = event.itineraryId,
+                                cacheRefreshToken = cacheRefreshToken,
                                 typeColor = typeColor.copy(alpha = 0.5f),
                                 isSelected = false,
                                 isRejected = true,
@@ -292,6 +311,8 @@ fun EventOptionsPanel(
 private fun OptionRow(
     event: TravelEvent,
     opt: EventOption,
+    tripId: String,
+    cacheRefreshToken: Int,
     typeColor: Color,
     isSelected: Boolean,
     isRejected: Boolean,
@@ -299,7 +320,8 @@ private fun OptionRow(
     onSelect: () -> Unit,
     onReject: () -> Unit
 ) {
-    val imageSource = opt.localImagePath.ifBlank { opt.imageUrl }
+    val context = LocalContext.current
+    val imageSource = remember(opt, tripId, cacheRefreshToken, context) { opt.heroImageModel(context, tripId) }
     val subtitle = formatOptionSubtitle(event, opt)
     val name = optionName(event, opt)
     val chosenElsewhereLabel = when (event.type.lowercase()) {

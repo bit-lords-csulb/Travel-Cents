@@ -27,32 +27,54 @@ import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import coil.compose.AsyncImage
 import com.example.travelcents.data.media.ImageCacheManager
+import com.example.travelcents.data.trip.model.EventOption
 import com.example.travelcents.data.trip.model.TravelEvent
 
 fun TravelEvent.heroImageModel(context: Context): String {
     val remoteHero = imageUrl.ifBlank { details["imageUrl"] ?: details["image_url"] ?: "" }
-    return localImagePath.ifBlank { cachedModelFor(context, remoteHero) ?: remoteHero }
+    return localImagePath.ifBlank { cachedOrRemoteModelFor(context, itineraryId, remoteHero).orEmpty() }
 }
 
 fun TravelEvent.galleryPhotoModels(context: Context): List<String> {
     val remoteHero = imageUrl.ifBlank { details["imageUrl"] ?: details["image_url"] ?: "" }
-    val preferredHero = localImagePath.ifBlank { cachedModelFor(context, remoteHero) ?: remoteHero }
+    val preferredHero = localImagePath.ifBlank {
+        cachedOrRemoteModelFor(context, itineraryId, remoteHero).orEmpty()
+    }
     return buildList {
         if (preferredHero.isNotBlank()) add(preferredHero)
         photoUrls
             .filter { it.isNotBlank() && it != remoteHero }
-            .map { cachedModelFor(context, it) ?: it }
+            .map { cachedOrRemoteModelFor(context, itineraryId, it).orEmpty() }
             .forEach(::add)
     }.distinct()
 }
 
-private fun TravelEvent.cachedModelFor(
+fun EventOption.heroImageModel(
     context: Context,
-    remoteUrl: String
-): String? {
-    if (itineraryId.isBlank() || remoteUrl.isBlank()) return null
-    return ImageCacheManager.localPathForUrl(context, itineraryId, remoteUrl)
+    tripId: String
+): String {
+    return localImagePath.ifBlank { cachedOrRemoteModelFor(context, tripId, imageUrl).orEmpty() }
 }
+
+fun EventOption.galleryPhotoModels(
+    context: Context,
+    tripId: String
+): List<String> {
+    val preferredHero = heroImageModel(context, tripId)
+    return buildList {
+        if (preferredHero.isNotBlank()) add(preferredHero)
+        photoUrls
+            .filter { it.isNotBlank() && it != imageUrl }
+            .map { cachedOrRemoteModelFor(context, tripId, it).orEmpty() }
+            .forEach(::add)
+    }.distinct()
+}
+
+private fun cachedOrRemoteModelFor(
+    context: Context,
+    tripId: String,
+    remoteUrl: String
+): String? = ImageCacheManager.resolveCachedMediaUrl(context, tripId, remoteUrl)
 
 @Composable
 fun PhotoGalleryButton(
