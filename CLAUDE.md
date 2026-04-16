@@ -48,6 +48,7 @@ All values are injected as `BuildConfig` fields at build time via `app/build.gra
 - `ui/components/ProfileAvatar.kt` — avatar component
 - `ui/modules/TripPhotoGallery.kt` — photo gallery dialog + helpers
 - `ui/modules/CalendarDateTimeUtils.kt` — shared date/time formatting utilities
+- `ui/modules/TripStaticMap.kt` — `rememberStaticMapModel()` + `prefetchStaticMaps()`: loads and caches OpenStreetMap static map tiles per event
 
 ### Auth
 - `ui/auth/AuthViewModel.kt` — signUp / logIn / signOut, StateFlow state
@@ -77,7 +78,9 @@ All values are injected as `BuildConfig` fields at build time via `app/build.gra
 - `data/trip/remote/DestinationImageRepository.kt` — hero image fetching for destinations
 - `data/trip/remote/CurrencyApiService.kt` — exchange rate API
 - `data/trip/local/CurrencyRateCache.kt` — persisted currency rate cache
-- `data/media/ImageCacheManager.kt` — downloads and caches trip images locally
+- `data/media/ImageCacheManager.kt` — downloads and caches trip images (hero photos + static maps) locally
+- `data/media/StaticMapUrlFactory.kt` — builds OpenStreetMap static map tile URLs (no API key required); provider constant: `PROVIDER = "osm_staticmap"`
+- `data/trip/model/EventDetailContract.kt` — canonical `ATTR_*` string constants for all `details` map keys; extension functions `detailValue()`, `firstNonBlank()`, `displayName()` for `TravelEvent` and `EventOption`
 
 ### Current Trip / Itinerary
 - `ui/main/current/screen/CurrentTripScreen.kt` — top-level screen; composes all current-trip views
@@ -93,8 +96,8 @@ All values are injected as `BuildConfig` fields at build time via `app/build.gra
 - `ui/main/current/editor/CurrentPlanEditorDialog.kt` — inline event editor
 - `ui/main/current/helpers/CurrentTripPlanUtils.kt` — utility functions for plan manipulation
 - `ui/main/current/sharing/CurrentTripShareSheet.kt` — share sheet for exporting a trip
-- `ui/main/itinerary/ItineraryViewModel.kt` — real-time Firestore listener; exposes `events`, `tripTitle`, `currentTripId`
-- `ui/main/itinerary/ExpandedEventCard.kt` — full-detail bottom sheet for a single event
+- `ui/main/itinerary/ItineraryViewModel.kt` — real-time Firestore listener; exposes `events`, `tripTitle`, `currentTripId`; lazily enriches events with Yelp business details and Yelp reviews on demand
+- `ui/main/itinerary/ExpandedEventCard.kt` — full-detail bottom sheet for a single event; renders static map tile, Yelp details, and photos
 - `ui/main/itinerary/SharedTripHeader.kt` — shared header used by itinerary views
 
 ### Home
@@ -242,11 +245,15 @@ Events are rendered by type. Color scheme in `FinalPlan.kt` / `ExpandedEventCard
 | Type | Accent | Key `details` Fields |
 |---|---|---|
 | `flight` | Blue `#64B5F6` | airline, flight_number, origin_airport, destination_airport, departure_time, arrival_time, total_price, flight_duration_min |
-| `hotel` | Purple `#B5A0FF` | hotel_name, check_in_date, check_out_date, rate_per_night |
-| `restaurant` / `dining` / `food` | Red `#FF716C` | restaurant_name, cuisine |
-| `activity` (default) | Light blue `#D5E3FB` | activity_name, title, location |
+ | `hotel` | Purple `#B5A0FF` | `ATTR_HOTEL_NAME`, check_in_date, check_out_date, `ATTR_RATE_PER_NIGHT`, `ATTR_AMENITIES`, `ATTR_BOOKING_URL` |
+| `restaurant` / `dining` / `food` | Red `#FF716C` | `ATTR_BUSINESS_NAME`, `ATTR_CATEGORIES`, `ATTR_AVERAGE_RATING`, `ATTR_HOURS_SUMMARY`, `ATTR_YELP_URL`, `ATTR_MENU_URL` |
+| `activity` (default) | Light blue `#D5E3FB` | `ATTR_BUSINESS_NAME`, activity_name, title, location, `ATTR_YELP_URL` |
 
-Title resolution order (all types): `details["title"]` → `details["activity_name"]` → `details["restaurant_name"]` → `details["hotel_name"]` → type string.
+All typed `ATTR_*` constants live in `data/trip/model/EventDetailContract.kt`. Use `detailValue(ATTR_FOO, "legacy_key")` (not raw string literals) for new code — it falls back through the list and returns the first non-blank value.
+
+Title resolution: use `TravelEvent.displayName()` / `EventOption.displayName(eventType)` from `EventDetailContract.kt` rather than manual key lookups.
+
+Static map fields: `ATTR_STATIC_MAP_URL`, `ATTR_STATIC_MAP_PROVIDER` (value: `"osm_staticmap"`), `ATTR_LATITUDE`, `ATTR_LONGITUDE`. Use `rememberStaticMapModel(event)` from `TripStaticMap.kt` in Composables.
 
 `TravelEvent.details` is a flat `Map<String, String>` — all type-specific fields live here. `TravelEvent.options` is a `List<EventOption>` stored in a Firestore subcollection (not in the main document).
 
