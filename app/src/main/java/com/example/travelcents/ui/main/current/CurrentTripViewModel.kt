@@ -9,11 +9,10 @@ import com.example.travelcents.data.trip.model.EventOption
 import com.example.travelcents.data.trip.model.Itinerary
 import com.example.travelcents.data.trip.model.TravelEvent
 import com.example.travelcents.data.trip.model.YelpReview
-import com.example.travelcents.data.trip.model.ATTR_BUSINESS_NAME
-import com.example.travelcents.data.trip.model.ATTR_HOTEL_NAME
 import com.example.travelcents.data.trip.model.DETAIL_YELP_ID
 import com.example.travelcents.data.trip.model.detailValue
 import com.example.travelcents.data.trip.model.resolveTripName
+import com.example.travelcents.data.trip.model.withSelectedOption
 import com.example.travelcents.data.trip.remote.YelpRepository
 import com.example.travelcents.ui.modules.defaultPlanTimeZoneId
 import com.example.travelcents.ui.modules.normalizeDate
@@ -34,7 +33,6 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.tasks.await
-import java.util.Locale
 import java.util.UUID
 
 data class EditablePlan(
@@ -270,7 +268,7 @@ class CurrentTripViewModel(application: Application) : AndroidViewModel(applicat
                             val baseEvent = event.copy(options = options)
                             val selectedOption = options.firstOrNull { it.selected }
                             if (selectedOption != null) {
-                                applySelectedOption(baseEvent, selectedOption).copy(options = options)
+                                baseEvent.withSelectedOption(selectedOption).copy(options = options)
                             } else {
                                 baseEvent
                             }
@@ -488,7 +486,7 @@ class CurrentTripViewModel(application: Application) : AndroidViewModel(applicat
         val selectedOption = enrichedOptions.firstOrNull { it.selected }
         val eventWithOptions = enrichedEvent.copy(options = enrichedOptions)
         val mergedEvent = if (selectedOption != null) {
-            applySelectedOption(eventWithOptions, selectedOption).copy(options = enrichedOptions)
+            eventWithOptions.withSelectedOption(selectedOption).copy(options = enrichedOptions)
         } else {
             eventWithOptions
         }
@@ -682,7 +680,7 @@ class CurrentTripViewModel(application: Application) : AndroidViewModel(applicat
         val event = _uiState.value.events.firstOrNull { it.eventId == eventId } ?: return
 
         val updatedOptions = options.map { it.copy(selected = it.optionId == optionId) }
-        val updatedEvent = applySelectedOption(event, selectedOption).copy(options = updatedOptions)
+        val updatedEvent = event.withSelectedOption(selectedOption).copy(options = updatedOptions)
         val updatedEvents = sortPlanEvents(
             _uiState.value.events.map {
                 if (it.eventId == eventId) updatedEvent else it
@@ -1037,46 +1035,6 @@ class CurrentTripViewModel(application: Application) : AndroidViewModel(applicat
         } else {
             fetchLatestItinerary(uid)
         }
-    }
-
-    private fun applySelectedOption(event: TravelEvent, option: EventOption): TravelEvent {
-        val mergedDetails = event.details.toMutableMap().apply {
-            putAll(option.details)
-            when (event.type.lowercase(Locale.US)) {
-                "hotel" -> {
-                    val hotelName = option.detailValue(ATTR_HOTEL_NAME, "hotel_name", "name")
-                    if (!hotelName.isNullOrBlank()) {
-                        put(ATTR_HOTEL_NAME, hotelName)
-                        put("title", hotelName)
-                    }
-                }
-                "restaurant", "dining", "food" -> {
-                    val name = option.detailValue(ATTR_BUSINESS_NAME, "restaurant_name", "name")
-                    if (!name.isNullOrBlank()) {
-                        put(ATTR_BUSINESS_NAME, name)
-                        put("title", name)
-                    }
-                }
-                "activity" -> {
-                    val name = option.detailValue(ATTR_BUSINESS_NAME, "activity_name", "title", "name")
-                    if (!name.isNullOrBlank()) {
-                        put(ATTR_BUSINESS_NAME, name)
-                        put("title", name)
-                    }
-                }
-                "flight" -> option.details["title"]?.let { put("title", it) }
-            }
-        }
-
-        val imageUrl = option.imageUrl.ifBlank { event.imageUrl }
-        val localImagePath = option.localImagePath.ifBlank { event.localImagePath }
-        val photoUrls = option.photoUrls.ifEmpty { event.photoUrls }
-        return event.copy(
-            imageUrl = imageUrl,
-            localImagePath = localImagePath,
-            photoUrls = photoUrls,
-            details = mergedDetails
-        )
     }
 
     private fun prefetchHotelGalleries(events: List<TravelEvent>) {
