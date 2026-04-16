@@ -1,5 +1,6 @@
 package com.example.travelcents.data.trip
 
+import android.util.Log
 import com.example.travelcents.data.trip.model.EventOption
 import com.example.travelcents.data.trip.model.Itinerary
 import com.example.travelcents.data.trip.model.TravelEvent
@@ -22,46 +23,26 @@ class FirestoreTripRepository(
 ) : TripRepository {
 
     override suspend fun getLatestActiveTripKey(viewerUid: String): TripKey? {
-        var lastDocument: DocumentSnapshot? = null
+        findLatestOwnedActiveTripKey(viewerUid)?.let { return it }
 
-        while (true) {
-            TripPerformanceLogger.recordTripQuery(
-                source = "FirestoreTripRepository.getLatestActiveTripKey",
-                detail = "ownerUid=$viewerUid"
-            )
-            var query: Query = tripsCollection(viewerUid)
-                .orderBy("createdAt", Query.Direction.DESCENDING)
-                .limit(1)
-
-            if (lastDocument != null) {
-                query = query.startAfter(lastDocument)
+        return getSharedTripSummaries(viewerUid)
+            .filterNot { trip -> trip.status.equals("archived", ignoreCase = true) }
+            .maxByOrNull { trip -> trip.createdAt }
+            ?.let { trip ->
+                TripKey(ownerUid = trip.ownerUid, tripId = trip.itineraryId)
             }
-
-            val documents = query.get().await().documents
-            if (documents.isEmpty()) return null
-
-            val activeTrip = documents.firstOrNull { document ->
-                !document.getString("status").orEmpty().equals("archived", ignoreCase = true)
-            }
-            if (activeTrip != null) {
-                return TripKey(ownerUid = viewerUid, tripId = activeTrip.id)
-            }
-
-            lastDocument = documents.last()
-        }
     }
 
-    override suspend fun getTripSummaries(viewerUid: String): List<Itinerary> {
-        TripPerformanceLogger.recordTripQuery(
-            source = "FirestoreTripRepository.getTripSummaries",
-            detail = "ownerUid=$viewerUid"
-        )
-        return tripsCollection(viewerUid)
-            .orderBy("createdAt", Query.Direction.DESCENDING)
-            .get()
-            .await()
-            .documents
-            .mapNotNull { mapTripSummary(it, viewerUid) }
+    override suspend fun getTripSummaries(viewerUid: String): List<Itinerary> = coroutineScope {
+        val ownedTrips = async { getOwnedTripSummaries(viewerUid) }
+        val sharedTrips = async { getSharedTripSummaries(viewerUid) }
+
+        (ownedTrips.await() + sharedTrips.await())
+            .distinctBy { trip -> "${trip.ownerUid}:${trip.itineraryId}" }
+            .sortedWith(
+                compareByDescending<Itinerary> { trip -> trip.createdAt }
+                    .thenByDescending { trip -> trip.dateFrom }
+            )
     }
 
     override suspend fun getTripSummary(key: TripKey): Itinerary? {
@@ -134,10 +115,19 @@ class FirestoreTripRepository(
     override suspend fun getTripMembers(key: TripKey): List<String> {
         TripPerformanceLogger.recordTripQuery(
             source = "FirestoreTripRepository.getTripMembers",
-            detail = "tripId=${key.tripId}"
+            detail = "ownerUid=${key.ownerUid} tripId=${key.tripId}"
         )
-        return db.collection("groups")
+
+        val tripSnapshot = tripDocument(key).get().await()
+        val storedMembers = normalizeTripMembers(
+            ownerUid = key.ownerUid,
+            memberUids = tripSnapshot.memberUids()
+        )
+        if (storedMembers.isNotEmpty()) return storedMembers
+
+        val fallbackMembers = db.collection("groups")
             .whereEqualTo("linkedTripId", key.tripId)
+            .whereEqualTo("linkedTripOwnerId", key.ownerUid)
             .get()
             .await()
             .documents
@@ -145,6 +135,15 @@ class FirestoreTripRepository(
                 (doc.get("members") as? List<*>)?.filterIsInstance<String>().orEmpty()
             }
             .distinct()
+
+        if (fallbackMembers.isNotEmpty()) {
+            ensureTripAccess(key, fallbackMembers)
+        }
+
+        return normalizeTripMembers(
+            ownerUid = key.ownerUid,
+            memberUids = fallbackMembers
+        )
     }
 
     override suspend fun getEventOptions(
@@ -185,6 +184,156 @@ class FirestoreTripRepository(
                 eventId to options
             }
         }.awaitAll().toMap()
+    }
+
+    override suspend fun ensureTripAccess(
+        key: TripKey,
+        memberUids: List<String>,
+        defaultRole: TripAccessRole
+    ) {
+        val tripRef = tripDocument(key)
+        db.runTransaction { transaction ->
+            val snapshot = transaction.get(tripRef)
+            if (!snapshot.exists()) {
+                throw IllegalStateException("Trip ${key.tripId} is no longer available.")
+            }
+
+            val access = mergeTripAccessMetadata(
+                ownerUid = key.ownerUid,
+                existingMemberUids = snapshot.memberUids(),
+                existingRoleByUid = snapshot.roleByUid(),
+                additionalMemberUids = memberUids,
+                defaultRole = defaultRole
+            )
+
+            transaction.set(
+                tripRef,
+                mapOf(
+                    "ownerUid" to key.ownerUid,
+                    "memberUids" to access.memberUids,
+                    "roleByUid" to access.roleByUid
+                ),
+                SetOptions.merge()
+            )
+        }.await()
+    }
+
+    override suspend fun deleteTrip(key: TripKey) = coroutineScope {
+        TripPerformanceLogger.recordTripQuery(
+            source = "FirestoreTripRepository.deleteTrip",
+            detail = "ownerUid=${key.ownerUid} tripId=${key.tripId}"
+        )
+
+        val tripRef = tripDocument(key)
+        val eventDocuments = tripRef.collection("events").get().await().documents
+        val optionDocuments = loadTripOptionDocumentsForDelete(key, eventDocuments)
+
+        val deleteRefs = buildList {
+            addAll(optionDocuments.map { document -> document.reference })
+            addAll(eventDocuments.map { document -> document.reference })
+            add(tripRef)
+        }.distinctBy { reference -> reference.path }
+
+        deleteRefs.chunked(MAX_BATCH_DELETE_SIZE).forEach { chunk ->
+            db.runBatch { batch ->
+                chunk.forEach { reference ->
+                    batch.delete(reference)
+                }
+            }.await()
+        }
+    }
+
+    private suspend fun findLatestOwnedActiveTripKey(ownerUid: String): TripKey? {
+        var lastDocument: DocumentSnapshot? = null
+
+        while (true) {
+            TripPerformanceLogger.recordTripQuery(
+                source = "FirestoreTripRepository.getLatestActiveTripKey",
+                detail = "ownerUid=$ownerUid"
+            )
+            var query: Query = tripsCollection(ownerUid)
+                .orderBy("createdAt", Query.Direction.DESCENDING)
+                .limit(1)
+
+            if (lastDocument != null) {
+                query = query.startAfter(lastDocument)
+            }
+
+            val documents = query.get().await().documents
+            if (documents.isEmpty()) return null
+
+            val activeTrip = documents.firstOrNull { document ->
+                !document.getString("status").orEmpty().equals("archived", ignoreCase = true)
+            }
+            if (activeTrip != null) {
+                return TripKey(ownerUid = ownerUid, tripId = activeTrip.id)
+            }
+
+            lastDocument = documents.last()
+        }
+    }
+
+    private suspend fun getOwnedTripSummaries(ownerUid: String): List<Itinerary> {
+        TripPerformanceLogger.recordTripQuery(
+            source = "FirestoreTripRepository.getTripSummaries",
+            detail = "ownerUid=$ownerUid"
+        )
+        return tripsCollection(ownerUid)
+            .orderBy("createdAt", Query.Direction.DESCENDING)
+            .get()
+            .await()
+            .documents
+            .mapNotNull { document -> mapTripSummary(document, ownerUid) }
+    }
+
+    private suspend fun getSharedTripSummaries(viewerUid: String): List<Itinerary> {
+        TripPerformanceLogger.recordTripQuery(
+            source = "FirestoreTripRepository.getSharedTripSummaries",
+            detail = "viewerUid=$viewerUid"
+        )
+        return db.collectionGroup("trips")
+            .whereArrayContains("memberUids", viewerUid)
+            .get()
+            .await()
+            .documents
+            .mapNotNull { document ->
+                val ownerUid = document.inferredOwnerUid()
+                if (ownerUid.isBlank() || ownerUid == viewerUid) return@mapNotNull null
+                mapTripSummary(document, ownerUid)
+            }
+    }
+
+    private suspend fun loadTripOptionDocumentsForDelete(
+        key: TripKey,
+        eventDocuments: List<DocumentSnapshot>
+    ): List<DocumentSnapshot> = coroutineScope {
+        runCatching {
+            TripPerformanceLogger.recordOptionQuery(
+                source = "FirestoreTripRepository.deleteTrip",
+                detail = "bulk ownerUid=${key.ownerUid} tripId=${key.tripId}"
+            )
+            db.collectionGroup("options")
+                .whereEqualTo("ownerUid", key.ownerUid)
+                .whereEqualTo("tripId", key.tripId)
+                .get()
+                .await()
+                .documents
+        }.getOrElse { error ->
+            Log.w(TAG, "Bulk option delete lookup failed for trip ${key.tripId}; using fallback.", error)
+            eventDocuments.map { eventDocument ->
+                async {
+                    TripPerformanceLogger.recordOptionQuery(
+                        source = "FirestoreTripRepository.deleteTrip.fallback",
+                        detail = "ownerUid=${key.ownerUid} tripId=${key.tripId} eventId=${eventDocument.id}"
+                    )
+                    eventDocument.reference
+                        .collection("options")
+                        .get()
+                        .await()
+                        .documents
+                }
+            }.awaitAll().flatten()
+        }
     }
 
     private suspend fun backfillMissingOptionScope(
@@ -248,9 +397,46 @@ class FirestoreTripRepository(
                 createdAt = document.getString("createdAt") ?: "",
                 status = document.getString("status") ?: "",
                 eventIds = (document.get("eventIds") as? List<*>)?.filterIsInstance<String>().orEmpty(),
-                homeImageUrl = document.getString("homeImageUrl") ?: ""
+                homeImageUrl = document.getString("homeImageUrl") ?: "",
+                ownerUid = ownerUid,
+                memberUids = document.memberUids().ifEmpty { listOf(ownerUid) },
+                roleByUid = document.roleByUid().ifEmpty {
+                    mapOf(ownerUid to TripAccessRole.OWNER.wireValue)
+                }
             )
         }.getOrNull()
+    }
+
+    private fun normalizeTripMembers(ownerUid: String, memberUids: List<String>): List<String> {
+        val normalized = memberUids
+            .filter { it.isNotBlank() }
+            .distinct()
+        return if (normalized.size == 1 && normalized.firstOrNull() == ownerUid) {
+            emptyList()
+        } else {
+            normalized
+        }
+    }
+
+    private fun DocumentSnapshot.inferredOwnerUid(): String {
+        return getString("ownerUid").orEmpty().ifBlank {
+            reference.parent.parent?.id.orEmpty()
+        }
+    }
+
+    private fun DocumentSnapshot.memberUids(): List<String> {
+        return (get("memberUids") as? List<*>)?.filterIsInstance<String>().orEmpty()
+    }
+
+    private fun DocumentSnapshot.roleByUid(): Map<String, String> {
+        return (get("roleByUid") as? Map<*, *>)
+            ?.mapNotNull { entry ->
+                val key = entry.key as? String ?: return@mapNotNull null
+                val value = entry.value as? String ?: return@mapNotNull null
+                key to value
+            }
+            ?.toMap()
+            .orEmpty()
     }
 
     private fun tripDocument(key: TripKey) = tripsCollection(key.ownerUid).document(key.tripId)
@@ -258,4 +444,9 @@ class FirestoreTripRepository(
     private fun tripsCollection(ownerUid: String) = db.collection("users")
         .document(ownerUid)
         .collection("trips")
+
+    private companion object {
+        private const val MAX_BATCH_DELETE_SIZE = 450
+        private const val TAG = "FirestoreTripRepository"
+    }
 }

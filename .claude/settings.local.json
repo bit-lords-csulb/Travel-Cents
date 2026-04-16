@@ -9,7 +9,10 @@
       "mcp__ide__getDiagnostics",
       "Read(//mnt/c/Users/Zaher503/AndroidStudioProjects/**)",
       "Bash(./gradlew assembleDebug)",
-      "Bash(./gradlew :app:compileDebugKotlin)"
+      "Bash(./gradlew :app:compileDebugKotlin)",
+      "Bash(./gradlew compileDebugKotlin --warning-mode all)",
+      "Bash(./gradlew clean *)",
+      "Bash(./gradlew lintDebug)"
     ]
   }
 }

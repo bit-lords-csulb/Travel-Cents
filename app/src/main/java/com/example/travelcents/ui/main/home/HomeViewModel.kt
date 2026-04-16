@@ -26,6 +26,7 @@ import retrofit2.converter.gson.GsonConverterFactory
 
 data class HomeUiState(
     val isLoading: Boolean = true,
+    val viewerUid: String = "",
     val trips: List<Itinerary> = emptyList(),
     // itinerary id -> home card image URL
     val tripImages: Map<String, String> = emptyMap(),
@@ -82,13 +83,14 @@ class HomeViewModel : ViewModel() {
         val uid = auth.currentUser?.uid ?: run {
             _uiState.value = HomeUiState(
                 isLoading = false,
+                viewerUid = "",
                 profile = currentProfile,
                 errorMessage = "Not logged in"
             )
             return
         }
 
-        _uiState.value = HomeUiState(isLoading = true, profile = currentProfile)
+        _uiState.value = HomeUiState(isLoading = true, viewerUid = uid, profile = currentProfile)
 
         viewModelScope.launch {
             runCatching {
@@ -101,15 +103,17 @@ class HomeViewModel : ViewModel() {
 
                 _uiState.value = HomeUiState(
                     isLoading = false,
+                    viewerUid = uid,
                     trips = trips,
                     tripImages = cachedImages,
                     profile = currentProfile
                 )
-                fetchDestinationImages(uid, trips.filter { it.homeImageUrl.isBlank() })
+                fetchDestinationImages(trips.filter { it.homeImageUrl.isBlank() })
             }.onFailure { error ->
                 Log.e("HomeViewModel", "Failed to load trips: ${error.message}")
                 _uiState.value = HomeUiState(
                     isLoading = false,
+                    viewerUid = uid,
                     profile = currentProfile,
                     errorMessage = error.message ?: "Failed to load trips"
                 )
@@ -117,7 +121,7 @@ class HomeViewModel : ViewModel() {
         }
     }
 
-    private fun fetchDestinationImages(uid: String, trips: List<Itinerary>) {
+    private fun fetchDestinationImages(trips: List<Itinerary>) {
         if (trips.isEmpty()) return
 
         viewModelScope.launch {
@@ -131,7 +135,9 @@ class HomeViewModel : ViewModel() {
                         "HomeViewModel",
                         "Resolved '${trip.destination}' via '${result.matchedQuery}' to '${result.matchedTitle}' url='${result.imageUrl}'"
                     )
-                    persistHomeImage(uid, trip.itineraryId, result.imageUrl)
+                    if (trip.ownerUid == _uiState.value.viewerUid) {
+                        persistHomeImage(trip.ownerUid, trip.itineraryId, result.imageUrl)
+                    }
                 } else {
                     Log.w(
                         "HomeViewModel",
@@ -143,9 +149,9 @@ class HomeViewModel : ViewModel() {
         }
     }
 
-    private suspend fun persistHomeImage(uid: String, tripId: String, imageUrl: String) {
+    private suspend fun persistHomeImage(ownerUid: String, tripId: String, imageUrl: String) {
         runCatching {
-            db.collection("users").document(uid)
+            db.collection("users").document(ownerUid)
                 .collection("trips").document(tripId)
                 .update("homeImageUrl", imageUrl)
                 .await()

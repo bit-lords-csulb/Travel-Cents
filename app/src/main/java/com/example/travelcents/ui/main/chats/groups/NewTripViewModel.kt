@@ -7,11 +7,14 @@ import com.example.travelcents.data.social.model.Friend
 import com.example.travelcents.data.social.model.Group
 import com.example.travelcents.data.social.repository.FriendsRepository
 import com.example.travelcents.data.social.repository.GroupsRepository
+import com.example.travelcents.data.trip.FirestoreTripRepository
+import com.example.travelcents.data.trip.TripKey
 import com.example.travelcents.data.trip.model.TripPreview
 import com.google.firebase.Firebase
 import com.google.firebase.auth.auth
 import com.google.firebase.firestore.firestore
 import kotlinx.coroutines.flow.*
+import kotlinx.coroutines.launch
 
 class NewTripViewModel(
     private val friendsRepository: FriendsRepository = FriendsRepository(),
@@ -20,6 +23,7 @@ class NewTripViewModel(
 
     private val auth = Firebase.auth
     private val db = Firebase.firestore
+    private val tripRepository = FirestoreTripRepository(db)
     val currentUid: String get() = auth.currentUser?.uid ?: ""
 
     private val _allFriends = MutableStateFlow<List<Friend>>(emptyList())
@@ -134,6 +138,21 @@ class NewTripViewModel(
             onSuccess = { groupId ->
                 groupsRepository.fetchGroup(groupId) { group ->
                     _isCreating.value = false
+                    if (linkedTripId.isNotEmpty()) {
+                        viewModelScope.launch {
+                            runCatching {
+                                tripRepository.ensureTripAccess(
+                                    key = TripKey(
+                                        ownerUid = linkedTripOwnerId,
+                                        tripId = linkedTripId
+                                    ),
+                                    memberUids = members
+                                )
+                            }.onFailure { error ->
+                                Log.e("NewTripViewModel", "Failed to grant linked trip access", error)
+                            }
+                        }
+                    }
                     if (group != null) onSuccess(group)
                 }
             },

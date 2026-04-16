@@ -53,6 +53,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.example.travelcents.data.trip.TripKey
 import com.example.travelcents.data.trip.model.Itinerary
 import com.example.travelcents.ui.main.current.TripMemberUi
 import com.example.travelcents.ui.modules.formatDayOfWeekFull
@@ -73,8 +74,11 @@ fun CurrentTripHeader(
     tripTitle: String,
     heroDate: String,
     currentTripId: String?,
+    currentTripOwnerUid: String?,
+    viewerUid: String?,
     allTrips: List<Itinerary>,
     canAdd: Boolean,
+    canEditTrip: Boolean,
     isReorderActive: Boolean,
     isInCalendarMode: Boolean,
     isWeekMode: Boolean,
@@ -89,7 +93,7 @@ fun CurrentTripHeader(
     onToggleReorder: () -> Unit,
     onArchiveTrip: (String) -> Unit,
     onDeleteTrip: (String) -> Unit,
-    onSwitchTrip: (String) -> Unit,
+    onSwitchTrip: (TripKey) -> Unit,
     onRenameTrip: (String) -> Unit,
     controlsContent: @Composable () -> Unit
 ) {
@@ -268,18 +272,32 @@ fun CurrentTripHeader(
                         .widthIn(min = 200.dp)
                 ) {
                     allTrips.forEach { trip ->
+                        val isCurrentTrip = trip.itineraryId == currentTripId && trip.ownerUid == currentTripOwnerUid
+                        val tripLabel = buildString {
+                            append(trip.tripName)
+                            if (trip.status.equals("archived", ignoreCase = true)) {
+                                append(" · Archived")
+                            } else if (!viewerUid.isNullOrBlank() && trip.ownerUid != viewerUid) {
+                                append(" · Shared")
+                            }
+                        }
                         DropdownMenuItem(
                             text = {
                                 Text(
-                                    text = trip.tripName,
-                                    color = if (trip.itineraryId == currentTripId) DeepSea5 else DeepSea4,
-                                    fontWeight = if (trip.itineraryId == currentTripId) FontWeight.Bold else FontWeight.Normal
+                                    text = tripLabel,
+                                    color = if (isCurrentTrip) DeepSea5 else DeepSea4,
+                                    fontWeight = if (isCurrentTrip) FontWeight.Bold else FontWeight.Normal
                                 )
                             },
                             onClick = {
                                 switcherExpanded = false
-                                if (trip.itineraryId != currentTripId) {
-                                    onSwitchTrip(trip.itineraryId)
+                                if (!isCurrentTrip) {
+                                    onSwitchTrip(
+                                        TripKey(
+                                            ownerUid = trip.ownerUid,
+                                            tripId = trip.itineraryId
+                                        )
+                                    )
                                 }
                             }
                         )
@@ -326,7 +344,8 @@ fun CurrentTripHeader(
                         onClick = {
                             menuExpanded = false
                             onShareClick()
-                        }
+                        },
+                        enabled = canEditTrip && currentTripId != null
                     )
                     DropdownMenuItem(
                         text = {
@@ -340,7 +359,8 @@ fun CurrentTripHeader(
                         onClick = {
                             menuExpanded = false
                             onToggleReorder()
-                        }
+                        },
+                        enabled = canEditTrip && currentTripId != null
                     )
                     DropdownMenuItem(
                         text = { Text("Rename Trip", color = DeepSea5, fontWeight = FontWeight.Medium) },
@@ -349,7 +369,8 @@ fun CurrentTripHeader(
                             menuExpanded = false
                             editableTitle = displayTitle
                             showRenameDialog = true
-                        }
+                        },
+                        enabled = canEditTrip && currentTripId != null
                     )
                     DropdownMenuItem(
                         text = { Text("Archive Trip", color = DeepSea5, fontWeight = FontWeight.Medium) },
@@ -358,7 +379,7 @@ fun CurrentTripHeader(
                             currentTripId?.let(onArchiveTrip)
                             menuExpanded = false
                         },
-                        enabled = currentTripId != null
+                        enabled = canEditTrip && currentTripId != null
                     )
                     DropdownMenuItem(
                         text = { Text("Delete Trip", color = Color(0xFFE77D90), fontWeight = FontWeight.Medium) },
@@ -367,7 +388,7 @@ fun CurrentTripHeader(
                             menuExpanded = false
                             showDeleteDialog = true
                         },
-                        enabled = currentTripId != null
+                        enabled = canEditTrip && currentTripId != null
                     )
                 }
             }

@@ -65,6 +65,7 @@ import kotlin.math.roundToInt
 @Composable
 fun CurrentTripDayView(
     events: List<TravelEvent>,
+    canEditTrip: Boolean,
     sortedDates: List<String>,
     selectedDate: String,
     onDateSelected: (String) -> Unit,
@@ -126,6 +127,7 @@ fun CurrentTripDayView(
                         modifier = Modifier.weight(1f),
                         date = activeDate,
                         events = dayEvents,
+                        canEditTrip = canEditTrip,
                         scheduleWindow = scheduleWindow,
                         hourHeight = hourHeight,
                         onEventClick = onEventClick,
@@ -168,6 +170,7 @@ private fun ScheduleDayColumn(
     modifier: Modifier,
     date: String,
     events: List<TravelEvent>,
+    canEditTrip: Boolean,
     scheduleWindow: ScheduleWindow,
     hourHeight: Dp,
     onEventClick: (TravelEvent) -> Unit,
@@ -209,11 +212,13 @@ private fun ScheduleDayColumn(
                 }
             }
     ) {
-        ScheduleGridTapTarget(
-            scheduleWindow = scheduleWindow,
-            hourHeight = hourHeight,
-            onSlotClick = onEmptySlotClick
-        )
+        if (canEditTrip) {
+            ScheduleGridTapTarget(
+                scheduleWindow = scheduleWindow,
+                hourHeight = hourHeight,
+                onSlotClick = onEmptySlotClick
+            )
+        }
 
         currentTimeMinutes(date)
             ?.takeIf { showCurrentTimeIndicator && it in (scheduleWindow.startHour * 60) until (scheduleWindow.endHour * 60) }
@@ -228,6 +233,7 @@ private fun ScheduleDayColumn(
         eventLayouts.forEach { layout ->
             ScheduleEventCard(
                 layout = layout,
+                canEditTrip = canEditTrip,
                 maxWidth = maxWidth,
                 scheduleWindow = scheduleWindow,
                 hourHeight = hourHeight,
@@ -293,6 +299,7 @@ private fun BoxScope.CurrentTimeIndicator(
 @Composable
 private fun BoxScope.ScheduleEventCard(
     layout: EventLayoutInfo,
+    canEditTrip: Boolean,
     maxWidth: Dp,
     scheduleWindow: ScheduleWindow,
     hourHeight: Dp,
@@ -346,16 +353,18 @@ private fun BoxScope.ScheduleEventCard(
                         fontSize = 10.sp,
                         modifier = Modifier.weight(1f)
                     )
-                    IconButton(
-                        onClick = onDeleteClick,
-                        modifier = Modifier.size(24.dp)
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.DeleteOutline,
-                            contentDescription = "Delete plan",
-                            tint = Color(0xFFE77D90),
-                            modifier = Modifier.size(14.dp)
-                        )
+                    if (canEditTrip) {
+                        IconButton(
+                            onClick = onDeleteClick,
+                            modifier = Modifier.size(24.dp)
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.DeleteOutline,
+                                contentDescription = "Delete plan",
+                                tint = Color(0xFFE77D90),
+                                modifier = Modifier.size(14.dp)
+                            )
+                        }
                     }
                 }
                 Spacer(modifier = Modifier.height(2.dp))

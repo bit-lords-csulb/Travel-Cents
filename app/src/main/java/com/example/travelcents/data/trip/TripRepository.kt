@@ -27,4 +27,12 @@ interface TripRepository {
         key: TripKey,
         eventIds: List<String>
     ): Map<String, List<EventOption>>
+
+    suspend fun ensureTripAccess(
+        key: TripKey,
+        memberUids: List<String>,
+        defaultRole: TripAccessRole = TripAccessRole.VIEWER
+    )
+
+    suspend fun deleteTrip(key: TripKey)
 }

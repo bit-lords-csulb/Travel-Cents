@@ -61,6 +61,7 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import coil.compose.AsyncImage
 import coil.request.ImageRequest
 import com.example.travelcents.BuildConfig
+import com.example.travelcents.data.trip.TripKey
 import com.example.travelcents.data.trip.model.Itinerary
 import com.example.travelcents.ui.components.ProfileAvatar
 import com.example.travelcents.ui.theme.DeepSea1
@@ -83,7 +84,7 @@ private val SurfaceBright = Color(0xFF243447)
 @Composable
 fun HomePage(
     modifier: Modifier = Modifier,
-    onTripClick: (String) -> Unit = {},
+    onTripClick: (TripKey) -> Unit = {},
     onProfileClick: () -> Unit = {},
     homeViewModel: HomeViewModel = viewModel(),
     currencyViewModel: CurrencyViewModel = viewModel()
@@ -106,6 +107,7 @@ fun HomePage(
 
         TripsCarousel(
             trips = homeUiState.trips,
+            viewerUid = homeUiState.viewerUid,
             tripImages = homeUiState.tripImages,
             isLoading = homeUiState.isLoading,
             onTripClick = onTripClick
@@ -173,7 +175,7 @@ private fun HomeHeader(
                 )
             }
             Text(
-                text = "My Trips",
+                text = "Trips",
                 color = Primary,
                 fontSize = 24.sp,
                 fontWeight = FontWeight.Bold
@@ -203,9 +205,10 @@ private fun HomeHeader(
 @Composable
 private fun TripsCarousel(
     trips: List<Itinerary>,
+    viewerUid: String,
     tripImages: Map<String, String>,
     isLoading: Boolean,
-    onTripClick: (String) -> Unit = {}
+    onTripClick: (TripKey) -> Unit = {}
 ) {
     Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
         when {
@@ -232,9 +235,17 @@ private fun TripsCarousel(
                 ) { page ->
                     TripCard(
                         trip = trips[page],
+                        viewerUid = viewerUid,
                         imageUrl = tripImages[trips[page].itineraryId],
                         isCurrent = page == pagerState.currentPage,
-                        onClick = { onTripClick(trips[page].itineraryId) }
+                        onClick = {
+                            onTripClick(
+                                TripKey(
+                                    ownerUid = trips[page].ownerUid,
+                                    tripId = trips[page].itineraryId
+                                )
+                            )
+                        }
                     )
                 }
 
@@ -281,7 +292,13 @@ private fun CarouselPlaceholder(content: @Composable () -> Unit) {
 }
 
 @Composable
-private fun TripCard(trip: Itinerary, imageUrl: String?, isCurrent: Boolean, onClick: () -> Unit = {}) {
+private fun TripCard(
+    trip: Itinerary,
+    viewerUid: String,
+    imageUrl: String?,
+    isCurrent: Boolean,
+    onClick: () -> Unit = {}
+) {
     val context = LocalContext.current
     val today = LocalDate.now()
     val countdownDays: Long? = runCatching {
@@ -358,6 +375,30 @@ private fun TripCard(trip: Itinerary, imageUrl: String?, isCurrent: Boolean, onC
                     fontSize = 9.sp,
                     fontWeight = FontWeight.Bold,
                     letterSpacing = 0.8.sp
+                )
+            }
+        }
+
+        val isSharedTrip = trip.ownerUid.isNotBlank() && trip.ownerUid != viewerUid
+        val statusBadge = when {
+            trip.status.equals("archived", ignoreCase = true) -> "Archived"
+            isSharedTrip -> "Shared"
+            else -> null
+        }
+        if (statusBadge != null) {
+            Box(
+                modifier = Modifier
+                    .align(Alignment.TopStart)
+                    .padding(14.dp)
+                    .background(Color.Black.copy(alpha = 0.28f), RoundedCornerShape(50.dp))
+                    .border(0.5.dp, Color.White.copy(alpha = 0.16f), RoundedCornerShape(50.dp))
+                    .padding(horizontal = 10.dp, vertical = 5.dp)
+            ) {
+                Text(
+                    text = statusBadge,
+                    color = Color.White,
+                    fontSize = 10.sp,
+                    fontWeight = FontWeight.Bold
                 )
             }
         }
