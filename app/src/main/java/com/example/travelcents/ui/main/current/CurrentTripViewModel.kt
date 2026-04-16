@@ -7,6 +7,7 @@ import androidx.lifecycle.viewModelScope
 import com.example.travelcents.data.media.ImageCacheManager
 import com.example.travelcents.data.trip.FirestoreTripRepository
 import com.example.travelcents.data.trip.TripKey
+import com.example.travelcents.data.trip.TripAccessRole
 import com.example.travelcents.data.trip.TripPerformanceLogger
 import com.example.travelcents.data.trip.TripRepository
 import com.example.travelcents.data.trip.model.EventOption
@@ -63,7 +64,9 @@ data class CurrentTripUiState(
     val currentTripId: String? = null,
     val currentTripOwnerUid: String? = null,
     val viewerUid: String? = null,
+    val accessRole: TripAccessRole = TripAccessRole.VIEWER,
     val canEditTrip: Boolean = false,
+    val canManageTrip: Boolean = false,
     val tripTitle: String = "Loading Trip...",
     val destination: String = "",
     val dateFrom: String = "",
@@ -197,7 +200,13 @@ class CurrentTripViewModel(application: Application) : AndroidViewModel(applicat
         TripPerformanceLogger.bindTrip(tripKey.tripId)
         currentTripDestination = itinerary.destination
         val viewerUid = auth.currentUser?.uid
-        val canEditTrip = viewerUid == tripKey.ownerUid
+        val accessRole = when {
+            viewerUid.isNullOrBlank() -> TripAccessRole.VIEWER
+            viewerUid == tripKey.ownerUid -> TripAccessRole.OWNER
+            else -> TripAccessRole.fromWireValue(itinerary.roleByUid[viewerUid])
+        }
+        val canEditTrip = accessRole.canMutateEvents()
+        val canManageTrip = accessRole.canManageTrip()
         val storedTripTitle = itinerary.tripName
         val nextTripTitle = resolveTripName(storedTripTitle, currentTripDestination)
         _tripTitle.value = nextTripTitle
@@ -207,7 +216,9 @@ class CurrentTripViewModel(application: Application) : AndroidViewModel(applicat
                 currentTripId = tripKey.tripId,
                 currentTripOwnerUid = tripKey.ownerUid,
                 viewerUid = viewerUid,
+                accessRole = accessRole,
                 canEditTrip = canEditTrip,
+                canManageTrip = canManageTrip,
                 tripTitle = nextTripTitle,
                 destination = currentTripDestination,
                 dateFrom = itinerary.dateFrom,
@@ -217,7 +228,7 @@ class CurrentTripViewModel(application: Application) : AndroidViewModel(applicat
             )
         }
 
-        if (canEditTrip && nextTripTitle != storedTripTitle.trim()) {
+        if (canManageTrip && nextTripTitle != storedTripTitle.trim()) {
             viewModelScope.launch {
                 runCatching {
                     db.collection("users").document(tripKey.ownerUid)
@@ -229,7 +240,18 @@ class CurrentTripViewModel(application: Application) : AndroidViewModel(applicat
         }
 
         listenToEvents(tripKey)
-        fetchTripMembers(tripKey)
+        if (canManageTrip) {
+            viewModelScope.launch {
+                runCatching {
+                    tripRepository.backfillOwnedTripAccess(tripKey.ownerUid)
+                }.onFailure { error ->
+                    Log.w("CurrentTripViewModel", "Trip access backfill failed for owner view", error)
+                }
+                fetchTripMembers(tripKey)
+            }
+        } else {
+            fetchTripMembers(tripKey)
+        }
     }
 
     private fun listenToEvents(tripKey: TripKey) {
@@ -295,7 +317,7 @@ class CurrentTripViewModel(application: Application) : AndroidViewModel(applicat
     }
 
     fun upsertPlan(plan: EditablePlan) {
-        val tripKey = requireOwnerTripKey("add or edit plans")
+        val tripKey = requireTripContributorKey("add or edit plans")
         if (auth.currentUser?.uid == null) {
             postError("Create or load a trip before adding plans.")
             return
@@ -356,7 +378,7 @@ class CurrentTripViewModel(application: Application) : AndroidViewModel(applicat
     }
 
     fun deletePlan(plan: EditablePlan) {
-        val tripKey = requireOwnerTripKey("delete plans")
+        val tripKey = requireTripContributorKey("delete plans")
         val eventId = plan.eventId
 
         if (auth.currentUser?.uid == null || eventId.isNullOrBlank()) {
@@ -601,6 +623,18 @@ class CurrentTripViewModel(application: Application) : AndroidViewModel(applicat
         return tripKey.takeIf { key -> key.ownerUid == auth.currentUser?.uid }
     }
 
+    private fun currentTripWriteKeyIfContributor(): TripKey? {
+        return currentTripWriteKey()?.takeIf { _uiState.value.canEditTrip }
+    }
+
+    private fun requireTripContributorKey(action: String): TripKey? {
+        currentTripWriteKeyIfContributor()?.let { return it }
+        if (currentTripWriteKey() != null) {
+            postError("You do not have permission to $action.")
+        }
+        return null
+    }
+
     private fun requireOwnerTripKey(action: String): TripKey? {
         currentTripWriteKeyIfOwner()?.let { return it }
         if (currentTripWriteKey() != null) {
@@ -674,7 +708,7 @@ class CurrentTripViewModel(application: Application) : AndroidViewModel(applicat
     }
 
     fun selectOption(eventId: String, optionId: String) {
-        val tripKey = requireOwnerTripKey("change selected options") ?: return
+        val tripKey = requireTripContributorKey("change selected options") ?: return
         val options = _eventOptions.value[eventId].orEmpty()
         val selectedOption = options.firstOrNull { it.optionId == optionId } ?: return
         val event = _uiState.value.events.firstOrNull { it.eventId == eventId } ?: return
@@ -732,8 +766,8 @@ class CurrentTripViewModel(application: Application) : AndroidViewModel(applicat
     }
 
     fun rejectOption(eventId: String, optionId: String) {
-        if (currentTripWriteKeyIfOwner() == null) {
-            postError("Only the trip owner can change options.")
+        if (currentTripWriteKeyIfContributor() == null) {
+            postError("You do not have permission to change options.")
             return
         }
         _rejectedOptions.update { current ->
@@ -747,7 +781,7 @@ class CurrentTripViewModel(application: Application) : AndroidViewModel(applicat
         startTime: String,
         notes: String
     ) {
-        val tripKey = requireOwnerTripKey("edit plans") ?: return
+        val tripKey = requireTripContributorKey("edit plans") ?: return
         val currentEvent = _uiState.value.events.firstOrNull { it.eventId == eventId } ?: return
 
         val updatedDetails = currentEvent.details.toMutableMap().apply {
@@ -848,7 +882,7 @@ class CurrentTripViewModel(application: Application) : AndroidViewModel(applicat
     }
 
     fun persistEventPlacements(affectedDates: Set<String>) {
-        val tripKey = requireOwnerTripKey("reorder plans") ?: return
+        val tripKey = requireTripContributorKey("reorder plans") ?: return
         val normalizedDates = affectedDates.map(::normalizeDate).toSet()
         val affectedEvents = _uiState.value.events.filter { normalizeDate(it.date) in normalizedDates }
 
@@ -965,6 +999,11 @@ class CurrentTripViewModel(application: Application) : AndroidViewModel(applicat
         viewModelScope.launch {
             try {
                 _allTrips.value = tripRepository.getTripSummaries(uid)
+                runCatching {
+                    tripRepository.backfillOwnedTripAccess(uid)
+                }.onFailure { error ->
+                    Log.w("CurrentTripViewModel", "Failed to backfill owned trip access", error)
+                }
             } catch (e: Exception) {
                 Log.e("CurrentTripViewModel", "Failed to load all trips", e)
                 _uiState.update { it.copy(errorMessage = e.message ?: "Failed to load trips.") }

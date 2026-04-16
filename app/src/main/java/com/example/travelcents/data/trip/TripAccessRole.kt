@@ -5,6 +5,14 @@ enum class TripAccessRole(val wireValue: String) {
     EDITOR("editor"),
     VIEWER("viewer");
 
+    fun canMutateEvents(): Boolean {
+        return this == OWNER || this == EDITOR
+    }
+
+    fun canManageTrip(): Boolean {
+        return this == OWNER
+    }
+
     companion object {
         fun fromWireValue(value: String?): TripAccessRole {
             return entries.firstOrNull { role ->
@@ -40,7 +48,12 @@ fun mergeTripAccessMetadata(
         .apply {
             put(ownerUid, TripAccessRole.OWNER.wireValue)
             normalizedMembers.forEach { memberUid ->
-                if (memberUid != ownerUid && get(memberUid).isNullOrBlank()) {
+                if (memberUid == ownerUid) return@forEach
+
+                val existingRole = TripAccessRole.fromWireValue(get(memberUid))
+                if (existingRole == TripAccessRole.VIEWER && defaultRole == TripAccessRole.EDITOR) {
+                    put(memberUid, defaultRole.wireValue)
+                } else if (get(memberUid).isNullOrBlank()) {
                     put(memberUid, defaultRole.wireValue)
                 }
             }

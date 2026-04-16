@@ -7,6 +7,7 @@ import com.example.travelcents.data.trip.model.TravelEvent
 import com.example.travelcents.data.trip.model.resolveTripName
 import com.google.firebase.firestore.DocumentSnapshot
 import com.google.firebase.firestore.FirebaseFirestore
+import com.google.firebase.firestore.FirebaseFirestoreException
 import com.google.firebase.firestore.Query
 import com.google.firebase.firestore.QuerySnapshot
 import com.google.firebase.firestore.SetOptions
@@ -25,7 +26,7 @@ class FirestoreTripRepository(
     override suspend fun getLatestActiveTripKey(viewerUid: String): TripKey? {
         findLatestOwnedActiveTripKey(viewerUid)?.let { return it }
 
-        return getSharedTripSummaries(viewerUid)
+        return getSharedTripSummariesSafe(viewerUid)
             .filterNot { trip -> trip.status.equals("archived", ignoreCase = true) }
             .maxByOrNull { trip -> trip.createdAt }
             ?.let { trip ->
@@ -35,7 +36,7 @@ class FirestoreTripRepository(
 
     override suspend fun getTripSummaries(viewerUid: String): List<Itinerary> = coroutineScope {
         val ownedTrips = async { getOwnedTripSummaries(viewerUid) }
-        val sharedTrips = async { getSharedTripSummaries(viewerUid) }
+        val sharedTrips = async { getSharedTripSummariesSafe(viewerUid) }
 
         (ownedTrips.await() + sharedTrips.await())
             .distinctBy { trip -> "${trip.ownerUid}:${trip.itineraryId}" }
@@ -119,30 +120,9 @@ class FirestoreTripRepository(
         )
 
         val tripSnapshot = tripDocument(key).get().await()
-        val storedMembers = normalizeTripMembers(
-            ownerUid = key.ownerUid,
-            memberUids = tripSnapshot.memberUids()
-        )
-        if (storedMembers.isNotEmpty()) return storedMembers
-
-        val fallbackMembers = db.collection("groups")
-            .whereEqualTo("linkedTripId", key.tripId)
-            .whereEqualTo("linkedTripOwnerId", key.ownerUid)
-            .get()
-            .await()
-            .documents
-            .flatMap { doc ->
-                (doc.get("members") as? List<*>)?.filterIsInstance<String>().orEmpty()
-            }
-            .distinct()
-
-        if (fallbackMembers.isNotEmpty()) {
-            ensureTripAccess(key, fallbackMembers)
-        }
-
         return normalizeTripMembers(
             ownerUid = key.ownerUid,
-            memberUids = fallbackMembers
+            memberUids = tripSnapshot.memberUids()
         )
     }
 
@@ -211,11 +191,61 @@ class FirestoreTripRepository(
                 mapOf(
                     "ownerUid" to key.ownerUid,
                     "memberUids" to access.memberUids,
-                    "roleByUid" to access.roleByUid
+                    "roleByUid" to access.roleByUid,
+                    "accessSchemaVersion" to Itinerary.ACCESS_SCHEMA_VERSION
                 ),
                 SetOptions.merge()
             )
         }.await()
+    }
+
+    override suspend fun backfillOwnedTripAccess(ownerUid: String) = coroutineScope {
+        val tripDocuments = tripsCollection(ownerUid).get().await().documents
+        tripDocuments.forEach { tripDocument ->
+            val tripKey = TripKey(ownerUid = ownerUid, tripId = tripDocument.id)
+            val existingMembers = tripDocument.memberUids()
+            val existingRoles = tripDocument.roleByUid()
+            val accessVersion = tripDocument.accessSchemaVersion()
+
+            val linkedGroupEditors = linkedGroupMembers(tripKey)
+            val legacySharedViewers = legacySharedTripMembers(tripKey)
+
+            val shouldBackfill = accessVersion < Itinerary.ACCESS_SCHEMA_VERSION ||
+                existingMembers.isEmpty() ||
+                existingRoles.isEmpty() ||
+                linkedGroupEditors.any { uid -> existingRoles[uid] != TripAccessRole.EDITOR.wireValue } ||
+                legacySharedViewers.any { uid -> uid !in existingMembers }
+
+            if (!shouldBackfill) return@forEach
+
+            val viewerAccess = mergeTripAccessMetadata(
+                ownerUid = ownerUid,
+                existingMemberUids = existingMembers,
+                existingRoleByUid = existingRoles,
+                additionalMemberUids = legacySharedViewers.toList(),
+                defaultRole = TripAccessRole.VIEWER
+            )
+            val finalAccess = mergeTripAccessMetadata(
+                ownerUid = ownerUid,
+                existingMemberUids = viewerAccess.memberUids,
+                existingRoleByUid = viewerAccess.roleByUid,
+                additionalMemberUids = linkedGroupEditors.toList(),
+                defaultRole = TripAccessRole.EDITOR
+            )
+
+            db.runBatch { batch ->
+                batch.set(
+                    tripDocument.reference,
+                    mapOf(
+                        "ownerUid" to ownerUid,
+                        "memberUids" to finalAccess.memberUids,
+                        "roleByUid" to finalAccess.roleByUid,
+                        "accessSchemaVersion" to Itinerary.ACCESS_SCHEMA_VERSION
+                    ),
+                    SetOptions.merge()
+                )
+            }.await()
+        }
     }
 
     override suspend fun deleteTrip(key: TripKey) = coroutineScope {
@@ -286,7 +316,24 @@ class FirestoreTripRepository(
             .mapNotNull { document -> mapTripSummary(document, ownerUid) }
     }
 
-    private suspend fun getSharedTripSummaries(viewerUid: String): List<Itinerary> {
+    private suspend fun getSharedTripSummariesSafe(viewerUid: String): List<Itinerary> {
+        return runCatching {
+            getSharedTripSummariesByMembership(viewerUid)
+        }.getOrElse { error ->
+            if (!shouldFallbackSharedTripQuery(error)) {
+                throw error
+            }
+
+            Log.w(
+                TAG,
+                "Shared trip membership query unavailable for viewer $viewerUid. Falling back to chat/group discovery.",
+                error
+            )
+            getSharedTripSummariesFromFallback(viewerUid)
+        }
+    }
+
+    private suspend fun getSharedTripSummariesByMembership(viewerUid: String): List<Itinerary> {
         TripPerformanceLogger.recordTripQuery(
             source = "FirestoreTripRepository.getSharedTripSummaries",
             detail = "viewerUid=$viewerUid"
@@ -301,6 +348,143 @@ class FirestoreTripRepository(
                 if (ownerUid.isBlank() || ownerUid == viewerUid) return@mapNotNull null
                 mapTripSummary(document, ownerUid)
             }
+    }
+
+    private suspend fun getSharedTripSummariesFromFallback(viewerUid: String): List<Itinerary> =
+        coroutineScope {
+            val linkedGroupTripKeys = async { linkedGroupTripKeysForViewer(viewerUid) }
+            val sharedMessageTripKeys = async { sharedMessageTripKeysForViewer(viewerUid) }
+
+            (linkedGroupTripKeys.await() + sharedMessageTripKeys.await())
+                .distinctBy { key -> "${key.ownerUid}:${key.tripId}" }
+                .map { key ->
+                    async {
+                        runCatching {
+                            getTripSummary(key)
+                        }.getOrElse { error ->
+                            Log.w(
+                                TAG,
+                                "Shared trip fallback could not load ${key.ownerUid}/${key.tripId}.",
+                                error
+                            )
+                            null
+                        }
+                    }
+                }
+                .awaitAll()
+                .filterNotNull()
+        }
+
+    private suspend fun linkedGroupMembers(key: TripKey): Set<String> {
+        return db.collection("groups")
+            .whereEqualTo("linkedTripId", key.tripId)
+            .whereEqualTo("linkedTripOwnerId", key.ownerUid)
+            .get()
+            .await()
+            .documents
+            .flatMap { document ->
+                (document.get("members") as? List<*>)?.filterIsInstance<String>().orEmpty()
+            }
+            .filter { memberUid -> memberUid != key.ownerUid }
+            .toSet()
+    }
+
+    private suspend fun linkedGroupTripKeysForViewer(viewerUid: String): List<TripKey> {
+        return runCatching {
+            db.collection("groups")
+                .whereArrayContains("members", viewerUid)
+                .get()
+                .await()
+                .documents
+                .mapNotNull { document ->
+                    val ownerUid = document.getString("linkedTripOwnerId").orEmpty()
+                    val tripId = document.getString("linkedTripId").orEmpty()
+                    if (ownerUid.isBlank() || tripId.isBlank() || ownerUid == viewerUid) {
+                        null
+                    } else {
+                        TripKey(ownerUid = ownerUid, tripId = tripId)
+                    }
+                }
+        }.getOrElse { error ->
+            Log.w(TAG, "Linked-group shared trip fallback failed for viewer $viewerUid.", error)
+            emptyList()
+        }
+    }
+
+    private suspend fun legacySharedTripMembers(key: TripKey): Set<String> = coroutineScope {
+        val sharedMessages = runCatching {
+            db.collectionGroup("messages")
+                .whereEqualTo("messageType", "trip_card")
+                .whereEqualTo("ownerUid", key.ownerUid)
+                .whereEqualTo("sharedTripId", key.tripId)
+                .get()
+                .await()
+                .documents
+        }.getOrElse { error ->
+            Log.w(TAG, "Legacy share backfill query failed for trip ${key.tripId}.", error)
+            emptyList()
+        }
+
+        sharedMessages
+            .mapNotNull { document -> document.reference.parent.parent }
+            .distinctBy { reference -> reference.path }
+            .map { parentRef ->
+                async {
+                    runCatching {
+                        parentRef.get().await()
+                    }.getOrNull()
+                }
+            }
+            .awaitAll()
+            .mapNotNull { snapshot ->
+                snapshot?.get("members") as? List<*>
+            }
+            .flatten()
+            .filterIsInstance<String>()
+            .filter { memberUid -> memberUid != key.ownerUid }
+            .toSet()
+    }
+
+    private suspend fun sharedMessageTripKeysForViewer(viewerUid: String): List<TripKey> =
+        coroutineScope {
+            val groupRefs = async { chatContainerRefs("groups", viewerUid) }
+            val directRefs = async { chatContainerRefs("directChats", viewerUid) }
+
+            (groupRefs.await() + directRefs.await())
+                .distinctBy { reference -> reference.path }
+                .map { chatRef ->
+                    async {
+                        runCatching {
+                            chatRef.collection("messages")
+                                .whereEqualTo("messageType", "trip_card")
+                                .get()
+                                .await()
+                                .documents
+                                .mapNotNull { document -> document.sharedTripKey(viewerUid) }
+                        }.getOrElse { error ->
+                            Log.w(TAG, "Trip-card fallback failed for chat ${chatRef.path}.", error)
+                            emptyList()
+                        }
+                    }
+                }
+                .awaitAll()
+                .flatten()
+                .distinctBy { key -> "${key.ownerUid}:${key.tripId}" }
+        }
+
+    private suspend fun chatContainerRefs(
+        collection: String,
+        viewerUid: String
+    ) = runCatching {
+        db.collection(collection)
+            .whereArrayContains("members", viewerUid)
+            .get()
+            .await()
+            .documents
+            .map { document -> document.reference }
+    }.getOrElse { error ->
+        Log.w(TAG, "Chat fallback lookup failed for $collection and viewer $viewerUid.", error)
+        emptyList()
     }
 
     private suspend fun loadTripOptionDocumentsForDelete(
@@ -402,7 +586,8 @@ class FirestoreTripRepository(
                 memberUids = document.memberUids().ifEmpty { listOf(ownerUid) },
                 roleByUid = document.roleByUid().ifEmpty {
                     mapOf(ownerUid to TripAccessRole.OWNER.wireValue)
-                }
+                },
+                accessSchemaVersion = document.accessSchemaVersion().coerceAtLeast(0)
             )
         }.getOrNull()
     }
@@ -424,6 +609,16 @@ class FirestoreTripRepository(
         }
     }
 
+    private fun DocumentSnapshot.sharedTripKey(viewerUid: String): TripKey? {
+        val ownerUid = getString("ownerUid").orEmpty()
+        val tripId = getString("sharedTripId").orEmpty()
+        return if (ownerUid.isBlank() || tripId.isBlank() || ownerUid == viewerUid) {
+            null
+        } else {
+            TripKey(ownerUid = ownerUid, tripId = tripId)
+        }
+    }
+
     private fun DocumentSnapshot.memberUids(): List<String> {
         return (get("memberUids") as? List<*>)?.filterIsInstance<String>().orEmpty()
     }
@@ -437,6 +632,22 @@ class FirestoreTripRepository(
             }
             ?.toMap()
             .orEmpty()
+    }
+
+    private fun DocumentSnapshot.accessSchemaVersion(): Int {
+        return (getLong("accessSchemaVersion") ?: 0L).toInt()
+    }
+
+    private fun shouldFallbackSharedTripQuery(error: Throwable): Boolean {
+        val firestoreError = error as? FirebaseFirestoreException
+        if (firestoreError?.code == FirebaseFirestoreException.Code.FAILED_PRECONDITION) {
+            return true
+        }
+
+        val message = error.message.orEmpty().lowercase()
+        return "collection_group_contains" in message ||
+            "collections_group_contains" in message ||
+            "requires an index" in message
     }
 
     private fun tripDocument(key: TripKey) = tripsCollection(key.ownerUid).document(key.tripId)

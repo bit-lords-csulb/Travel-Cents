@@ -1,0 +1,149 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function signedIn() {
+      return request.auth != null;
+    }
+
+    function isSelf(uid) {
+      return signedIn() && request.auth.uid == uid;
+    }
+
+    function currentUserDoc() {
+      return get(/databases/$(database)/documents/users/$(request.auth.uid));
+    }
+
+    function currentUserExists() {
+      return signedIn() && exists(/databases/$(database)/documents/users/$(request.auth.uid));
+    }
+
+    function currentUserProfileMatchesUsername(username) {
+      return signedIn() &&
+        currentUserExists() &&
+        currentUserDoc().data.username == username &&
+        request.resource.data.keys().hasOnly(['email']) &&
+        request.resource.data.email == currentUserDoc().data.email;
+    }
+
+    function isMemberList(members) {
+      return members is list && request.auth.uid in members;
+    }
+
+    function tripDoc(ownerUid, tripId) {
+      return get(/databases/$(database)/documents/users/$(ownerUid)/trips/$(tripId));
+    }
+
+    function tripExists(ownerUid, tripId) {
+      return exists(/databases/$(database)/documents/users/$(ownerUid)/trips/$(tripId));
+    }
+
+    function tripRole(ownerUid, tripId) {
+      return tripDoc(ownerUid, tripId).data.roleByUid[request.auth.uid];
+    }
+
+    function canReadTrip(ownerUid, tripId) {
+      return signedIn() && (
+        isSelf(ownerUid) ||
+        (
+          tripExists(ownerUid, tripId) && (
+            isMemberList(tripDoc(ownerUid, tripId).data.memberUids) ||
+            tripRole(ownerUid, tripId) in ['viewer', 'editor', 'owner']
+          )
+        )
+      );
+    }
+
+    function canMutateTripEvents(ownerUid, tripId) {
+      return signedIn() && (
+        isSelf(ownerUid) ||
+        (tripExists(ownerUid, tripId) && tripRole(ownerUid, tripId) in ['editor', 'owner'])
+      );
+    }
+
+    function canMutateTripEventIdsOnly() {
+      return request.resource.data.diff(resource.data).affectedKeys().hasOnly(['eventIds']);
+    }
+
+    function isExistingChatMember(path) {
+      return signedIn() && exists(path) && isMemberList(get(path).data.members);
+    }
+
+    match /usernames/{username} {
+      allow get: if true;
+      allow list: if false;
+      allow create, update: if currentUserProfileMatchesUsername(username);
+      allow delete: if signedIn() &&
+        currentUserExists() &&
+        currentUserDoc().data.username == username;
+    }
+
+    match /users/{userUid} {
+      allow read: if signedIn();
+      allow create, update, delete: if isSelf(userUid);
+
+      match /friends/{friendUid} {
+        allow read: if isSelf(userUid);
+        allow create, update, delete: if signedIn() &&
+          (request.auth.uid == userUid || request.auth.uid == friendUid);
+      }
+
+      match /trips/{tripId} {
+        allow get, list: if canReadTrip(userUid, tripId);
+        allow create: if isSelf(userUid) &&
+          request.resource.data.ownerUid == userUid &&
+          request.resource.data.roleByUid[userUid] == 'owner';
+        allow update: if isSelf(userUid) ||
+          (canMutateTripEvents(userUid, tripId) && canMutateTripEventIdsOnly());
+        allow delete: if isSelf(userUid);
+
+        match /events/{eventId} {
+          allow read: if canReadTrip(userUid, tripId);
+          allow create, update, delete: if canMutateTripEvents(userUid, tripId);
+
+          match /options/{optionId} {
+            allow read: if canReadTrip(userUid, tripId);
+            allow create, update, delete: if canMutateTripEvents(userUid, tripId);
+          }
+        }
+      }
+    }
+
+    match /directChats/{chatId} {
+      allow get, list, update, delete: if signedIn() && isMemberList(resource.data.members);
+      allow create: if signedIn() && isMemberList(request.resource.data.members);
+
+      match /messages/{messageId} {
+        allow read, create, update, delete: if isExistingChatMember(
+          /databases/$(database)/documents/directChats/$(chatId)
+        );
+      }
+    }
+
+    match /groups/{groupId} {
+      allow get, list, update, delete: if signedIn() && isMemberList(resource.data.members);
+      allow create: if signedIn() && isMemberList(request.resource.data.members);
+
+      match /messages/{messageId} {
+        allow read, create, update, delete: if isExistingChatMember(
+          /databases/$(database)/documents/groups/$(groupId)
+        );
+      }
+
+      match /events/{eventId} {
+        allow read, create, update, delete: if isExistingChatMember(
+          /databases/$(database)/documents/groups/$(groupId)
+        );
+
+        match /comments/{commentId} {
+          allow read, create, update, delete: if isExistingChatMember(
+            /databases/$(database)/documents/groups/$(groupId)
+          );
+        }
+      }
+    }
+
+    match /serpCache/{docId} {
+      allow read, write: if signedIn();
+    }
+  }
+}

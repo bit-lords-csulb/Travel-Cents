@@ -41,4 +41,20 @@ class TripAccessMetadataTest {
             merged.roleByUid
         )
     }
+
+    @Test
+    fun mergeTripAccessMetadata_upgradesViewerToEditorWhenRequested() {
+        val merged = mergeTripAccessMetadata(
+            ownerUid = "owner-1",
+            existingMemberUids = listOf("owner-1", "editor-1"),
+            existingRoleByUid = mapOf(
+                "owner-1" to TripAccessRole.OWNER.wireValue,
+                "editor-1" to TripAccessRole.VIEWER.wireValue
+            ),
+            additionalMemberUids = listOf("editor-1"),
+            defaultRole = TripAccessRole.EDITOR
+        )
+
+        assertEquals(TripAccessRole.EDITOR.wireValue, merged.roleByUid["editor-1"])
+    }
 }
