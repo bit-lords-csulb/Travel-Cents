@@ -74,6 +74,7 @@ An AI-powered travel planning Android app built with Jetpack Compose and Kotlin.
 - Four event card types: **Flight**, **Hotel**, **Restaurant**, and **Activity**.
 - Real-time Firestore listener.
 - Inline edit, add, and delete events.
+- **Expanded event detail sheet** — Yelp ratings, hours, photos, booking/menu links, and an embedded static map for hotels, restaurants, and activities.
 - **Final Plan** view for a polished, read-only or shareable summary of the trip.
 
 ### AI Chat
@@ -109,6 +110,7 @@ An AI-powered travel planning Android app built with Jetpack Compose and Kotlin.
 | Flight & Hotel Data | SerpAPI |
 | Activity Search | Yelp Fusion API |
 | Activity Descriptions | Wikipedia REST API |
+| Static Maps | OpenStreetMap (no API key) |
 | HTTP (AI/Serp) | Retrofit 2 + OkHttp 4 |
 | HTTP (Yelp/Wikipedia) | Ktor Client |
 | Serialization | Gson |
