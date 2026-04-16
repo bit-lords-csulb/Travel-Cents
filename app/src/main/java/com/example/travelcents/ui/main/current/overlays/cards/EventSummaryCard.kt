@@ -27,6 +27,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImage
 import com.example.travelcents.data.trip.model.TravelEvent
+import com.example.travelcents.ui.main.current.eventSubtitle
 import com.example.travelcents.ui.main.current.eventTitle
 import com.example.travelcents.ui.modules.PhotoGalleryButton
 import java.util.Locale
@@ -115,7 +116,7 @@ fun EventSummaryCard(
 
             Column(
                 modifier = Modifier.weight(0.62f),
-                verticalArrangement = Arrangement.spacedBy(12.dp)
+                verticalArrangement = Arrangement.spacedBy(8.dp)
             ) {
                 Text(
                     text = title,
@@ -128,23 +129,27 @@ fun EventSummaryCard(
                     badges = listOf(timeSummary, durationSummary),
                     accent = accent
                 )
-                Spacer(modifier = Modifier.height(2.dp))
-                Row(
-                    horizontalArrangement = Arrangement.spacedBy(10.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Box(
-                        modifier = Modifier
-                            .size(10.dp)
-                            .clip(RoundedCornerShape(999.dp))
-                            .background(accent)
-                    )
-                    Text(
-                        text = "Compact card layout enabled for this event type.",
-                        color = CardTextMuted,
-                        fontSize = 12.sp,
-                        lineHeight = 16.sp
-                    )
+                if (!event.type.equals("flight", ignoreCase = true)) {
+                    val subtitle = eventSubtitle(event)
+                    if (subtitle.isNotBlank()) {
+                        Row(
+                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Box(
+                                modifier = Modifier
+                                    .size(6.dp)
+                                    .clip(RoundedCornerShape(999.dp))
+                                    .background(accent)
+                            )
+                            Text(
+                                text = subtitle,
+                                color = CardTextMuted,
+                                fontSize = 11.sp,
+                                lineHeight = 15.sp
+                            )
+                        }
+                    }
                 }
             }
         }

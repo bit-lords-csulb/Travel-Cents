@@ -62,15 +62,7 @@ internal fun eventLocationLabel(event: TravelEvent): String {
 
 internal fun eventTimeSummary(event: TravelEvent): String {
     if (event.type.equals("flight", ignoreCase = true)) {
-        val datePrefix = event.date.takeIf { it.isNotBlank() }?.let { "$it  " }.orEmpty()
-        val departure = formatDisplayTime(event.startTime)
-        val arrival = formatDisplayTime(event.endTime)
-        val arrivalDate = event.details["arrival_date"]?.takeIf { it.isNotBlank() }
-        return if (!arrivalDate.isNullOrBlank() && arrivalDate != event.date) {
-            "$datePrefix$departure - $arrivalDate  $arrival"
-        } else {
-            "$datePrefix$departure - $arrival"
-        }
+        return event.date.takeIf { it.isNotBlank() } ?: "Departure date TBD"
     }
     val datePrefix = event.date.takeIf { it.isNotBlank() }?.let { "$it  " }.orEmpty()
     return datePrefix + formatDisplayTimeRange(event.startTime, event.endTime)

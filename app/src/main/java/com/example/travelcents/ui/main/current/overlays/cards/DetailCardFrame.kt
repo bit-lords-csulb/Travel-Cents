@@ -40,7 +40,7 @@ fun DetailCardFrame(
                         )
                     )
                 )
-                .padding(18.dp),
+                .padding(14.dp),
             content = content
         )
     }
