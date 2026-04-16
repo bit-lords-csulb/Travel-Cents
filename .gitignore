@@ -13,5 +13,8 @@
 .externalNativeBuild
 .cxx
 local.properties
+.gradle-home/
+.android/
+.kotlin/
 plan.md
 .claude/settings.local.json

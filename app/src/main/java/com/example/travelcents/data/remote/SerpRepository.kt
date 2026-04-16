@@ -434,11 +434,10 @@ object SerpRepository {
     // sort_by=8 (highest rated). Prices are per-room; group pricing computed client-side.
     suspend fun searchHotels(
         request: TravelRequest,
-        itinerary: Itinerary,
-        maxPricePerNight: Double = 0.0
+        itinerary: Itinerary
     ): List<TravelEvent> {
         val destNorm = itinerary.destination.lowercase().trim()
-        val cacheKey = "${destNorm}_${request.dateFrom}_${request.dateTo}_${request.adults}_${request.currency}_${maxPricePerNight.toInt()}"
+        val cacheKey = "${destNorm}_${request.dateFrom}_${request.dateTo}_${request.adults}_${request.children}_${request.currency}_rated"
 
         SerpCache.getHotels(cacheKey)?.let { cached ->
             return cached.map { it.copy(itineraryId = itinerary.itineraryId) }
@@ -455,7 +454,6 @@ object SerpRepository {
                 put("currency", request.currency)
                 put("sort_by", "8") // highest rated
                 put("api_key", BuildConfig.SERP_API_KEY)
-                if (maxPricePerNight > 0) put("max_price", maxPricePerNight.toInt().toString())
             }
 
             val response = api.searchHotels(params)
@@ -469,6 +467,10 @@ object SerpRepository {
                 hotelToEventOption(hotel, eventId, isSelected = idx == 0, roomsNeeded = roomsNeeded)
             }
 
+            val selectedPhotos = selectedHotel?.images
+                ?.mapNotNull { it.originalImage ?: it.thumbnail }
+                ?: emptyList()
+
             TravelEvent(
                 eventId = eventId,
                 type = "hotel",
@@ -476,7 +478,8 @@ object SerpRepository {
                 date = request.dateFrom,
                 startTime = selectedHotel?.checkInTime ?: "15:00",
                 endTime = selectedHotel?.checkOutTime ?: "11:00",
-                imageUrl = selectedHotel?.images?.firstOrNull()?.thumbnail ?: "",
+                imageUrl = selectedPhotos.firstOrNull() ?: "",
+                photoUrls = selectedPhotos,
                 details = buildMap {
                     selectedHotel?.let { hotel ->
                         put("hotel_name", hotel.name)
@@ -524,12 +527,14 @@ object SerpRepository {
             ?.minByOrNull { it.ratePerNight?.extractedLowest ?: Double.MAX_VALUE }
             ?.link
 
+        val photos = hotel.images?.mapNotNull { it.originalImage ?: it.thumbnail } ?: emptyList()
         return EventOption(
             optionId = UUID.randomUUID().toString(),
             eventId = eventId,
             source = "serp",
             selected = isSelected,
-            imageUrl = hotel.images?.firstOrNull()?.thumbnail ?: "",
+            imageUrl = photos.firstOrNull() ?: "",
+            photoUrls = photos,
             details = buildMap {
                 put("hotel_name", hotel.name)
                 hotel.overallRating?.let { put("rating", it.toString()) }

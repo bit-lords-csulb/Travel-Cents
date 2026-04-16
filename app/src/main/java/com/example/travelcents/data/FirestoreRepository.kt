@@ -25,8 +25,7 @@ class FirestoreRepository {
             }
     }
 
-    // ── Friends ───────────────────────────────────────────────────────────────
-
+    // Friends
     fun searchUsersByUsername(query: String, excludeUid: String, onResult: (List<Friend>) -> Unit) {
         db.collection("users")
             .whereEqualTo("username", query.trim().lowercase())
@@ -183,7 +182,6 @@ class FirestoreRepository {
                 onUpdate(groups)
             }
     }
-
     fun createGroup(
         name: String,
         members: List<String>,

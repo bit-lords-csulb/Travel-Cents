@@ -10,16 +10,15 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.OpenInNew
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.GridView
-import androidx.compose.material.icons.filled.OpenInNew
 import androidx.compose.material.icons.filled.SwapHoriz
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.layout.ContentScale
@@ -52,6 +51,7 @@ private fun expandedTypeColor(type: String): Color = when (type.lowercase()) {
     else -> Color(0xFFD5E3FB)
 }
 
+@Suppress("ASSIGNED_BUT_NEVER_ACCESSED_VARIABLE")
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ExpandedEventCard(
@@ -65,25 +65,29 @@ fun ExpandedEventCard(
     val typeColor = expandedTypeColor(event.type)
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
 
-    // All photos: event hero first, then unique option images
+    // Photos of this specific venue: use photoUrls if populated (hotel images from SerpAPI),
+    // otherwise fall back to the single hero image.
     val photos = remember(event) {
-        buildList {
-            if (event.imageUrl.isNotBlank()) add(event.imageUrl)
-            event.options.forEach { opt ->
-                if (opt.imageUrl.isNotBlank() && opt.imageUrl !in this) add(opt.imageUrl)
-            }
+        event.photoUrls.ifEmpty {
+            listOfNotNull(event.imageUrl.takeIf { it.isNotBlank() })
         }
     }
     var showGallery by remember { mutableStateOf(false) }
 
     // Editable fields pre-filled from event
-    val existingTitle = event.details["title"] ?: event.details["activity_name"]
-        ?: event.details["restaurant_name"] ?: event.type.replaceFirstChar { it.uppercase() }
+    val existingTitle = when (event.type.lowercase()) {
+        "hotel" -> event.details["hotel_name"] ?: event.details["title"] ?: event.details["name"]
+        "restaurant", "dining", "food" -> event.details["restaurant_name"] ?: event.details["title"] ?: event.details["name"]
+        else -> event.details["title"]
+            ?: event.details["activity_name"]
+            ?: event.details["restaurant_name"]
+            ?: event.details["name"]
+    } ?: event.type.replaceFirstChar { it.uppercase() }
     val existingNotes = event.details["description"] ?: event.details["notes"] ?: ""
 
-    var editTitle by remember(event.eventId) { mutableStateOf(existingTitle) }
-    var editTime by remember(event.eventId) { mutableStateOf(event.startTime) }
-    var editNotes by remember(event.eventId) { mutableStateOf(existingNotes) }
+    var editTitle by remember(event.eventId, existingTitle) { mutableStateOf(existingTitle) }
+    var editTime by remember(event.eventId, event.startTime) { mutableStateOf(event.startTime) }
+    var editNotes by remember(event.eventId, existingNotes) { mutableStateOf(existingNotes) }
     var isEditing by remember { mutableStateOf(false) }
     val uriHandler = LocalUriHandler.current
 
@@ -411,7 +415,7 @@ private fun HotelDetails(event: TravelEvent) {
                 shape = RoundedCornerShape(8.dp),
                 contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp)
             ) {
-                Icon(Icons.Default.OpenInNew, contentDescription = null, modifier = Modifier.size(14.dp))
+                Icon(Icons.AutoMirrored.Filled.OpenInNew, contentDescription = null, modifier = Modifier.size(14.dp))
                 Spacer(modifier = Modifier.width(4.dp))
                 Text("Book now", fontSize = 12.sp)
             }
@@ -433,7 +437,7 @@ private fun RestaurantDetails(
 ) {
     val d = event.details
     DetailGroup("RESTAURANT INFO") {
-        DetailRow("Price", d["price_tier"] ?: "—")
+        DetailRow("Price", d["price_tier"] ?: "Not listed")
         DetailRow("Rating", d["rating"]?.let { "★$it" } ?: "—")
         DetailRow("Reviews", d["review_count"] ?: "—")
         if (d["address"] != null) DetailRow("Address", d["address"]!!)

@@ -15,6 +15,10 @@ import java.util.concurrent.TimeUnit
 
 object YelpRepository {
 
+    private const val OPTIONS_PER_EVENT = 5
+    private const val SEARCH_PAGE_SIZE = 50
+    private const val SEARCH_MAX_RESULTS = 240
+
     private val client = OkHttpClient.Builder()
         .addInterceptor { chain ->
             val req = chain.request().newBuilder()
@@ -37,35 +41,16 @@ object YelpRepository {
         .build()
         .create(YelpApiService::class.java)
 
-    // Dietary alias map for Yelp category params
-    private val dietaryAliases = mapOf(
-        "Vegan" to "vegan",
-        "Vegetarian" to "vegetarian",
-        "Halal" to "halal",
-        "Kosher" to "kosher",
-        "Gluten-Free" to "gluten_free"
-    )
-
-    // 1 call per day for the given location + dietary prefs. Returns a TravelEvent with 5 options.
+    // 1 call per day for the given location. Returns a TravelEvent with 5 options.
     suspend fun searchRestaurants(
         location: String,
         date: String,
-        itineraryId: String,
-        dietary: List<String> = emptyList()
+        itineraryId: String
     ): TravelEvent? {
         return try {
-            val dietaryCategories = dietary.mapNotNull { dietaryAliases[it] }
-            val categories = buildString {
-                append("restaurants")
-                if (dietaryCategories.isNotEmpty()) {
-                    append(",")
-                    append(dietaryCategories.joinToString(","))
-                }
-            }
-
             val params = mapOf(
                 "location" to location,
-                "categories" to categories,
+                "categories" to "restaurants",
                 "limit" to "5",
                 "sort_by" to "rating"
             )
@@ -177,27 +162,18 @@ object YelpRepository {
         }
     }
 
-    // Single pooled fetch for restaurants (limit=20). Use distributePoolToEvents to assign across days.
+    // Single pooled fetch for restaurants. Size the pool to the itinerary, paging as needed.
     suspend fun fetchRestaurantPool(
         location: String,
-        dietary: List<String> = emptyList()
+        targetCount: Int = OPTIONS_PER_EVENT
     ): List<YelpBusiness> {
         return try {
-            val dietaryCategories = dietary.mapNotNull { dietaryAliases[it] }
-            val categories = buildString {
-                append("restaurants")
-                if (dietaryCategories.isNotEmpty()) {
-                    append(",")
-                    append(dietaryCategories.joinToString(","))
-                }
-            }
-            val params = mapOf(
-                "location" to location,
-                "categories" to categories,
-                "limit" to "20",
-                "sort_by" to "rating"
+            fetchBusinessPool(
+                location = location,
+                categories = "restaurants",
+                targetCount = targetCount,
+                sortBy = "rating"
             )
-            api.searchBusinesses(params).businesses
         } catch (_: Exception) {
             emptyList()
         }
@@ -218,6 +194,47 @@ object YelpRepository {
         }
     }
 
+    private suspend fun fetchBusinessPool(
+        location: String,
+        categories: String,
+        targetCount: Int,
+        sortBy: String
+    ): List<YelpBusiness> {
+        val desiredCount = targetCount
+            .coerceAtLeast(OPTIONS_PER_EVENT)
+            .coerceAtMost(SEARCH_MAX_RESULTS)
+
+        val businesses = mutableListOf<YelpBusiness>()
+        val seenIds = linkedSetOf<String>()
+        var offset = 0
+
+        while (businesses.size < desiredCount && offset < SEARCH_MAX_RESULTS) {
+            val remaining = desiredCount - businesses.size
+            val limit = minOf(SEARCH_PAGE_SIZE, remaining, SEARCH_MAX_RESULTS - offset)
+            if (limit <= 0) break
+
+            val page = api.searchBusinesses(
+                mapOf(
+                    "location" to location,
+                    "categories" to categories,
+                    "limit" to limit.toString(),
+                    "offset" to offset.toString(),
+                    "sort_by" to sortBy
+                )
+            ).businesses
+
+            if (page.isEmpty()) break
+
+            val newBusinesses = page.filter { seenIds.add(it.id) }
+            businesses += newBusinesses
+
+            if (page.size < limit) break
+            offset += limit
+        }
+
+        return businesses
+    }
+
     // Distribute a Yelp business pool across trip days round-robin.
     // Day i gets pool[i] as primary; alternatives are up to 4 other businesses from the pool.
     // Days beyond pool size are skipped (returns fewer events than dates if pool is small).
@@ -235,7 +252,7 @@ object YelpRepository {
             if (dayIndex >= pool.size) return@mapIndexedNotNull null
             val primary = pool[dayIndex]
             val eventId = UUID.randomUUID().toString()
-            val alternatives = pool.filterIndexed { i, _ -> i != dayIndex }.take(4)
+            val alternatives = pool.filterIndexed { i, _ -> i != dayIndex }.take(OPTIONS_PER_EVENT - 1)
             val options = listOf(
                 businessToEventOption(primary, eventId, isSelected = true, source = "yelp")
             ) + alternatives.map {

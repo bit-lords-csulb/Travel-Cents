@@ -34,19 +34,26 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.navigation.NavGraph.Companion.findStartDestination
 import androidx.navigation.NavType
+import androidx.compose.runtime.LaunchedEffect
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
-import com.example.travelcents.ui.auth.AuthViewModel
+import com.example.travelcents.ui.main.aichat.AiTripChatPage
+import com.example.travelcents.ui.main.chats.chat.ChatsScreen
 import com.example.travelcents.ui.main.itinerary.EditPlanScreen
+import com.example.travelcents.ui.main.itinerary.FinalPlanPage
 import com.example.travelcents.ui.main.itinerary.ItineraryScreen
 import com.example.travelcents.ui.main.itinerary.ItineraryViewModel
-import com.example.travelcents.ui.main.chats.chat.ChatsScreen
 import com.example.travelcents.ui.main.newtrip.NewTripLandingPage
 import com.example.travelcents.ui.main.newtrip.NewTripViewModel
-import com.example.travelcents.ui.main.aichat.AiTripChatPage
+import com.example.travelcents.ui.main.newtrip.TripGeneratingPage
+import com.example.travelcents.ui.main.newtrip.TripStep1DestinationPage
+import com.example.travelcents.ui.main.newtrip.TripStep2DatesPage
+import com.example.travelcents.ui.main.newtrip.TripStep3TravelersPage
+import com.example.travelcents.ui.main.newtrip.TripStep4BudgetPage
+import com.example.travelcents.ui.main.newtrip.TripStep5InterestsPage
 import com.example.travelcents.ui.theme.DeepSea1
 import com.example.travelcents.ui.theme.DeepSea2
 import com.example.travelcents.ui.theme.DeepSea3
@@ -54,22 +61,38 @@ import com.example.travelcents.ui.theme.DeepSea4
 import com.example.travelcents.ui.theme.DeepSea5
 
 object MainRoutes {
-    const val Current = "current"
-    const val NewTrip = "new_trip"
-    const val Home = "home"
-    const val Chats = "chats"
-    const val Settings = "settings"
+    const val CURRENT = "current"
+    const val NEW_TRIP = "new_trip"
+    const val NEW_TRIP_STEP_1 = "new_trip_step1"
+    const val NEW_TRIP_STEP_2 = "new_trip_step2"
+    const val NEW_TRIP_STEP_3 = "new_trip_step3"
+    const val NEW_TRIP_STEP_4 = "new_trip_step4"
+    const val NEW_TRIP_STEP_5 = "new_trip_step5"
+    const val TRIP_GENERATING = "trip_generating"
+    const val HOME = "home"
+    const val CHATS = "chats"
+    const val SETTINGS = "settings"
 
-    const val EditPlan = "edit_plan/{tripId}/{eventId}"
-    const val AiTripChat = "ai_trip_chat"
+    const val EDIT_PLAN = "edit_plan/{tripId}/{eventId}"
+    const val AI_TRIP_CHAT = "ai_trip_chat"
+    const val FINAL_PLAN = "final_plan"
 }
 
 private val bottomNavRoutes = setOf(
-    MainRoutes.Current,
-    MainRoutes.NewTrip,
-    MainRoutes.Home,
-    MainRoutes.Chats,
-    MainRoutes.Settings
+    MainRoutes.CURRENT,
+    MainRoutes.NEW_TRIP,
+    MainRoutes.NEW_TRIP_STEP_1,
+    MainRoutes.NEW_TRIP_STEP_2,
+    MainRoutes.NEW_TRIP_STEP_3,
+    MainRoutes.NEW_TRIP_STEP_4,
+    MainRoutes.NEW_TRIP_STEP_5,
+    MainRoutes.TRIP_GENERATING,
+    MainRoutes.AI_TRIP_CHAT,
+    MainRoutes.HOME,
+    MainRoutes.CHATS,
+    MainRoutes.SETTINGS,
+    MainRoutes.EDIT_PLAN,
+    MainRoutes.FINAL_PLAN
 )
 
 private data class BottomNavItem(
@@ -81,17 +104,35 @@ private data class BottomNavItem(
 @Composable
 fun MainScaffold(modifier: Modifier = Modifier, onLogout: () -> Unit = {}) {
     val newTripViewModel: NewTripViewModel = viewModel()
-    val authViewModel: AuthViewModel = viewModel()
+    val sharedItineraryViewModel: ItineraryViewModel = viewModel()
     val navController = rememberNavController()
+
     val navBackStackEntry by navController.currentBackStackEntryAsState()
-    val currentRoute = navBackStackEntry?.destination?.route ?: MainRoutes.Home
+    val currentRoute = navBackStackEntry?.destination?.route ?: MainRoutes.HOME
+    val selectedBottomRoute = when (currentRoute) {
+        MainRoutes.EDIT_PLAN -> MainRoutes.CURRENT
+        MainRoutes.NEW_TRIP,
+        MainRoutes.NEW_TRIP_STEP_1,
+        MainRoutes.NEW_TRIP_STEP_2,
+        MainRoutes.NEW_TRIP_STEP_3,
+        MainRoutes.NEW_TRIP_STEP_4,
+        MainRoutes.NEW_TRIP_STEP_5,
+        MainRoutes.TRIP_GENERATING,
+        MainRoutes.AI_TRIP_CHAT,
+        MainRoutes.FINAL_PLAN -> MainRoutes.NEW_TRIP
+        else -> currentRoute
+    }
+    val itineraryUiState by sharedItineraryViewModel.uiState.collectAsState()
+
+    // Load trip once on mount so currentTripId is available before any tab is visited
+    LaunchedEffect(Unit) { sharedItineraryViewModel.loadTrip() }
 
     val items = listOf(
-        BottomNavItem(MainRoutes.Current, "CURRENT", Icons.Outlined.CalendarToday),
-        BottomNavItem(MainRoutes.NewTrip, "NEW TRIP", Icons.Outlined.AutoAwesome),
-        BottomNavItem(MainRoutes.Home, "HOME", Icons.Outlined.Home),
-        BottomNavItem(MainRoutes.Chats, "CHATS", Icons.Outlined.ChatBubbleOutline),
-        BottomNavItem(MainRoutes.Settings, "SETTINGS", Icons.Outlined.Settings)
+        BottomNavItem(MainRoutes.CURRENT, "CURRENT", Icons.Outlined.CalendarToday),
+        BottomNavItem(MainRoutes.NEW_TRIP, "NEW TRIP", Icons.Outlined.AutoAwesome),
+        BottomNavItem(MainRoutes.HOME, "HOME", Icons.Outlined.Home),
+        BottomNavItem(MainRoutes.CHATS, "CHATS", Icons.Outlined.ChatBubbleOutline),
+        BottomNavItem(MainRoutes.SETTINGS, "SETTINGS", Icons.Outlined.Settings)
     )
 
     Column(
@@ -99,26 +140,23 @@ fun MainScaffold(modifier: Modifier = Modifier, onLogout: () -> Unit = {}) {
             .fillMaxSize()
             .background(DeepSea1)
     ) {
-        // Main content area
         Box(modifier = Modifier.weight(1f).fillMaxWidth()) {
             NavHost(
                 navController = navController,
-                startDestination = MainRoutes.Home,
+                startDestination = MainRoutes.HOME,
                 modifier = Modifier.fillMaxSize()
             ) {
-                composable(MainRoutes.Current) {
-                    val itineraryViewModel: ItineraryViewModel = viewModel()
-                    val uiState by itineraryViewModel.uiState.collectAsState()
-
+                composable(MainRoutes.CURRENT) {
+                    LaunchedEffect(Unit) { sharedItineraryViewModel.loadTrip() }
                     ItineraryScreen(
-                        viewModel = itineraryViewModel,
+                        viewModel = sharedItineraryViewModel,
                         onEditEventClick = { clickedEventId ->
-                            uiState.currentTripId?.let { tripId ->
+                            itineraryUiState.currentTripId?.let { tripId ->
                                 navController.navigate("edit_plan/$tripId/$clickedEventId")
                             }
                         },
                         onAddEventClick = {
-                            uiState.currentTripId?.let { tripId ->
+                            itineraryUiState.currentTripId?.let { tripId ->
                                 navController.navigate("edit_plan/$tripId/new")
                             }
                         }
@@ -126,7 +164,7 @@ fun MainScaffold(modifier: Modifier = Modifier, onLogout: () -> Unit = {}) {
                 }
 
                 composable(
-                    route = MainRoutes.EditPlan,
+                    route = MainRoutes.EDIT_PLAN,
                     arguments = listOf(
                         navArgument("tripId") { type = NavType.StringType },
                         navArgument("eventId") { type = NavType.StringType }
@@ -142,36 +180,107 @@ fun MainScaffold(modifier: Modifier = Modifier, onLogout: () -> Unit = {}) {
                     )
                 }
 
-                composable(MainRoutes.NewTrip) {
+                composable(MainRoutes.NEW_TRIP) {
                     NewTripLandingPage(
                         modifier = Modifier.fillMaxSize(),
-                        onPlanTripClick = { /* Logic for starting plan */ },
-                        onAiChatClick = { navController.navigate(MainRoutes.AiTripChat) }
+                        onPlanTripClick = { navController.navigate(MainRoutes.NEW_TRIP_STEP_1) },
+                        onAiChatClick = { navController.navigate(MainRoutes.AI_TRIP_CHAT) },
+                        onViewLastTripClick = if (itineraryUiState.currentTripId != null) {
+                            { navController.navigate(MainRoutes.FINAL_PLAN) }
+                        } else null
                     )
                 }
-                composable(MainRoutes.Home) { HomePage(modifier = Modifier.fillMaxSize()) }
-                composable(MainRoutes.Chats) { ChatsScreen(modifier = Modifier.fillMaxSize()) }
-                composable(MainRoutes.Settings) { 
+                composable(MainRoutes.NEW_TRIP_STEP_1) {
+                    TripStep1DestinationPage(
+                        modifier = Modifier.fillMaxSize(),
+                        viewModel = newTripViewModel,
+                        onBackClick = { navController.popBackStack() },
+                        onCloseClick = { navController.popBackStack(MainRoutes.NEW_TRIP, false) },
+                        onContinueClick = { navController.navigate(MainRoutes.NEW_TRIP_STEP_2) }
+                    )
+                }
+                composable(MainRoutes.NEW_TRIP_STEP_2) {
+                    TripStep2DatesPage(
+                        modifier = Modifier.fillMaxSize(),
+                        viewModel = newTripViewModel,
+                        onBackClick = { navController.popBackStack() },
+                        onCloseClick = { navController.popBackStack(MainRoutes.NEW_TRIP, false) },
+                        onContinueClick = { navController.navigate(MainRoutes.NEW_TRIP_STEP_3) }
+                    )
+                }
+                composable(MainRoutes.NEW_TRIP_STEP_3) {
+                    TripStep3TravelersPage(
+                        modifier = Modifier.fillMaxSize(),
+                        viewModel = newTripViewModel,
+                        onBackClick = { navController.popBackStack() },
+                        onCloseClick = { navController.popBackStack(MainRoutes.NEW_TRIP, false) },
+                        onContinueClick = { navController.navigate(MainRoutes.NEW_TRIP_STEP_4) }
+                    )
+                }
+                composable(MainRoutes.NEW_TRIP_STEP_4) {
+                    TripStep4BudgetPage(
+                        modifier = Modifier.fillMaxSize(),
+                        viewModel = newTripViewModel,
+                        onBackClick = { navController.popBackStack() },
+                        onCloseClick = { navController.popBackStack(MainRoutes.NEW_TRIP, false) },
+                        onContinueClick = { navController.navigate(MainRoutes.NEW_TRIP_STEP_5) }
+                    )
+                }
+                composable(MainRoutes.NEW_TRIP_STEP_5) {
+                    TripStep5InterestsPage(
+                        modifier = Modifier.fillMaxSize(),
+                        viewModel = newTripViewModel,
+                        onBackClick = { navController.popBackStack() },
+                        onCloseClick = { navController.popBackStack(MainRoutes.NEW_TRIP, false) },
+                        onTripGenerated = {
+                            navController.navigate(MainRoutes.TRIP_GENERATING)
+                        }
+                    )
+                }
+                composable(MainRoutes.TRIP_GENERATING) {
+                    TripGeneratingPage(
+                        modifier = Modifier.fillMaxSize(),
+                        viewModel = newTripViewModel,
+                        onTripReady = {
+                            navController.navigate(MainRoutes.FINAL_PLAN) {
+                                popUpTo(MainRoutes.HOME) { inclusive = false }
+                            }
+                        }
+                    )
+                }
+                composable(MainRoutes.HOME) { HomePage(modifier = Modifier.fillMaxSize()) }
+                composable(MainRoutes.CHATS) { ChatsScreen(modifier = Modifier.fillMaxSize()) }
+                composable(MainRoutes.SETTINGS) {
                     SettingsPage(
                         modifier = Modifier.fillMaxSize(),
-                        authViewModel = authViewModel,
                         onLoggedOut = onLogout
-                    ) 
+                    )
                 }
-                composable(MainRoutes.AiTripChat) {
+                composable(MainRoutes.AI_TRIP_CHAT) {
                     AiTripChatPage(
                         modifier = Modifier.fillMaxSize(),
                         onBackClick = { navController.popBackStack() }
                     )
                 }
+                composable(MainRoutes.FINAL_PLAN) {
+                    LaunchedEffect(Unit) { sharedItineraryViewModel.loadTrip() }
+                    FinalPlanPage(
+                        viewModel = sharedItineraryViewModel,
+                        modifier = Modifier.fillMaxSize(),
+                        onBackClick = {
+                            navController.navigate(MainRoutes.CURRENT) {
+                                popUpTo(MainRoutes.HOME) { inclusive = false }
+                            }
+                        }
+                    )
+                }
             }
         }
 
-        // Bottom Navigation Bar
         if (currentRoute in bottomNavRoutes) {
             BottomNavBar(
                 items = items,
-                currentRoute = currentRoute,
+                currentRoute = selectedBottomRoute,
                 onItemSelected = { route ->
                     navController.navigate(route) {
                         popUpTo(navController.graph.findStartDestination().id) {

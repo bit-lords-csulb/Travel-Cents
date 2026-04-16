@@ -48,7 +48,6 @@ class NewTripViewModel(application: Application) : AndroidViewModel(application)
     var travelStyle by mutableStateOf("comfort")
     var currency by mutableStateOf("USD")
     var budgetTotal by mutableStateOf("")
-    var dietary by mutableStateOf(emptyList<String>())
     var interests by mutableStateOf(emptyList<String>())
     var specialRequests by mutableStateOf("")
 
@@ -124,7 +123,6 @@ class NewTripViewModel(application: Application) : AndroidViewModel(application)
             travelStyle = travelStyle,
             currency = currency,
             budgetTotal = budget,
-            dietary = dietary,
             interests = interests,
             specialRequests = specialRequests
         )
@@ -136,18 +134,13 @@ class NewTripViewModel(application: Application) : AndroidViewModel(application)
                 _uiState.value = TripUiState.Loading(GROQ_ITINERARY_MESSAGES.random())
                 val itinerary = GroqRepository.generateItinerary(request)
 
-                // Hotel budget slice (~40% of total / nights)
-                val hotelBudgetPerNight = if (budget > 0 && itinerary.durationDays > 0)
-                    (budget * 0.40) / itinerary.durationDays
-                else 0.0
-
                 // Step 2: Flights + hotels in parallel
                 _generationStep.value = GenerationStep.SEARCHING_FLIGHTS
                 _uiState.value = TripUiState.Loading(SERP_FLIGHTS_MESSAGES.random())
                 val flightsDeferred = async { SerpRepository.searchFlights(request, itinerary) }
                 _generationStep.value = GenerationStep.FINDING_HOTELS
                 _uiState.value = TripUiState.Loading(SERP_HOTELS_MESSAGES.random())
-                val hotelsDeferred = async { SerpRepository.searchHotels(request, itinerary, hotelBudgetPerNight) }
+                val hotelsDeferred = async { SerpRepository.searchHotels(request, itinerary) }
                 val realFlights = flightsDeferred.await()
                 val realHotels = hotelsDeferred.await()
 
@@ -162,7 +155,11 @@ class NewTripViewModel(application: Application) : AndroidViewModel(application)
                 // Step 3: Yelp restaurants — 1 pooled call, distributed round-robin across days
                 _generationStep.value = GenerationStep.FINDING_RESTAURANTS
                 _uiState.value = TripUiState.Loading(YELP_RESTAURANTS_MESSAGES.random())
-                val restaurantPool = YelpRepository.fetchRestaurantPool(itinerary.destination, request.dietary)
+                val restaurantPoolTarget = tripDates.size * 5
+                val restaurantPool = YelpRepository.fetchRestaurantPool(
+                    location = itinerary.destination,
+                    targetCount = restaurantPoolTarget
+                )
                 val restaurantEvents = YelpRepository.distributePoolToEvents(
                     restaurantPool, tripDates, "restaurant", itinerary.itineraryId
                 )
@@ -245,17 +242,6 @@ class NewTripViewModel(application: Application) : AndroidViewModel(application)
     fun resetState() {
         _uiState.value = TripUiState.Idle
         _generationStep.value = GenerationStep.IDLE
-    }
-
-    fun toggleDietary(item: String) {
-        dietary = if (item in dietary) dietary - item else dietary + item
-    }
-
-    fun setDietaryItems(items: List<String>) {
-        dietary = items
-            .map { it.trim() }
-            .filter { it.isNotBlank() }
-            .distinct()
     }
 
     fun toggleInterest(item: String) {
