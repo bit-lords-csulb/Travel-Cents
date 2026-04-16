@@ -1,5 +1,6 @@
 package com.example.travelcents.ui.modules
 
+import android.content.Context
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
@@ -25,20 +26,32 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import coil.compose.AsyncImage
+import com.example.travelcents.data.media.ImageCacheManager
 import com.example.travelcents.data.trip.model.TravelEvent
 
-fun TravelEvent.heroImageModel(): String =
-    localImagePath.ifBlank { imageUrl.ifBlank { details["imageUrl"] ?: details["image_url"] ?: "" } }
-
-fun TravelEvent.galleryPhotoModels(): List<String> {
+fun TravelEvent.heroImageModel(context: Context): String {
     val remoteHero = imageUrl.ifBlank { details["imageUrl"] ?: details["image_url"] ?: "" }
-    val preferredHero = localImagePath.ifBlank { remoteHero }
+    return localImagePath.ifBlank { cachedModelFor(context, remoteHero) ?: remoteHero }
+}
+
+fun TravelEvent.galleryPhotoModels(context: Context): List<String> {
+    val remoteHero = imageUrl.ifBlank { details["imageUrl"] ?: details["image_url"] ?: "" }
+    val preferredHero = localImagePath.ifBlank { cachedModelFor(context, remoteHero) ?: remoteHero }
     return buildList {
         if (preferredHero.isNotBlank()) add(preferredHero)
         photoUrls
             .filter { it.isNotBlank() && it != remoteHero }
+            .map { cachedModelFor(context, it) ?: it }
             .forEach(::add)
     }.distinct()
+}
+
+private fun TravelEvent.cachedModelFor(
+    context: Context,
+    remoteUrl: String
+): String? {
+    if (itineraryId.isBlank() || remoteUrl.isBlank()) return null
+    return ImageCacheManager.localPathForUrl(context, itineraryId, remoteUrl)
 }
 
 @Composable

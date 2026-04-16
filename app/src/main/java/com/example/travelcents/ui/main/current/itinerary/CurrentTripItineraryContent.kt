@@ -53,6 +53,7 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -268,10 +269,11 @@ private fun CurrentTripItineraryCard(
     onDeleteClick: () -> Unit,
     onAlternativesClick: () -> Unit
 ) {
+    val context = LocalContext.current
     val accent = eventPalette(event).accent
     val title = eventTitle(event)
     val description = eventSubtitle(event).ifBlank { "Tap to edit details" }
-    val heroImage = remember(event) { event.heroImageModel() }
+    val heroImage = remember(event, context) { event.heroImageModel(context) }
 
     Row(
         modifier = Modifier

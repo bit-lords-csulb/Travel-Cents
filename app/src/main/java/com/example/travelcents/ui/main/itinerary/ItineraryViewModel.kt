@@ -1,8 +1,10 @@
 package com.example.travelcents.ui.main.itinerary
 
+import android.app.Application
 import android.util.Log
-import androidx.lifecycle.ViewModel
+import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
+import com.example.travelcents.data.media.prefetchSelectedHotelGalleries
 import com.example.travelcents.data.trip.model.EventOption
 import com.example.travelcents.data.trip.model.Itinerary
 import com.example.travelcents.data.trip.model.TravelEvent
@@ -37,7 +39,7 @@ data class ShareTarget(
     val isGroup: Boolean
 )
 
-class ItineraryViewModel : ViewModel() {
+class ItineraryViewModel(application: Application) : AndroidViewModel(application) {
 
     companion object {
         private const val DEFAULT_TRIP_TITLE = "Loading Trip..."
@@ -209,6 +211,7 @@ class ItineraryViewModel : ViewModel() {
                     _uiState.update { state ->
                         state.copy(events = enrichedEvents)
                     }
+                    prefetchHotelGalleries(enrichedEvents)
                     prefetchYelpEnrichment(enrichedEvents)
                 }
             }
@@ -480,6 +483,7 @@ class ItineraryViewModel : ViewModel() {
             current + (eventId to nextRejected)
         }
         _uiState.update { it.copy(events = updatedEvents) }
+        prefetchHotelGalleries(listOf(updatedEvent))
 
         viewModelScope.launch {
             try {
@@ -834,6 +838,21 @@ class ItineraryViewModel : ViewModel() {
             details = mergedDetails
         )
     }
+
+    private fun prefetchHotelGalleries(events: List<TravelEvent>) {
+        if (events.none { it.type.equals("hotel", ignoreCase = true) && it.itineraryId.isNotBlank() }) {
+            return
+        }
+
+        viewModelScope.launch {
+            runCatching {
+                prefetchSelectedHotelGalleries(getApplication<Application>(), events)
+            }.onFailure { error ->
+                Log.w("ItineraryViewModel", "Failed to prefetch hotel galleries", error)
+            }
+        }
+    }
+
     private fun sortPlanEvents(events: List<TravelEvent>): List<TravelEvent> {
         return events.sortedWith(
             compareBy<TravelEvent>(

@@ -25,6 +25,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
@@ -93,10 +94,11 @@ fun ExpandedEventCard(
     onDismiss: () -> Unit,
     onSaveEdits: (title: String, startTime: String, notes: String) -> Unit
 ) {
+    val context = LocalContext.current
     val typeColor = expandedTypeColor(event.type)
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
 
-    val photos = remember(event) { event.galleryPhotoModels() }
+    val photos = remember(event, context) { event.galleryPhotoModels(context) }
     var showGallery by remember { mutableStateOf(false) }
 
     // Editable fields pre-filled from event

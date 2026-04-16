@@ -8,6 +8,7 @@ import androidx.compose.runtime.setValue
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.travelcents.data.media.ImageCacheManager
+import com.example.travelcents.data.media.selectedMediaUrls
 import com.example.travelcents.data.trip.model.Itinerary
 import com.example.travelcents.data.trip.model.TravelEvent
 import com.example.travelcents.data.trip.model.TravelRequest
@@ -223,14 +224,22 @@ class NewTripViewModel(application: Application) : AndroidViewModel(application)
                 val allEvents = realFlights + realHotels + restaurantEvents + activityEvents + localEvents
                 val linkedItinerary = itinerary.copy(eventIds = allEvents.map { it.eventId })
 
-                // Step 5: Download selected hero images only — alternative images are lazy-loaded on expand
+                // Step 5: Download selected hero images plus the selected hotel galleries.
                 _generationStep.value = GenerationStep.DOWNLOADING_IMAGES
                 _uiState.value = TripUiState.Loading(DOWNLOADING_MESSAGES.random())
-                val heroImageUrls = allEvents.map { it.imageUrl }.filter { it.isNotBlank() }
+                val heroImageUrls = allEvents
+                    .filterNot { it.type.equals("hotel", ignoreCase = true) }
+                    .map { it.imageUrl }
+                val selectedHotelGalleryUrls = allEvents
+                    .filter { it.type.equals("hotel", ignoreCase = true) }
+                    .flatMap { it.selectedMediaUrls() }
+                val mediaUrls = (heroImageUrls + selectedHotelGalleryUrls)
+                    .filter { it.isNotBlank() }
+                    .distinct()
                 val localPaths = ImageCacheManager.downloadTripImages(
                     getApplication(),
                     itinerary.itineraryId,
-                    heroImageUrls
+                    mediaUrls
                 )
 
                 // Keep the remote hero URL intact and persist the local cache path separately.
