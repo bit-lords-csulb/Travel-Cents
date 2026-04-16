@@ -22,7 +22,6 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.travelcents.ui.main.current.calendar.buildTripDateRange
 import com.example.travelcents.ui.main.current.header.CurrentTripHeader
-import com.example.travelcents.ui.modules.prefetchStaticMaps
 import com.example.travelcents.ui.modules.buildCalendarDates
 import com.example.travelcents.ui.modules.sortEventsForCalendar
 import com.example.travelcents.ui.modules.todayIsoDate
@@ -46,8 +45,6 @@ fun CurrentTripScreen(
     val reviewsLoading by viewModel.reviewsLoading.collectAsState()
     val shareTargets by viewModel.shareTargets.collectAsState()
     val tripMembers by viewModel.tripMembers.collectAsState()
-    val context = LocalContext.current
-
     val events = remember(uiState.events) { sortEventsForCalendar(uiState.events) }
     val eventDates = remember(events) {
         events.map { it.date }
@@ -110,12 +107,6 @@ fun CurrentTripScreen(
         if (yelpId != null) {
             viewModel.fetchYelpReviews(yelpId)
             viewModel.ensureYelpEventEnriched(event.eventId)
-        }
-    }
-
-    LaunchedEffect(uiState.currentTripId, uiState.events) {
-        if (!uiState.currentTripId.isNullOrBlank() && uiState.events.isNotEmpty()) {
-            prefetchStaticMaps(context, uiState.events)
         }
     }
 
