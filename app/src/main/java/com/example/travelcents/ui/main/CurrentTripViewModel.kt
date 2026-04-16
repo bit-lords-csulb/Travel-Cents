@@ -42,27 +42,27 @@ data class CurrentTripUiState(
     val errorMessage: String? = null
 )
 
-class CurrentTripViewModel : ViewModel() {
+open class CurrentTripViewModel : ViewModel() {
 
     companion object {
-        private const val DEFAULT_TRIP_TITLE = "Loading Trip..."
-        private const val EMPTY_PLANS_MESSAGE = "No plans yet. Tap + to add one."
+        protected const val DEFAULT_TRIP_TITLE = "Loading Trip..."
+        protected const val EMPTY_PLANS_MESSAGE = "No plans yet. Tap + to add one."
     }
 
-    private val _events = MutableStateFlow<List<TravelEvent>>(emptyList())
+    protected val _events = MutableStateFlow<List<TravelEvent>>(emptyList())
     val events: StateFlow<List<TravelEvent>> = _events.asStateFlow()
 
-    private val _tripTitle = MutableStateFlow(DEFAULT_TRIP_TITLE)
+    protected val _tripTitle = MutableStateFlow(DEFAULT_TRIP_TITLE)
     val tripTitle: StateFlow<String> = _tripTitle.asStateFlow()
 
-    private val _uiState = MutableStateFlow(CurrentTripUiState())
-    val uiState: StateFlow<CurrentTripUiState> = _uiState.asStateFlow()
+    protected val _uiState = MutableStateFlow(CurrentTripUiState())
+    open val uiState: StateFlow<CurrentTripUiState> = _uiState.asStateFlow()
 
-    private val db = FirebaseFirestore.getInstance()
-    private val auth = FirebaseAuth.getInstance()
-    private var eventsListener: ListenerRegistration? = null
+    protected val db = FirebaseFirestore.getInstance()
+    protected val auth = FirebaseAuth.getInstance()
+    protected var eventsListener: ListenerRegistration? = null
 
-    private fun resetTripState(
+    protected open fun resetTripState(
         isLoading: Boolean = false,
         tripTitle: String = DEFAULT_TRIP_TITLE,
         infoMessage: String? = null,
@@ -80,7 +80,7 @@ class CurrentTripViewModel : ViewModel() {
         )
     }
 
-    private fun fetchLatestItinerary(uid: String) {
+    protected open fun fetchLatestItinerary(uid: String) {
         db.collection("users").document(uid)
             .collection("trips")
             .orderBy("createdAt", Query.Direction.DESCENDING)
@@ -103,7 +103,7 @@ class CurrentTripViewModel : ViewModel() {
             }
     }
 
-    private fun fetchTrip(uid: String, tripId: String) {
+    protected open fun fetchTrip(uid: String, tripId: String) {
         db.collection("users").document(uid)
             .collection("trips")
             .document(tripId)
@@ -122,7 +122,7 @@ class CurrentTripViewModel : ViewModel() {
             }
     }
 
-    private fun handleTripDocument(uid: String, document: DocumentSnapshot) {
+    protected open fun handleTripDocument(uid: String, document: DocumentSnapshot) {
         _tripTitle.value = document.getString("tripName") ?: "Unnamed Trip"
         _uiState.update {
             it.copy(
@@ -139,7 +139,7 @@ class CurrentTripViewModel : ViewModel() {
         listenToEvents(uid, document.id)
     }
 
-    private fun listenToEvents(uid: String, tripId: String) {
+    protected open fun listenToEvents(uid: String, tripId: String) {
         eventsListener?.remove()
         eventsListener = db.collection("users").document(uid)
             .collection("trips").document(tripId)
@@ -300,7 +300,7 @@ class CurrentTripViewModel : ViewModel() {
         }
     }
 
-    fun loadTrip(tripId: String? = null) {
+    open fun loadTrip(tripId: String? = null) {
         val uid = auth.currentUser?.uid
 
         if (uid == null) {

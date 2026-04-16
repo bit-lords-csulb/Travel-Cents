@@ -1,7 +1,6 @@
 package com.example.travelcents.ui.main.itinerary
 
 import android.util.Log
-import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.travelcents.data.model.EventOption
 import com.example.travelcents.data.model.Itinerary
@@ -9,14 +8,12 @@ import com.example.travelcents.data.model.TravelEvent
 import com.example.travelcents.data.model.YelpReview
 import com.example.travelcents.data.remote.YelpRepository
 import com.example.travelcents.ui.main.CurrentTripUiState
+import com.example.travelcents.ui.main.CurrentTripViewModel
 import com.example.travelcents.ui.main.normalizeDate
 import com.example.travelcents.ui.main.normalizeTime
-import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.DocumentSnapshot
 import com.google.firebase.firestore.FieldPath
 import com.google.firebase.firestore.FieldValue
-import com.google.firebase.firestore.FirebaseFirestore
-import com.google.firebase.firestore.ListenerRegistration
 import com.google.firebase.firestore.Query
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
@@ -33,15 +30,7 @@ data class ShareTarget(
     val isGroup: Boolean
 )
 
-class ItineraryViewModel : ViewModel() {
-
-    companion object {
-        private const val DEFAULT_TRIP_TITLE = "Loading Trip..."
-        private const val EMPTY_PLANS_MESSAGE = "No plans yet. Tap + to add one."
-    }
-
-    private val _uiState = MutableStateFlow(CurrentTripUiState())
-    val uiState: StateFlow<CurrentTripUiState> = _uiState.asStateFlow()
+class ItineraryViewModel : CurrentTripViewModel() {
 
     private val _eventOptions = MutableStateFlow<Map<String, List<EventOption>>>(emptyMap())
     val eventOptions: StateFlow<Map<String, List<EventOption>>> = _eventOptions.asStateFlow()
@@ -61,92 +50,29 @@ class ItineraryViewModel : ViewModel() {
     private val _allTrips = MutableStateFlow<List<Itinerary>>(emptyList())
     val allTrips: StateFlow<List<Itinerary>> = _allTrips.asStateFlow()
 
-    private val db = FirebaseFirestore.getInstance()
-    private val auth = FirebaseAuth.getInstance()
-    private var eventsListener: ListenerRegistration? = null
     private var currentTripDestination: String = ""
 
-    private fun resetTripState(
-        isLoading: Boolean = false,
-        tripTitle: String = DEFAULT_TRIP_TITLE,
-        infoMessage: String? = null,
-        errorMessage: String? = null
+    override fun resetTripState(
+        isLoading: Boolean,
+        tripTitle: String,
+        infoMessage: String?,
+        errorMessage: String?
     ) {
-        eventsListener?.remove()
-        eventsListener = null
+        super.resetTripState(isLoading, tripTitle, infoMessage, errorMessage)
         currentTripDestination = ""
         _eventOptions.value = emptyMap()
         _rejectedOptions.value = emptyMap()
         _yelpReviews.value = emptyMap()
         _reviewsLoading.value = emptySet()
         _shareTargets.value = emptyList()
-        _uiState.value = CurrentTripUiState(
-            isLoading = isLoading,
-            tripTitle = tripTitle,
-            infoMessage = infoMessage,
-            errorMessage = errorMessage
-        )
     }
 
-    private fun fetchLatestItinerary(uid: String) {
-        db.collection("users").document(uid)
-            .collection("trips")
-            .orderBy("createdAt", Query.Direction.DESCENDING)
-            .limit(1)
-            .get()
-            .addOnSuccessListener { tripSnapshot ->
-                if (tripSnapshot.isEmpty) {
-                    resetTripState(
-                        infoMessage = "No trip found yet. Create one from the New Trip tab."
-                    )
-                    return@addOnSuccessListener
-                }
-
-                handleTripDocument(uid, tripSnapshot.documents.first())
-            }
-            .addOnFailureListener { e ->
-                Log.e("ItineraryViewModel", "DATABASE ERROR: ${e.message}")
-                resetTripState(errorMessage = e.message ?: "Failed to load trip.")
-            }
-    }
-
-    private fun fetchTrip(uid: String, tripId: String) {
-        db.collection("users").document(uid)
-            .collection("trips")
-            .document(tripId)
-            .get()
-            .addOnSuccessListener { document ->
-                if (!document.exists()) {
-                    resetTripState(infoMessage = "That trip is no longer available.")
-                    return@addOnSuccessListener
-                }
-
-                handleTripDocument(uid, document)
-            }
-            .addOnFailureListener { e ->
-                Log.e("ItineraryViewModel", "DATABASE ERROR: ${e.message}")
-                resetTripState(errorMessage = e.message ?: "Failed to load trip.")
-            }
-    }
-
-    private fun handleTripDocument(uid: String, document: DocumentSnapshot) {
+    override fun handleTripDocument(uid: String, document: DocumentSnapshot) {
         currentTripDestination = document.getString("destination") ?: ""
-        _uiState.update {
-            it.copy(
-                isLoading = false,
-                currentTripId = document.id,
-                tripTitle = document.getString("tripName") ?: "Unnamed Trip",
-                dateFrom = document.getString("dateFrom") ?: "",
-                dateTo = document.getString("dateTo") ?: "",
-                infoMessage = null,
-                errorMessage = null
-            )
-        }
-
-        listenToEvents(uid, document.id)
+        super.handleTripDocument(uid, document)
     }
 
-    private fun listenToEvents(uid: String, tripId: String) {
+    override fun listenToEvents(uid: String, tripId: String) {
         eventsListener?.remove()
         eventsListener = db.collection("users").document(uid)
             .collection("trips").document(tripId)
@@ -194,6 +120,7 @@ class ItineraryViewModel : ViewModel() {
                 }
 
                 val sortedEvents = sortPlanEvents(fetchedEvents)
+                _events.value = sortedEvents
                 _uiState.update {
                     it.copy(
                         isLoading = false,
@@ -218,6 +145,7 @@ class ItineraryViewModel : ViewModel() {
                     _rejectedOptions.update { current ->
                         current.filterKeys { key -> optionsByEvent.containsKey(key) }
                     }
+                    _events.value = enrichedEvents
                     _uiState.update { state ->
                         state.copy(events = enrichedEvents)
                     }
@@ -397,6 +325,7 @@ class ItineraryViewModel : ViewModel() {
             val nextRejected = current[eventId].orEmpty() - optionId
             current + (eventId to nextRejected)
         }
+        _events.value = updatedEvents
         _uiState.update { it.copy(events = updatedEvents) }
 
         viewModelScope.launch {
@@ -460,8 +389,10 @@ class ItineraryViewModel : ViewModel() {
             startTime = normalizeTime(startTime),
             details = updatedDetails
         )
+        val sortedWithPatch = sortPlanEvents(_uiState.value.events.map { if (it.eventId == eventId) updatedEvent else it })
+        _events.value = sortedWithPatch
         _uiState.update { state ->
-            state.copy(events = sortPlanEvents(state.events.map { if (it.eventId == eventId) updatedEvent else it }))
+            state.copy(events = sortedWithPatch)
         }
 
         viewModelScope.launch {
@@ -525,6 +456,7 @@ class ItineraryViewModel : ViewModel() {
                 }
             }
 
+        _events.value = updatedEvents
         _uiState.update { it.copy(events = updatedEvents) }
     }
 
@@ -671,6 +603,7 @@ class ItineraryViewModel : ViewModel() {
         val tripId = _uiState.value.currentTripId ?: return
         val trimmed = newName.trim().ifBlank { return }
 
+        _tripTitle.value = trimmed
         _uiState.update { it.copy(tripTitle = trimmed) }
         _allTrips.update { trips -> trips.map { if (it.itineraryId == tripId) it.copy(tripName = trimmed) else it } }
 
@@ -685,29 +618,6 @@ class ItineraryViewModel : ViewModel() {
                 _uiState.update { it.copy(errorMessage = e.message ?: "Failed to rename trip.") }
             }
         }
-    }
-
-    fun loadTrip(tripId: String? = null) {
-        val uid = auth.currentUser?.uid
-
-        if (uid == null) {
-            resetTripState(infoMessage = "Log in to load your current trip.")
-            return
-        }
-
-        resetTripState(isLoading = true)
-
-        if (tripId != null) {
-            fetchTrip(uid, tripId)
-        } else {
-            fetchLatestItinerary(uid)
-        }
-    }
-
-    override fun onCleared() {
-        eventsListener?.remove()
-        eventsListener = null
-        super.onCleared()
     }
 
     private fun applySelectedOption(event: TravelEvent, option: EventOption): TravelEvent {

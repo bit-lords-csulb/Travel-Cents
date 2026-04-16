@@ -40,6 +40,7 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
+import com.example.travelcents.ui.auth.AuthViewModel
 import com.example.travelcents.ui.main.aichat.AiTripChatPage
 import com.example.travelcents.ui.main.chats.chat.ChatsScreen
 import com.example.travelcents.ui.main.itinerary.EditPlanScreen
@@ -102,7 +103,12 @@ private data class BottomNavItem(
 )
 
 @Composable
-fun MainScaffold(modifier: Modifier = Modifier, onLogout: () -> Unit = {}) {
+fun MainScaffold(
+    modifier: Modifier = Modifier,
+    authViewModel: AuthViewModel,
+    onLogout: () -> Unit = {}
+) {
+    val mainViewModel: MainViewModel = viewModel()
     val newTripViewModel: NewTripViewModel = viewModel()
     val sharedItineraryViewModel: ItineraryViewModel = viewModel()
     val navController = rememberNavController()
@@ -123,6 +129,7 @@ fun MainScaffold(modifier: Modifier = Modifier, onLogout: () -> Unit = {}) {
         else -> currentRoute
     }
     val itineraryUiState by sharedItineraryViewModel.uiState.collectAsState()
+    val userSettings by mainViewModel.userSettings.collectAsState()
 
     // Load trip once on mount so currentTripId is available before any tab is visited
     LaunchedEffect(Unit) { sharedItineraryViewModel.loadTrip() }
@@ -150,6 +157,7 @@ fun MainScaffold(modifier: Modifier = Modifier, onLogout: () -> Unit = {}) {
                     LaunchedEffect(Unit) { sharedItineraryViewModel.loadTrip() }
                     ItineraryScreen(
                         viewModel = sharedItineraryViewModel,
+                        userSettings = userSettings,
                         onEditEventClick = { clickedEventId ->
                             itineraryUiState.currentTripId?.let { tripId ->
                                 navController.navigate("edit_plan/$tripId/$clickedEventId")
@@ -248,11 +256,18 @@ fun MainScaffold(modifier: Modifier = Modifier, onLogout: () -> Unit = {}) {
                         }
                     )
                 }
-                composable(MainRoutes.HOME) { HomePage(modifier = Modifier.fillMaxSize()) }
+                composable(MainRoutes.HOME) { 
+                    HomePage(
+                        modifier = Modifier.fillMaxSize(),
+                        userSettings = userSettings
+                    ) 
+                }
                 composable(MainRoutes.CHATS) { ChatsScreen(modifier = Modifier.fillMaxSize()) }
                 composable(MainRoutes.SETTINGS) {
                     SettingsPage(
                         modifier = Modifier.fillMaxSize(),
+                        authViewModel = authViewModel,
+                        mainViewModel = mainViewModel,
                         onLoggedOut = onLogout
                     )
                 }
