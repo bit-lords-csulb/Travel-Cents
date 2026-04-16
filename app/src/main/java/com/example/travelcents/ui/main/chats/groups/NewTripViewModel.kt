@@ -8,6 +8,7 @@ import com.example.travelcents.data.social.model.Group
 import com.example.travelcents.data.social.repository.FriendsRepository
 import com.example.travelcents.data.social.repository.GroupsRepository
 import com.example.travelcents.data.trip.FirestoreTripRepository
+import com.example.travelcents.data.trip.TripAccessRole
 import com.example.travelcents.data.trip.TripKey
 import com.example.travelcents.data.trip.model.TripPreview
 import com.google.firebase.Firebase
@@ -146,7 +147,8 @@ class NewTripViewModel(
                                         ownerUid = linkedTripOwnerId,
                                         tripId = linkedTripId
                                     ),
-                                    memberUids = members
+                                    memberUids = members,
+                                    defaultRole = TripAccessRole.EDITOR
                                 )
                             }.onFailure { error ->
                                 Log.e("NewTripViewModel", "Failed to grant linked trip access", error)

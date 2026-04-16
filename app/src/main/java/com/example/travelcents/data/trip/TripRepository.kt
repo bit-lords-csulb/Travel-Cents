@@ -34,5 +34,7 @@ interface TripRepository {
         defaultRole: TripAccessRole = TripAccessRole.VIEWER
     )
 
+    suspend fun backfillOwnedTripAccess(ownerUid: String)
+
     suspend fun deleteTrip(key: TripKey)
 }

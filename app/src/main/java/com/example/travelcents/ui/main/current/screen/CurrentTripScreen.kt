@@ -146,6 +146,7 @@ fun CurrentTripScreen(
                     allTrips = allTrips,
                     canAdd = uiState.currentTripId != null && uiState.canEditTrip,
                     canEditTrip = uiState.canEditTrip,
+                    canManageTrip = uiState.canManageTrip,
                     isReorderActive = displayMode == CurrentDisplayMode.ITINERARY && jiggleMode,
                     isInCalendarMode = displayMode != CurrentDisplayMode.ITINERARY,
                     isWeekMode = displayMode == CurrentDisplayMode.WEEK,
@@ -170,7 +171,7 @@ fun CurrentTripScreen(
                         }
                     },
                     onShareClick = {
-                        if (!uiState.canEditTrip) {
+                        if (!uiState.canManageTrip) {
                             viewModel.postError("Only the trip owner can share this trip.")
                         } else {
                             viewModel.fetchShareTargets()

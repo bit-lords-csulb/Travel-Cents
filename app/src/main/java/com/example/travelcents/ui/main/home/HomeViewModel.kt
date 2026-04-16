@@ -108,6 +108,11 @@ class HomeViewModel : ViewModel() {
                     tripImages = cachedImages,
                     profile = currentProfile
                 )
+                runCatching {
+                    tripRepository.backfillOwnedTripAccess(uid)
+                }.onFailure { error ->
+                    Log.w("HomeViewModel", "Failed to backfill owned trip access", error)
+                }
                 fetchDestinationImages(trips.filter { it.homeImageUrl.isBlank() })
             }.onFailure { error ->
                 Log.e("HomeViewModel", "Failed to load trips: ${error.message}")

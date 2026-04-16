@@ -79,6 +79,7 @@ fun CurrentTripHeader(
     allTrips: List<Itinerary>,
     canAdd: Boolean,
     canEditTrip: Boolean,
+    canManageTrip: Boolean,
     isReorderActive: Boolean,
     isInCalendarMode: Boolean,
     isWeekMode: Boolean,
@@ -345,7 +346,7 @@ fun CurrentTripHeader(
                             menuExpanded = false
                             onShareClick()
                         },
-                        enabled = canEditTrip && currentTripId != null
+                        enabled = canManageTrip && currentTripId != null
                     )
                     DropdownMenuItem(
                         text = {
@@ -370,7 +371,7 @@ fun CurrentTripHeader(
                             editableTitle = displayTitle
                             showRenameDialog = true
                         },
-                        enabled = canEditTrip && currentTripId != null
+                        enabled = canManageTrip && currentTripId != null
                     )
                     DropdownMenuItem(
                         text = { Text("Archive Trip", color = DeepSea5, fontWeight = FontWeight.Medium) },
@@ -379,7 +380,7 @@ fun CurrentTripHeader(
                             currentTripId?.let(onArchiveTrip)
                             menuExpanded = false
                         },
-                        enabled = canEditTrip && currentTripId != null
+                        enabled = canManageTrip && currentTripId != null
                     )
                     DropdownMenuItem(
                         text = { Text("Delete Trip", color = Color(0xFFE77D90), fontWeight = FontWeight.Medium) },
@@ -388,7 +389,7 @@ fun CurrentTripHeader(
                             menuExpanded = false
                             showDeleteDialog = true
                         },
-                        enabled = canEditTrip && currentTripId != null
+                        enabled = canManageTrip && currentTripId != null
                     )
                 }
             }
