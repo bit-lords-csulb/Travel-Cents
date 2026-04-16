@@ -81,6 +81,7 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import androidx.lifecycle.viewmodel.compose.viewModel
+import com.example.travelcents.data.local.UserSettings
 import com.example.travelcents.data.model.TravelEvent
 import com.example.travelcents.ui.theme.DeepSea1
 import com.example.travelcents.ui.theme.DeepSea2
@@ -145,6 +146,7 @@ private data class EventLayoutInfo(
 fun CurrentPage(
     modifier: Modifier = Modifier,
     viewModel: CurrentTripViewModel = viewModel(),
+    userSettings: UserSettings,
     startInCalendar: Boolean = false,
     autoLoadTrip: Boolean = true,
     onViewItineraryRequested: (() -> Unit)? = null
@@ -179,11 +181,14 @@ fun CurrentPage(
     var editorPlan by remember { mutableStateOf<EditablePlan?>(null) }
     var deleteCandidate by remember { mutableStateOf<EditablePlan?>(null) }
 
-    val tripDateRange = remember(uiState.dateFrom, uiState.dateTo, calendarDates) {
+    val userLocale = remember(userSettings.countryCode) { Locale("", userSettings.countryCode) }
+
+    val tripDateRange = remember(uiState.dateFrom, uiState.dateTo, calendarDates, userSettings.dateFormat) {
         buildTripDateRange(
             dateFrom = uiState.dateFrom,
             dateTo = uiState.dateTo,
-            eventDates = calendarDates
+            eventDates = calendarDates,
+            pattern = userSettings.dateFormat.replace("/", " ") // Simple mapping for MMM d style
         )
     }
 
@@ -224,7 +229,8 @@ fun CurrentPage(
                                     calendarDates.firstOrNull()
                                         ?: uiState.dateFrom.ifBlank { todayIsoDate() }
                                 },
-                                startMinutes = 9 * 60
+                                startMinutes = 9 * 60,
+                                locale = userLocale
                             )
                         }
                     },
@@ -263,30 +269,33 @@ fun CurrentPage(
                     )
                     displayMode == CurrentDisplayMode.ITINERARY -> ItineraryContent(
                         events = events,
-                        onEventClick = { event -> editorPlan = event.toEditablePlan() },
-                        onDeleteClick = { event -> deleteCandidate = event.toEditablePlan() }
+                        onEventClick = { event -> editorPlan = event.toEditablePlan(userLocale) },
+                        onDeleteClick = { event -> deleteCandidate = event.toEditablePlan(userLocale) },
+                        dateFormat = userSettings.dateFormat
                     )
                     displayMode == CurrentDisplayMode.WEEK -> WeekCalendarContent(
                         events = events,
                         sortedDates = calendarDates,
                         selectedDate = selectedDate,
                         onDateSelected = { selectedDate = it },
-                        onEventClick = { event -> editorPlan = event.toEditablePlan() },
-                        onDeleteClick = { event -> deleteCandidate = event.toEditablePlan() },
+                        onEventClick = { event -> editorPlan = event.toEditablePlan(userLocale) },
+                        onDeleteClick = { event -> deleteCandidate = event.toEditablePlan(userLocale) },
                         onCreatePlan = { date, startMinutes ->
-                            editorPlan = newEditablePlan(date = date, startMinutes = startMinutes)
-                        }
+                            editorPlan = newEditablePlan(date = date, startMinutes = startMinutes, locale = userLocale)
+                        },
+                        locale = userLocale
                     )
                     else -> DayCalendarContent(
                         events = events,
                         sortedDates = calendarDates,
                         selectedDate = selectedDate,
                         onDateSelected = { selectedDate = it },
-                        onEventClick = { event -> editorPlan = event.toEditablePlan() },
-                        onDeleteClick = { event -> deleteCandidate = event.toEditablePlan() },
+                        onEventClick = { event -> editorPlan = event.toEditablePlan(userLocale) },
+                        onDeleteClick = { event -> deleteCandidate = event.toEditablePlan(userLocale) },
                         onCreatePlan = { date, startMinutes ->
-                            editorPlan = newEditablePlan(date = date, startMinutes = startMinutes)
-                        }
+                            editorPlan = newEditablePlan(date = date, startMinutes = startMinutes, locale = userLocale)
+                        },
+                        locale = userLocale
                     )
                 }
             }
@@ -318,7 +327,8 @@ fun CurrentPage(
             onDelete = { planToDelete ->
                 editorPlan = null
                 deleteCandidate = planToDelete
-            }
+            },
+            locale = userLocale
         )
     }
 }
@@ -536,7 +546,8 @@ private fun WeekOverviewDayRow(
     canAddPlan: Boolean,
     onEventClick: (TravelEvent) -> Unit,
     onDeleteClick: (TravelEvent) -> Unit,
-    onAddClick: () -> Unit
+    onAddClick: () -> Unit,
+    locale: Locale = Locale.US
 ) {
     Row(
         modifier = Modifier
@@ -597,7 +608,8 @@ private fun WeekOverviewDayRow(
                         event = event,
                         date = date,
                         onClick = { onEventClick(event) },
-                        onDeleteClick = { onDeleteClick(event) }
+                        onDeleteClick = { onDeleteClick(event) },
+                        locale = locale
                     )
                 }
             }
@@ -626,7 +638,8 @@ private fun WeekOverviewEventRow(
     event: TravelEvent,
     date: String,
     onClick: () -> Unit,
-    onDeleteClick: () -> Unit
+    onDeleteClick: () -> Unit,
+    locale: Locale = Locale.US
 ) {
     val span = remember(event, date) { eventSpanForDate(event, date) }
     val palette = eventPalette(event)
@@ -647,8 +660,9 @@ private fun WeekOverviewEventRow(
                 .background(palette.accent)
         )
 
+        val timeLabel = span?.let { renderSpanLabel(it, locale) } ?: formatDisplayTimeRange(event.startTime, event.endTime, locale)
         Text(
-            text = span?.let(::renderSpanLabel) ?: formatDisplayTimeRange(event.startTime, event.endTime),
+            text = timeLabel,
             color = DeepSea4,
             fontSize = 10.sp,
             maxLines = 1,
@@ -823,7 +837,9 @@ private fun DeletePlanDialog(
 private fun ItineraryContent(
     events: List<TravelEvent>,
     onEventClick: (TravelEvent) -> Unit,
-    onDeleteClick: (TravelEvent) -> Unit
+    onDeleteClick: (TravelEvent) -> Unit,
+    dateFormat: String = "EEEE, MMMM d",
+    locale: Locale = Locale.US
 ) {
     if (events.isEmpty()) {
         EmptyState(
@@ -849,7 +865,7 @@ private fun ItineraryContent(
         items(sortedDates, key = { it }) { date ->
             Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
                 Text(
-                    text = formatItineraryHeader(date),
+                    text = formatItineraryHeader(date, dateFormat),
                     color = DeepSea5,
                     fontSize = 15.sp,
                     fontWeight = FontWeight.Bold
@@ -859,7 +875,8 @@ private fun ItineraryContent(
                     ListPlanCard(
                         event = event,
                         onClick = { onEventClick(event) },
-                        onDeleteClick = { onDeleteClick(event) }
+                        onDeleteClick = { onDeleteClick(event) },
+                        locale = locale
                     )
                 }
             }
@@ -871,7 +888,8 @@ private fun ItineraryContent(
 private fun ListPlanCard(
     event: TravelEvent,
     onClick: () -> Unit,
-    onDeleteClick: () -> Unit
+    onDeleteClick: () -> Unit,
+    locale: Locale = Locale.US
 ) {
     val palette = eventPalette(event)
 
@@ -900,7 +918,7 @@ private fun ListPlanCard(
                     .padding(start = 14.dp, top = 12.dp, bottom = 12.dp)
             ) {
                 Text(
-                    text = formatDisplayTimeRange(event.startTime, event.endTime),
+                    text = formatDisplayTimeRange(event.startTime, event.endTime, locale),
                     color = DeepSea4,
                     fontSize = 11.sp
                 )
@@ -948,7 +966,8 @@ private fun WeekCalendarContent(
     onDateSelected: (String) -> Unit,
     onEventClick: (TravelEvent) -> Unit,
     onDeleteClick: (TravelEvent) -> Unit,
-    onCreatePlan: (String, Int) -> Unit
+    onCreatePlan: (String, Int) -> Unit,
+    locale: Locale = Locale.US
 ) {
     if (sortedDates.isEmpty()) {
         EmptyState(
@@ -995,7 +1014,8 @@ private fun WeekCalendarContent(
                         canAddPlan = date in sortedDates,
                         onEventClick = onEventClick,
                         onDeleteClick = onDeleteClick,
-                        onAddClick = { onCreatePlan(date, defaultStartMinutesForDate(events, date)) }
+                        onAddClick = { onCreatePlan(date, defaultStartMinutesForDate(events, date)) },
+                        locale = locale
                     )
                 }
             }
@@ -1011,7 +1031,8 @@ private fun DayCalendarContent(
     onDateSelected: (String) -> Unit,
     onEventClick: (TravelEvent) -> Unit,
     onDeleteClick: (TravelEvent) -> Unit,
-    onCreatePlan: (String, Int) -> Unit
+    onCreatePlan: (String, Int) -> Unit,
+    locale: Locale = Locale.US
 ) {
     if (sortedDates.isEmpty()) {
         EmptyState(
@@ -1067,7 +1088,8 @@ private fun DayCalendarContent(
                 TimeAxis(
                     scheduleWindow = scheduleWindow,
                     hourHeight = hourHeight,
-                    topSpacing = 0.dp
+                    topSpacing = 0.dp,
+                    locale = locale
                 )
 
                 Spacer(modifier = Modifier.width(8.dp))
@@ -1085,75 +1107,10 @@ private fun DayCalendarContent(
                     onEventClick = onEventClick,
                     onDeleteClick = onDeleteClick,
                     onEmptySlotClick = { startMinutes -> onCreatePlan(activeDate, startMinutes) },
-                    showCurrentTimeIndicator = activeDate == todayIsoDate()
+                    showCurrentTimeIndicator = activeDate == todayIsoDate(),
+                    locale = locale
                 )
             }
-        }
-    }
-}
-
-@Composable
-private fun CalendarDateChipRow(
-    dates: List<String>,
-    selectedDate: String,
-    onDateSelected: (String) -> Unit,
-    horizontalScrollState: ScrollState? = null,
-    leadingSpacerWidth: Dp = 0.dp,
-    chipWidth: Dp? = null,
-    trailingSpacerWidth: Dp? = null
-) {
-    val scrollState = horizontalScrollState ?: rememberScrollState()
-
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .horizontalScroll(scrollState),
-        horizontalArrangement = Arrangement.spacedBy(8.dp)
-    ) {
-        if (leadingSpacerWidth > 0.dp) {
-            Spacer(modifier = Modifier.width(leadingSpacerWidth))
-        }
-        dates.forEach { date ->
-            val selected = date == selectedDate
-            Box(
-                modifier = Modifier
-                    .clip(RoundedCornerShape(14.dp))
-                    .background(if (selected) DeepSea3 else DeepSea2)
-                    .border(
-                        width = 1.dp,
-                        color = if (selected) DeepSea4 else DeepSea3.copy(alpha = 0.6f),
-                        shape = RoundedCornerShape(14.dp)
-                    )
-                    .clickable { onDateSelected(date) }
-                    .then(
-                        if (chipWidth != null) Modifier.width(chipWidth) else Modifier
-                    )
-            ) {
-                Column(
-                    modifier = Modifier
-                        .then(if (chipWidth != null) Modifier.fillMaxWidth() else Modifier)
-                        .padding(horizontal = 14.dp, vertical = 10.dp),
-                    horizontalAlignment = Alignment.CenterHorizontally
-                ) {
-                    Text(
-                        text = formatDayOfWeekShort(date),
-                        color = if (selected) DeepSea5 else DeepSea4,
-                        fontSize = 10.sp,
-                        fontWeight = FontWeight.Bold,
-                        letterSpacing = 0.6.sp
-                    )
-                    Spacer(modifier = Modifier.height(2.dp))
-                    Text(
-                        text = formatMonthDayCompact(date),
-                        color = DeepSea5,
-                        fontSize = 12.sp,
-                        fontWeight = FontWeight.SemiBold
-                    )
-                }
-            }
-        }
-        if (trailingSpacerWidth != null) {
-            Spacer(modifier = Modifier.width(trailingSpacerWidth))
         }
     }
 }
@@ -1163,7 +1120,8 @@ private fun TimeAxis(
     scheduleWindow: ScheduleWindow,
     hourHeight: Dp,
     topSpacing: Dp = 56.dp,
-    useTwentyFourHourLabels: Boolean = false
+    useTwentyFourHourLabels: Boolean = false,
+    locale: Locale = Locale.US
 ) {
     Column(modifier = Modifier.width(50.dp)) {
         Spacer(modifier = Modifier.height(topSpacing))
@@ -1175,7 +1133,7 @@ private fun TimeAxis(
                 contentAlignment = Alignment.TopStart
             ) {
                 Text(
-                    text = if (useTwentyFourHourLabels) hourLabel24(hour) else hourLabel(hour),
+                    text = if (useTwentyFourHourLabels) hourLabel24(hour) else hourLabel(hour, locale),
                     color = DeepSea4.copy(alpha = 0.8f),
                     fontSize = 11.sp
                 )
@@ -1198,7 +1156,8 @@ private fun ScheduleDayColumn(
     onEventClick: (TravelEvent) -> Unit,
     onDeleteClick: (TravelEvent) -> Unit,
     onEmptySlotClick: (Int) -> Unit,
-    showCurrentTimeIndicator: Boolean = false
+    showCurrentTimeIndicator: Boolean = false,
+    locale: Locale = Locale.US
 ) {
     val gridHeight = hourHeight * (scheduleWindow.endHour - scheduleWindow.startHour).toFloat()
     val headerShape = RoundedCornerShape(18.dp)
@@ -1295,7 +1254,8 @@ private fun ScheduleDayColumn(
                     hourHeight = hourHeight,
                     compact = compact,
                     onClick = { onEventClick(layout.span.event) },
-                    onDeleteClick = { onDeleteClick(layout.span.event) }
+                    onDeleteClick = { onDeleteClick(layout.span.event) },
+                    locale = locale
                 )
             }
         }
@@ -1363,7 +1323,8 @@ private fun BoxScope.ScheduleEventCard(
     hourHeight: Dp,
     compact: Boolean,
     onClick: () -> Unit,
-    onDeleteClick: () -> Unit
+    onDeleteClick: () -> Unit,
+    locale: Locale = Locale.US
 ) {
     val span = layout.span
     val startMinutes = span.startMinutes
@@ -1419,7 +1380,7 @@ private fun BoxScope.ScheduleEventCard(
                     verticalAlignment = Alignment.Top
                 ) {
                     Text(
-                        text = renderSpanLabel(span),
+                        text = renderSpanLabel(span, locale),
                         color = DeepSea4,
                         fontSize = if (compact && !showDeleteButton) 10.sp else if (compact) 9.sp else 10.sp,
                         modifier = Modifier.weight(1f)
@@ -1467,7 +1428,8 @@ private fun PlanEditorDialog(
     initialPlan: EditablePlan,
     onDismiss: () -> Unit,
     onSave: (EditablePlan) -> Unit,
-    onDelete: (EditablePlan) -> Unit
+    onDelete: (EditablePlan) -> Unit,
+    locale: Locale = Locale.US
 ) {
     val context = LocalContext.current
     var planType by remember(initialPlan) {
@@ -1475,10 +1437,10 @@ private fun PlanEditorDialog(
     }
     var title by remember(initialPlan) { mutableStateOf(initialPlan.title) }
     var date by remember(initialPlan) { mutableStateOf(normalizeDate(initialPlan.date)) }
-    var time by remember(initialPlan) { mutableStateOf(formatDisplayTime(initialPlan.startTime)) }
+    var time by remember(initialPlan) { mutableStateOf(formatDisplayTime(initialPlan.startTime, locale)) }
     var endTime by remember(initialPlan) {
         mutableStateOf(
-            initialPlan.endTime.takeIf { it.isNotBlank() }?.let(::formatDisplayTime).orEmpty()
+            initialPlan.endTime.takeIf { it.isNotBlank() }?.let { formatDisplayTime(it, locale) }.orEmpty()
         )
     }
     var location by remember(initialPlan) { mutableStateOf(initialPlan.location) }
@@ -1673,7 +1635,7 @@ private fun PlanEditorDialog(
                         placeholder = "Optional",
                         icon = Icons.Default.AccessTime,
                         onClick = {
-                            showTimePicker(context, endTime.ifBlank { plusMinutes(time, 60) }) {
+                            showTimePicker(context, endTime.ifBlank { plusMinutes(time, 60, locale) }) {
                                 endTime = it
                             }
                         }
@@ -1851,14 +1813,14 @@ private fun PickerField(
     }
 }
 
-private fun TravelEvent.toEditablePlan(): EditablePlan {
+private fun TravelEvent.toEditablePlan(locale: Locale = Locale.US): EditablePlan {
     return EditablePlan(
         eventId = eventId,
         type = type,
         title = eventTitle(this),
         date = normalizeDate(date),
-        startTime = formatDisplayTime(startTime),
-        endTime = endTime.takeIf { it.isNotBlank() }?.let(::formatDisplayTime).orEmpty(),
+        startTime = formatDisplayTime(startTime, locale),
+        endTime = endTime.takeIf { it.isNotBlank() }?.let { formatDisplayTime(it, locale) }.orEmpty(),
         timeZoneId = tz.ifBlank { defaultPlanTimeZoneId() },
         location = editableLocation(this),
         notes = editableNotes(this),
@@ -1869,13 +1831,14 @@ private fun TravelEvent.toEditablePlan(): EditablePlan {
 
 private fun newEditablePlan(
     date: String,
-    startMinutes: Int
+    startMinutes: Int,
+    locale: Locale = Locale.US
 ): EditablePlan {
-    val startTime = formatMinutes(startMinutes)
+    val startTime = formatMinutes(startMinutes, locale)
     return EditablePlan(
         date = normalizeDate(date),
         startTime = startTime,
-        endTime = plusMinutes(startTime, 60),
+        endTime = plusMinutes(startTime, 60, locale),
         timeZoneId = defaultPlanTimeZoneId(),
         colorKey = defaultColorKeyForType("activity")
     )
@@ -2132,13 +2095,13 @@ private fun eventDateTimeRange(event: TravelEvent): Pair<LocalDateTime, LocalDat
     return startDateTime to endDateTime
 }
 
-private fun renderSpanLabel(span: EventRenderSpan): String {
+private fun renderSpanLabel(span: EventRenderSpan, locale: Locale = Locale.US): String {
     val safeEndMinutes = span.endMinutes.coerceAtMost((23 * 60) + 59)
     return when {
         span.continuesBefore && span.continuesAfter -> "Continues all day"
-        span.continuesBefore -> "Until ${formatMinutes(safeEndMinutes)}"
-        span.continuesAfter -> "${formatMinutes(span.startMinutes)} onward"
-        else -> "${formatMinutes(span.startMinutes)} - ${formatMinutes(safeEndMinutes)}"
+        span.continuesBefore -> "Until ${formatMinutes(safeEndMinutes, locale)}"
+        span.continuesAfter -> "${formatMinutes(span.startMinutes, locale)} onward"
+        else -> "${formatMinutes(span.startMinutes, locale)} - ${formatMinutes(safeEndMinutes, locale)}"
     }
 }
 
@@ -2198,7 +2161,8 @@ private fun buildScheduleWindow(
 private fun buildTripDateRange(
     dateFrom: String,
     dateTo: String,
-    eventDates: List<String>
+    eventDates: List<String>,
+    pattern: String = "MMM d"
 ): String {
     val start = dateFrom.ifBlank { eventDates.firstOrNull().orEmpty() }
     val end = dateTo.ifBlank { eventDates.lastOrNull().orEmpty() }
@@ -2208,10 +2172,10 @@ private fun buildTripDateRange(
     }
 
     if (start == end || end.isBlank()) {
-        return formatTripDate(start).uppercase(Locale.US)
+        return formatTripDate(start, pattern).uppercase(Locale.US)
     }
 
-    return "${formatTripDate(start).uppercase(Locale.US)} - ${formatTripDate(end).uppercase(Locale.US)}"
+    return "${formatTripDate(start, pattern).uppercase(Locale.US)} - ${formatTripDate(end, pattern).uppercase(Locale.US)}"
 }
 
 private fun showDatePicker(

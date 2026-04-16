@@ -161,6 +161,34 @@ class AuthModel {
     fun signOut() {
         auth.signOut()
     }
+
+    // Delete account
+    suspend fun deleteAccount(): Result<Unit> = suspendCancellableCoroutine { continuation ->
+        val user = auth.currentUser
+        if (user == null) {
+            continuation.resume(Result.failure(Exception("No user logged in")))
+            return@suspendCancellableCoroutine
+        }
+
+        val uid = user.uid
+        // Delete from Firestore first
+        db.collection("users").document(uid).delete()
+            .addOnSuccessListener {
+                // Then delete from Auth
+                user.delete()
+                    .addOnCompleteListener { task ->
+                        if (task.isSuccessful) {
+                            continuation.resume(Result.success(Unit))
+                        } else {
+                            continuation.resume(Result.failure(task.exception ?: Exception("Failed to delete user account")))
+                        }
+                    }
+            }
+            .addOnFailureListener { e ->
+                continuation.resume(Result.failure(e))
+            }
+    }
+
     // Log in with Google ID Token
     suspend fun signInWithGoogle(idToken: String): Result<String> = suspendCancellableCoroutine { continuation ->
         val credential = GoogleAuthProvider.getCredential(idToken, null)
@@ -205,8 +233,3 @@ class AuthModel {
             }
     }
 }
-
-
-
-
-

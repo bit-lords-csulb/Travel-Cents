@@ -1,6 +1,5 @@
 package com.example.travelcents.ui.main
 
-import android.util.Log
 import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -32,6 +31,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Bookmark
 import androidx.compose.material.icons.filled.ChevronRight
+import androidx.compose.material.icons.filled.Cloud
 import androidx.compose.material.icons.filled.Description
 import androidx.compose.material.icons.filled.Flight
 import androidx.compose.material.icons.filled.FlightTakeoff
@@ -41,6 +41,9 @@ import androidx.compose.material.icons.filled.Notifications
 import androidx.compose.material.icons.automirrored.filled.OpenInNew
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.SwapVert
+import androidx.compose.material.icons.filled.Thunderstorm
+import androidx.compose.material.icons.filled.WbCloudy
+import androidx.compose.material.icons.filled.WbSunny
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
@@ -51,11 +54,11 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
@@ -73,17 +76,20 @@ import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import coil.compose.AsyncImage
-import coil.request.ImageRequest
-import com.example.travelcents.BuildConfig
+import com.example.travelcents.data.local.UserSettings
 import com.example.travelcents.data.model.Itinerary
 import com.example.travelcents.ui.theme.DeepSea1
 import com.example.travelcents.ui.theme.DeepSea2
 import com.example.travelcents.ui.theme.DeepSea3
 import com.example.travelcents.ui.theme.DeepSea4
 import com.example.travelcents.ui.theme.DeepSea5
+import java.text.NumberFormat
 import java.time.LocalDate
+import java.time.LocalTime
 import java.time.format.DateTimeFormatter
 import java.time.temporal.ChronoUnit
+import java.util.Locale
+import kotlin.math.abs
 
 // Accent colors that mirror the HTML template's primary palette
 private val Primary = Color(0xFF64B5F6)
@@ -97,11 +103,27 @@ private val SurfaceBright = Color(0xFF243447)
 @Composable
 fun HomePage(
     modifier: Modifier = Modifier,
-    onTripClick: (String) -> Unit = {},
+    userSettings: UserSettings,
     homeViewModel: HomeViewModel = viewModel(),
     currencyViewModel: CurrencyViewModel = viewModel()
 ) {
     val homeUiState by homeViewModel.uiState.collectAsStateWithLifecycle()
+
+    // Sync currency if user settings change.
+    // Ensure one side is always USD as the app is US-based.
+    LaunchedEffect(userSettings.currency) {
+        if (userSettings.currency != "USD") {
+            // If user is in a non-US region (e.g. UK), default to Regional -> USD
+            currencyViewModel.onFromCurrencyChange(userSettings.currency)
+            currencyViewModel.onToCurrencyChange("USD")
+        } else {
+            // If user is in US, default to USD -> EUR
+            currencyViewModel.onFromCurrencyChange("USD")
+            if (currencyViewModel.toCurrency == "USD") {
+                currencyViewModel.onToCurrencyChange("EUR")
+            }
+        }
+    }
 
     Column(
         modifier = modifier
@@ -117,7 +139,7 @@ fun HomePage(
             trips = homeUiState.trips,
             tripImages = homeUiState.tripImages,
             isLoading = homeUiState.isLoading,
-            onTripClick = onTripClick
+            dateFormat = userSettings.dateFormat
         )
 
         Spacer(modifier = Modifier.height(24.dp))
@@ -127,7 +149,12 @@ fun HomePage(
             verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
             Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                SavedPlacesWidget(modifier = Modifier.weight(1f).aspectRatio(1f))
+                WeatherWidget(
+                    modifier = Modifier.weight(1f).aspectRatio(1f),
+                    tempUnit = userSettings.temperatureUnit,
+                    region = userSettings.region,
+                    country = userSettings.country
+                )
                 CurrencyWidget(
                     modifier = Modifier.weight(1f).aspectRatio(1f),
                     amount = currencyViewModel.amount,
@@ -141,7 +168,8 @@ fun HomePage(
                     onAmountChange = currencyViewModel::onAmountChange,
                     onFromCurrencyChange = currencyViewModel::onFromCurrencyChange,
                     onToCurrencyChange = currencyViewModel::onToCurrencyChange,
-                    onSwap = currencyViewModel::swap
+                    onSwap = currencyViewModel::swap,
+                    countryCode = userSettings.countryCode
                 )
             }
 
@@ -219,7 +247,7 @@ private fun TripsCarousel(
     trips: List<Itinerary>,
     tripImages: Map<String, String>,
     isLoading: Boolean,
-    onTripClick: (String) -> Unit = {}
+    dateFormat: String
 ) {
     Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
         when {
@@ -246,9 +274,9 @@ private fun TripsCarousel(
                 ) { page ->
                     TripCard(
                         trip = trips[page],
-                        imageUrl = tripImages[trips[page].itineraryId],
+                        imageUrl = tripImages[trips[page].destination],
                         isCurrent = page == pagerState.currentPage,
-                        onClick = { onTripClick(trips[page].itineraryId) }
+                        dateFormat = dateFormat
                     )
                 }
 
@@ -298,13 +326,16 @@ private fun CarouselPlaceholder(content: @Composable () -> Unit) {
 }
 
 @Composable
-private fun TripCard(trip: Itinerary, imageUrl: String?, isCurrent: Boolean, onClick: () -> Unit = {}) {
-    val context = LocalContext.current
+private fun TripCard(trip: Itinerary, imageUrl: String?, isCurrent: Boolean, dateFormat: String) {
     val today = LocalDate.now()
     val countdownDays: Long? = runCatching {
-        val fmt = DateTimeFormatter.ofPattern("yyyy-MM-dd")
-        ChronoUnit.DAYS.between(today, LocalDate.parse(trip.dateFrom, fmt))
+        // Assume database date format is yyyy-MM-dd
+        val dbFmt = DateTimeFormatter.ofPattern("yyyy-MM-dd")
+        ChronoUnit.DAYS.between(today, LocalDate.parse(trip.dateFrom, dbFmt))
     }.getOrNull()
+
+    val imageSeed = abs(trip.destination.hashCode() % 1000)
+    val resolvedImageUrl = imageUrl ?: "https://picsum.photos/seed/$imageSeed/400/500"
 
     Box(
         modifier = Modifier
@@ -312,42 +343,13 @@ private fun TripCard(trip: Itinerary, imageUrl: String?, isCurrent: Boolean, onC
             .aspectRatio(4f / 5f)
             .clip(RoundedCornerShape(24.dp))
             .alpha(if (isCurrent) 1f else 0.6f)
-            .clickable(enabled = isCurrent) { onClick() }
     ) {
-        if (imageUrl != null) {
-            val request = remember(imageUrl) {
-                ImageRequest.Builder(context)
-                    .data(imageUrl)
-                    .setHeader("User-Agent", WIKIMEDIA_IMAGE_USER_AGENT)
-                    .setHeader("Api-User-Agent", WIKIMEDIA_IMAGE_USER_AGENT)
-                    .crossfade(true)
-                    .listener(
-                        onError = { request, result ->
-                            Log.w(
-                                "HomePage",
-                                "Trip card image failed for '${trip.destination}' url='${request.data}': ${result.throwable.message}"
-                            )
-                        }
-                    )
-                    .build()
-            }
-            AsyncImage(
-                model = request,
-                contentDescription = trip.destination,
-                contentScale = ContentScale.Crop,
-                modifier = Modifier.fillMaxSize()
-            )
-        } else {
-            Box(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .background(
-                        Brush.linearGradient(
-                            colors = listOf(DeepSea3, SurfaceBright, DeepSea2)
-                        )
-                    )
-            )
-        }
+        AsyncImage(
+            model = resolvedImageUrl,
+            contentDescription = trip.destination,
+            contentScale = ContentScale.Crop,
+            modifier = Modifier.fillMaxSize()
+        )
 
         // Gradient scrim
         Box(
@@ -420,6 +422,96 @@ private fun TripCard(trip: Itinerary, imageUrl: String?, isCurrent: Boolean, onC
                     )
                 }
             }
+        }
+    }
+}
+
+// ─────────────────────────────────────────────────────────────
+// Weather Widget (added for regional impact)
+// ─────────────────────────────────────────────────────────────
+
+@Composable
+private fun WeatherWidget(modifier: Modifier = Modifier, tempUnit: String, region: String, country: String) {
+    val location = if (region.isNotBlank()) region else country
+    
+    // Simulate weather conditions based on location
+    val condition = when {
+        location.contains("London", ignoreCase = true) || location.contains("UK", ignoreCase = true) -> "Rainy"
+        location.contains("Seattle", ignoreCase = true) || location.contains("Paris", ignoreCase = true) -> "Cloudy"
+        location.contains("Tokyo", ignoreCase = true) -> "Partly Cloudy"
+        else -> "Sunny"
+    }
+    
+    val (weatherIcon, iconColor) = when (condition) {
+        "Rainy" -> Icons.Default.Thunderstorm to Color(0xFF90A4AE)
+        "Cloudy" -> Icons.Default.Cloud to Color(0xFFB0BEC5)
+        "Partly Cloudy" -> Icons.Default.WbCloudy to Color(0xFFFFD54F)
+        else -> Icons.Default.WbSunny to Color(0xFFFFD54F)
+    }
+
+    Card(
+        modifier = modifier,
+        shape = RoundedCornerShape(24.dp),
+        colors = CardDefaults.cardColors(containerColor = DeepSea2)
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(14.dp),
+            verticalArrangement = Arrangement.SpaceBetween
+        ) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.Top
+            ) {
+                Column {
+                    Text(
+                        text = "Weather",
+                        color = DeepSea5,
+                        fontSize = 14.sp,
+                        fontWeight = FontWeight.Bold
+                    )
+                    Text(
+                        text = location,
+                        color = DeepSea4,
+                        fontSize = 10.sp,
+                        maxLines = 1
+                    )
+                }
+                Icon(
+                    imageVector = weatherIcon,
+                    contentDescription = condition,
+                    tint = iconColor,
+                    modifier = Modifier.size(20.dp)
+                )
+            }
+            
+            Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.fillMaxWidth()) {
+                // Simulate slightly different weather if a region is specified
+                val baseTemp = if (condition == "Rainy") 15 else if (condition == "Cloudy") 18 else 22
+                val temp = if (tempUnit == "Fahrenheit") "${(baseTemp * 9/5) + 32}°F" else "${baseTemp}°C"
+                Text(
+                    text = temp,
+                    color = DeepSea5,
+                    fontSize = 32.sp,
+                    fontWeight = FontWeight.Bold
+                )
+                Text(
+                    text = condition,
+                    color = DeepSea4,
+                    fontSize = 12.sp
+                )
+            }
+            
+            val currentTime = LocalTime.now().format(DateTimeFormatter.ofPattern("h:mm a"))
+            Text(
+                text = "Local Time: $currentTime",
+                color = DeepSea4,
+                fontSize = 10.sp,
+                modifier = Modifier.fillMaxWidth(),
+                textAlign = TextAlign.Center
+            )
         }
     }
 }
@@ -570,7 +662,8 @@ private fun CurrencyWidget(
     onAmountChange: (String) -> Unit,
     onFromCurrencyChange: (String) -> Unit,
     onToCurrencyChange: (String) -> Unit,
-    onSwap: () -> Unit
+    onSwap: () -> Unit,
+    countryCode: String
 ) {
     Card(
         modifier = modifier,
@@ -704,8 +797,20 @@ private fun CurrencyWidget(
                                 fontWeight = FontWeight.Medium
                             )
                         }
+                        
+                        // Impacting numerical formats based on locale/country
+                        val locale = Locale("", countryCode)
+                        val formattedResult = try {
+                            val formatter = NumberFormat.getNumberInstance(locale)
+                            formatter.minimumFractionDigits = 2
+                            formatter.maximumFractionDigits = 2
+                            formatter.format(result)
+                        } catch (e: Exception) {
+                            "%.2f".format(result)
+                        }
+
                         Text(
-                            text = "%.2f".format(result),
+                            text = formattedResult,
                             color = Primary,
                             fontSize = 17.sp,
                             fontWeight = FontWeight.Bold
@@ -1009,7 +1114,3 @@ private fun DocumentsWidget() {
         }
     }
 }
-
-private const val WIKIMEDIA_CONTACT_URL = "https://github.com/bit-lords-csulb/Travel-Cents"
-private val WIKIMEDIA_IMAGE_USER_AGENT =
-    "TravelCents/${BuildConfig.VERSION_NAME} (Android app; $WIKIMEDIA_CONTACT_URL)"

@@ -69,13 +69,17 @@ fun normalizeTime(rawTime: String): String {
     return parseFlexibleTime(rawTime)?.format(storageTimeFormatter) ?: rawTime.trim()
 }
 
-fun formatDisplayTime(time: String): String {
-    return parseFlexibleTime(time)?.format(displayTimeFormatter) ?: time.ifBlank { "TIME TBD" }
+fun formatDisplayTime(time: String, locale: Locale = Locale.US): String {
+    val formatter = if (locale == Locale.US) displayTimeFormatter else DateTimeFormatter.ofPattern("HH:mm", locale)
+    return parseFlexibleTime(time)?.format(formatter) ?: time.ifBlank { "TIME TBD" }
 }
 
-fun formatDisplayTimeRange(startTime: String, endTime: String): String {
-    val formattedStart = formatDisplayTime(startTime)
-    val formattedEnd = parseFlexibleTime(endTime)?.format(displayTimeFormatter)
+fun formatDisplayTimeRange(startTime: String, endTime: String, locale: Locale = Locale.US): String {
+    val formattedStart = formatDisplayTime(startTime, locale)
+    val formattedEnd = parseFlexibleTime(endTime)?.let { 
+        val formatter = if (locale == Locale.US) displayTimeFormatter else DateTimeFormatter.ofPattern("HH:mm", locale)
+        it.format(formatter)
+    }
 
     return when {
         formattedEnd.isNullOrBlank() -> formattedStart
@@ -84,48 +88,55 @@ fun formatDisplayTimeRange(startTime: String, endTime: String): String {
     }
 }
 
-fun formatMinutes(minutes: Int): String {
+fun formatMinutes(minutes: Int, locale: Locale = Locale.US): String {
     val clamped = minutes.coerceIn(0, (23 * 60) + 59)
-    return LocalTime.of(clamped / 60, clamped % 60).format(displayTimeFormatter)
+    val formatter = if (locale == Locale.US) displayTimeFormatter else DateTimeFormatter.ofPattern("HH:mm", locale)
+    return LocalTime.of(clamped / 60, clamped % 60).format(formatter)
 }
 
 fun parseTimeToMinutes(rawTime: String): Int? {
     return parseFlexibleTime(rawTime)?.let { it.hour * 60 + it.minute }
 }
 
-fun plusMinutes(rawTime: String, minutesToAdd: Long): String {
+fun plusMinutes(rawTime: String, minutesToAdd: Long, locale: Locale = Locale.US): String {
+    val formatter = if (locale == Locale.US) displayTimeFormatter else DateTimeFormatter.ofPattern("HH:mm", locale)
     return parseFlexibleTime(rawTime)
         ?.plusMinutes(minutesToAdd)
-        ?.format(displayTimeFormatter)
+        ?.format(formatter)
         ?: rawTime
 }
 
-fun hourLabel(hour: Int): String {
-    return LocalTime.of(hour.coerceIn(0, 23), 0).format(displayHourFormatter)
+fun hourLabel(hour: Int, locale: Locale = Locale.US): String {
+    val formatter = if (locale == Locale.US) displayHourFormatter else DateTimeFormatter.ofPattern("HH:00", locale)
+    return LocalTime.of(hour.coerceIn(0, 23), 0).format(formatter)
 }
 
 fun hourLabel24(hour: Int): String {
     return "%02d:00".format(Locale.US, hour.coerceIn(0, 23))
 }
 
-fun formatTripDate(rawDate: String): String {
-    return parseIsoDate(rawDate)?.format(tripDateFormatter) ?: rawDate
+fun formatTripDate(rawDate: String, pattern: String = "MMM d"): String {
+    val formatter = DateTimeFormatter.ofPattern(pattern, Locale.US)
+    return parseIsoDate(rawDate)?.format(formatter) ?: rawDate
 }
 
-fun formatItineraryHeader(rawDate: String): String {
-    return parseIsoDate(rawDate)?.format(itineraryHeaderFormatter)?.uppercase(Locale.US) ?: rawDate
+fun formatItineraryHeader(rawDate: String, pattern: String = "EEEE, MMMM d"): String {
+    val formatter = DateTimeFormatter.ofPattern(pattern, Locale.US)
+    return parseIsoDate(rawDate)?.format(formatter)?.uppercase(Locale.US) ?: rawDate
 }
 
-fun formatLongDayLabel(rawDate: String): String {
-    return parseIsoDate(rawDate)?.format(longDayFormatter) ?: rawDate
+fun formatLongDayLabel(rawDate: String, pattern: String = "MMMM d"): String {
+    val formatter = DateTimeFormatter.ofPattern(pattern, Locale.US)
+    return parseIsoDate(rawDate)?.format(formatter) ?: rawDate
 }
 
 fun formatDayOfWeekShort(rawDate: String): String {
     return parseIsoDate(rawDate)?.format(shortDayFormatter)?.uppercase(Locale.US) ?: rawDate
 }
 
-fun formatMonthDayCompact(rawDate: String): String {
-    return parseIsoDate(rawDate)?.format(tripDateFormatter)?.uppercase(Locale.US) ?: rawDate
+fun formatMonthDayCompact(rawDate: String, pattern: String = "MMM d"): String {
+    val formatter = DateTimeFormatter.ofPattern(pattern, Locale.US)
+    return parseIsoDate(rawDate)?.format(formatter)?.uppercase(Locale.US) ?: rawDate
 }
 
 fun buildCalendarDates(

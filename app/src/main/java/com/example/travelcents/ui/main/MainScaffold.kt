@@ -22,7 +22,6 @@ import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.lifecycle.viewmodel.compose.viewModel
@@ -35,11 +34,13 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.navigation.NavGraph.Companion.findStartDestination
 import androidx.navigation.NavType
+import androidx.compose.runtime.LaunchedEffect
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
+import com.example.travelcents.ui.auth.AuthViewModel
 import com.example.travelcents.ui.main.aichat.AiTripChatPage
 import com.example.travelcents.ui.main.chats.chat.ChatsScreen
 import com.example.travelcents.ui.main.itinerary.EditPlanScreen
@@ -76,7 +77,6 @@ object MainRoutes {
     const val EDIT_PLAN = "edit_plan/{tripId}/{eventId}"
     const val AI_TRIP_CHAT = "ai_trip_chat"
     const val FINAL_PLAN = "final_plan"
-    const val FINAL_PLAN_BY_ID = "final_plan/{tripId}"
 }
 
 private val bottomNavRoutes = setOf(
@@ -93,8 +93,7 @@ private val bottomNavRoutes = setOf(
     MainRoutes.CHATS,
     MainRoutes.SETTINGS,
     MainRoutes.EDIT_PLAN,
-    MainRoutes.FINAL_PLAN,
-    MainRoutes.FINAL_PLAN_BY_ID
+    MainRoutes.FINAL_PLAN
 )
 
 private data class BottomNavItem(
@@ -104,10 +103,14 @@ private data class BottomNavItem(
 )
 
 @Composable
-fun MainScaffold(modifier: Modifier = Modifier, onLogout: () -> Unit = {}) {
+fun MainScaffold(
+    modifier: Modifier = Modifier,
+    authViewModel: AuthViewModel,
+    onLogout: () -> Unit = {}
+) {
+    val mainViewModel: MainViewModel = viewModel()
     val newTripViewModel: NewTripViewModel = viewModel()
-    val currentTripViewModel: CurrentTripViewModel = viewModel()
-    val finalPlanViewModel: ItineraryViewModel = viewModel()
+    val sharedItineraryViewModel: ItineraryViewModel = viewModel()
     val navController = rememberNavController()
 
     val navBackStackEntry by navController.currentBackStackEntryAsState()
@@ -122,14 +125,14 @@ fun MainScaffold(modifier: Modifier = Modifier, onLogout: () -> Unit = {}) {
         MainRoutes.NEW_TRIP_STEP_5,
         MainRoutes.TRIP_GENERATING,
         MainRoutes.AI_TRIP_CHAT,
-        MainRoutes.FINAL_PLAN,
-        MainRoutes.FINAL_PLAN_BY_ID -> MainRoutes.NEW_TRIP
+        MainRoutes.FINAL_PLAN -> MainRoutes.NEW_TRIP
         else -> currentRoute
     }
-    val itineraryUiState by currentTripViewModel.uiState.collectAsState()
+    val itineraryUiState by sharedItineraryViewModel.uiState.collectAsState()
+    val userSettings by mainViewModel.userSettings.collectAsState()
 
     // Load trip once on mount so currentTripId is available before any tab is visited
-    LaunchedEffect(Unit) { currentTripViewModel.loadTrip() }
+    LaunchedEffect(Unit) { sharedItineraryViewModel.loadTrip() }
 
     val items = listOf(
         BottomNavItem(MainRoutes.CURRENT, "CURRENT", Icons.Outlined.CalendarToday),
@@ -151,9 +154,10 @@ fun MainScaffold(modifier: Modifier = Modifier, onLogout: () -> Unit = {}) {
                 modifier = Modifier.fillMaxSize()
             ) {
                 composable(MainRoutes.CURRENT) {
-                    LaunchedEffect(Unit) { currentTripViewModel.loadTrip() }
+                    LaunchedEffect(Unit) { sharedItineraryViewModel.loadTrip() }
                     ItineraryScreen(
-                        viewModel = currentTripViewModel,
+                        viewModel = sharedItineraryViewModel,
+                        userSettings = userSettings,
                         onEditEventClick = { clickedEventId ->
                             itineraryUiState.currentTripId?.let { tripId ->
                                 navController.navigate("edit_plan/$tripId/$clickedEventId")
@@ -252,16 +256,18 @@ fun MainScaffold(modifier: Modifier = Modifier, onLogout: () -> Unit = {}) {
                         }
                     )
                 }
-                composable(MainRoutes.HOME) {
+                composable(MainRoutes.HOME) { 
                     HomePage(
                         modifier = Modifier.fillMaxSize(),
-                        onTripClick = { tripId -> navController.navigate("final_plan/$tripId") }
-                    )
+                        userSettings = userSettings
+                    ) 
                 }
                 composable(MainRoutes.CHATS) { ChatsScreen(modifier = Modifier.fillMaxSize()) }
                 composable(MainRoutes.SETTINGS) {
                     SettingsPage(
                         modifier = Modifier.fillMaxSize(),
+                        authViewModel = authViewModel,
+                        mainViewModel = mainViewModel,
                         onLoggedOut = onLogout
                     )
                 }
@@ -272,28 +278,12 @@ fun MainScaffold(modifier: Modifier = Modifier, onLogout: () -> Unit = {}) {
                     )
                 }
                 composable(MainRoutes.FINAL_PLAN) {
-                    LaunchedEffect(Unit) { finalPlanViewModel.loadTrip() }
+                    LaunchedEffect(Unit) { sharedItineraryViewModel.loadTrip() }
                     FinalPlanPage(
-                        viewModel = finalPlanViewModel,
+                        viewModel = sharedItineraryViewModel,
                         modifier = Modifier.fillMaxSize(),
                         onBackClick = {
                             navController.navigate(MainRoutes.CURRENT) {
-                                popUpTo(MainRoutes.HOME) { inclusive = false }
-                            }
-                        }
-                    )
-                }
-                composable(
-                    route = MainRoutes.FINAL_PLAN_BY_ID,
-                    arguments = listOf(navArgument("tripId") { type = NavType.StringType })
-                ) { backStackEntry ->
-                    val tripId = backStackEntry.arguments?.getString("tripId")
-                    LaunchedEffect(tripId) { finalPlanViewModel.loadTrip(tripId) }
-                    FinalPlanPage(
-                        viewModel = finalPlanViewModel,
-                        modifier = Modifier.fillMaxSize(),
-                        onBackClick = {
-                            navController.navigate(MainRoutes.HOME) {
                                 popUpTo(MainRoutes.HOME) { inclusive = false }
                             }
                         }
@@ -305,19 +295,14 @@ fun MainScaffold(modifier: Modifier = Modifier, onLogout: () -> Unit = {}) {
         if (currentRoute in bottomNavRoutes) {
             BottomNavBar(
                 items = items,
-                selectedRoute = selectedBottomRoute,
-                activeRoute = currentRoute,
+                currentRoute = selectedBottomRoute,
                 onItemSelected = { route ->
-                    val resetNewTripToLanding =
-                        route == MainRoutes.NEW_TRIP && currentRoute == MainRoutes.FINAL_PLAN
-
                     navController.navigate(route) {
                         popUpTo(navController.graph.findStartDestination().id) {
                             saveState = true
                         }
                         launchSingleTop = true
-                        // Preserve in-progress trip planning, but don't restore Final Plan into the New Trip tab.
-                        restoreState = !resetNewTripToLanding
+                        restoreState = true
                     }
                 }
             )
@@ -328,8 +313,7 @@ fun MainScaffold(modifier: Modifier = Modifier, onLogout: () -> Unit = {}) {
 @Composable
 private fun BottomNavBar(
     items: List<BottomNavItem>,
-    selectedRoute: String,
-    activeRoute: String,
+    currentRoute: String,
     onItemSelected: (String) -> Unit
 ) {
     Column {
@@ -343,13 +327,12 @@ private fun BottomNavBar(
             verticalAlignment = Alignment.CenterVertically
         ) {
             items.forEach { item ->
-                val selected = selectedRoute == item.route
-                val isCurrentDestination = activeRoute == item.route
+                val selected = currentRoute == item.route
                 Column(
                     modifier = Modifier
                         .weight(1f)
                         .clickable {
-                            if (!isCurrentDestination) {
+                            if (!selected) {
                                 onItemSelected(item.route)
                             }
                         }

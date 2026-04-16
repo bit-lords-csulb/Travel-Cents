@@ -10,6 +10,8 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
@@ -17,6 +19,7 @@ import androidx.compose.material.icons.automirrored.filled.ExitToApp
 import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.Mail
 import androidx.compose.material.icons.filled.Person
+import androidx.compose.material.icons.filled.Public
 import androidx.compose.material.icons.filled.Visibility
 import androidx.compose.material.icons.filled.VisibilityOff
 import androidx.compose.material3.*
@@ -31,15 +34,24 @@ import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.window.Dialog
 import com.example.travelcents.data.FirestoreRepository
+import com.example.travelcents.ui.auth.AuthViewModel
 import com.example.travelcents.ui.theme.*
+import com.example.travelcents.data.model.Country
+import com.example.travelcents.data.model.majorCountries
 import com.google.firebase.auth.EmailAuthProvider
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FirebaseFirestore
 
 @Suppress("ASSIGNED_BUT_NEVER_ACCESSED_VARIABLE")
 @Composable
-fun SettingsPage(modifier: Modifier = Modifier, onLoggedOut: () -> Unit = {}) {
+fun SettingsPage(
+    modifier: Modifier = Modifier,
+    authViewModel: AuthViewModel,
+    mainViewModel: MainViewModel,
+    onLoggedOut: () -> Unit = {}
+) {
     var selectedTab by remember { mutableStateOf("Preferences") }
     val currentUser = FirebaseAuth.getInstance().currentUser
     val userEmail = currentUser?.email ?: "demo@student.csulb.edu"
@@ -75,7 +87,7 @@ fun SettingsPage(modifier: Modifier = Modifier, onLoggedOut: () -> Unit = {}) {
             text = { Text("Are you sure you want to logout?") },
             confirmButton = {
                 TextButton(onClick = {
-                    FirebaseAuth.getInstance().signOut()
+                    authViewModel.signOut()
                     showLogoutDialog = false
                     onLoggedOut()
                 }) {
@@ -100,13 +112,8 @@ fun SettingsPage(modifier: Modifier = Modifier, onLoggedOut: () -> Unit = {}) {
             text = { Text("Are you sure? All data will be lost permanently. This action cannot be undone.") },
             confirmButton = {
                 TextButton(onClick = {
-                    val user = FirebaseAuth.getInstance().currentUser
-                    val uid = user?.uid
-                    user?.delete()?.addOnCompleteListener { task ->
-                        if (task.isSuccessful) {
-                            uid?.let {
-                                FirebaseFirestore.getInstance().collection("users").document(it).delete()
-                            }
+                    authViewModel.deleteAccount { success ->
+                        if (success) {
                             showDeleteDialog = false
                             onLoggedOut()
                         }
@@ -165,6 +172,7 @@ fun SettingsPage(modifier: Modifier = Modifier, onLoggedOut: () -> Unit = {}) {
         }
 
         Spacer(modifier = Modifier.height(16.dp))
+        @Suppress("KotlinConstantConditions")
         Text(
             text = userName,
             color = DeepSea5,
@@ -228,7 +236,7 @@ fun SettingsPage(modifier: Modifier = Modifier, onLoggedOut: () -> Unit = {}) {
 
         // Content Area
         when (selectedTab) {
-            "Preferences" -> PreferencesTab()
+            "Preferences" -> PreferencesTab(mainViewModel)
             "Profile" -> ProfileTab(onProfileUpdated = { refreshTrigger++ })
             "Security" -> SecurityTab()
         }
@@ -439,6 +447,7 @@ fun SecurityTab() {
         )
 
         if (error != null) {
+            @Suppress("KotlinConstantConditions")
             Text(error!!, color = Color.Red, fontSize = 12.sp, modifier = Modifier.padding(top = 8.dp))
         }
 
@@ -515,7 +524,11 @@ fun SecurityInputField(label: String, value: String, onValueChange: (String) -> 
 }
 
 @Composable
-fun PreferencesTab() {
+fun PreferencesTab(mainViewModel: MainViewModel) {
+    val userSettings by mainViewModel.userSettings.collectAsState()
+    var showCountryDialog by remember { mutableStateOf(false) }
+    var showRegionDialog by remember { mutableStateOf(false) }
+
     Column(modifier = Modifier.fillMaxWidth()) {
         SettingHeader("Notifications")
         
@@ -556,9 +569,132 @@ fun PreferencesTab() {
         Spacer(modifier = Modifier.height(24.dp))
 
         SettingHeader("Regional Settings")
-        RegionalInputItem(label = "Language", value = "English")
-        RegionalInputItem(label = "Timezone", value = "Pacific (PST)")
+        RegionalInputItem(
+            label = "Country / Region",
+            value = userSettings.country,
+            onClick = { showCountryDialog = true }
+        )
+        RegionalInputItem(
+            label = "City / State / Province",
+            value = if (userSettings.region.isNotBlank()) userSettings.region else "Not specified",
+            onClick = { showRegionDialog = true }
+        )
+        RegionalInputItem(
+            label = "Currency",
+            value = "${userSettings.currency} (${currencySymbol(userSettings.currency)})"
+        )
+        RegionalInputItem(
+            label = "Units",
+            value = userSettings.temperatureUnit
+        )
     }
+
+    if (showCountryDialog) {
+        CountrySelectionDialog(
+            onDismiss = { showCountryDialog = false },
+            onSelect = { country ->
+                mainViewModel.updateCountry(country)
+                showCountryDialog = false
+            }
+        )
+    }
+
+    if (showRegionDialog) {
+        RegionInputDialog(
+            currentRegion = userSettings.region,
+            onDismiss = { showRegionDialog = false },
+            onConfirm = { region ->
+                mainViewModel.updateRegion(region)
+                showRegionDialog = false
+            }
+        )
+    }
+}
+
+@Composable
+fun CountrySelectionDialog(onDismiss: () -> Unit, onSelect: (Country) -> Unit) {
+    Dialog(onDismissRequest = onDismiss) {
+        Card(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(450.dp)
+                .padding(16.dp),
+            shape = RoundedCornerShape(24.dp),
+            colors = CardDefaults.cardColors(containerColor = DeepSea2)
+        ) {
+            Column(modifier = Modifier.padding(16.dp)) {
+                Text(
+                    "Select Country",
+                    color = DeepSea5,
+                    fontSize = 20.sp,
+                    fontWeight = FontWeight.Bold,
+                    modifier = Modifier.padding(bottom = 16.dp)
+                )
+                LazyColumn(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    items(majorCountries) { country ->
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clip(RoundedCornerShape(12.dp))
+                                .background(DeepSea3)
+                                .clickable { onSelect(country) }
+                                .padding(16.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Icon(Icons.Default.Public, contentDescription = null, tint = DeepSea5, modifier = Modifier.size(20.dp))
+                            Spacer(modifier = Modifier.width(12.dp))
+                            Text(country.name, color = DeepSea5, fontSize = 16.sp)
+                            Spacer(modifier = Modifier.weight(1f))
+                            Text(country.code, color = DeepSea4, fontSize = 12.sp)
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+fun RegionInputDialog(currentRegion: String, onDismiss: () -> Unit, onConfirm: (String) -> Unit) {
+    var text by remember { mutableStateOf(currentRegion) }
+    
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        containerColor = DeepSea2,
+        titleContentColor = DeepSea5,
+        textContentColor = DeepSea4,
+        title = { Text("Set Location") },
+        text = {
+            Column {
+                Text("Enter your city, state, or province for precise tailoring.", fontSize = 14.sp)
+                Spacer(modifier = Modifier.height(16.dp))
+                TextField(
+                    value = text,
+                    onValueChange = { text = it },
+                    placeholder = { Text("e.g. California, London, Tokyo") },
+                    singleLine = true,
+                    colors = TextFieldDefaults.colors(
+                        focusedContainerColor = DeepSea3,
+                        unfocusedContainerColor = DeepSea3,
+                        focusedTextColor = DeepSea5,
+                        unfocusedTextColor = DeepSea5,
+                        cursorColor = DeepSea5
+                    ),
+                    modifier = Modifier.fillMaxWidth()
+                )
+            }
+        },
+        confirmButton = {
+            TextButton(onClick = { onConfirm(text) }) {
+                Text("Save", color = DeepSea5)
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text("Cancel", color = DeepSea4)
+            }
+        }
+    )
 }
 
 @Composable
@@ -605,10 +741,11 @@ fun SwitchSettingItem(
 }
 
 @Composable
-fun RegionalInputItem(label: String, value: String) {
+fun RegionalInputItem(label: String, value: String, onClick: (() -> Unit)? = null) {
     Column(
         modifier = Modifier
             .fillMaxWidth()
+            .then(if (onClick != null) Modifier.clickable { onClick() } else Modifier)
             .padding(vertical = 12.dp)
     ) {
         Text(text = label, color = DeepSea4, fontSize = 14.sp)
@@ -617,4 +754,30 @@ fun RegionalInputItem(label: String, value: String) {
         Spacer(modifier = Modifier.height(4.dp))
         HorizontalDivider(color = DeepSea3, thickness = 1.dp)
     }
+}
+
+private fun currencySymbol(code: String) = when (code) {
+    "USD" -> "$"; "CAD" -> "CA$"; "AUD" -> "A$"; "NZD" -> "NZ$"
+    "SGD" -> "S$"; "HKD" -> "HK$"; "MXN" -> "MX$"
+    "EUR" -> "€"
+    "GBP" -> "£"
+    "JPY" -> "¥"; "CNY" -> "¥"
+    "KRW" -> "₩"
+    "INR" -> "₹"
+    "BRL" -> "R$"
+    "TRY" -> "₺"
+    "ILS" -> "₪"
+    "PHP" -> "₱"
+    "THB" -> "฿"
+    "PLN" -> "zł"
+    "ZAR" -> "R"
+    "IDR" -> "Rp"
+    "MYR" -> "RM"
+    "CHF" -> "Fr"
+    "SEK" -> "kr"; "NOK" -> "kr"; "DKK" -> "kr"; "ISK" -> "kr"
+    "HUF" -> "Ft"
+    "CZK" -> "Kč"
+    "RON" -> "lei"
+    "BGN" -> "лв"
+    else -> ""
 }

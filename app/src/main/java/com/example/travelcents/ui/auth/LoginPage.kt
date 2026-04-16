@@ -33,7 +33,6 @@ import androidx.compose.runtime.setValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import android.view.View
-import androidx.core.content.edit
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -62,24 +61,12 @@ import androidx.navigation.NavController
 import com.example.travelcents.ui.theme.DeepSea1
 import com.example.travelcents.ui.theme.DeepSea2
 import com.example.travelcents.ui.theme.DeepSea4
-import com.example.travelcents.ui.theme.DeepSea5
-import kotlin.Result
-import kotlin.runCatching
-import androidx.compose.runtime.rememberCoroutineScope
-import androidx.compose.ui.platform.LocalContext
-import androidx.credentials.CredentialManager
-import androidx.credentials.CustomCredential
-import androidx.credentials.GetCredentialRequest
-import androidx.credentials.exceptions.GetCredentialException
-import com.google.android.libraries.identity.googleid.GetGoogleIdOption
-import com.google.android.libraries.identity.googleid.GoogleIdTokenCredential
-import kotlinx.coroutines.launch
-import android.util.Log
 
 private const val LOGIN_PREFS = "login_preferences"
 private const val KEY_REMEMBER_ME = "remember_me"
 private const val KEY_SAVED_EMAIL = "saved_email_or_username"
 private const val KEY_SAVED_PASSWORD = "saved_password"
+
 @Composable
 fun LoginPage(modifier: Modifier = Modifier, navController: NavController, authViewModel: AuthViewModel) {
     val context = LocalContext.current
@@ -104,6 +91,7 @@ fun LoginPage(modifier: Modifier = Modifier, navController: NavController, authV
     // Collect StateFlows as Compose state
     val isLoggedIn by authViewModel.isLoggedIn.collectAsStateWithLifecycle()
     val isLoading by authViewModel.isLoading.collectAsStateWithLifecycle()
+    val isAccountCreated by authViewModel.isAccountCreated.collectAsStateWithLifecycle()
     val errorMessage by authViewModel.errorMessage.collectAsStateWithLifecycle()
     val statusMessage by authViewModel.statusMessage.collectAsStateWithLifecycle()
 
@@ -119,7 +107,7 @@ fun LoginPage(modifier: Modifier = Modifier, navController: NavController, authV
     // Navigate to the home screen if the user is logged in
     LaunchedEffect(isLoggedIn) {
         if (isLoggedIn) {
-            sharedPreferences.edit {
+            with(sharedPreferences.edit()) {
                 if (rememberMeState) {
                     putBoolean(KEY_REMEMBER_ME, true)
                     putString(KEY_SAVED_EMAIL, email.trim())
@@ -129,6 +117,7 @@ fun LoginPage(modifier: Modifier = Modifier, navController: NavController, authV
                     remove(KEY_SAVED_EMAIL)
                     remove(KEY_SAVED_PASSWORD)
                 }
+                apply()
             }
             navController.navigate("home") {
                 popUpTo("login") { inclusive = true }
@@ -184,6 +173,14 @@ fun LoginPage(modifier: Modifier = Modifier, navController: NavController, authV
                             focusManager.moveFocus(
                                 if (event.isShiftPressed) FocusDirection.Previous else FocusDirection.Next
                             )
+                            true
+                        }
+                        event.key == Key.Enter && event.type == KeyEventType.KeyDown -> {
+                            if (email.isNotBlank() && password.isNotBlank()) {
+                                authViewModel.logIn(email, password)
+                            } else {
+                                passwordFocusRequester.requestFocus()
+                            }
                             true
                         }
                         event.key == Key.Enter && event.type == KeyEventType.KeyDown -> {
@@ -344,9 +341,7 @@ fun LoginPage(modifier: Modifier = Modifier, navController: NavController, authV
             }
         }
 
-        Spacer(modifier = Modifier.height(16.dp))
-
-        GoogleSignInButton(authViewModel = authViewModel)
+        Spacer(modifier = Modifier.height(28.dp))
 
         Row(
             modifier = Modifier.fillMaxWidth(),
@@ -370,58 +365,5 @@ fun LoginPage(modifier: Modifier = Modifier, navController: NavController, authV
                 }
             )
         }
-    }
-}
-
-@Composable
-fun GoogleSignInButton(authViewModel: AuthViewModel) {
-    val context = LocalContext.current
-    val coroutineScope = rememberCoroutineScope()
-
-    Button(
-        onClick = {
-            coroutineScope.launch {
-                val credentialManager = CredentialManager.create(context)
-
-                // 1. Build the Google ID Option
-                val googleIdOption = GetGoogleIdOption.Builder()
-                    .setFilterByAuthorizedAccounts(false)
-                    .setServerClientId("805994740096-d31i7240546h0701vh3m2kphrtsqqqtt.apps.googleusercontent.com")
-                    .setAutoSelectEnabled(false)
-                    .build()
-
-                // 2. Build the Credential Request
-                val request = GetCredentialRequest.Builder()
-                    .addCredentialOption(googleIdOption)
-                    .build()
-
-                try {
-                    // 3. Launch the Android Bottom Sheet Prompt
-                    val result = credentialManager.getCredential(
-                        request = request,
-                        context = context,
-                    )
-
-                    // 4. Extract the ID Token if successful
-                    val credential = result.credential
-                    if (credential is CustomCredential && credential.type == GoogleIdTokenCredential.TYPE_GOOGLE_ID_TOKEN_CREDENTIAL) {
-                        val googleIdTokenCredential = GoogleIdTokenCredential.createFrom(credential.data)
-                        val idToken = googleIdTokenCredential.idToken
-
-                        Log.d("GoogleAuth", "Google ID token received")
-                        authViewModel.logInWithGoogle(idToken)
-                    }
-                } catch (e: GetCredentialException) {
-                    Log.e("GoogleAuth", "Google Sign-In failed", e)
-                }
-            }
-        },
-        modifier = Modifier
-            .fillMaxWidth()
-            .height(48.dp),
-        shape = RoundedCornerShape(12.dp),
-        colors = ButtonDefaults.buttonColors(containerColor = Color.White)
-    ) {
-        Text("Continue with Google", color = Color.Black, fontSize = 16.sp, fontWeight = FontWeight.SemiBold)
     }
 }
