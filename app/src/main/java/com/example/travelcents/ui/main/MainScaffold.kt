@@ -39,8 +39,14 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
-import com.example.travelcents.ui.itinerary.EditPlanScreen
+import com.example.travelcents.ui.auth.AuthViewModel
+import com.example.travelcents.ui.main.itinerary.EditPlanScreen
+import com.example.travelcents.ui.main.itinerary.ItineraryScreen
+import com.example.travelcents.ui.main.itinerary.ItineraryViewModel
 import com.example.travelcents.ui.main.chats.chat.ChatsScreen
+import com.example.travelcents.ui.main.newtrip.NewTripLandingPage
+import com.example.travelcents.ui.main.newtrip.NewTripViewModel
+import com.example.travelcents.ui.main.aichat.AiTripChatPage
 import com.example.travelcents.ui.theme.DeepSea1
 import com.example.travelcents.ui.theme.DeepSea2
 import com.example.travelcents.ui.theme.DeepSea3
@@ -75,6 +81,7 @@ private data class BottomNavItem(
 @Composable
 fun MainScaffold(modifier: Modifier = Modifier, onLogout: () -> Unit = {}) {
     val newTripViewModel: NewTripViewModel = viewModel()
+    val authViewModel: AuthViewModel = viewModel()
     val navController = rememberNavController()
     val navBackStackEntry by navController.currentBackStackEntryAsState()
     val currentRoute = navBackStackEntry?.destination?.route ?: MainRoutes.Home
@@ -92,6 +99,7 @@ fun MainScaffold(modifier: Modifier = Modifier, onLogout: () -> Unit = {}) {
             .fillMaxSize()
             .background(DeepSea1)
     ) {
+        // Main content area
         Box(modifier = Modifier.weight(1f).fillMaxWidth()) {
             NavHost(
                 navController = navController,
@@ -135,10 +143,10 @@ fun MainScaffold(modifier: Modifier = Modifier, onLogout: () -> Unit = {}) {
                 }
 
                 composable(MainRoutes.NewTrip) {
-                    NewTripPage(
+                    NewTripLandingPage(
                         modifier = Modifier.fillMaxSize(),
-                        viewModel = newTripViewModel,
-                        onChatClick = { navController.navigate(MainRoutes.AiTripChat) }
+                        onPlanTripClick = { /* Logic for starting plan */ },
+                        onAiChatClick = { navController.navigate(MainRoutes.AiTripChat) }
                     )
                 }
                 composable(MainRoutes.Home) { HomePage(modifier = Modifier.fillMaxSize()) }
@@ -146,6 +154,7 @@ fun MainScaffold(modifier: Modifier = Modifier, onLogout: () -> Unit = {}) {
                 composable(MainRoutes.Settings) { 
                     SettingsPage(
                         modifier = Modifier.fillMaxSize(),
+                        authViewModel = authViewModel,
                         onLoggedOut = onLogout
                     ) 
                 }
@@ -158,7 +167,7 @@ fun MainScaffold(modifier: Modifier = Modifier, onLogout: () -> Unit = {}) {
             }
         }
 
-        // Hide bottom nav on the AI chat screen
+        // Bottom Navigation Bar
         if (currentRoute in bottomNavRoutes) {
             BottomNavBar(
                 items = items,

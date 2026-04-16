@@ -20,6 +20,9 @@ firebaseFirestoreKtx = "26.1.1"
 lifecycleRuntimeCompose = "2.10.0"
 material3 = "1.4.0"
 lifecycleViewmodelKtx = "2.10.0"
+reorderable = "3.0.0"
+playServicesLocation = "21.3.0"
+playServicesBase = "18.5.0"
 
 [libraries]
 androidx-core-ktx = { group = "androidx.core", name = "core-ktx", version.ref = "coreKtx" }
@@ -51,8 +54,11 @@ firebase-firestore-ktx = { group = "com.google.firebase", name = "firebase-fires
 androidx-lifecycle-runtime-compose = { group = "androidx.lifecycle", name = "lifecycle-runtime-compose", version.ref = "lifecycleRuntimeCompose" }
 androidx-material3 = { group = "androidx.compose.material3", name = "material3", version.ref = "material3" }
 androidx-lifecycle-viewmodel-ktx = { group = "androidx.lifecycle", name = "lifecycle-viewmodel-ktx", version.ref = "lifecycleViewmodelKtx" }
+reorderable = { module = "sh.calvin.reorderable:reorderable", version.ref = "reorderable" }
+play-services-location = { group = "com.google.android.gms", name = "play-services-location", version.ref = "playServicesLocation" }
+play-services-base = { group = "com.google.android.gms", name = "play-services-base", version.ref = "playServicesBase" }
+
 [plugins]
 android-application = { id = "com.android.application", version.ref = "agp" }
 kotlin-compose = { id = "org.jetbrains.kotlin.plugin.compose", version.ref = "kotlin" }
 google-gms-google-services = { id = "com.google.gms.google-services", version.ref = "googleGmsGoogleServices" }
-
