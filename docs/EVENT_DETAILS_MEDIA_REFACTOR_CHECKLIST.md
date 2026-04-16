@@ -208,36 +208,36 @@ Related plan: [EVENT_DETAILS_MEDIA_REFACTOR_PLAN.md](C:\Users\Zaher503\AndroidSt
 
 ### Checklist
 
-- [ ] Create `ui/main/current/overlays/cards/`
-- [ ] Create shared card primitives:
-  - [ ] `DetailCardFrame.kt`
-  - [ ] `DetailCardHeader.kt`
-  - [ ] `DetailBadgeRow.kt`
-  - [ ] `DetailLinkRow.kt`
-  - [ ] `StaticMapCard.kt`
-- [ ] Create flight-specific cards:
-  - [ ] `FlightTimingCard.kt`
-  - [ ] `FlightRouteCard.kt`
-  - [ ] `FlightPricingCard.kt`
-- [ ] Create hotel-specific cards:
-  - [ ] `HotelStayCard.kt`
-  - [ ] `HotelPricingCard.kt`
-  - [ ] `HotelAmenitiesCard.kt`
-- [ ] Create restaurant-specific cards:
-  - [ ] `RestaurantSummaryCard.kt`
-  - [ ] `RestaurantServicesCard.kt`
-  - [ ] `RestaurantHoursCard.kt`
-- [ ] Create activity-specific cards:
-  - [ ] `ActivitySummaryCard.kt`
-  - [ ] `ActivityHoursCard.kt`
-- [ ] Create shared cards:
-  - [ ] `LocationMapCard.kt`
-  - [ ] `ReviewsCard.kt`
-- [ ] Refactor `CurrentTripEventDetailsDialog.kt` into a coordinator/composer only
-- [ ] Replace oversized top cards with compact summary cards
-- [ ] Remove `Place Info`
-- [ ] Replace `Experience` with useful type-specific cards
-- [ ] Reduce map card height and densify address row
+- [x] Create `ui/main/current/overlays/cards/`
+- [x] Create shared card primitives:
+  - [x] `DetailCardFrame.kt`
+  - [x] `DetailCardHeader.kt`
+  - [x] `DetailBadgeRow.kt`
+  - [x] `DetailLinkRow.kt`
+  - [x] `StaticMapCard.kt`
+- [x] Create flight-specific cards:
+  - [x] `FlightTimingCard.kt`
+  - [x] `FlightRouteCard.kt`
+  - [x] `FlightPricingCard.kt`
+- [x] Create hotel-specific cards:
+  - [x] `HotelStayCard.kt`
+  - [x] `HotelPricingCard.kt`
+  - [x] `HotelAmenitiesCard.kt`
+- [x] Create restaurant-specific cards:
+  - [x] `RestaurantSummaryCard.kt`
+  - [x] `RestaurantServicesCard.kt`
+  - [x] `RestaurantHoursCard.kt`
+- [x] Create activity-specific cards:
+  - [x] `ActivitySummaryCard.kt`
+  - [x] `ActivityHoursCard.kt`
+- [x] Create shared cards:
+  - [x] `LocationMapCard.kt`
+  - [x] `ReviewsCard.kt`
+- [x] Refactor `CurrentTripEventDetailsDialog.kt` into a coordinator/composer only
+- [x] Replace oversized top cards with compact summary cards
+- [x] Remove `Place Info`
+- [x] Replace `Experience` with useful type-specific cards
+- [x] Reduce map card height and densify address row
 
 ## Phase 8: ViewModel Integration Parity
 
