@@ -281,7 +281,13 @@ class NewTripViewModel(application: Application) : AndroidViewModel(application)
             for (option in event.options) {
                 eventRef.collection("options")
                     .document(option.optionId)
-                    .set(option.toMap())
+                    .set(
+                        option.scopedTo(
+                            ownerUid = uid,
+                            tripId = itinerary.itineraryId,
+                            eventId = event.eventId
+                        ).toMap()
+                    )
                     .await()
             }
         }
