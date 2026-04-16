@@ -1,6 +1,6 @@
 # Event Details Media Refactor Checklist
 
-Updated: 2026-04-15
+Updated: 2026-04-16
 
 Related plan: [EVENT_DETAILS_MEDIA_REFACTOR_PLAN.md](C:\Users\Zaher503\AndroidStudioProjects\Travel-Cents\docs\EVENT_DETAILS_MEDIA_REFACTOR_PLAN.md)
 
@@ -165,14 +165,14 @@ Related plan: [EVENT_DETAILS_MEDIA_REFACTOR_PLAN.md](C:\Users\Zaher503\AndroidSt
 
 ### Checklist
 
-- [ ] Verify selected hotel event preserves all returned Serp image URLs
-- [ ] Verify hotel options preserve all returned Serp image URLs
-- [ ] Ensure hotel option selection copies:
-  - [ ] `imageUrl`
-  - [ ] `photoUrls`
-- [ ] Extend local download flow to include selected hotel gallery images
-- [ ] Add background prefetch for selected hotel galleries on trip load
-- [ ] Add background prefetch when user switches hotel options
+- [x] Verify selected hotel event preserves all returned Serp image URLs
+- [x] Verify hotel options preserve all returned Serp image URLs
+- [x] Ensure hotel option selection copies:
+  - [x] `imageUrl`
+  - [x] `photoUrls`
+- [x] Extend local download flow to include selected hotel gallery images
+- [x] Add background prefetch for selected hotel galleries on trip load
+- [x] Add background prefetch when user switches hotel options
 - [ ] Verify hotel galleries are available in:
   - [ ] current-trip screen
   - [ ] itinerary screen

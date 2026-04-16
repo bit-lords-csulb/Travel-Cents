@@ -49,6 +49,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -106,9 +107,10 @@ fun CurrentTripEventDetailsDialog(
     onDelete: () -> Unit,
     onAlternatives: (() -> Unit)? = null
 ) {
+    val context = LocalContext.current
     val uriHandler = LocalUriHandler.current
-    val photos = remember(event) { event.galleryPhotoModels() }
-    val heroImage = remember(event) { event.heroImageModel() }
+    val photos = remember(event, context) { event.galleryPhotoModels(context) }
+    val heroImage = remember(event, context) { event.heroImageModel(context) }
     val officialUrl = remember(event) { eventOfficialUrl(event) }
     val reviewUrl = yelpReviews.firstOrNull()?.url?.takeIf { it.isNotBlank() } ?: officialUrl
     val mapsQuery = remember(event) { eventMapsQuery(event) }
