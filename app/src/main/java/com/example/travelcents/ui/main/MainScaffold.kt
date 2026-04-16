@@ -254,8 +254,8 @@ fun MainScaffold(modifier: Modifier = Modifier, onLogout: () -> Unit = {}) {
                 composable(MainRoutes.HOME) {
                     HomePage(
                         modifier = Modifier.fillMaxSize(),
-                        onTripClick = { tripId ->
-                            currentTripViewModel.loadTrip(tripId)
+                        onTripClick = { tripKey ->
+                            currentTripViewModel.loadTrip(tripKey)
                             navController.navigate(MainRoutes.CURRENT_ITINERARY)
                         },
                         onProfileClick = {

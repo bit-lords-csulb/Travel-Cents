@@ -96,6 +96,12 @@ fun CurrentTripScreen(
         }
     }
 
+    LaunchedEffect(uiState.canEditTrip) {
+        if (!uiState.canEditTrip) {
+            jiggleMode = false
+        }
+    }
+
     LaunchedEffect(editorPlan) {
         editorPlan?.existingDetails?.get("yelp_id")
             ?.takeIf { it.isNotBlank() }
@@ -135,8 +141,11 @@ fun CurrentTripScreen(
                     tripTitle = uiState.tripTitle,
                     heroDate = itineraryVisibleDate.ifBlank { uiState.dateFrom },
                     currentTripId = uiState.currentTripId,
+                    currentTripOwnerUid = uiState.currentTripOwnerUid,
+                    viewerUid = uiState.viewerUid,
                     allTrips = allTrips,
-                    canAdd = uiState.currentTripId != null,
+                    canAdd = uiState.currentTripId != null && uiState.canEditTrip,
+                    canEditTrip = uiState.canEditTrip,
                     isReorderActive = displayMode == CurrentDisplayMode.ITINERARY && jiggleMode,
                     isInCalendarMode = displayMode != CurrentDisplayMode.ITINERARY,
                     isWeekMode = displayMode == CurrentDisplayMode.WEEK,
@@ -147,7 +156,9 @@ fun CurrentTripScreen(
                     onCalendarClick = { onNavigateToMode(CurrentDisplayMode.DAY) },
                     onBackClick = { onNavigateToMode(CurrentDisplayMode.ITINERARY) },
                     onAddClick = {
-                        if (uiState.currentTripId == null) {
+                        if (!uiState.canEditTrip) {
+                            viewModel.postError("Shared trips are read-only for now.")
+                        } else if (uiState.currentTripId == null) {
                             viewModel.postError("Create a trip first before adding calendar plans.")
                         } else {
                             editorPlan = newEditablePlan(
@@ -159,14 +170,22 @@ fun CurrentTripScreen(
                         }
                     },
                     onShareClick = {
-                        viewModel.fetchShareTargets()
-                        showShareSheet = true
+                        if (!uiState.canEditTrip) {
+                            viewModel.postError("Only the trip owner can share this trip.")
+                        } else {
+                            viewModel.fetchShareTargets()
+                            showShareSheet = true
+                        }
                     },
                     onToggleReorder = {
-                        if (displayMode != CurrentDisplayMode.ITINERARY) {
-                            onNavigateToMode(CurrentDisplayMode.ITINERARY)
+                        if (!uiState.canEditTrip) {
+                            viewModel.postError("Shared trips are read-only for now.")
+                        } else {
+                            if (displayMode != CurrentDisplayMode.ITINERARY) {
+                                onNavigateToMode(CurrentDisplayMode.ITINERARY)
+                            }
+                            jiggleMode = !jiggleMode
                         }
-                        jiggleMode = !jiggleMode
                     },
                     onArchiveTrip = { tripId ->
                         jiggleMode = false
@@ -176,13 +195,13 @@ fun CurrentTripScreen(
                         jiggleMode = false
                         viewModel.deleteTrip(tripId)
                     },
-                    onSwitchTrip = { tripId ->
+                    onSwitchTrip = { tripKey ->
                         jiggleMode = false
                         selectedEventId = null
                         optionsPanelEventId = null
                         editorPlan = null
                         deleteCandidate = null
-                        viewModel.loadTrip(tripId)
+                        viewModel.loadTrip(tripKey)
                     },
                     onRenameTrip = viewModel::renameTrip,
                     controlsContent = {
@@ -219,34 +238,69 @@ fun CurrentTripScreen(
                             events = events,
                             eventOptions = eventOptions,
                             rejectedOptions = rejectedOptions,
+                            canEditTrip = uiState.canEditTrip,
                             jiggleMode = jiggleMode,
                             onEventClick = { selectedEventId = it.eventId },
-                            onDeleteClick = { deleteCandidate = it.toEditablePlan() },
-                            onOpenAlternatives = { optionsPanelEventId = it },
+                            onDeleteClick = {
+                                if (uiState.canEditTrip) {
+                                    deleteCandidate = it.toEditablePlan()
+                                } else {
+                                    viewModel.postError("Shared trips are read-only for now.")
+                                }
+                            },
+                            onOpenAlternatives = {
+                                if (uiState.canEditTrip) {
+                                    optionsPanelEventId = it
+                                } else {
+                                    viewModel.postError("Shared trips are read-only for now.")
+                                }
+                            },
                             onMoveEvent = viewModel::moveEventLocally,
                             onPersistEventPlacements = viewModel::persistEventPlacements,
                             onVisibleDateChange = { itineraryVisibleDate = it }
                         )
                         displayMode == CurrentDisplayMode.WEEK -> CurrentTripWeekView(
                             events = events,
+                            canEditTrip = uiState.canEditTrip,
                             sortedDates = calendarDates,
                             selectedDate = selectedDate,
                             onDateSelected = { selectedDate = it },
                             onEventClick = { selectedEventId = it.eventId },
-                            onDeleteClick = { deleteCandidate = it.toEditablePlan() },
+                            onDeleteClick = {
+                                if (uiState.canEditTrip) {
+                                    deleteCandidate = it.toEditablePlan()
+                                } else {
+                                    viewModel.postError("Shared trips are read-only for now.")
+                                }
+                            },
                             onCreatePlan = { date, startMinutes ->
-                                editorPlan = newEditablePlan(date, startMinutes)
+                                if (uiState.canEditTrip) {
+                                    editorPlan = newEditablePlan(date, startMinutes)
+                                } else {
+                                    viewModel.postError("Shared trips are read-only for now.")
+                                }
                             }
                         )
                         else -> CurrentTripDayView(
                             events = events,
+                            canEditTrip = uiState.canEditTrip,
                             sortedDates = calendarDates,
                             selectedDate = selectedDate,
                             onDateSelected = { selectedDate = it },
                             onEventClick = { selectedEventId = it.eventId },
-                            onDeleteClick = { deleteCandidate = it.toEditablePlan() },
+                            onDeleteClick = {
+                                if (uiState.canEditTrip) {
+                                    deleteCandidate = it.toEditablePlan()
+                                } else {
+                                    viewModel.postError("Shared trips are read-only for now.")
+                                }
+                            },
                             onCreatePlan = { date, startMinutes ->
-                                editorPlan = newEditablePlan(date, startMinutes)
+                                if (uiState.canEditTrip) {
+                                    editorPlan = newEditablePlan(date, startMinutes)
+                                } else {
+                                    viewModel.postError("Shared trips are read-only for now.")
+                                }
                             }
                         )
                     }
@@ -254,6 +308,7 @@ fun CurrentTripScreen(
             }
             CurrentTripOverlayHost(
                 uiState = uiState,
+                canEditTrip = uiState.canEditTrip,
                 eventOptions = eventOptions,
                 rejectedOptions = rejectedOptions,
                 yelpReviews = yelpReviews,

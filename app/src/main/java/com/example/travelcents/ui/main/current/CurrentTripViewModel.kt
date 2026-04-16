@@ -4,6 +4,7 @@ import android.app.Application
 import android.util.Log
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
+import com.example.travelcents.data.media.ImageCacheManager
 import com.example.travelcents.data.trip.FirestoreTripRepository
 import com.example.travelcents.data.trip.TripKey
 import com.example.travelcents.data.trip.TripPerformanceLogger
@@ -22,6 +23,7 @@ import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FieldPath
 import com.google.firebase.firestore.FieldValue
 import com.google.firebase.firestore.FirebaseFirestore
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -59,6 +61,9 @@ data class TripMemberUi(
 data class CurrentTripUiState(
     val isLoading: Boolean = true,
     val currentTripId: String? = null,
+    val currentTripOwnerUid: String? = null,
+    val viewerUid: String? = null,
+    val canEditTrip: Boolean = false,
     val tripTitle: String = "Loading Trip...",
     val destination: String = "",
     val dateFrom: String = "",
@@ -71,7 +76,8 @@ data class CurrentTripUiState(
 data class ShareTarget(
     val id: String,
     val name: String,
-    val isGroup: Boolean
+    val isGroup: Boolean,
+    val memberUids: List<String> = emptyList()
 )
 
 class CurrentTripViewModel(application: Application) : AndroidViewModel(application) {
@@ -145,6 +151,7 @@ class CurrentTripViewModel(application: Application) : AndroidViewModel(applicat
         _uiState.value = CurrentTripUiState(
             isLoading = isLoading,
             tripTitle = tripTitle,
+            viewerUid = auth.currentUser?.uid,
             infoMessage = infoMessage,
             errorMessage = errorMessage
         )
@@ -189,6 +196,8 @@ class CurrentTripViewModel(application: Application) : AndroidViewModel(applicat
         currentTripKey = tripKey
         TripPerformanceLogger.bindTrip(tripKey.tripId)
         currentTripDestination = itinerary.destination
+        val viewerUid = auth.currentUser?.uid
+        val canEditTrip = viewerUid == tripKey.ownerUid
         val storedTripTitle = itinerary.tripName
         val nextTripTitle = resolveTripName(storedTripTitle, currentTripDestination)
         _tripTitle.value = nextTripTitle
@@ -196,6 +205,9 @@ class CurrentTripViewModel(application: Application) : AndroidViewModel(applicat
             it.copy(
                 isLoading = false,
                 currentTripId = tripKey.tripId,
+                currentTripOwnerUid = tripKey.ownerUid,
+                viewerUid = viewerUid,
+                canEditTrip = canEditTrip,
                 tripTitle = nextTripTitle,
                 destination = currentTripDestination,
                 dateFrom = itinerary.dateFrom,
@@ -205,7 +217,7 @@ class CurrentTripViewModel(application: Application) : AndroidViewModel(applicat
             )
         }
 
-        if (nextTripTitle != storedTripTitle.trim()) {
+        if (canEditTrip && nextTripTitle != storedTripTitle.trim()) {
             viewModelScope.launch {
                 runCatching {
                     db.collection("users").document(tripKey.ownerUid)
@@ -283,11 +295,12 @@ class CurrentTripViewModel(application: Application) : AndroidViewModel(applicat
     }
 
     fun upsertPlan(plan: EditablePlan) {
-        val tripKey = currentTripWriteKey()
-        if (auth.currentUser?.uid == null || tripKey == null) {
+        val tripKey = requireOwnerTripKey("add or edit plans")
+        if (auth.currentUser?.uid == null) {
             postError("Create or load a trip before adding plans.")
             return
         }
+        if (tripKey == null) return
 
         viewModelScope.launch {
             try {
@@ -343,13 +356,14 @@ class CurrentTripViewModel(application: Application) : AndroidViewModel(applicat
     }
 
     fun deletePlan(plan: EditablePlan) {
-        val tripKey = currentTripWriteKey()
+        val tripKey = requireOwnerTripKey("delete plans")
         val eventId = plan.eventId
 
-        if (auth.currentUser?.uid == null || tripKey == null || eventId.isNullOrBlank()) {
+        if (auth.currentUser?.uid == null || eventId.isNullOrBlank()) {
             postError("This plan cannot be deleted yet.")
             return
         }
+        if (tripKey == null) return
 
         viewModelScope.launch {
             try {
@@ -390,7 +404,7 @@ class CurrentTripViewModel(application: Application) : AndroidViewModel(applicat
         eventId: String,
         forceRefresh: Boolean = false
     ) {
-        val tripKey = currentTripWriteKey() ?: return
+        val tripKey = currentTripWriteKeyIfOwner() ?: return
         val event = _uiState.value.events.firstOrNull { it.eventId == eventId } ?: return
         val options = _eventOptions.value[eventId].orEmpty()
         val yelpId = mediaDetailPipeline.yelpEnrichmentTargetId(
@@ -425,6 +439,7 @@ class CurrentTripViewModel(application: Application) : AndroidViewModel(applicat
     }
 
     private fun prefetchYelpEnrichment(events: List<TravelEvent>) {
+        if (currentTripWriteKeyIfOwner() == null) return
         events.forEach { event ->
             if (event.type.lowercase(Locale.US) !in YELP_PREFETCH_TYPES) return@forEach
             ensureYelpEventEnriched(event.eventId)
@@ -483,7 +498,7 @@ class CurrentTripViewModel(application: Application) : AndroidViewModel(applicat
             try {
                 val memberUids = tripRepository.getTripMembers(tripKey)
 
-                if (memberUids.isEmpty()) {
+                if (memberUids.isEmpty() || (memberUids.size == 1 && memberUids.first() == tripKey.ownerUid)) {
                     _tripMembers.value = emptyList()
                     return@launch
                 }
@@ -515,10 +530,12 @@ class CurrentTripViewModel(application: Application) : AndroidViewModel(applicat
                     .await()
                     .documents
                     .map { doc ->
+                        val members = (doc.get("members") as? List<*>)?.filterIsInstance<String>().orEmpty()
                         ShareTarget(
                             id = doc.id,
                             name = doc.getString("name") ?: "Unnamed Group",
-                            isGroup = true
+                            isGroup = true,
+                            memberUids = members
                         )
                     }
 
@@ -536,10 +553,15 @@ class CurrentTripViewModel(application: Application) : AndroidViewModel(applicat
 
                 val userNames = fetchUserNames(chatEntries.map { it.second }.distinct())
                 val directTargets = chatEntries.map { (chatId, otherUid) ->
+                    val members = directChatDocs
+                        .firstOrNull { doc -> doc.id == chatId }
+                        ?.get("members")
+                        .let { raw -> (raw as? List<*>)?.filterIsInstance<String>().orEmpty() }
                     ShareTarget(
                         id = chatId,
                         name = userNames[otherUid] ?: "Unknown",
-                        isGroup = false
+                        isGroup = false,
+                        memberUids = members
                     )
                 }
 
@@ -574,6 +596,19 @@ class CurrentTripViewModel(application: Application) : AndroidViewModel(applicat
         return TripKey(ownerUid = ownerUid, tripId = tripId)
     }
 
+    private fun currentTripWriteKeyIfOwner(): TripKey? {
+        val tripKey = currentTripWriteKey() ?: return null
+        return tripKey.takeIf { key -> key.ownerUid == auth.currentUser?.uid }
+    }
+
+    private fun requireOwnerTripKey(action: String): TripKey? {
+        currentTripWriteKeyIfOwner()?.let { return it }
+        if (currentTripWriteKey() != null) {
+            postError("Only the trip owner can $action.")
+        }
+        return null
+    }
+
     private fun resolveSenderDisplayName(): String {
         val currentUser = auth.currentUser ?: return "Traveler"
         val authDisplayName = currentUser.displayName?.trim().orEmpty()
@@ -592,10 +627,15 @@ class CurrentTripViewModel(application: Application) : AndroidViewModel(applicat
 
     fun shareTripToChat(target: ShareTarget) {
         val uid = auth.currentUser?.uid ?: return
-        val tripId = _uiState.value.currentTripId ?: return
+        val tripKey = requireOwnerTripKey("share this trip") ?: return
 
         viewModelScope.launch {
             try {
+                tripRepository.ensureTripAccess(
+                    key = tripKey,
+                    memberUids = target.memberUids
+                )
+
                 val senderName = resolveSenderDisplayName()
                 val container = if (target.isGroup) "groups" else "directChats"
                 val chatRef = db.collection(container).document(target.id)
@@ -607,8 +647,8 @@ class CurrentTripViewModel(application: Application) : AndroidViewModel(applicat
                     "senderName" to senderName,
                     "timestamp" to FieldValue.serverTimestamp(),
                     "messageType" to "trip_card",
-                    "sharedTripId" to tripId,
-                    "ownerUid" to (currentTripKey?.ownerUid ?: uid),
+                    "sharedTripId" to tripKey.tripId,
+                    "ownerUid" to tripKey.ownerUid,
                     "tripName" to _uiState.value.tripTitle,
                     "tripDestination" to currentTripDestination,
                     "tripDateFrom" to _uiState.value.dateFrom,
@@ -634,7 +674,7 @@ class CurrentTripViewModel(application: Application) : AndroidViewModel(applicat
     }
 
     fun selectOption(eventId: String, optionId: String) {
-        val tripKey = currentTripWriteKey() ?: return
+        val tripKey = requireOwnerTripKey("change selected options") ?: return
         val options = _eventOptions.value[eventId].orEmpty()
         val selectedOption = options.firstOrNull { it.optionId == optionId } ?: return
         val event = _uiState.value.events.firstOrNull { it.eventId == eventId } ?: return
@@ -692,6 +732,10 @@ class CurrentTripViewModel(application: Application) : AndroidViewModel(applicat
     }
 
     fun rejectOption(eventId: String, optionId: String) {
+        if (currentTripWriteKeyIfOwner() == null) {
+            postError("Only the trip owner can change options.")
+            return
+        }
         _rejectedOptions.update { current ->
             current + (eventId to (current[eventId].orEmpty() + optionId))
         }
@@ -703,7 +747,7 @@ class CurrentTripViewModel(application: Application) : AndroidViewModel(applicat
         startTime: String,
         notes: String
     ) {
-        val tripKey = currentTripWriteKey() ?: return
+        val tripKey = requireOwnerTripKey("edit plans") ?: return
         val currentEvent = _uiState.value.events.firstOrNull { it.eventId == eventId } ?: return
 
         val updatedDetails = currentEvent.details.toMutableMap().apply {
@@ -804,7 +848,7 @@ class CurrentTripViewModel(application: Application) : AndroidViewModel(applicat
     }
 
     fun persistEventPlacements(affectedDates: Set<String>) {
-        val tripKey = currentTripWriteKey() ?: return
+        val tripKey = requireOwnerTripKey("reorder plans") ?: return
         val normalizedDates = affectedDates.map(::normalizeDate).toSet()
         val affectedEvents = _uiState.value.events.filter { normalizeDate(it.date) in normalizedDates }
 
@@ -839,15 +883,16 @@ class CurrentTripViewModel(application: Application) : AndroidViewModel(applicat
     fun archiveTrip(tripId: String) {
         val uid = auth.currentUser?.uid ?: return
         val currentTripId = _uiState.value.currentTripId
-        val ownerUid = currentTripKey
-            ?.takeIf { it.tripId == tripId }
-            ?.ownerUid
-            ?: uid
+        val tripKey = requireOwnerTripKey("archive this trip") ?: return
+        if (tripKey.tripId != tripId) {
+            postError("Load the trip again before archiving it.")
+            return
+        }
 
         viewModelScope.launch {
             try {
                 db.collection("users")
-                    .document(ownerUid)
+                    .document(tripKey.ownerUid)
                     .collection("trips")
                     .document(tripId)
                     .update(
@@ -866,11 +911,7 @@ class CurrentTripViewModel(application: Application) : AndroidViewModel(applicat
                 _uiState.update { it.copy(infoMessage = "Trip archived.", errorMessage = null) }
 
                 if (currentTripId == tripId) {
-                    if (ownerUid == uid) {
-                        fetchLatestItinerary(uid)
-                    } else {
-                        resetTripState(infoMessage = "Trip archived.")
-                    }
+                    fetchLatestItinerary(uid)
                 }
             } catch (e: Exception) {
                 Log.e("CurrentTripViewModel", "Failed to archive trip", e)
@@ -881,34 +922,33 @@ class CurrentTripViewModel(application: Application) : AndroidViewModel(applicat
 
     fun deleteTrip(tripId: String) {
         val uid = auth.currentUser?.uid ?: return
-        val ownerUid = currentTripKey
-            ?.takeIf { it.tripId == tripId }
-            ?.ownerUid
-            ?: uid
+        val tripKey = requireOwnerTripKey("delete this trip") ?: return
+        if (tripKey.tripId != tripId) {
+            postError("Load the trip again before deleting it.")
+            return
+        }
 
         viewModelScope.launch {
             try {
-                val remaining = _allTrips.value.filter { it.itineraryId != tripId }
+                val remaining = _allTrips.value.filterNot { trip ->
+                    trip.itineraryId == tripKey.tripId && trip.ownerUid == tripKey.ownerUid
+                }
                 _allTrips.value = remaining
 
-                val tripRef = db.collection("users")
-                    .document(ownerUid)
-                    .collection("trips")
-                    .document(tripId)
-
-                val eventDocs = tripRef.collection("events").get().await().documents
-                eventDocs.forEach { eventDoc ->
-                    val optionDocs = eventDoc.reference.collection("options").get().await().documents
-                    optionDocs.forEach { it.reference.delete().await() }
-                    eventDoc.reference.delete().await()
+                tripRepository.deleteTrip(tripKey)
+                viewModelScope.launch(Dispatchers.IO) {
+                    runCatching {
+                        ImageCacheManager.deleteTripImages(getApplication(), tripKey.tripId)
+                    }.onFailure { error ->
+                        Log.w("CurrentTripViewModel", "Failed to clear cached trip media", error)
+                    }
                 }
-                tripRef.delete().await()
 
                 val nextTrip = remaining.firstOrNull {
                     !it.status.equals("archived", ignoreCase = true)
                 }
                 if (nextTrip != null) {
-                    fetchTrip(TripKey(ownerUid = uid, tripId = nextTrip.itineraryId))
+                    fetchTrip(TripKey(ownerUid = nextTrip.ownerUid, tripId = nextTrip.itineraryId))
                 } else {
                     resetTripState(infoMessage = NO_TRIP_MESSAGE)
                 }
@@ -933,7 +973,7 @@ class CurrentTripViewModel(application: Application) : AndroidViewModel(applicat
     }
 
     fun renameTrip(newName: String) {
-        val tripKey = currentTripWriteKey() ?: return
+        val tripKey = requireOwnerTripKey("rename this trip") ?: return
         val trimmed = newName.trim().ifBlank { return }
 
         _tripTitle.value = trimmed

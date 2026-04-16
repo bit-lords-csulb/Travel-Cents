@@ -22,6 +22,7 @@ import java.util.Locale
 @Composable
 fun CurrentTripOverlayHost(
     uiState: CurrentTripUiState,
+    canEditTrip: Boolean,
     eventOptions: Map<String, List<com.example.travelcents.data.trip.model.EventOption>>,
     rejectedOptions: Map<String, Set<String>>,
     yelpReviews: Map<String, List<com.example.travelcents.data.trip.model.YelpReview>>,
@@ -54,6 +55,7 @@ fun CurrentTripOverlayHost(
                 currentOptions = eventOptions[eventId].orEmpty(),
                 yelpReviews = yelpReviews[yelpId].orEmpty(),
                 reviewsLoading = reviewsLoading.contains(yelpId),
+                canEditTrip = canEditTrip,
                 onDismiss = { onSelectedEventIdChange(null) },
                 onEdit = {
                     onSelectedEventIdChange(null)
@@ -63,7 +65,7 @@ fun CurrentTripOverlayHost(
                     onSelectedEventIdChange(null)
                     onDeleteCandidateChange(event.toEditablePlan())
                 },
-                onAlternatives = if (eventOptions[eventId].orEmpty().size > 1) {
+                onAlternatives = if (canEditTrip && eventOptions[eventId].orEmpty().size > 1) {
                     {
                         onSelectedEventIdChange(null)
                         onOptionsPanelEventIdChange(eventId)
