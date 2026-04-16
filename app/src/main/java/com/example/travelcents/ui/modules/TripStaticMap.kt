@@ -16,7 +16,7 @@ fun TravelEvent.staticMapUrl(): String? = detailValue(ATTR_STATIC_MAP_URL)
 
 fun TravelEvent.staticMapModel(context: android.content.Context): String? {
     val url = staticMapUrl()?.takeIf { it.isNotBlank() } ?: return null
-    return ImageCacheManager.localPathForUrl(context, itineraryId, url) ?: url
+    return ImageCacheManager.resolveCachedMediaUrl(context, itineraryId, url)
 }
 
 suspend fun prefetchStaticMaps(
@@ -29,7 +29,7 @@ suspend fun prefetchStaticMaps(
             if (tripId.isBlank()) return@forEach
             val urls = tripEvents.mapNotNull { it.staticMapUrl()?.takeIf(String::isNotBlank) }
             if (urls.isNotEmpty()) {
-                ImageCacheManager.downloadTripImages(context, tripId, urls)
+                ImageCacheManager.cacheTripMedia(context, tripId, urls)
             }
         }
 }

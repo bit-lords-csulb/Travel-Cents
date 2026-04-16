@@ -188,17 +188,17 @@ Related plan: [EVENT_DETAILS_MEDIA_REFACTOR_PLAN.md](C:\Users\Zaher503\AndroidSt
 
 ### Checklist
 
-- [ ] Extend `ImageCacheManager.kt` to download lists of URLs, not just hero images
-- [ ] Decide URL-to-file naming strategy for gallery and static-map assets
-- [ ] Support local caching for:
-  - [ ] event hero images
-  - [ ] event gallery images
-  - [ ] option gallery images
-  - [ ] static map images
-- [ ] Ensure cache writes are idempotent
-- [ ] Ensure cache lookups prefer local files before remote URLs
-- [ ] Ensure local cache remains per-device only
-- [ ] Verify no shared logic assumes another device can use a saved local path
+- [x] Extend `ImageCacheManager.kt` to download lists of URLs, not just hero images
+- [x] Decide URL-to-file naming strategy for gallery and static-map assets
+- [x] Support local caching for:
+  - [x] event hero images
+  - [x] event gallery images
+  - [x] option gallery images
+  - [x] static map images
+- [x] Ensure cache writes are idempotent
+- [x] Ensure cache lookups prefer local files before remote URLs
+- [x] Ensure local cache remains per-device only
+- [x] Verify no shared logic assumes another device can use a saved local path
 
 ## Phase 7: Event Details UI Refactor
 

@@ -8,7 +8,7 @@ import androidx.compose.runtime.setValue
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.travelcents.data.media.ImageCacheManager
-import com.example.travelcents.data.media.selectedMediaUrls
+import com.example.travelcents.data.media.remoteMediaUrls
 import com.example.travelcents.data.trip.model.Itinerary
 import com.example.travelcents.data.trip.model.TravelEvent
 import com.example.travelcents.data.trip.model.TravelRequest
@@ -232,11 +232,11 @@ class NewTripViewModel(application: Application) : AndroidViewModel(application)
                     .map { it.imageUrl }
                 val selectedHotelGalleryUrls = allEvents
                     .filter { it.type.equals("hotel", ignoreCase = true) }
-                    .flatMap { it.selectedMediaUrls() }
+                    .flatMap { it.remoteMediaUrls() }
                 val mediaUrls = (heroImageUrls + selectedHotelGalleryUrls)
                     .filter { it.isNotBlank() }
                     .distinct()
-                val localPaths = ImageCacheManager.downloadTripImages(
+                val localPaths = ImageCacheManager.cacheTripMedia(
                     getApplication(),
                     itinerary.itineraryId,
                     mediaUrls
