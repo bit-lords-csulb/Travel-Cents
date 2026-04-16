@@ -15,14 +15,25 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.travelcents.data.trip.model.TravelEvent
 import com.example.travelcents.ui.modules.formatDisplayTime
+import java.time.ZoneId
+import java.time.ZonedDateTime
+import java.time.format.DateTimeFormatter
+import java.util.Locale
 
 @Composable
 fun FlightTimingCard(event: TravelEvent) {
     val departureDate = event.date.takeIf { it.isNotBlank() } ?: "Date TBD"
     val arrivalDate = event.details["arrival_date"]?.takeIf { it.isNotBlank() } ?: departureDate
+    val tzAbbr = timezoneAbbr(event.tz)
     DetailCardFrame(accent = CardSky) {
-        DetailCardHeader(eyebrow = "Timing", title = "Departure and arrival")
-        Spacer(modifier = Modifier.height(14.dp))
+        Text(
+            text = "TIMING",
+            color = CardTextMuted,
+            fontSize = 10.sp,
+            fontWeight = FontWeight.Bold,
+            letterSpacing = 1.8.sp
+        )
+        Spacer(modifier = Modifier.height(8.dp))
         Row(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.spacedBy(16.dp)
@@ -31,6 +42,7 @@ fun FlightTimingCard(event: TravelEvent) {
                 modifier = Modifier.weight(1f),
                 label = "Depart",
                 time = formatDisplayTime(event.startTime),
+                tzAbbr = tzAbbr,
                 date = departureDate,
                 alignEnd = false
             )
@@ -38,14 +50,14 @@ fun FlightTimingCard(event: TravelEvent) {
                 modifier = Modifier.weight(1f),
                 label = "Arrive",
                 time = formatDisplayTime(event.endTime),
+                tzAbbr = tzAbbr,
                 date = arrivalDate,
                 alignEnd = true
             )
         }
-        Spacer(modifier = Modifier.height(14.dp))
+        Spacer(modifier = Modifier.height(8.dp))
         DetailBadgeRow(
             badges = listOf(
-                eventDurationSummary(event),
                 event.details["trip_type"] ?: "",
                 event.details["stops"]?.takeIf { it.isNotBlank() }?.let { "$it stops" } ?: ""
             ),
@@ -59,12 +71,14 @@ private fun FlightTimeCell(
     modifier: Modifier,
     label: String,
     time: String,
+    tzAbbr: String?,
     date: String,
     alignEnd: Boolean
 ) {
+    val align = if (alignEnd) TextAlign.End else TextAlign.Start
     Column(
         modifier = modifier,
-        verticalArrangement = Arrangement.spacedBy(4.dp)
+        verticalArrangement = Arrangement.spacedBy(2.dp)
     ) {
         Text(
             text = label.uppercase(),
@@ -72,7 +86,7 @@ private fun FlightTimeCell(
             fontSize = 10.sp,
             fontWeight = FontWeight.Bold,
             letterSpacing = 1.4.sp,
-            textAlign = if (alignEnd) TextAlign.End else TextAlign.Start,
+            textAlign = align,
             modifier = Modifier.fillMaxWidth()
         )
         Text(
@@ -80,15 +94,37 @@ private fun FlightTimeCell(
             color = CardText,
             fontSize = 28.sp,
             fontWeight = FontWeight.ExtraBold,
-            textAlign = if (alignEnd) TextAlign.End else TextAlign.Start,
+            textAlign = align,
             modifier = Modifier.fillMaxWidth()
         )
+        if (tzAbbr != null) {
+            Text(
+                text = tzAbbr,
+                color = CardTextMuted.copy(alpha = 0.65f),
+                fontSize = 10.sp,
+                fontWeight = FontWeight.SemiBold,
+                letterSpacing = 0.8.sp,
+                textAlign = align,
+                modifier = Modifier.fillMaxWidth()
+            )
+        }
         Text(
             text = date,
             color = CardTextMuted,
-            fontSize = 12.sp,
-            textAlign = if (alignEnd) TextAlign.End else TextAlign.Start,
+            fontSize = 11.sp,
+            textAlign = align,
             modifier = Modifier.fillMaxWidth()
         )
+    }
+}
+
+private fun timezoneAbbr(tz: String): String? {
+    if (tz.isBlank()) return null
+    return try {
+        val zoneId = ZoneId.of(tz)
+        ZonedDateTime.now(zoneId)
+            .format(DateTimeFormatter.ofPattern("zzz", Locale.US))
+    } catch (e: Exception) {
+        tz.take(3).uppercase(Locale.US).ifBlank { null }
     }
 }

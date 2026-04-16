@@ -35,7 +35,7 @@ fun DetailBadgeRow(
                 fontWeight = FontWeight.SemiBold,
                 modifier = Modifier
                     .background(accent.copy(alpha = 0.14f), RoundedCornerShape(999.dp))
-                    .padding(horizontal = 10.dp, vertical = 6.dp)
+                    .padding(horizontal = 8.dp, vertical = 4.dp)
             )
         }
     }

@@ -28,7 +28,7 @@ fun DetailCardHeader(
     ) {
         Column(
             modifier = Modifier.weight(1f),
-            verticalArrangement = Arrangement.spacedBy(6.dp)
+            verticalArrangement = Arrangement.spacedBy(3.dp)
         ) {
             Text(
                 text = eyebrow.uppercase(),
@@ -40,8 +40,8 @@ fun DetailCardHeader(
             Text(
                 text = title,
                 color = CardText,
-                fontSize = 20.sp,
-                lineHeight = 24.sp,
+                fontSize = 18.sp,
+                lineHeight = 22.sp,
                 fontWeight = FontWeight.Bold
             )
         }
