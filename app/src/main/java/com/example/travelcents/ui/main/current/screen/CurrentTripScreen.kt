@@ -20,6 +20,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
+import com.example.travelcents.data.trip.TripPerformanceLogger
 import com.example.travelcents.ui.main.current.calendar.buildTripDateRange
 import com.example.travelcents.ui.main.current.header.CurrentTripHeader
 import com.example.travelcents.ui.modules.buildCalendarDates
@@ -107,6 +108,16 @@ fun CurrentTripScreen(
         if (yelpId != null) {
             viewModel.fetchYelpReviews(yelpId)
             viewModel.ensureYelpEventEnriched(event.eventId)
+        }
+    }
+
+    LaunchedEffect(uiState.isLoading, uiState.currentTripId, uiState.events.size) {
+        if (!uiState.isLoading && uiState.currentTripId != null) {
+            TripPerformanceLogger.recordFirstRender(
+                source = "CurrentTripScreen",
+                tripId = uiState.currentTripId,
+                eventCount = uiState.events.size
+            )
         }
     }
 

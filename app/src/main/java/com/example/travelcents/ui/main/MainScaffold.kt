@@ -17,6 +17,7 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import com.example.travelcents.ui.components.MainBottomNavBar
+import com.example.travelcents.data.trip.TripKey
 import com.example.travelcents.ui.main.aichat.AiTripChatPage
 import com.example.travelcents.ui.main.chats.chat.ChatsScreen
 import com.example.travelcents.ui.main.current.CurrentDisplayMode
@@ -98,9 +99,6 @@ fun MainScaffold(modifier: Modifier = Modifier, onLogout: () -> Unit = {}) {
     val currentRoute = navBackStackEntry?.destination?.route ?: MainRoutes.HOME
     val currentTopLevelRoute = selectedBottomRoute(currentRoute)
 
-    // Load trip once on mount so currentTripId is available before any tab is visited
-    LaunchedEffect(Unit) { currentTripViewModel.loadTrip() }
-
     Scaffold(
         modifier = modifier
             .fillMaxSize()
@@ -136,6 +134,9 @@ fun MainScaffold(modifier: Modifier = Modifier, onLogout: () -> Unit = {}) {
             ) {
                 composable(MainRoutes.CURRENT) {
                     LaunchedEffect(Unit) {
+                        if (currentTripViewModel.uiState.value.currentTripId == null) {
+                            currentTripViewModel.loadTrip()
+                        }
                         navController.navigate(MainRoutes.CURRENT_ITINERARY) {
                             popUpTo(MainRoutes.CURRENT) { inclusive = true }
                         }
@@ -243,6 +244,7 @@ fun MainScaffold(modifier: Modifier = Modifier, onLogout: () -> Unit = {}) {
                         modifier = Modifier.fillMaxSize(),
                         viewModel = newTripViewModel,
                         onTripReady = {
+                            currentTripViewModel.loadTrip()
                             navController.navigate(MainRoutes.CURRENT_ITINERARY) {
                                 popUpTo(MainRoutes.HOME) { inclusive = false }
                             }
@@ -263,7 +265,17 @@ fun MainScaffold(modifier: Modifier = Modifier, onLogout: () -> Unit = {}) {
                         }
                     )
                 }
-                composable(MainRoutes.CHATS) { ChatsScreen(modifier = Modifier.fillMaxSize()) }
+                composable(MainRoutes.CHATS) {
+                    ChatsScreen(
+                        modifier = Modifier.fillMaxSize(),
+                        onTripCardClick = { tripId, ownerUid ->
+                            currentTripViewModel.loadTrip(TripKey(ownerUid = ownerUid, tripId = tripId))
+                            navController.navigate(MainRoutes.CURRENT_ITINERARY) {
+                                launchSingleTop = true
+                            }
+                        }
+                    )
+                }
                 composable(MainRoutes.SETTINGS) {
                     SettingsPage(
                         modifier = Modifier.fillMaxSize(),
