@@ -20,3 +20,6 @@ local.properties
 .kotlin/
 plan.md
 .claude/settings.local.json
+analytics.settings
+__pycache__/
+.codex_tmp_signin_assets.zip
