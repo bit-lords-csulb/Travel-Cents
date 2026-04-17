@@ -50,6 +50,7 @@ import com.example.travelcents.ui.theme.DeepSea5
 @Composable
 fun CurrentTripWeekView(
     events: List<TravelEvent>,
+    canEditTrip: Boolean,
     sortedDates: List<String>,
     selectedDate: String,
     onDateSelected: (String) -> Unit,
@@ -89,7 +90,8 @@ fun CurrentTripWeekView(
                         date = date,
                         selected = date == selectedDate,
                         events = eventsForDate(events, date),
-                        canAddPlan = date in sortedDates,
+                        canAddPlan = canEditTrip && date in sortedDates,
+                        canEditTrip = canEditTrip,
                         onEventClick = onEventClick,
                         onDeleteClick = onDeleteClick,
                         onAddClick = { onCreatePlan(date, defaultStartMinutesForDate(events, date)) }
@@ -106,6 +108,7 @@ private fun WeekOverviewDayRow(
     selected: Boolean,
     events: List<TravelEvent>,
     canAddPlan: Boolean,
+    canEditTrip: Boolean,
     onEventClick: (TravelEvent) -> Unit,
     onDeleteClick: (TravelEvent) -> Unit,
     onAddClick: () -> Unit
@@ -167,6 +170,7 @@ private fun WeekOverviewDayRow(
                     WeekOverviewEventRow(
                         event = event,
                         date = date,
+                        canEditTrip = canEditTrip,
                         onClick = { onEventClick(event) },
                         onDeleteClick = { onDeleteClick(event) }
                     )
@@ -195,6 +199,7 @@ private fun WeekOverviewDayRow(
 private fun WeekOverviewEventRow(
     event: TravelEvent,
     date: String,
+    canEditTrip: Boolean,
     onClick: () -> Unit,
     onDeleteClick: () -> Unit
 ) {
@@ -237,16 +242,18 @@ private fun WeekOverviewEventRow(
             modifier = Modifier.weight(1f)
         )
 
-        IconButton(
-            onClick = onDeleteClick,
-            modifier = Modifier.size(20.dp)
-        ) {
-            Icon(
-                imageVector = Icons.Default.DeleteOutline,
-                contentDescription = "Delete plan",
-                tint = Color(0xFFE77D90),
-                modifier = Modifier.size(12.dp)
-            )
+        if (canEditTrip) {
+            IconButton(
+                onClick = onDeleteClick,
+                modifier = Modifier.size(20.dp)
+            ) {
+                Icon(
+                    imageVector = Icons.Default.DeleteOutline,
+                    contentDescription = "Delete plan",
+                    tint = Color(0xFFE77D90),
+                    modifier = Modifier.size(12.dp)
+                )
+            }
         }
     }
 }

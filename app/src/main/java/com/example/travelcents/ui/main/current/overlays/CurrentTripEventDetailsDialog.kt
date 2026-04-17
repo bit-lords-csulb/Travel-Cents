@@ -79,6 +79,8 @@ fun CurrentTripEventDetailsDialog(
     currentOptions: List<EventOption>,
     yelpReviews: List<YelpReview>,
     reviewsLoading: Boolean,
+    canEditTrip: Boolean,
+    canShowAlternatives: Boolean = currentOptions.size > 1,
     onDismiss: () -> Unit,
     onEdit: () -> Unit,
     onDelete: () -> Unit,
@@ -140,42 +142,44 @@ fun CurrentTripEventDetailsDialog(
                         )
                     }
 
-                    Box {
-                        IconButton(onClick = { menuExpanded = true }) {
-                            Icon(
-                                imageVector = Icons.Default.MoreVert,
-                                contentDescription = "More actions",
-                                tint = CardTextMuted
-                            )
-                        }
-                        DropdownMenu(
-                            expanded = menuExpanded,
-                            onDismissRequest = { menuExpanded = false },
-                            containerColor = CardSurface
-                        ) {
-                            DropdownMenuItem(
-                                text = { Text("Edit details", color = CardText) },
-                                onClick = {
-                                    menuExpanded = false
-                                    onEdit()
-                                }
-                            )
-                            if (onAlternatives != null && currentOptions.size > 1) {
+                    if (canEditTrip) {
+                        Box {
+                            IconButton(onClick = { menuExpanded = true }) {
+                                Icon(
+                                    imageVector = Icons.Default.MoreVert,
+                                    contentDescription = "More actions",
+                                    tint = CardTextMuted
+                                )
+                            }
+                            DropdownMenu(
+                                expanded = menuExpanded,
+                                onDismissRequest = { menuExpanded = false },
+                                containerColor = CardSurface
+                            ) {
                                 DropdownMenuItem(
-                                    text = { Text("Change option", color = CardText) },
+                                    text = { Text("Edit details", color = CardText) },
                                     onClick = {
                                         menuExpanded = false
-                                        onAlternatives()
+                                        onEdit()
+                                    }
+                                )
+                                if (onAlternatives != null && canShowAlternatives) {
+                                    DropdownMenuItem(
+                                        text = { Text("Change option", color = CardText) },
+                                        onClick = {
+                                            menuExpanded = false
+                                            onAlternatives()
+                                        }
+                                    )
+                                }
+                                DropdownMenuItem(
+                                    text = { Text("Delete plan", color = CardCoral) },
+                                    onClick = {
+                                        menuExpanded = false
+                                        onDelete()
                                     }
                                 )
                             }
-                            DropdownMenuItem(
-                                text = { Text("Delete plan", color = CardCoral) },
-                                onClick = {
-                                    menuExpanded = false
-                                    onDelete()
-                                }
-                            )
                         }
                     }
                 }
@@ -185,7 +189,7 @@ fun CurrentTripEventDetailsDialog(
                         .fillMaxSize()
                         .verticalScroll(rememberScrollState())
                         .padding(horizontal = 18.dp, vertical = 14.dp),
-                    verticalArrangement = Arrangement.spacedBy(16.dp)
+                    verticalArrangement = Arrangement.spacedBy(10.dp)
                 ) {
                     EventSummaryCard(
                         event = event,

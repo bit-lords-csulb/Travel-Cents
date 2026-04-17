@@ -7,14 +7,19 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
-import com.example.travelcents.data.media.ImageCacheManager
 import com.example.travelcents.data.media.remoteMediaUrls
+import com.example.travelcents.data.media.TripMediaCacheStore
+import com.example.travelcents.data.trip.TripKey
 import com.example.travelcents.data.trip.model.Itinerary
 import com.example.travelcents.data.trip.model.TravelEvent
 import com.example.travelcents.data.trip.model.TravelRequest
 import com.example.travelcents.data.trip.remote.SerpRepository
 import com.example.travelcents.data.ai.repository.TripPlannerRepository
 import com.example.travelcents.data.trip.remote.YelpRepository
+import com.example.travelcents.data.sync.TripSyncRemoteDataSource
+import com.example.travelcents.data.trip.model.YelpOptionPoolItem
+import com.example.travelcents.data.trip.model.YELP_POOL_TYPE_ACTIVITIES
+import com.example.travelcents.data.trip.model.YELP_POOL_TYPE_RESTAURANTS
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FirebaseFirestore
 import kotlinx.coroutines.async
@@ -161,22 +166,26 @@ class NewTripViewModel(application: Application) : AndroidViewModel(application)
                     ?: request.dateFrom
                 val minimumStartTime = minimumActivityStartTime(outboundFlight, request.dateFrom)
                 val tripDates = generateActivityDates(request.dateFrom, request.dateTo, flightArrivalDate)
+                val yelpOptionPools = linkedMapOf<String, List<YelpOptionPoolItem>>()
 
-                // Step 3: Yelp restaurants — paged pooled fetch sized to the itinerary.
-                // Each day keeps the full loaded pool as options, with its preferred 5-business chunk first.
+                // Step 3: Yelp restaurants — fetch a compact shared pool and only persist the selected daily event.
                 _generationStep.value = GenerationStep.FINDING_RESTAURANTS
                 _uiState.value = TripUiState.Loading(YELP_RESTAURANTS_MESSAGES.random())
                 val restaurantEvents = if (tripDates.isEmpty()) {
                     emptyList()
                 } else {
-                    val restaurantPoolTarget = tripDates.size * 5
-                    val restaurantPool = YelpRepository.fetchRestaurantPool(
+                    val restaurantPool = YelpRepository.mapBusinessesToPoolItems(
+                        YelpRepository.fetchRestaurantPool(
                         location = itinerary.destination,
-                        targetCount = restaurantPoolTarget
+                        targetCount = sharedYelpPoolTarget(tripDates.size)
+                        )
                     )
+                    if (restaurantPool.isNotEmpty()) {
+                        yelpOptionPools[YELP_POOL_TYPE_RESTAURANTS] = restaurantPool
+                    }
                     deferSyntheticEvents(
-                        YelpRepository.distributePoolToEvents(
-                        restaurantPool, tripDates, "restaurant", itinerary.itineraryId
+                        YelpRepository.distributePoolToSelectedEvents(
+                            restaurantPool, tripDates, "restaurant", itinerary.itineraryId
                         ),
                         flightArrivalDate,
                         minimumStartTime
@@ -192,11 +201,12 @@ class NewTripViewModel(application: Application) : AndroidViewModel(application)
                     activityEvents = emptyList()
                     localEvents = emptyList()
                 } else {
-                    val activityPoolTarget = tripDates.size * 5
                     val activityPoolDeferred = async {
-                        YelpRepository.fetchActivityPool(
+                        YelpRepository.mapBusinessesToPoolItems(
+                            YelpRepository.fetchActivityPool(
                             location = itinerary.destination,
-                            targetCount = activityPoolTarget
+                            targetCount = sharedYelpPoolTarget(tripDates.size)
+                            )
                         )
                     }
                     val yelpEventsDeferred = async {
@@ -207,9 +217,13 @@ class NewTripViewModel(application: Application) : AndroidViewModel(application)
                             itineraryId = itinerary.itineraryId
                         )
                     }
+                    val activityPool = activityPoolDeferred.await()
+                    if (activityPool.isNotEmpty()) {
+                        yelpOptionPools[YELP_POOL_TYPE_ACTIVITIES] = activityPool
+                    }
                     activityEvents = deferSyntheticEvents(
-                        YelpRepository.distributePoolToEvents(
-                            activityPoolDeferred.await(), tripDates, "activity", itinerary.itineraryId
+                        YelpRepository.distributePoolToSelectedEvents(
+                            activityPool, tripDates, "activity", itinerary.itineraryId
                         ),
                         flightArrivalDate,
                         minimumStartTime
@@ -236,10 +250,10 @@ class NewTripViewModel(application: Application) : AndroidViewModel(application)
                 val mediaUrls = (heroImageUrls + selectedHotelGalleryUrls)
                     .filter { it.isNotBlank() }
                     .distinct()
-                val localPaths = ImageCacheManager.cacheTripMedia(
-                    getApplication(),
-                    itinerary.itineraryId,
-                    mediaUrls
+                val localPaths = TripMediaCacheStore.cacheTripMedia(
+                    context = getApplication(),
+                    tripKey = TripKey(ownerUid = uid, tripId = itinerary.itineraryId),
+                    urls = mediaUrls
                 )
 
                 // Keep the remote hero URL intact and persist the local cache path separately.
@@ -251,7 +265,12 @@ class NewTripViewModel(application: Application) : AndroidViewModel(application)
                 // Step 6: Save to Firestore (events + options subcollection)
                 _generationStep.value = GenerationStep.SAVING
                 _uiState.value = TripUiState.Loading(FIRESTORE_MESSAGES.random())
-                saveToFirestore(uid, linkedItinerary, patchedEvents)
+                saveToFirestore(
+                    uid = uid,
+                    itinerary = linkedItinerary,
+                    events = patchedEvents,
+                    yelpOptionPools = yelpOptionPools
+                )
 
                 _generationStep.value = GenerationStep.COMPLETE
                 _uiState.value = TripUiState.Success(linkedItinerary, patchedEvents)
@@ -266,25 +285,16 @@ class NewTripViewModel(application: Application) : AndroidViewModel(application)
     private suspend fun saveToFirestore(
         uid: String,
         itinerary: Itinerary,
-        events: List<TravelEvent>
+        events: List<TravelEvent>,
+        yelpOptionPools: Map<String, List<YelpOptionPoolItem>>
     ) {
-        val db = FirebaseFirestore.getInstance()
-        val tripRef = db.collection("users").document(uid)
-            .collection("trips").document(itinerary.itineraryId)
-
-        tripRef.set(itinerary.toFirestoreMap()).await()
-
-        for (event in events) {
-            val eventRef = tripRef.collection("events").document(event.eventId)
-            eventRef.set(event.toFirestoreMap()).await()
-            // Options stored as subcollection: events/{eventId}/options/{optionId}
-            for (option in event.options) {
-                eventRef.collection("options")
-                    .document(option.optionId)
-                    .set(option.toMap())
-                    .await()
-            }
-        }
+        TripSyncRemoteDataSource(FirebaseFirestore.getInstance())
+            .createTrip(
+                ownerUid = uid,
+                itinerary = itinerary,
+                events = events,
+                yelpOptionPools = yelpOptionPools
+            )
     }
 
     fun resetState() {
@@ -375,6 +385,10 @@ class NewTripViewModel(application: Application) : AndroidViewModel(application)
     private fun parseTripTime(rawTime: String?): LocalTime? {
         val value = rawTime?.takeIf { it.isNotBlank() } ?: return null
         return runCatching { LocalTime.parse(value, TRIP_TIME_FORMATTER) }.getOrNull()
+    }
+
+    private fun sharedYelpPoolTarget(dayCount: Int): Int {
+        return (dayCount + 4).coerceIn(10, 15)
     }
 
     companion object {

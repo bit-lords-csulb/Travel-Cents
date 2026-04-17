@@ -12,6 +12,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.example.travelcents.data.trip.model.DETAIL_YELP_ID
 import com.example.travelcents.data.trip.model.displayName
 import com.example.travelcents.ui.theme.DeepSea2
 import com.example.travelcents.ui.theme.DeepSea3
@@ -22,8 +23,10 @@ import java.util.Locale
 @Composable
 fun CurrentTripOverlayHost(
     uiState: CurrentTripUiState,
+    canEditTrip: Boolean,
     eventOptions: Map<String, List<com.example.travelcents.data.trip.model.EventOption>>,
     rejectedOptions: Map<String, Set<String>>,
+    optionsLoading: Set<String>,
     yelpReviews: Map<String, List<com.example.travelcents.data.trip.model.YelpReview>>,
     reviewsLoading: Set<String>,
     shareTargets: List<ShareTarget>,
@@ -43,17 +46,22 @@ fun CurrentTripOverlayHost(
     onDeletePlan: (EditablePlan) -> Unit,
     onShareTrip: (ShareTarget) -> Unit,
     onSelectOption: (String, String) -> Unit,
-    onRejectOption: (String, String) -> Unit
+    onRejectOption: (String, String) -> Unit,
+    onLoadMoreOptions: (String) -> Unit
 ) {
     selectedEventId?.let { eventId ->
         val event = uiState.events.firstOrNull { it.eventId == eventId }
         if (event != null) {
             val yelpId = event.details["yelp_id"].orEmpty()
+            val canShowAlternatives = canEditTrip &&
+                (eventId !in eventOptions || eventOptions[eventId].orEmpty().size > 1)
             CurrentTripEventDetailsDialog(
                 event = event,
                 currentOptions = eventOptions[eventId].orEmpty(),
                 yelpReviews = yelpReviews[yelpId].orEmpty(),
                 reviewsLoading = reviewsLoading.contains(yelpId),
+                canEditTrip = canEditTrip,
+                canShowAlternatives = canShowAlternatives,
                 onDismiss = { onSelectedEventIdChange(null) },
                 onEdit = {
                     onSelectedEventIdChange(null)
@@ -63,7 +71,7 @@ fun CurrentTripOverlayHost(
                     onSelectedEventIdChange(null)
                     onDeleteCandidateChange(event.toEditablePlan())
                 },
-                onAlternatives = if (eventOptions[eventId].orEmpty().size > 1) {
+                onAlternatives = if (canShowAlternatives) {
                     {
                         onSelectedEventIdChange(null)
                         onOptionsPanelEventIdChange(eventId)
@@ -94,6 +102,8 @@ fun CurrentTripOverlayHost(
         CurrentPlanEditorDialog(
             initialPlan = plan,
             currentOptions = eventOptions[plan.eventId].orEmpty(),
+            canShowAlternatives = plan.eventId != null &&
+                (plan.eventId !in eventOptions || eventOptions[plan.eventId].orEmpty().size > 1),
             yelpReviews = yelpReviews[yelpId].orEmpty(),
             reviewsLoading = reviewsLoading.contains(yelpId),
             onDismiss = { onEditorPlanChange(null) },
@@ -117,6 +127,8 @@ fun CurrentTripOverlayHost(
         val options = eventOptions[eventId].orEmpty()
         val rejected = rejectedOptions[eventId].orEmpty()
         if (event != null) {
+            val canLoadMoreOptions = event.details[DETAIL_YELP_ID].orEmpty().isNotBlank() &&
+                event.type.lowercase(Locale.US) in setOf("restaurant", "dining", "food", "activity")
             val selectedNamesElsewhere = uiState.events
                 .filter { it.eventId != eventId && it.type.equals(event.type, ignoreCase = true) }
                 .mapNotNull { other ->
@@ -129,8 +141,14 @@ fun CurrentTripOverlayHost(
                 event = event,
                 options = options,
                 rejectedIds = rejected,
+                isLoading = eventId in optionsLoading,
                 onSelect = { optionId -> onSelectOption(eventId, optionId) },
                 onReject = { optionId -> onRejectOption(eventId, optionId) },
+                onLoadMore = if (canLoadMoreOptions) {
+                    { onLoadMoreOptions(eventId) }
+                } else {
+                    null
+                },
                 onDismiss = { onOptionsPanelEventIdChange(null) },
                 selectedNamesElsewhere = selectedNamesElsewhere
             )

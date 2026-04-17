@@ -44,6 +44,7 @@ fun EventsPage(
 ) {
     val events by viewModel.events.collectAsState()
     val isLoading by viewModel.isLoading.collectAsState()
+    val canWriteLinkedTrip by viewModel.canWriteLinkedTrip.collectAsState()
 
     LaunchedEffect(group) {
         viewModel.updateGroup(group)
@@ -141,10 +142,7 @@ fun EventsPage(
                 Spacer(modifier = Modifier.height(32.dp))
 
                 // Add to Itinerary button
-                val isTripOwner =
-                    group.linkedTripOwnerId.isEmpty() || group.linkedTripOwnerId == viewModel.currentUid
-
-                if (selectedTab == 0 && isTripOwner) {
+                if (selectedTab == 0 && canWriteLinkedTrip) {
                     Button(
                         onClick = {
                             viewModel.markEventAsWon(event)
@@ -322,10 +320,7 @@ fun EventsPage(
                             onDownvote = { viewModel.downvote(event) },
                             onCommentClick = { onEventClick(event) },
                             onLongPress = {
-                                eventToDelete = event.takeIf {
-                                    it.createdBy == viewModel.currentUid ||
-                                            group.linkedTripOwnerId == viewModel.currentUid
-                                }
+                                eventToDelete = event.takeIf(viewModel::canDeleteEvent)
                             }
                         )
                     }

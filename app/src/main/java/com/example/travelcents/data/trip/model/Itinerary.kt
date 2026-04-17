@@ -18,11 +18,21 @@ data class Itinerary(
     val createdAt: String,
     val status: String,
     val eventIds: List<String>,
-    val homeImageUrl: String = ""
+    val homeImageUrl: String = "",
+    val ownerUid: String = userId,
+    val memberUids: List<String> = listOf(ownerUid),
+    val roleByUid: Map<String, String> = mapOf(ownerUid to "owner"),
+    val accessSchemaVersion: Int = ACCESS_SCHEMA_VERSION,
+    val summaryVersion: Long = 0L,
+    val eventsVersion: Long = 0L,
+    val optionsVersion: Long = 0L,
+    val membersVersion: Long = 0L,
+    val updatedAtEpochMs: Long = 0L
 ) {
     fun toFirestoreMap(): Map<String, Any> = mapOf(
         "itineraryId" to itineraryId,
         "userId" to userId,
+        "ownerUid" to ownerUid,
         "tripName" to tripName,
         "destination" to destination,
         "origin" to origin,
@@ -38,8 +48,20 @@ data class Itinerary(
         "createdAt" to createdAt,
         "status" to status,
         "eventIds" to eventIds,
-        "homeImageUrl" to homeImageUrl
+        "homeImageUrl" to homeImageUrl,
+        "memberUids" to memberUids,
+        "roleByUid" to roleByUid,
+        "accessSchemaVersion" to accessSchemaVersion,
+        "summaryVersion" to summaryVersion,
+        "eventsVersion" to eventsVersion,
+        "optionsVersion" to optionsVersion,
+        "membersVersion" to membersVersion,
+        "updatedAtEpochMs" to updatedAtEpochMs
     )
+
+    companion object {
+        const val ACCESS_SCHEMA_VERSION = 1
+    }
 }
 
 

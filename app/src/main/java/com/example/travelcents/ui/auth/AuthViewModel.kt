@@ -6,6 +6,7 @@ import androidx.lifecycle.viewModelScope
 import com.example.travelcents.data.auth.AuthRepository
 import com.google.firebase.FirebaseNetworkException
 import com.google.firebase.FirebaseTooManyRequestsException
+import com.google.firebase.auth.FirebaseAuthException
 import com.google.firebase.auth.FirebaseAuthInvalidCredentialsException
 import com.google.firebase.auth.FirebaseAuthInvalidUserException
 import com.google.firebase.auth.FirebaseAuthUserCollisionException
@@ -182,11 +183,7 @@ class AuthViewModel : ViewModel() {
                 onFailure = { error ->
                     Log.e("AuthViewModel", "Google login failed", error)
                     _statusMessage.value = null
-                    _errorMessage.value = when (error) {
-                        is FirebaseNetworkException -> "Google sign-in needs a network connection."
-                        is FirebaseTooManyRequestsException -> "Too many sign-in attempts. Please try again later."
-                        else -> "Google login failed. Please try again."
-                    }
+                    _errorMessage.value = mapGoogleLoginError(error)
                 }
             )
         }
@@ -219,6 +216,24 @@ class AuthViewModel : ViewModel() {
                 "Network error. Please check your connection."
             else -> "Login failed. Please try again."
         }
+    }
+
+    private fun mapGoogleLoginError(error: Throwable): String = when (error) {
+        is FirebaseAuthInvalidCredentialsException ->
+            "Google sign-in is misconfigured for this app. Verify the web OAuth client, SHA fingerprints, and download a fresh google-services.json."
+        is FirebaseAuthException -> when (error.errorCode.uppercase()) {
+            "ERROR_OPERATION_NOT_ALLOWED" ->
+                "Google sign-in is disabled in Firebase Authentication."
+            "ERROR_ACCOUNT_EXISTS_WITH_DIFFERENT_CREDENTIAL" ->
+                "This email already exists with a different sign-in method."
+            "ERROR_INVALID_CREDENTIAL",
+            "ERROR_INVALID_IDP_RESPONSE" ->
+                "Google sign-in is misconfigured for this app. Verify the web OAuth client, SHA fingerprints, and download a fresh google-services.json."
+            else -> error.message ?: "Google login failed. Please try again."
+        }
+        is FirebaseNetworkException -> "Google sign-in needs a network connection."
+        is FirebaseTooManyRequestsException -> "Too many sign-in attempts. Please try again later."
+        else -> error.message ?: "Google login failed. Please try again."
     }
 }
 

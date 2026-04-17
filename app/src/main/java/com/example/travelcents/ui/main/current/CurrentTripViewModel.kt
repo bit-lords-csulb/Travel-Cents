@@ -4,29 +4,43 @@ import android.app.Application
 import android.util.Log
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
+import com.example.travelcents.data.media.TripMediaCacheStore
+import com.example.travelcents.data.local.trip.TravelCentsDatabase
+import com.example.travelcents.data.local.trip.TripLocalDataSource
+import com.example.travelcents.data.trip.FirestoreTripRepository
+import com.example.travelcents.data.trip.TripKey
+import com.example.travelcents.data.trip.TripAccessRole
+import com.example.travelcents.data.trip.TripPerformanceLogger
+import com.example.travelcents.data.trip.TripRepository
+import com.example.travelcents.data.trip.model.DETAIL_YELP_ID
 import com.example.travelcents.data.trip.model.EventOption
 import com.example.travelcents.data.trip.model.Itinerary
 import com.example.travelcents.data.trip.model.TravelEvent
+import com.example.travelcents.data.trip.model.YelpOptionPoolItem
 import com.example.travelcents.data.trip.model.YelpReview
+import com.example.travelcents.data.trip.model.detailValue
 import com.example.travelcents.data.trip.model.resolveTripName
+import com.example.travelcents.data.trip.model.YELP_POOL_TYPE_ACTIVITIES
+import com.example.travelcents.data.trip.model.YELP_POOL_TYPE_RESTAURANTS
 import com.example.travelcents.data.trip.remote.YelpRepository
+import com.example.travelcents.data.sync.CurrentTripSyncCoordinator
+import com.example.travelcents.data.sync.TripHydrationWorker
+import com.example.travelcents.data.sync.TripSyncCoordinator
+import com.example.travelcents.data.sync.TripSyncRemoteDataSource
 import com.example.travelcents.ui.modules.defaultPlanTimeZoneId
 import com.example.travelcents.ui.modules.normalizeDate
 import com.example.travelcents.ui.modules.normalizeTime
 import com.example.travelcents.ui.main.shared.TripMediaDetailPipeline
 import com.google.firebase.auth.FirebaseAuth
-import com.google.firebase.firestore.DocumentSnapshot
 import com.google.firebase.firestore.FieldPath
 import com.google.firebase.firestore.FieldValue
 import com.google.firebase.firestore.FirebaseFirestore
-import com.google.firebase.firestore.ListenerRegistration
-import com.google.firebase.firestore.Query
-import kotlinx.coroutines.async
-import kotlinx.coroutines.awaitAll
-import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.tasks.await
@@ -57,6 +71,11 @@ data class TripMemberUi(
 data class CurrentTripUiState(
     val isLoading: Boolean = true,
     val currentTripId: String? = null,
+    val currentTripOwnerUid: String? = null,
+    val viewerUid: String? = null,
+    val accessRole: TripAccessRole = TripAccessRole.VIEWER,
+    val canEditTrip: Boolean = false,
+    val canManageTrip: Boolean = false,
     val tripTitle: String = "Loading Trip...",
     val destination: String = "",
     val dateFrom: String = "",
@@ -69,7 +88,8 @@ data class CurrentTripUiState(
 data class ShareTarget(
     val id: String,
     val name: String,
-    val isGroup: Boolean
+    val isGroup: Boolean,
+    val memberUids: List<String> = emptyList()
 )
 
 class CurrentTripViewModel(application: Application) : AndroidViewModel(application) {
@@ -78,6 +98,8 @@ class CurrentTripViewModel(application: Application) : AndroidViewModel(applicat
         private const val DEFAULT_TRIP_TITLE = "Loading Trip..."
         private const val EMPTY_PLANS_MESSAGE = "No plans yet. Tap + to add one."
         private const val NO_TRIP_MESSAGE = "No trip found yet. Create one from the New Trip tab."
+        private const val SHARED_YELP_VISIBLE_OPTIONS = 5
+        private const val SHARED_YELP_POOL_EXPANSION_SIZE = 10
     }
 
     private val _events = MutableStateFlow<List<TravelEvent>>(emptyList())
@@ -98,6 +120,9 @@ class CurrentTripViewModel(application: Application) : AndroidViewModel(applicat
     private val _rejectedOptions = MutableStateFlow<Map<String, Set<String>>>(emptyMap())
     val rejectedOptions: StateFlow<Map<String, Set<String>>> = _rejectedOptions.asStateFlow()
 
+    private val _optionsLoading = MutableStateFlow<Set<String>>(emptySet())
+    val optionsLoading: StateFlow<Set<String>> = _optionsLoading.asStateFlow()
+
     private val _yelpReviews = MutableStateFlow<Map<String, List<YelpReview>>>(emptyMap())
     val yelpReviews: StateFlow<Map<String, List<YelpReview>>> = _yelpReviews.asStateFlow()
 
@@ -113,8 +138,32 @@ class CurrentTripViewModel(application: Application) : AndroidViewModel(applicat
 
     private val db = FirebaseFirestore.getInstance()
     private val auth = FirebaseAuth.getInstance()
-    private var eventsListener: ListenerRegistration? = null
+    private val tripRepository: TripRepository = FirestoreTripRepository(db)
+    private val tripLocalDataSource = TripLocalDataSource(TravelCentsDatabase.getInstance(application))
+    private val tripSyncRemoteDataSource = TripSyncRemoteDataSource(db)
+    private val tripSyncCoordinator = TripSyncCoordinator(
+        localDataSource = tripLocalDataSource,
+        remoteDataSource = tripSyncRemoteDataSource,
+        legacyRemoteRepository = tripRepository
+    )
+    private val currentTripSyncCoordinator = CurrentTripSyncCoordinator(
+        localDataSource = tripLocalDataSource,
+        remoteDataSource = tripSyncRemoteDataSource,
+        homeSyncCoordinator = tripSyncCoordinator,
+        legacyRemoteRepository = tripRepository
+    )
+    private var currentTripSummaryJob: Job? = null
+    private var currentTripEventsJob: Job? = null
+    private var currentTripMembersJob: Job? = null
+    private var currentTripOptionsJob: Job? = null
+    private var allTripsJob: Job? = null
+    private var allTripsObserverUid: String? = null
+    private var currentTripKey: TripKey? = null
+    private var currentTripSummary: Itinerary? = null
     private var currentTripDestination: String = ""
+    private var localEventsSnapshot: List<TravelEvent> = emptyList()
+    private val sharedYelpPools = mutableMapOf<String, List<YelpOptionPoolItem>>()
+    private val sharedYelpWindowBoost = mutableMapOf<String, Int>()
     private val mediaDetailPipeline = TripMediaDetailPipeline(application)
 
     private fun resetTripState(
@@ -123,14 +172,25 @@ class CurrentTripViewModel(application: Application) : AndroidViewModel(applicat
         infoMessage: String? = null,
         errorMessage: String? = null
     ) {
-        eventsListener?.remove()
-        eventsListener = null
+        currentTripSummaryJob?.cancel()
+        currentTripSummaryJob = null
+        currentTripEventsJob?.cancel()
+        currentTripEventsJob = null
+        currentTripMembersJob?.cancel()
+        currentTripMembersJob = null
+        currentTripOptionsJob?.cancel()
+        currentTripOptionsJob = null
+        currentTripKey = null
+        currentTripSummary = null
         currentTripDestination = ""
+        localEventsSnapshot = emptyList()
+        sharedYelpPools.clear()
+        sharedYelpWindowBoost.clear()
         _events.value = emptyList()
         _tripTitle.value = tripTitle
-        _allTrips.value = emptyList()
         _eventOptions.value = emptyMap()
         _rejectedOptions.value = emptyMap()
+        _optionsLoading.value = emptySet()
         _yelpReviews.value = emptyMap()
         _reviewsLoading.value = emptySet()
         _yelpEnrichmentInFlight.value = emptySet()
@@ -139,179 +199,224 @@ class CurrentTripViewModel(application: Application) : AndroidViewModel(applicat
         _uiState.value = CurrentTripUiState(
             isLoading = isLoading,
             tripTitle = tripTitle,
+            viewerUid = auth.currentUser?.uid,
             infoMessage = infoMessage,
             errorMessage = errorMessage
         )
     }
 
-    private fun fetchLatestItinerary(uid: String) {
-        db.collection("users").document(uid)
-            .collection("trips")
-            .orderBy("createdAt", Query.Direction.DESCENDING)
-            .get()
-            .addOnSuccessListener { tripSnapshot ->
-                val latestActiveTrip = tripSnapshot.documents.firstOrNull { document ->
-                    !document.getString("status").orEmpty().equals("archived", ignoreCase = true)
+    private fun observeCurrentTrip(
+        viewerUid: String,
+        tripKey: TripKey
+    ) {
+        currentTripKey = tripKey
+        TripPerformanceLogger.bindTrip(tripKey.tripId)
+        currentTripSummaryJob?.cancel()
+        currentTripSummaryJob = viewModelScope.launch {
+            tripLocalDataSource.observeTripSummary(viewerUid, tripKey).collect { itinerary ->
+                if (itinerary != null) {
+                    handleObservedTripSummary(tripKey, itinerary)
                 }
+            }
+        }
 
-                if (latestActiveTrip == null) {
-                    Log.d("CurrentTripViewModel", "No active trips found.")
-                    resetTripState(
-                        infoMessage = NO_TRIP_MESSAGE
-                    )
-                    return@addOnSuccessListener
+        currentTripEventsJob?.cancel()
+        currentTripEventsJob = viewModelScope.launch {
+            tripLocalDataSource.observeTripEvents(tripKey).collect { events ->
+                localEventsSnapshot = sortPlanEvents(events)
+                publishCurrentEvents(localEventsSnapshot, _eventOptions.value)
+            }
+        }
+
+        currentTripMembersJob?.cancel()
+        currentTripMembersJob = viewModelScope.launch {
+            tripLocalDataSource.observeTripMembers(tripKey).collect { members ->
+                _tripMembers.value = members
+                    .filterNot { member -> member.memberUid == tripKey.ownerUid && members.size == 1 }
+                    .map { member ->
+                        val displayName = member.displayName.ifBlank { member.memberUid }
+                        TripMemberUi(
+                            uid = member.memberUid,
+                            displayName = displayName,
+                            initial = displayName.firstOrNull { it.isLetter() } ?: '?'
+                        )
+                    }
+            }
+        }
+
+        currentTripOptionsJob?.cancel()
+        currentTripOptionsJob = viewModelScope.launch {
+            tripLocalDataSource.observeTripOptions(tripKey).collect { optionsByEvent ->
+                _eventOptions.value = optionsByEvent
+                _rejectedOptions.update { current ->
+                    current.filterKeys { key -> key in optionsByEvent || localEventsSnapshot.any { it.eventId == key } }
                 }
-
-                handleTripDocument(uid, latestActiveTrip)
+                publishCurrentEvents(localEventsSnapshot, optionsByEvent)
             }
-            .addOnFailureListener { e ->
-                Log.e("CurrentTripViewModel", "DATABASE ERROR: ${e.message}", e)
-                resetTripState(errorMessage = e.message ?: "Failed to load trip.")
-            }
+        }
     }
 
-    private fun fetchTrip(uid: String, tripId: String) {
-        db.collection("users").document(uid)
-            .collection("trips")
-            .document(tripId)
-            .get()
-            .addOnSuccessListener { document ->
-                if (!document.exists()) {
-                    resetTripState(infoMessage = "That trip is no longer available.")
-                    return@addOnSuccessListener
-                }
-
-                handleTripDocument(uid, document)
-            }
-            .addOnFailureListener { e ->
-                Log.e("CurrentTripViewModel", "DATABASE ERROR: ${e.message}", e)
-                resetTripState(errorMessage = e.message ?: "Failed to load trip.")
-            }
-    }
-
-    private fun handleTripDocument(uid: String, document: DocumentSnapshot) {
-        currentTripDestination = document.getString("destination") ?: ""
-        val storedTripTitle = document.getString("tripName")
+    private fun handleObservedTripSummary(
+        tripKey: TripKey,
+        itinerary: Itinerary
+    ) {
+        currentTripSummary = itinerary
+        currentTripDestination = itinerary.destination
+        val viewerUid = auth.currentUser?.uid
+        val accessRole = when {
+            viewerUid.isNullOrBlank() -> TripAccessRole.VIEWER
+            viewerUid == tripKey.ownerUid -> TripAccessRole.OWNER
+            else -> TripAccessRole.fromWireValue(itinerary.roleByUid[viewerUid])
+        }
+        val canEditTrip = accessRole.canMutateEvents()
+        val canManageTrip = accessRole.canManageTrip()
+        val storedTripTitle = itinerary.tripName
         val nextTripTitle = resolveTripName(storedTripTitle, currentTripDestination)
         _tripTitle.value = nextTripTitle
         _uiState.update {
             it.copy(
                 isLoading = false,
-                currentTripId = document.id,
+                currentTripId = tripKey.tripId,
+                currentTripOwnerUid = tripKey.ownerUid,
+                viewerUid = viewerUid,
+                accessRole = accessRole,
+                canEditTrip = canEditTrip,
+                canManageTrip = canManageTrip,
                 tripTitle = nextTripTitle,
                 destination = currentTripDestination,
-                dateFrom = document.getString("dateFrom") ?: "",
-                dateTo = document.getString("dateTo") ?: "",
-                infoMessage = null,
+                dateFrom = itinerary.dateFrom,
+                dateTo = itinerary.dateTo,
+                infoMessage = if (localEventsSnapshot.isEmpty()) EMPTY_PLANS_MESSAGE else null,
                 errorMessage = null
             )
         }
 
-        if (nextTripTitle != storedTripTitle.orEmpty().trim()) {
+        if (canManageTrip && nextTripTitle != storedTripTitle.trim()) {
             viewModelScope.launch {
                 runCatching {
-                    db.collection("users").document(uid)
-                        .collection("trips").document(document.id)
-                        .update("tripName", nextTripTitle)
-                        .await()
+                    tripSyncRemoteDataSource.updateTripSummaryFields(
+                        tripKey = tripKey,
+                        fields = mapOf("tripName" to nextTripTitle)
+                    )
                 }
             }
         }
-
-        listenToEvents(uid, document.id)
-        fetchTripMembers(document.id)
     }
 
-    private fun listenToEvents(uid: String, tripId: String) {
-        eventsListener?.remove()
-        eventsListener = db.collection("users").document(uid)
-            .collection("trips").document(tripId)
-            .collection("events")
-            .addSnapshotListener { snapshot, error ->
-                if (error != null) {
-                    Log.e("CurrentTripViewModel", "Listen failed.", error)
-                    _uiState.update { it.copy(errorMessage = error.message ?: "Failed to load plans.") }
-                    return@addSnapshotListener
-                }
-
-                val docs = snapshot?.documents ?: emptyList()
-                val fetchedEvents = docs.mapNotNull { doc ->
-                    val data = doc.data ?: return@mapNotNull null
-                    TravelEvent.fromFirestoreMap(
-                        map = data,
-                        documentId = doc.id,
-                        fallbackItineraryId = tripId
-                    )
-                }
-
-                val sortedEvents = sortPlanEvents(fetchedEvents)
-                _events.value = sortedEvents
-                _uiState.update {
-                    it.copy(
-                        isLoading = false,
-                        events = sortedEvents,
-                        infoMessage = when {
-                            sortedEvents.isEmpty() && it.infoMessage.isNullOrBlank() -> EMPTY_PLANS_MESSAGE
-                            sortedEvents.isNotEmpty() && it.infoMessage == EMPTY_PLANS_MESSAGE -> null
-                            else -> it.infoMessage
-                        },
-                        errorMessage = null
-                    )
-                }
-
-                viewModelScope.launch {
-                    val optionsByEvent = loadOptionsForEvents(uid, tripId, sortedEvents)
-                    val enrichedEvents = mediaDetailPipeline.applySelectedOptions(
-                        events = sortedEvents,
-                        optionsByEvent = optionsByEvent,
-                        sortEvents = ::sortPlanEvents
-                    )
-                    _eventOptions.value = optionsByEvent
-                    _rejectedOptions.update { current ->
-                        current.filterKeys { key -> optionsByEvent.containsKey(key) }
-                    }
-                    _events.value = enrichedEvents
-                    _uiState.update { state ->
-                        state.copy(events = enrichedEvents)
-                    }
-                    prefetchSharedEventMedia(enrichedEvents)
-                    prefetchYelpEnrichment(enrichedEvents)
-                }
-            }
+    private fun publishCurrentEvents(
+        baseEvents: List<TravelEvent>,
+        optionsByEvent: Map<String, List<EventOption>>
+    ) {
+        val alignedOptionsByEvent = alignEventOptionsWithSelectedState(baseEvents, optionsByEvent)
+        if (alignedOptionsByEvent != _eventOptions.value) {
+            _eventOptions.value = alignedOptionsByEvent
+        }
+        val enrichedEvents = mediaDetailPipeline.applySelectedOptions(
+            events = baseEvents,
+            optionsByEvent = alignedOptionsByEvent,
+            sortEvents = ::sortPlanEvents
+        )
+        _events.value = enrichedEvents
+        _uiState.update {
+            it.copy(
+                isLoading = currentTripSummary == null && enrichedEvents.isEmpty(),
+                events = enrichedEvents,
+                infoMessage = when {
+                    currentTripSummary == null -> it.infoMessage
+                    enrichedEvents.isEmpty() -> EMPTY_PLANS_MESSAGE
+                    it.infoMessage == EMPTY_PLANS_MESSAGE -> null
+                    else -> it.infoMessage
+                },
+                errorMessage = null
+            )
+        }
+        prefetchSharedEventMedia(enrichedEvents)
     }
 
-    private suspend fun loadOptionsForEvents(
-        uid: String,
-        tripId: String,
-        events: List<TravelEvent>
-    ): Map<String, List<EventOption>> = coroutineScope {
-        if (events.isEmpty()) return@coroutineScope emptyMap()
+    private fun alignEventOptionsWithSelectedState(
+        events: List<TravelEvent>,
+        optionsByEvent: Map<String, List<EventOption>>
+    ): Map<String, List<EventOption>> {
+        if (events.isEmpty() || optionsByEvent.isEmpty()) return optionsByEvent
 
-        events.map { event ->
-            async {
-                val options = db.collection("users")
-                    .document(uid)
-                    .collection("trips")
-                    .document(tripId)
-                    .collection("events")
-                    .document(event.eventId)
-                    .collection("options")
-                    .get()
-                    .await()
-                    .documents
-                    .map { doc ->
-                        val raw = doc.data ?: emptyMap()
-                        EventOption.fromMap(
-                            raw + mapOf(
-                                "optionId" to (raw["optionId"]?.toString() ?: doc.id),
-                                "eventId" to event.eventId
-                            )
-                        )
-                    }
-                    .sortedByDescending { it.selected }
-                event.eventId to options
+        var changed = false
+        val eventById = events.associateBy(TravelEvent::eventId)
+        val alignedOptions = optionsByEvent.mapValues { (eventId, options) ->
+            val event = eventById[eventId] ?: return@mapValues options
+            val selectedOptionId = event.selectedOptionId
+                .takeIf { it.isNotBlank() }
+                ?: event.detailValue(DETAIL_YELP_ID)?.takeIf { it.isNotBlank() }
+                ?: return@mapValues options
+
+            val normalizedOptions = options.map { option ->
+                option.copy(selected = option.optionId == selectedOptionId)
+            }.toMutableList()
+
+            if (normalizedOptions.none(EventOption::selected) && yelpPoolTypeForEvent(event) != null) {
+                normalizedOptions.add(
+                    index = 0,
+                    element = EventOption(
+                        optionId = selectedOptionId,
+                        eventId = eventId,
+                        source = "yelp",
+                        selected = true,
+                        imageUrl = event.imageUrl,
+                        localImagePath = event.localImagePath,
+                        photoUrls = event.photoUrls,
+                        details = event.details
+                    )
+                )
             }
-        }.awaitAll().toMap()
+
+            val dedupedOptions = normalizedOptions.distinctBy(EventOption::optionId)
+            if (dedupedOptions != options) changed = true
+            dedupedOptions
+        }
+
+        return if (changed) alignedOptions else optionsByEvent
+    }
+
+    private fun refreshCurrentTrip(
+        viewerUid: String,
+        tripKey: TripKey,
+        missingTripMessage: String = "That trip is no longer available."
+    ) {
+        viewModelScope.launch {
+            try {
+                val refreshedSummary = currentTripSyncCoordinator.refreshTrip(
+                    viewerUid = viewerUid,
+                    tripKey = tripKey
+                )
+                if (refreshedSummary == null) {
+                    resetTripState(infoMessage = missingTripMessage)
+                } else {
+                    TripHydrationWorker.enqueue(getApplication(), tripKey)
+                }
+            } catch (e: Exception) {
+                Log.e("CurrentTripViewModel", "DATABASE ERROR: ${e.message}", e)
+                if (currentTripSummary == null) {
+                    resetTripState(errorMessage = e.message ?: "Failed to load trip.")
+                } else {
+                    _uiState.update { it.copy(errorMessage = e.message ?: "Failed to refresh trip.") }
+                }
+            }
+        }
+    }
+
+    private fun refreshCurrentTripInBackground(tripKey: TripKey) {
+        val viewerUid = auth.currentUser?.uid ?: return
+        refreshCurrentTrip(viewerUid = viewerUid, tripKey = tripKey)
+    }
+
+    private fun refreshHomeTripCacheInBackground() {
+        val viewerUid = auth.currentUser?.uid ?: return
+        viewModelScope.launch {
+            runCatching {
+                tripSyncCoordinator.refreshHomeIfNeeded(viewerUid)
+            }.onFailure { error ->
+                Log.w("CurrentTripViewModel", "Failed to refresh local home trip cache", error)
+            }
+        }
     }
 
     fun clearMessages() {
@@ -323,12 +428,12 @@ class CurrentTripViewModel(application: Application) : AndroidViewModel(applicat
     }
 
     fun upsertPlan(plan: EditablePlan) {
-        val uid = auth.currentUser?.uid
-        val tripId = _uiState.value.currentTripId
-        if (uid == null || tripId.isNullOrBlank()) {
+        val tripKey = requireTripContributorKey("add or edit plans")
+        if (auth.currentUser?.uid == null) {
             postError("Create or load a trip before adding plans.")
             return
         }
+        if (tripKey == null) return
 
         viewModelScope.launch {
             try {
@@ -353,7 +458,7 @@ class CurrentTripViewModel(application: Application) : AndroidViewModel(applicat
                 val event = TravelEvent(
                     eventId = eventId,
                     type = plan.type,
-                    itineraryId = tripId,
+                    itineraryId = tripKey.tripId,
                     tz = plan.timeZoneId.trim().ifBlank { defaultPlanTimeZoneId() },
                     date = normalizeDate(plan.date),
                     startTime = normalizeTime(plan.startTime),
@@ -361,14 +466,15 @@ class CurrentTripViewModel(application: Application) : AndroidViewModel(applicat
                     details = mergedDetails
                 )
 
-                db.collection("users")
-                    .document(uid)
-                    .collection("trips")
-                    .document(tripId)
-                    .collection("events")
-                    .document(eventId)
-                    .set(event.toFirestoreMap())
-                    .await()
+                localEventsSnapshot = sortPlanEvents(
+                    localEventsSnapshot
+                        .filterNot { existing -> existing.eventId == eventId }
+                        .plus(event)
+                )
+                publishCurrentEvents(localEventsSnapshot, _eventOptions.value)
+                persistLocalTripSnapshot(events = localEventsSnapshot)
+                tripSyncRemoteDataSource.upsertEvent(tripKey = tripKey, event = event)
+                refreshCurrentTripInBackground(tripKey)
 
                 _uiState.update {
                     it.copy(
@@ -384,25 +490,31 @@ class CurrentTripViewModel(application: Application) : AndroidViewModel(applicat
     }
 
     fun deletePlan(plan: EditablePlan) {
-        val uid = auth.currentUser?.uid
-        val tripId = _uiState.value.currentTripId
+        val tripKey = requireTripContributorKey("delete plans")
         val eventId = plan.eventId
 
-        if (uid == null || tripId.isNullOrBlank() || eventId.isNullOrBlank()) {
+        if (auth.currentUser?.uid == null || eventId.isNullOrBlank()) {
             postError("This plan cannot be deleted yet.")
             return
         }
+        if (tripKey == null) return
 
         viewModelScope.launch {
             try {
-                db.collection("users")
-                    .document(uid)
-                    .collection("trips")
-                    .document(tripId)
-                    .collection("events")
-                    .document(eventId)
-                    .delete()
-                    .await()
+                localEventsSnapshot = sortPlanEvents(
+                    localEventsSnapshot.filterNot { existing -> existing.eventId == eventId }
+                )
+                val updatedOptions = _eventOptions.value - eventId
+                _eventOptions.value = updatedOptions
+                _rejectedOptions.update { current -> current - eventId }
+                publishCurrentEvents(localEventsSnapshot, updatedOptions)
+                persistLocalTripSnapshot(
+                    events = localEventsSnapshot,
+                    options = updatedOptions,
+                    persistOptions = true
+                )
+                tripSyncRemoteDataSource.deleteEvent(tripKey = tripKey, eventId = eventId)
+                refreshCurrentTripInBackground(tripKey)
 
                 _uiState.update {
                     it.copy(
@@ -432,8 +544,7 @@ class CurrentTripViewModel(application: Application) : AndroidViewModel(applicat
         eventId: String,
         forceRefresh: Boolean = false
     ) {
-        val uid = auth.currentUser?.uid ?: return
-        val tripId = _uiState.value.currentTripId ?: return
+        val tripKey = currentTripWriteKeyIfOwner() ?: return
         val event = _uiState.value.events.firstOrNull { it.eventId == eventId } ?: return
         val options = _eventOptions.value[eventId].orEmpty()
         val yelpId = mediaDetailPipeline.yelpEnrichmentTargetId(
@@ -445,6 +556,10 @@ class CurrentTripViewModel(application: Application) : AndroidViewModel(applicat
             ?: return
 
         _yelpEnrichmentInFlight.update { it + yelpId }
+        TripPerformanceLogger.recordYelpEnrichmentAttempt(
+            source = "CurrentTripViewModel.ensureYelpEventEnriched",
+            detail = "tripId=${tripKey.tripId} eventId=$eventId type=${event.type}"
+        )
         viewModelScope.launch {
             try {
                 val result = YelpRepository.enrichYelpBackedEvent(
@@ -454,18 +569,12 @@ class CurrentTripViewModel(application: Application) : AndroidViewModel(applicat
                 ) ?: return@launch
 
                 applyEnrichedEventState(eventId, result.event, result.options)
-                persistYelpEnrichment(uid, tripId, eventId, result)
+                persistYelpEnrichment(tripKey, eventId, result)
             } catch (e: Exception) {
                 Log.e("CurrentTripViewModel", "Failed to enrich Yelp event", e)
             } finally {
                 _yelpEnrichmentInFlight.update { it - yelpId }
             }
-        }
-    }
-
-    private fun prefetchYelpEnrichment(events: List<TravelEvent>) {
-        events.forEach { event ->
-            ensureYelpEventEnriched(event.eventId)
         }
     }
 
@@ -476,76 +585,301 @@ class CurrentTripViewModel(application: Application) : AndroidViewModel(applicat
     ) {
         val mergedEvent = mediaDetailPipeline.mergeEventWithOptions(enrichedEvent, enrichedOptions)
 
-        val updatedEvents = sortPlanEvents(
-            _uiState.value.events.map { event ->
+        localEventsSnapshot = sortPlanEvents(
+            localEventsSnapshot.map { event ->
                 if (event.eventId == eventId) mergedEvent else event
             }
         )
 
-        _eventOptions.update { it + (eventId to enrichedOptions) }
-        _events.value = updatedEvents
-        _uiState.update { it.copy(events = updatedEvents) }
+        val updatedOptions = _eventOptions.value + (eventId to enrichedOptions)
+        _eventOptions.value = updatedOptions
+        publishCurrentEvents(localEventsSnapshot, updatedOptions)
+        persistLocalTripSnapshot(
+            events = localEventsSnapshot,
+            options = updatedOptions,
+            persistOptions = true
+        )
     }
 
     private suspend fun persistYelpEnrichment(
-        uid: String,
-        tripId: String,
+        tripKey: TripKey,
         eventId: String,
         result: YelpRepository.YelpEventEnrichmentResult
     ) {
-        val eventRef = db.collection("users")
-            .document(uid)
-            .collection("trips")
-            .document(tripId)
-            .collection("events")
-            .document(eventId)
-
-        db.runBatch { batch ->
-            batch.set(eventRef, result.event.toFirestoreMap())
-            result.options
-                .filter { it.optionId in result.updatedOptionIds }
-                .forEach { option ->
-                    batch.set(
-                        eventRef.collection("options").document(option.optionId),
-                        option.toMap()
-                    )
-                }
-        }.await()
+        val shouldPersistEventOnly = yelpPoolTypeForEvent(result.event) != null &&
+            result.event.selectedOptionId.isNotBlank()
+        if (shouldPersistEventOnly) {
+            tripSyncRemoteDataSource.upsertEvent(
+                tripKey = tripKey,
+                event = result.event
+            )
+        } else {
+            tripSyncRemoteDataSource.persistEventAndOptions(
+                tripKey = tripKey,
+                eventId = eventId,
+                event = result.event,
+                options = result.options,
+                updatedOptionIds = result.updatedOptionIds
+            )
+        }
+        persistLocalTripSnapshot(
+            tripKey = tripKey,
+            events = localEventsSnapshot,
+            options = _eventOptions.value,
+            persistOptions = !shouldPersistEventOnly
+        )
+        refreshCurrentTripInBackground(tripKey)
     }
 
-    private fun fetchTripMembers(tripId: String) {
+    fun ensureEventOptionsLoaded(eventId: String) {
+        val tripKey = currentTripKey ?: return
+        val summary = currentTripSummary ?: return
         viewModelScope.launch {
+            if (eventId in _optionsLoading.value) return@launch
+            if (_eventOptions.value[eventId].orEmpty().isNotEmpty()) return@launch
             try {
-                val groupDocs = db.collection("groups")
-                    .whereEqualTo("linkedTripId", tripId)
-                    .get()
-                    .await()
-                    .documents
-
-                val memberUids = groupDocs.firstOrNull()
-                    ?.let { doc ->
-                        @Suppress("UNCHECKED_CAST")
-                        (doc.get("members") as? List<*>)?.filterIsInstance<String>()
+                _optionsLoading.update { it + eventId }
+                val event = localEventsSnapshot.firstOrNull { it.eventId == eventId }
+                    ?: _uiState.value.events.firstOrNull { it.eventId == eventId }
+                if (event != null) {
+                    val sharedYelpOptions = loadSharedYelpOptions(tripKey, event)
+                    if (sharedYelpOptions != null) {
+                        val updatedOptions = _eventOptions.value + (eventId to sharedYelpOptions)
+                        _eventOptions.value = updatedOptions
+                        publishCurrentEvents(localEventsSnapshot, updatedOptions)
+                        return@launch
                     }
-                    .orEmpty()
+                }
 
-                if (memberUids.isEmpty()) {
-                    _tripMembers.value = emptyList()
+                val localVersion = tripLocalDataSource.getTripOptionsVersionGroup(tripKey)
+                if (localVersion != null && localVersion == summary.optionsVersion) {
                     return@launch
                 }
 
-                val nameMap = fetchUserNames(memberUids)
-                _tripMembers.value = memberUids.mapNotNull { uid ->
-                    val name = nameMap[uid] ?: return@mapNotNull null
-                    TripMemberUi(
-                        uid = uid,
-                        displayName = name,
-                        initial = name.firstOrNull { it.isLetter() } ?: '?'
+                currentTripSyncCoordinator.hydrateOptionsIfNeeded(
+                    tripKey = tripKey,
+                    expectedOptionsVersion = summary.optionsVersion
+                )
+            } catch (e: Exception) {
+                Log.e("CurrentTripViewModel", "Failed to load options", e)
+                _uiState.update { it.copy(errorMessage = e.message ?: "Failed to load options.") }
+            } finally {
+                _optionsLoading.update { it - eventId }
+            }
+        }
+    }
+
+    private suspend fun loadSharedYelpOptions(
+        tripKey: TripKey,
+        event: TravelEvent
+    ): List<EventOption>? {
+        val poolType = yelpPoolTypeForEvent(event) ?: return null
+        val initialPoolItems = sharedYelpPools[poolType] ?: tripSyncRemoteDataSource
+            .fetchYelpOptionPool(tripKey, poolType)
+            .also { items ->
+                if (items.isNotEmpty()) {
+                    sharedYelpPools[poolType] = items
+                }
+            }
+
+        if (initialPoolItems.isEmpty()) return null
+
+        val poolItems = maybeExpandSharedYelpPool(
+            tripKey = tripKey,
+            event = event,
+            poolType = poolType,
+            poolItems = initialPoolItems,
+            rejectedIds = _rejectedOptions.value[event.eventId].orEmpty()
+        )
+
+        return synthesizeSharedYelpOptions(
+            tripId = tripKey.tripId,
+            event = event,
+            poolItems = poolItems,
+            rejectedIds = _rejectedOptions.value[event.eventId].orEmpty()
+        )
+    }
+
+    private fun synthesizeSharedYelpOptions(
+        tripId: String,
+        event: TravelEvent,
+        poolItems: List<YelpOptionPoolItem>,
+        rejectedIds: Set<String>
+    ): List<EventOption> {
+        val selectedProviderId = event.selectedOptionId
+            .takeIf { it.isNotBlank() }
+            ?: event.detailValue(DETAIL_YELP_ID)
+        val orderedPool = YelpRepository.orderedPoolItemsForEvent(
+            pool = poolItems,
+            tripId = tripId,
+            eventId = event.eventId,
+            selectedProviderId = selectedProviderId
+        )
+
+        val orderedAlternatives = orderedPool.filterNot { item ->
+            item.providerId == selectedProviderId
+        }
+        val visibleAlternativeCount = SHARED_YELP_VISIBLE_OPTIONS +
+            rejectedIds.count { rejectedId -> orderedAlternatives.any { item -> item.providerId == rejectedId } } +
+            (sharedYelpWindowBoost[event.eventId] ?: 0)
+
+        val synthesizedOptions = orderedAlternatives
+            .take(visibleAlternativeCount)
+            .map { item ->
+                item.toEventOption(
+                    eventId = event.eventId,
+                    selected = false
+                )
+            }
+            .toMutableList()
+
+        if (!selectedProviderId.isNullOrBlank()) {
+            synthesizedOptions.add(
+                index = 0,
+                element = EventOption(
+                    optionId = selectedProviderId,
+                    eventId = event.eventId,
+                    source = "yelp",
+                    selected = true,
+                    imageUrl = event.imageUrl,
+                    localImagePath = event.localImagePath,
+                    photoUrls = event.photoUrls,
+                    details = event.details
+                )
+            )
+        }
+
+        return synthesizedOptions
+            .distinctBy(EventOption::optionId)
+            .map { option ->
+                option.copy(selected = option.optionId == selectedProviderId)
+            }
+    }
+
+    fun loadMoreOptions(eventId: String) {
+        val tripKey = currentTripKey ?: return
+        val event = localEventsSnapshot.firstOrNull { it.eventId == eventId }
+            ?: _uiState.value.events.firstOrNull { it.eventId == eventId }
+            ?: return
+        val poolType = yelpPoolTypeForEvent(event) ?: return
+        val poolItems = sharedYelpPools[poolType].orEmpty()
+        if (poolItems.isEmpty()) return
+
+        viewModelScope.launch {
+            if (eventId in _optionsLoading.value) return@launch
+            _optionsLoading.update { it + eventId }
+            try {
+                sharedYelpWindowBoost[eventId] =
+                    (sharedYelpWindowBoost[eventId] ?: 0) + SHARED_YELP_VISIBLE_OPTIONS
+                val expandedPool = maybeExpandSharedYelpPool(
+                    tripKey = tripKey,
+                    event = event,
+                    poolType = poolType,
+                    poolItems = poolItems,
+                    rejectedIds = _rejectedOptions.value[eventId].orEmpty()
+                )
+                val updatedOptions = synthesizeSharedYelpOptions(
+                    tripId = tripKey.tripId,
+                    event = event,
+                    poolItems = expandedPool,
+                    rejectedIds = _rejectedOptions.value[eventId].orEmpty()
+                )
+                val updatedOptionsByEvent = _eventOptions.value + (eventId to updatedOptions)
+                _eventOptions.value = updatedOptionsByEvent
+                publishCurrentEvents(localEventsSnapshot, updatedOptionsByEvent)
+            } catch (e: Exception) {
+                Log.w("CurrentTripViewModel", "Failed to load more shared Yelp options", e)
+            } finally {
+                _optionsLoading.update { it - eventId }
+            }
+        }
+    }
+
+    private suspend fun maybeExpandSharedYelpPool(
+        tripKey: TripKey,
+        event: TravelEvent,
+        poolType: String,
+        poolItems: List<YelpOptionPoolItem>,
+        rejectedIds: Set<String>
+    ): List<YelpOptionPoolItem> {
+        val selectedProviderId = event.selectedOptionId
+            .takeIf { it.isNotBlank() }
+            ?: event.detailValue(DETAIL_YELP_ID)
+        val currentAlternativeCount = poolItems.count { item ->
+            item.providerId != selectedProviderId
+        }
+        val requiredAlternativeCount = SHARED_YELP_VISIBLE_OPTIONS + rejectedIds.size
+        if (currentAlternativeCount >= requiredAlternativeCount) {
+            return poolItems
+        }
+
+        val location = currentTripDestination
+            .ifBlank { currentTripSummary?.destination.orEmpty() }
+            .ifBlank { return poolItems }
+        val additionalItems = YelpRepository.fetchAdditionalPoolItems(
+            location = location,
+            poolType = poolType,
+            existingProviderIds = poolItems.map(YelpOptionPoolItem::providerId).toSet(),
+            targetCount = maxOf(
+                SHARED_YELP_POOL_EXPANSION_SIZE,
+                requiredAlternativeCount - currentAlternativeCount
+            )
+        )
+        if (additionalItems.isEmpty()) return poolItems
+
+        val mergedItems = (poolItems + additionalItems).distinctBy(YelpOptionPoolItem::providerId)
+        tripSyncRemoteDataSource.upsertYelpOptionPoolItems(
+            tripKey = tripKey,
+            poolType = poolType,
+            items = additionalItems
+        )
+        sharedYelpPools[poolType] = mergedItems
+        return mergedItems
+    }
+
+    private fun yelpPoolTypeForEvent(event: TravelEvent): String? {
+        val yelpBusinessId = event.detailValue(DETAIL_YELP_ID)?.takeIf { it.isNotBlank() } ?: return null
+        if (yelpBusinessId.isBlank()) return null
+
+        return when (event.type.lowercase(Locale.US)) {
+            "restaurant", "dining", "food" -> YELP_POOL_TYPE_RESTAURANTS
+            "activity" -> YELP_POOL_TYPE_ACTIVITIES
+            else -> null
+        }
+    }
+
+    private fun persistLocalTripSnapshot(
+        tripKey: TripKey? = currentTripKey,
+        events: List<TravelEvent> = localEventsSnapshot,
+        options: Map<String, List<EventOption>> = _eventOptions.value,
+        persistOptions: Boolean = false
+    ) {
+        val resolvedTripKey = tripKey ?: return
+        val viewerUid = auth.currentUser?.uid ?: return
+        val summary = currentTripSummary ?: return
+        val updatedSummary = summary.copy(eventIds = events.map(TravelEvent::eventId))
+        currentTripSummary = updatedSummary
+        viewModelScope.launch {
+            runCatching {
+                tripLocalDataSource.upsertTripSummary(
+                    viewerUid = viewerUid,
+                    itinerary = updatedSummary,
+                    isCurrentCandidate = true
+                )
+                tripLocalDataSource.replaceTripEvents(
+                    tripKey = resolvedTripKey,
+                    events = events,
+                    eventVersionGroup = updatedSummary.eventsVersion.takeIf { it > 0 } ?: System.currentTimeMillis()
+                )
+                if (persistOptions) {
+                    tripLocalDataSource.replaceTripOptions(
+                        tripKey = resolvedTripKey,
+                        optionsByEvent = options,
+                        optionsVersionGroup = updatedSummary.optionsVersion.takeIf { it > 0 } ?: System.currentTimeMillis()
                     )
                 }
-            } catch (e: Exception) {
-                Log.d("CurrentTripViewModel", "Could not load trip members: ${e.message}")
-                _tripMembers.value = emptyList()
+            }.onFailure { error ->
+                Log.w("CurrentTripViewModel", "Failed to update local current-trip cache", error)
             }
         }
     }
@@ -561,10 +895,12 @@ class CurrentTripViewModel(application: Application) : AndroidViewModel(applicat
                     .await()
                     .documents
                     .map { doc ->
+                        val members = (doc.get("members") as? List<*>)?.filterIsInstance<String>().orEmpty()
                         ShareTarget(
                             id = doc.id,
                             name = doc.getString("name") ?: "Unnamed Group",
-                            isGroup = true
+                            isGroup = true,
+                            memberUids = members
                         )
                     }
 
@@ -582,10 +918,15 @@ class CurrentTripViewModel(application: Application) : AndroidViewModel(applicat
 
                 val userNames = fetchUserNames(chatEntries.map { it.second }.distinct())
                 val directTargets = chatEntries.map { (chatId, otherUid) ->
+                    val members = directChatDocs
+                        .firstOrNull { doc -> doc.id == chatId }
+                        ?.get("members")
+                        .let { raw -> (raw as? List<*>)?.filterIsInstance<String>().orEmpty() }
                     ShareTarget(
                         id = chatId,
                         name = userNames[otherUid] ?: "Unknown",
-                        isGroup = false
+                        isGroup = false,
+                        memberUids = members
                     )
                 }
 
@@ -614,13 +955,65 @@ class CurrentTripViewModel(application: Application) : AndroidViewModel(applicat
         }.toMap()
     }
 
+    private fun currentTripWriteKey(): TripKey? {
+        val tripId = _uiState.value.currentTripId ?: return null
+        val ownerUid = currentTripKey?.ownerUid ?: auth.currentUser?.uid ?: return null
+        return TripKey(ownerUid = ownerUid, tripId = tripId)
+    }
+
+    private fun currentTripWriteKeyIfOwner(): TripKey? {
+        val tripKey = currentTripWriteKey() ?: return null
+        return tripKey.takeIf { key -> key.ownerUid == auth.currentUser?.uid }
+    }
+
+    private fun currentTripWriteKeyIfContributor(): TripKey? {
+        return currentTripWriteKey()?.takeIf { _uiState.value.canEditTrip }
+    }
+
+    private fun requireTripContributorKey(action: String): TripKey? {
+        currentTripWriteKeyIfContributor()?.let { return it }
+        if (currentTripWriteKey() != null) {
+            postError("You do not have permission to $action.")
+        }
+        return null
+    }
+
+    private fun requireOwnerTripKey(action: String): TripKey? {
+        currentTripWriteKeyIfOwner()?.let { return it }
+        if (currentTripWriteKey() != null) {
+            postError("Only the trip owner can $action.")
+        }
+        return null
+    }
+
+    private fun resolveSenderDisplayName(): String {
+        val currentUser = auth.currentUser ?: return "Traveler"
+        val authDisplayName = currentUser.displayName?.trim().orEmpty()
+        if (authDisplayName.isNotBlank()) return authDisplayName
+
+        val emailDisplayName = currentUser.email
+            ?.substringBefore('@')
+            ?.replace('.', ' ')
+            ?.replace('_', ' ')
+            ?.trim()
+            .orEmpty()
+        if (emailDisplayName.isNotBlank()) return emailDisplayName
+
+        return "Traveler"
+    }
+
     fun shareTripToChat(target: ShareTarget) {
         val uid = auth.currentUser?.uid ?: return
-        val tripId = _uiState.value.currentTripId ?: return
+        val tripKey = requireOwnerTripKey("share this trip") ?: return
 
         viewModelScope.launch {
             try {
-                val senderName = fetchUserNames(listOf(uid))[uid] ?: "Traveler"
+                tripRepository.ensureTripAccess(
+                    key = tripKey,
+                    memberUids = target.memberUids
+                )
+
+                val senderName = resolveSenderDisplayName()
                 val container = if (target.isGroup) "groups" else "directChats"
                 val chatRef = db.collection(container).document(target.id)
                 val messageRef = chatRef.collection("messages").document()
@@ -631,8 +1024,8 @@ class CurrentTripViewModel(application: Application) : AndroidViewModel(applicat
                     "senderName" to senderName,
                     "timestamp" to FieldValue.serverTimestamp(),
                     "messageType" to "trip_card",
-                    "sharedTripId" to tripId,
-                    "ownerUid" to uid,
+                    "sharedTripId" to tripKey.tripId,
+                    "ownerUid" to tripKey.ownerUid,
                     "tripName" to _uiState.value.tripTitle,
                     "tripDestination" to currentTripDestination,
                     "tripDateFrom" to _uiState.value.dateFrom,
@@ -650,6 +1043,8 @@ class CurrentTripViewModel(application: Application) : AndroidViewModel(applicat
                         )
                     )
                 }.await()
+                refreshCurrentTripInBackground(tripKey)
+                refreshHomeTripCacheInBackground()
             } catch (e: Exception) {
                 Log.e("CurrentTripViewModel", "Failed to share trip", e)
                 _uiState.update { it.copy(errorMessage = e.message ?: "Failed to share trip.") }
@@ -658,60 +1053,128 @@ class CurrentTripViewModel(application: Application) : AndroidViewModel(applicat
     }
 
     fun selectOption(eventId: String, optionId: String) {
-        val uid = auth.currentUser?.uid ?: return
-        val tripId = _uiState.value.currentTripId ?: return
+        val tripKey = requireTripContributorKey("change selected options") ?: return
         val options = _eventOptions.value[eventId].orEmpty()
         val selectedOption = options.firstOrNull { it.optionId == optionId } ?: return
-        val event = _uiState.value.events.firstOrNull { it.eventId == eventId } ?: return
+        val event = localEventsSnapshot.firstOrNull { it.eventId == eventId }
+            ?: _uiState.value.events.firstOrNull { it.eventId == eventId }
+            ?: return
+        val isYelpSelectionEvent = selectedOption.source.equals("yelp", ignoreCase = true) &&
+            yelpPoolTypeForEvent(event) != null
 
-        val updatedOptions = options.map { it.copy(selected = it.optionId == optionId) }
+        val updatedOptions = options.map { option ->
+            option.copy(selected = option.optionId == optionId)
+                .scopedTo(
+                    ownerUid = tripKey.ownerUid,
+                    tripId = tripKey.tripId,
+                    eventId = eventId
+                )
+        }
         val updatedEvent = mediaDetailPipeline.mergeEventWithOptions(event, updatedOptions)
-        val updatedEvents = sortPlanEvents(
-            _uiState.value.events.map {
+        localEventsSnapshot = sortPlanEvents(
+            localEventsSnapshot.map {
                 if (it.eventId == eventId) updatedEvent else it
             }
         )
 
-        _eventOptions.update { it + (eventId to updatedOptions) }
+        val updatedOptionsByEvent = _eventOptions.value + (eventId to updatedOptions)
+        _eventOptions.value = updatedOptionsByEvent
         _rejectedOptions.update { current ->
             val nextRejected = current[eventId].orEmpty() - optionId
             current + (eventId to nextRejected)
         }
-        _events.value = updatedEvents
-        _uiState.update { it.copy(events = updatedEvents) }
+        publishCurrentEvents(localEventsSnapshot, updatedOptionsByEvent)
+        persistLocalTripSnapshot(
+            events = localEventsSnapshot,
+            options = updatedOptionsByEvent,
+            persistOptions = !isYelpSelectionEvent
+        )
         prefetchSharedEventMedia(listOf(updatedEvent))
 
         viewModelScope.launch {
             try {
-                val eventRef = db.collection("users")
-                    .document(uid)
-                    .collection("trips")
-                    .document(tripId)
-                    .collection("events")
-                    .document(eventId)
-
-                db.runBatch { batch ->
-                    batch.set(eventRef, updatedEvent.toFirestoreMap())
-                    updatedOptions.forEach { option ->
-                        batch.set(
-                            eventRef.collection("options").document(option.optionId),
-                            option.toMap()
-                        )
-                    }
-                }.await()
+                if (isYelpSelectionEvent) {
+                    tripSyncRemoteDataSource.upsertEvent(
+                        tripKey = tripKey,
+                        event = updatedEvent
+                    )
+                } else {
+                    tripSyncRemoteDataSource.persistEventAndOptions(
+                        tripKey = tripKey,
+                        eventId = eventId,
+                        event = updatedEvent,
+                        options = updatedOptions
+                    )
+                }
             } catch (e: Exception) {
                 Log.e("CurrentTripViewModel", "Failed to select option", e)
                 _uiState.update { it.copy(errorMessage = e.message ?: "Failed to update selection.") }
                 return@launch
             }
 
+            refreshCurrentTripInBackground(tripKey)
             ensureYelpEventEnriched(eventId)
         }
     }
 
     fun rejectOption(eventId: String, optionId: String) {
+        if (currentTripWriteKeyIfContributor() == null) {
+            postError("You do not have permission to change options.")
+            return
+        }
         _rejectedOptions.update { current ->
-            current + (eventId to (current[eventId].orEmpty() + optionId))
+            val updatedRejected = current[eventId].orEmpty() + optionId
+            val event = localEventsSnapshot.firstOrNull { it.eventId == eventId }
+                ?: _uiState.value.events.firstOrNull { it.eventId == eventId }
+            if (event != null) {
+                val poolType = yelpPoolTypeForEvent(event)
+                val poolItems = poolType?.let { sharedYelpPools[it] }.orEmpty()
+                if (poolItems.isNotEmpty()) {
+                    val updatedOptions = synthesizeSharedYelpOptions(
+                        tripId = currentTripKey?.tripId ?: event.itineraryId,
+                        event = event,
+                        poolItems = poolItems,
+                        rejectedIds = updatedRejected
+                    )
+                    _eventOptions.value = _eventOptions.value + (eventId to updatedOptions)
+                }
+            }
+            current + (eventId to updatedRejected)
+        }
+
+        val tripKey = currentTripKey ?: return
+        val event = localEventsSnapshot.firstOrNull { it.eventId == eventId }
+            ?: _uiState.value.events.firstOrNull { it.eventId == eventId }
+            ?: return
+        val poolType = yelpPoolTypeForEvent(event) ?: return
+        val poolItems = sharedYelpPools[poolType].orEmpty()
+        if (poolItems.isEmpty()) return
+
+        viewModelScope.launch {
+            if (eventId in _optionsLoading.value) return@launch
+            _optionsLoading.update { it + eventId }
+            try {
+                val expandedPool = maybeExpandSharedYelpPool(
+                    tripKey = tripKey,
+                    event = event,
+                    poolType = poolType,
+                    poolItems = poolItems,
+                    rejectedIds = _rejectedOptions.value[eventId].orEmpty()
+                )
+                val updatedOptions = synthesizeSharedYelpOptions(
+                    tripId = tripKey.tripId,
+                    event = event,
+                    poolItems = expandedPool,
+                    rejectedIds = _rejectedOptions.value[eventId].orEmpty()
+                )
+                val updatedOptionsByEvent = _eventOptions.value + (eventId to updatedOptions)
+                _eventOptions.value = updatedOptionsByEvent
+                publishCurrentEvents(localEventsSnapshot, updatedOptionsByEvent)
+            } catch (e: Exception) {
+                Log.w("CurrentTripViewModel", "Failed to expand shared Yelp options", e)
+            } finally {
+                _optionsLoading.update { it - eventId }
+            }
         }
     }
 
@@ -721,9 +1184,10 @@ class CurrentTripViewModel(application: Application) : AndroidViewModel(applicat
         startTime: String,
         notes: String
     ) {
-        val uid = auth.currentUser?.uid ?: return
-        val tripId = _uiState.value.currentTripId ?: return
-        val currentEvent = _uiState.value.events.firstOrNull { it.eventId == eventId } ?: return
+        val tripKey = requireTripContributorKey("edit plans") ?: return
+        val currentEvent = localEventsSnapshot.firstOrNull { it.eventId == eventId }
+            ?: _uiState.value.events.firstOrNull { it.eventId == eventId }
+            ?: return
 
         val updatedDetails = currentEvent.details.toMutableMap().apply {
             val trimmedTitle = title.trim()
@@ -745,24 +1209,16 @@ class CurrentTripViewModel(application: Application) : AndroidViewModel(applicat
             startTime = normalizeTime(startTime),
             details = updatedDetails
         )
-        val updatedEvents = sortPlanEvents(
-            _uiState.value.events.map { if (it.eventId == eventId) updatedEvent else it }
+        localEventsSnapshot = sortPlanEvents(
+            localEventsSnapshot.map { if (it.eventId == eventId) updatedEvent else it }
         )
-        _events.value = updatedEvents
-        _uiState.update { state ->
-            state.copy(events = updatedEvents)
-        }
+        publishCurrentEvents(localEventsSnapshot, _eventOptions.value)
+        persistLocalTripSnapshot(events = localEventsSnapshot)
 
         viewModelScope.launch {
             try {
-                db.collection("users")
-                    .document(uid)
-                    .collection("trips")
-                    .document(tripId)
-                    .collection("events")
-                    .document(eventId)
-                    .set(updatedEvent.toFirestoreMap())
-                    .await()
+                tripSyncRemoteDataSource.upsertEvent(tripKey = tripKey, event = updatedEvent)
+                refreshCurrentTripInBackground(tripKey)
             } catch (e: Exception) {
                 Log.e("CurrentTripViewModel", "Failed to patch event", e)
                 _uiState.update { it.copy(errorMessage = e.message ?: "Failed to save event changes.") }
@@ -776,7 +1232,7 @@ class CurrentTripViewModel(application: Application) : AndroidViewModel(applicat
         toDate: String,
         toIndex: Int
     ) {
-        val currentEvents = _uiState.value.events
+        val currentEvents = localEventsSnapshot
         val movingEvent = currentEvents.firstOrNull { it.eventId == eventId } ?: return
         val normalizedFromDate = normalizeDate(fromDate)
         val normalizedToDate = normalizeDate(toDate)
@@ -805,7 +1261,7 @@ class CurrentTripViewModel(application: Application) : AndroidViewModel(applicat
         val insertionIndex = toIndex.coerceIn(0, targetList.size)
         targetList.add(insertionIndex, movingEvent.copy(date = normalizedToDate))
 
-        val updatedEvents = grouped
+        localEventsSnapshot = grouped
             .toSortedMap(compareBy<String> { if (it.isBlank()) "9999-12-31" else it })
             .values
             .flatMap { dayEvents ->
@@ -818,13 +1274,11 @@ class CurrentTripViewModel(application: Application) : AndroidViewModel(applicat
                 }
             }
 
-        _events.value = updatedEvents
-        _uiState.update { it.copy(events = updatedEvents) }
+        publishCurrentEvents(localEventsSnapshot, _eventOptions.value)
     }
 
     fun persistEventPlacements(affectedDates: Set<String>) {
-        val uid = auth.currentUser?.uid ?: return
-        val tripId = _uiState.value.currentTripId ?: return
+        val tripKey = requireTripContributorKey("reorder plans") ?: return
         val normalizedDates = affectedDates.map(::normalizeDate).toSet()
         val affectedEvents = _uiState.value.events.filter { normalizeDate(it.date) in normalizedDates }
 
@@ -832,23 +1286,14 @@ class CurrentTripViewModel(application: Application) : AndroidViewModel(applicat
 
         viewModelScope.launch {
             try {
-                db.runBatch { batch ->
-                    affectedEvents.forEach { event ->
-                        val eventRef = db.collection("users")
-                            .document(uid)
-                            .collection("trips")
-                            .document(tripId)
-                            .collection("events")
-                            .document(event.eventId)
-                        batch.update(
-                            eventRef,
-                            mapOf(
-                                "date" to normalizeDate(event.date),
-                                "sortOrder" to (event.details["sortOrder"] ?: "0")
-                            )
-                        )
+                persistLocalTripSnapshot(events = localEventsSnapshot)
+                tripSyncRemoteDataSource.persistEventPlacements(
+                    tripKey = tripKey,
+                    events = affectedEvents.map { event ->
+                        event.copy(date = normalizeDate(event.date))
                     }
-                }.await()
+                )
+                refreshCurrentTripInBackground(tripKey)
             } catch (e: Exception) {
                 Log.e("CurrentTripViewModel", "Failed to persist placements", e)
                 _uiState.update { it.copy(errorMessage = e.message ?: "Failed to save event order.") }
@@ -859,30 +1304,40 @@ class CurrentTripViewModel(application: Application) : AndroidViewModel(applicat
     fun archiveTrip(tripId: String) {
         val uid = auth.currentUser?.uid ?: return
         val currentTripId = _uiState.value.currentTripId
+        val tripKey = requireOwnerTripKey("archive this trip") ?: return
+        if (tripKey.tripId != tripId) {
+            postError("Load the trip again before archiving it.")
+            return
+        }
 
         viewModelScope.launch {
             try {
-                db.collection("users")
-                    .document(uid)
-                    .collection("trips")
-                    .document(tripId)
-                    .update(
-                        mapOf(
-                            "status" to "archived",
-                            "archivedAt" to FieldValue.serverTimestamp()
-                        )
+                tripSyncRemoteDataSource.updateTripSummaryFields(
+                    tripKey = tripKey,
+                    fields = mapOf(
+                        "status" to "archived",
+                        "archivedAt" to FieldValue.serverTimestamp()
                     )
-                    .await()
+                )
 
                 _allTrips.update { trips ->
                     trips.map {
                         if (it.itineraryId == tripId) it.copy(status = "archived") else it
                     }
                 }
+                currentTripSummary = currentTripSummary?.copy(status = "archived")
+                currentTripSummary?.let { summary ->
+                    tripLocalDataSource.upsertTripSummary(
+                        viewerUid = uid,
+                        itinerary = summary,
+                        isCurrentCandidate = true
+                    )
+                }
                 _uiState.update { it.copy(infoMessage = "Trip archived.", errorMessage = null) }
+                refreshHomeTripCacheInBackground()
 
                 if (currentTripId == tripId) {
-                    fetchLatestItinerary(uid)
+                    loadTrip()
                 }
             } catch (e: Exception) {
                 Log.e("CurrentTripViewModel", "Failed to archive trip", e)
@@ -893,30 +1348,34 @@ class CurrentTripViewModel(application: Application) : AndroidViewModel(applicat
 
     fun deleteTrip(tripId: String) {
         val uid = auth.currentUser?.uid ?: return
+        val tripKey = requireOwnerTripKey("delete this trip") ?: return
+        if (tripKey.tripId != tripId) {
+            postError("Load the trip again before deleting it.")
+            return
+        }
 
         viewModelScope.launch {
             try {
-                val remaining = _allTrips.value.filter { it.itineraryId != tripId }
+                val remaining = _allTrips.value.filterNot { trip ->
+                    trip.itineraryId == tripKey.tripId && trip.ownerUid == tripKey.ownerUid
+                }
                 _allTrips.value = remaining
 
-                val tripRef = db.collection("users")
-                    .document(uid)
-                    .collection("trips")
-                    .document(tripId)
-
-                val eventDocs = tripRef.collection("events").get().await().documents
-                eventDocs.forEach { eventDoc ->
-                    val optionDocs = eventDoc.reference.collection("options").get().await().documents
-                    optionDocs.forEach { it.reference.delete().await() }
-                    eventDoc.reference.delete().await()
+                tripRepository.deleteTrip(tripKey)
+                viewModelScope.launch(Dispatchers.IO) {
+                    runCatching {
+                        TripMediaCacheStore.deleteTripMedia(getApplication(), tripKey)
+                    }.onFailure { error ->
+                        Log.w("CurrentTripViewModel", "Failed to clear cached trip media", error)
+                    }
                 }
-                tripRef.delete().await()
+                refreshHomeTripCacheInBackground()
 
                 val nextTrip = remaining.firstOrNull {
                     !it.status.equals("archived", ignoreCase = true)
                 }
                 if (nextTrip != null) {
-                    fetchTrip(uid, nextTrip.itineraryId)
+                    loadTrip(TripKey(ownerUid = nextTrip.ownerUid, tripId = nextTrip.itineraryId))
                 } else {
                     resetTripState(infoMessage = NO_TRIP_MESSAGE)
                 }
@@ -930,70 +1389,45 @@ class CurrentTripViewModel(application: Application) : AndroidViewModel(applicat
     fun loadAllTrips() {
         val uid = auth.currentUser?.uid ?: return
 
-        viewModelScope.launch {
-            try {
-                val docs = db.collection("users").document(uid)
-                    .collection("trips")
-                    .orderBy("createdAt", Query.Direction.DESCENDING)
-                    .get()
-                    .await()
-                    .documents
-
-                _allTrips.value = docs.mapNotNull { doc ->
-                    try {
-                        Itinerary(
-                            itineraryId = doc.id,
-                            userId = uid,
-                            tripName = resolveTripName(
-                                doc.getString("tripName"),
-                                doc.getString("destination") ?: ""
-                            ),
-                            destination = doc.getString("destination") ?: "",
-                            origin = doc.getString("origin") ?: "",
-                            originIata = doc.getString("originIata") ?: "",
-                            destinationIata = doc.getString("destinationIata") ?: "",
-                            dateFrom = doc.getString("dateFrom") ?: "",
-                            dateTo = doc.getString("dateTo") ?: "",
-                            durationDays = (doc.getLong("durationDays") ?: 0L).toInt(),
-                            currency = doc.getString("currency") ?: "USD",
-                            travelStyle = doc.getString("travelStyle") ?: "",
-                            adults = (doc.getLong("adults") ?: 1L).toInt(),
-                            children = (doc.getLong("children") ?: 0L).toInt(),
-                            createdAt = doc.getString("createdAt") ?: "",
-                            status = doc.getString("status") ?: "",
-                            eventIds = (doc.get("eventIds") as? List<*>)
-                                ?.filterIsInstance<String>() ?: emptyList(),
-                            homeImageUrl = doc.getString("homeImageUrl") ?: ""
-                        )
-                    } catch (e: Exception) {
-                        Log.e("CurrentTripViewModel", "Failed to parse trip ${doc.id}: ${e.message}", e)
-                        null
-                    }
+        if (allTripsObserverUid != uid || allTripsJob == null) {
+            allTripsJob?.cancel()
+            allTripsObserverUid = uid
+            allTripsJob = viewModelScope.launch {
+                tripLocalDataSource.observeHomeTripSummaries(uid).collect { trips ->
+                    _allTrips.value = trips
                 }
-            } catch (e: Exception) {
-                Log.e("CurrentTripViewModel", "Failed to load all trips", e)
-                _uiState.update { it.copy(errorMessage = e.message ?: "Failed to load trips.") }
             }
         }
+
+        refreshHomeTripCacheInBackground()
     }
 
     fun renameTrip(newName: String) {
-        val uid = auth.currentUser?.uid ?: return
-        val tripId = _uiState.value.currentTripId ?: return
+        val tripKey = requireOwnerTripKey("rename this trip") ?: return
         val trimmed = newName.trim().ifBlank { return }
+        val viewerUid = auth.currentUser?.uid ?: return
 
         _tripTitle.value = trimmed
         _uiState.update { it.copy(tripTitle = trimmed) }
         _allTrips.update { trips ->
-            trips.map { if (it.itineraryId == tripId) it.copy(tripName = trimmed) else it }
+            trips.map { if (it.itineraryId == tripKey.tripId) it.copy(tripName = trimmed) else it }
         }
 
         viewModelScope.launch {
             try {
-                db.collection("users").document(uid)
-                    .collection("trips").document(tripId)
-                    .update("tripName", trimmed)
-                    .await()
+                tripSyncRemoteDataSource.updateTripSummaryFields(
+                    tripKey = tripKey,
+                    fields = mapOf("tripName" to trimmed)
+                )
+                currentTripSummary = currentTripSummary?.copy(tripName = trimmed)
+                currentTripSummary?.let { summary ->
+                    tripLocalDataSource.upsertTripSummary(
+                        viewerUid = viewerUid,
+                        itinerary = summary,
+                        isCurrentCandidate = true
+                    )
+                }
+                refreshHomeTripCacheInBackground()
             } catch (e: Exception) {
                 Log.e("CurrentTripViewModel", "Failed to rename trip", e)
                 _uiState.update { it.copy(errorMessage = e.message ?: "Failed to rename trip.") }
@@ -1012,14 +1446,60 @@ class CurrentTripViewModel(application: Application) : AndroidViewModel(applicat
             return
         }
 
-        resetTripState(isLoading = true)
-        Log.d("CurrentTripViewModel", "UID found: $uid. Fetching trip: ${tripId ?: "Latest"}")
-
         if (tripId != null) {
-            fetchTrip(uid, tripId)
-        } else {
-            fetchLatestItinerary(uid)
+            loadTrip(TripKey(ownerUid = uid, tripId = tripId))
+            return
         }
+
+        resetTripState(isLoading = true)
+        Log.d("CurrentTripViewModel", "UID found: $uid. Fetching trip: Latest")
+        TripPerformanceLogger.beginTripLoad(
+            trigger = "load_latest_trip",
+            requestedTripId = null
+        )
+        viewModelScope.launch {
+            try {
+                val latestTripKey = currentTripSyncCoordinator.resolveLatestTripKey(uid)
+                if (latestTripKey == null) {
+                    Log.d("CurrentTripViewModel", "No active trips found.")
+                    resetTripState(infoMessage = NO_TRIP_MESSAGE)
+                    return@launch
+                }
+
+                observeCurrentTrip(uid, latestTripKey)
+                refreshCurrentTrip(
+                    viewerUid = uid,
+                    tripKey = latestTripKey,
+                    missingTripMessage = NO_TRIP_MESSAGE
+                )
+            } catch (e: Exception) {
+                Log.e("CurrentTripViewModel", "DATABASE ERROR: ${e.message}", e)
+                resetTripState(errorMessage = e.message ?: "Failed to load trip.")
+            }
+        }
+    }
+
+    fun loadTrip(tripKey: TripKey) {
+        val viewerUid = auth.currentUser?.uid
+        if (viewerUid == null) {
+            Log.e("CurrentTripViewModel", "UID is NULL. Firebase isn't ready yet.")
+            resetTripState(
+                infoMessage = "Log in to load your current trip."
+            )
+            return
+        }
+
+        resetTripState(isLoading = true)
+        Log.d(
+            "CurrentTripViewModel",
+            "Loading trip by key: ownerUid=${tripKey.ownerUid}, tripId=${tripKey.tripId}"
+        )
+        TripPerformanceLogger.beginTripLoad(
+            trigger = "load_trip_key",
+            requestedTripId = tripKey.tripId
+        )
+        observeCurrentTrip(viewerUid, tripKey)
+        refreshCurrentTrip(viewerUid = viewerUid, tripKey = tripKey)
     }
 
     private fun prefetchSharedEventMedia(events: List<TravelEvent>) {
@@ -1044,8 +1524,11 @@ class CurrentTripViewModel(application: Application) : AndroidViewModel(applicat
     }
 
     override fun onCleared() {
-        eventsListener?.remove()
-        eventsListener = null
+        currentTripSummaryJob?.cancel()
+        currentTripEventsJob?.cancel()
+        currentTripMembersJob?.cancel()
+        currentTripOptionsJob?.cancel()
+        allTripsJob?.cancel()
         super.onCleared()
     }
 }
