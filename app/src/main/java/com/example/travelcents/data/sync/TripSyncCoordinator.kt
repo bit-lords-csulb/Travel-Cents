@@ -7,8 +7,8 @@ import com.example.travelcents.data.trip.model.Itinerary
 import com.google.firebase.firestore.FirebaseFirestoreException
 
 class TripSyncCoordinator(
-    private val localDataSource: TripLocalDataSource,
-    private val remoteDataSource: TripSyncRemoteDataSource,
+    private val localDataSource: HomeSyncLocalStore,
+    private val remoteDataSource: HomeSyncRemoteSource,
     private val legacyRemoteRepository: TripRepository
 ) {
     suspend fun refreshHomeIfNeeded(viewerUid: String) {
