@@ -17,6 +17,34 @@ interface TripSummaryDao {
     )
     fun observeTripSummaries(viewerUid: String): Flow<List<TripSummaryEntity>>
 
+    @Query(
+        """
+        SELECT * FROM trip_summary
+        WHERE viewerUid = :viewerUid AND ownerUid = :ownerUid AND tripId = :tripId
+        LIMIT 1
+        """
+    )
+    fun observeTripSummary(viewerUid: String, ownerUid: String, tripId: String): Flow<TripSummaryEntity?>
+
+    @Query(
+        """
+        SELECT * FROM trip_summary
+        WHERE viewerUid = :viewerUid AND ownerUid = :ownerUid AND tripId = :tripId
+        LIMIT 1
+        """
+    )
+    suspend fun getTripSummary(viewerUid: String, ownerUid: String, tripId: String): TripSummaryEntity?
+
+    @Query(
+        """
+        SELECT * FROM trip_summary
+        WHERE viewerUid = :viewerUid AND LOWER(status) != 'archived'
+        ORDER BY isCurrentCandidate DESC, createdAt DESC, dateFrom DESC
+        LIMIT 1
+        """
+    )
+    suspend fun getLatestActiveTripSummary(viewerUid: String): TripSummaryEntity?
+
     @Query("SELECT COUNT(*) FROM trip_summary WHERE viewerUid = :viewerUid")
     suspend fun countTripSummaries(viewerUid: String): Int
 
@@ -43,6 +71,87 @@ interface TripSummaryDao {
         homeImageUrl: String,
         updatedAtEpochMs: Long
     )
+}
+
+@Dao
+interface TripEventDao {
+    @Query(
+        """
+        SELECT * FROM trip_event
+        WHERE ownerUid = :ownerUid AND tripId = :tripId
+        ORDER BY date ASC, startTime ASC, eventId ASC
+        """
+    )
+    fun observeTripEvents(ownerUid: String, tripId: String): Flow<List<TripEventEntity>>
+
+    @Query("SELECT COUNT(*) FROM trip_event WHERE ownerUid = :ownerUid AND tripId = :tripId")
+    suspend fun countForTrip(ownerUid: String, tripId: String): Int
+
+    @Query("SELECT eventId FROM trip_event WHERE ownerUid = :ownerUid AND tripId = :tripId")
+    suspend fun getEventIdsForTrip(ownerUid: String, tripId: String): List<String>
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun upsertAll(entities: List<TripEventEntity>)
+
+    @Query("DELETE FROM trip_event WHERE ownerUid = :ownerUid AND tripId = :tripId")
+    suspend fun deleteForTrip(ownerUid: String, tripId: String)
+}
+
+@Dao
+interface TripMemberDao {
+    @Query(
+        """
+        SELECT * FROM trip_member
+        WHERE ownerUid = :ownerUid AND tripId = :tripId
+        ORDER BY displayName ASC, memberUid ASC
+        """
+    )
+    fun observeTripMembers(ownerUid: String, tripId: String): Flow<List<TripMemberEntity>>
+
+    @Query("SELECT COUNT(*) FROM trip_member WHERE ownerUid = :ownerUid AND tripId = :tripId")
+    suspend fun countForTrip(ownerUid: String, tripId: String): Int
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun upsertAll(entities: List<TripMemberEntity>)
+
+    @Query("DELETE FROM trip_member WHERE ownerUid = :ownerUid AND tripId = :tripId")
+    suspend fun deleteForTrip(ownerUid: String, tripId: String)
+}
+
+@Dao
+interface EventOptionDao {
+    @Query(
+        """
+        SELECT * FROM event_option
+        WHERE ownerUid = :ownerUid AND tripId = :tripId
+        ORDER BY eventId ASC, selected DESC, optionId ASC
+        """
+    )
+    fun observeTripOptions(ownerUid: String, tripId: String): Flow<List<EventOptionEntity>>
+
+    @Query(
+        """
+        SELECT * FROM event_option
+        WHERE ownerUid = :ownerUid AND tripId = :tripId AND eventId = :eventId
+        ORDER BY selected DESC, optionId ASC
+        """
+    )
+    suspend fun getOptionsForEvent(ownerUid: String, tripId: String, eventId: String): List<EventOptionEntity>
+
+    @Query(
+        """
+        SELECT optionsVersionGroup FROM event_option
+        WHERE ownerUid = :ownerUid AND tripId = :tripId
+        LIMIT 1
+        """
+    )
+    suspend fun getTripOptionsVersionGroup(ownerUid: String, tripId: String): Long?
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun upsertAll(entities: List<EventOptionEntity>)
+
+    @Query("DELETE FROM event_option WHERE ownerUid = :ownerUid AND tripId = :tripId")
+    suspend fun deleteForTrip(ownerUid: String, tripId: String)
 }
 
 @Dao

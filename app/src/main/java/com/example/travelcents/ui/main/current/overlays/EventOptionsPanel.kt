@@ -145,6 +145,7 @@ fun EventOptionsPanel(
     event: TravelEvent,
     options: List<EventOption>,
     rejectedIds: Set<String>,
+    isLoading: Boolean = false,
     onSelect: (optionId: String) -> Unit,
     onReject: (optionId: String) -> Unit,
     onDismiss: () -> Unit,
@@ -226,11 +227,29 @@ fun EventOptionsPanel(
                                 .padding(horizontal = 20.dp, vertical = 24.dp),
                             contentAlignment = Alignment.Center
                         ) {
-                            Text(
-                                text = "No alternative options left for this slot.",
-                                color = OnSurfaceVar,
-                                fontSize = 12.sp
-                            )
+                            if (isLoading) {
+                                Column(
+                                    horizontalAlignment = Alignment.CenterHorizontally,
+                                    verticalArrangement = Arrangement.spacedBy(10.dp)
+                                ) {
+                                    CircularProgressIndicator(
+                                        color = typeColor,
+                                        strokeWidth = 2.dp,
+                                        modifier = Modifier.size(24.dp)
+                                    )
+                                    Text(
+                                        text = "Loading options...",
+                                        color = OnSurfaceVar,
+                                        fontSize = 12.sp
+                                    )
+                                }
+                            } else {
+                                Text(
+                                    text = "No alternative options left for this slot.",
+                                    color = OnSurfaceVar,
+                                    fontSize = 12.sp
+                                )
+                            }
                         }
                     }
                 } else {

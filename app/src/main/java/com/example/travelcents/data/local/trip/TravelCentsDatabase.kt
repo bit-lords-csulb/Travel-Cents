@@ -11,14 +11,20 @@ import androidx.room.TypeConverters
         TripSummaryEntity::class,
         UserStubEntity::class,
         SyncStateEntity::class,
-        AppStateEntity::class
+        AppStateEntity::class,
+        TripEventEntity::class,
+        TripMemberEntity::class,
+        EventOptionEntity::class
     ],
-    version = 2,
+    version = 3,
     exportSchema = false
 )
 @TypeConverters(TripLocalConverters::class)
 abstract class TravelCentsDatabase : RoomDatabase() {
     abstract fun tripSummaryDao(): TripSummaryDao
+    abstract fun tripEventDao(): TripEventDao
+    abstract fun tripMemberDao(): TripMemberDao
+    abstract fun eventOptionDao(): EventOptionDao
     abstract fun userStubDao(): UserStubDao
     abstract fun syncStateDao(): SyncStateDao
     abstract fun appStateDao(): AppStateDao

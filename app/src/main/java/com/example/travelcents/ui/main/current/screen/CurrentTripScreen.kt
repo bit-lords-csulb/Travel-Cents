@@ -42,6 +42,7 @@ fun CurrentTripScreen(
     val allTrips by viewModel.allTrips.collectAsState()
     val eventOptions by viewModel.eventOptions.collectAsState()
     val rejectedOptions by viewModel.rejectedOptions.collectAsState()
+    val optionsLoading by viewModel.optionsLoading.collectAsState()
     val yelpReviews by viewModel.yelpReviews.collectAsState()
     val reviewsLoading by viewModel.reviewsLoading.collectAsState()
     val shareTargets by viewModel.shareTargets.collectAsState()
@@ -103,6 +104,7 @@ fun CurrentTripScreen(
     }
 
     LaunchedEffect(editorPlan) {
+        editorPlan?.eventId?.let(viewModel::ensureEventOptionsLoaded)
         editorPlan?.existingDetails?.get("yelp_id")
             ?.takeIf { it.isNotBlank() }
             ?.let(viewModel::fetchYelpReviews)
@@ -115,6 +117,11 @@ fun CurrentTripScreen(
             viewModel.fetchYelpReviews(yelpId)
             viewModel.ensureYelpEventEnriched(event.eventId)
         }
+        event?.eventId?.let(viewModel::ensureEventOptionsLoaded)
+    }
+
+    LaunchedEffect(optionsPanelEventId) {
+        optionsPanelEventId?.let(viewModel::ensureEventOptionsLoaded)
     }
 
     LaunchedEffect(uiState.isLoading, uiState.currentTripId, uiState.events.size) {
@@ -312,6 +319,7 @@ fun CurrentTripScreen(
                 canEditTrip = uiState.canEditTrip,
                 eventOptions = eventOptions,
                 rejectedOptions = rejectedOptions,
+                optionsLoading = optionsLoading,
                 yelpReviews = yelpReviews,
                 reviewsLoading = reviewsLoading,
                 shareTargets = shareTargets,

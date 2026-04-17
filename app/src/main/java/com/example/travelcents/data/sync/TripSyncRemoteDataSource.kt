@@ -6,8 +6,10 @@ import com.example.travelcents.data.trip.model.EventOption
 import com.example.travelcents.data.trip.model.Itinerary
 import com.example.travelcents.data.trip.model.TravelEvent
 import com.example.travelcents.data.trip.model.resolveTripName
+import com.google.firebase.firestore.DocumentSnapshot
 import com.google.firebase.firestore.FieldValue
 import com.google.firebase.firestore.FirebaseFirestore
+import com.google.firebase.firestore.FirebaseFirestoreException
 import com.google.firebase.firestore.SetOptions
 import kotlinx.coroutines.tasks.await
 import kotlin.random.Random
@@ -16,6 +18,13 @@ data class TripManifestRemote(
     val manifestVersion: Long,
     val tripCount: Int,
     val latestActiveTripKey: TripKey?
+)
+
+data class RemoteTripMember(
+    val memberUid: String,
+    val role: String,
+    val displayName: String,
+    val avatarUrl: String
 )
 
 class TripSyncRemoteDataSource(
@@ -97,6 +106,89 @@ class TripSyncRemoteDataSource(
                 compareByDescending<Itinerary> { trip -> trip.createdAt }
                     .thenByDescending { trip -> trip.dateFrom }
             )
+    }
+
+    suspend fun fetchTripSummary(tripKey: TripKey): Itinerary? {
+        val snapshot = tripDocument(tripKey).get().await()
+        if (!snapshot.exists()) return null
+        return snapshot.toItinerary(ownerUid = tripKey.ownerUid)
+    }
+
+    suspend fun fetchTripEvents(tripKey: TripKey): List<TravelEvent> {
+        return tripDocument(tripKey)
+            .collection("events")
+            .get()
+            .await()
+            .documents
+            .mapNotNull { document ->
+                val data = document.data ?: return@mapNotNull null
+                TravelEvent.fromFirestoreMap(
+                    map = data,
+                    documentId = document.id,
+                    fallbackItineraryId = tripKey.tripId
+                )
+            }
+    }
+
+    suspend fun fetchTripMembers(tripKey: TripKey): List<RemoteTripMember> {
+        val snapshot = tripDocument(tripKey).get().await()
+        if (!snapshot.exists()) return emptyList()
+
+        val ownerUid = snapshot.getString("ownerUid").orEmpty().ifBlank { tripKey.ownerUid }
+        val memberUids = (snapshot.get("memberUids") as? List<*>)?.filterIsInstance<String>()
+            .orEmpty()
+            .ifEmpty { listOf(ownerUid) }
+        val roleByUid = (snapshot.get("roleByUid") as? Map<*, *>)
+            ?.mapNotNull { entry ->
+                val key = entry.key as? String ?: return@mapNotNull null
+                val value = entry.value as? String ?: return@mapNotNull null
+                key to value
+            }
+            ?.toMap()
+            .orEmpty()
+            .ifEmpty { mapOf(ownerUid to TripAccessRole.OWNER.wireValue) }
+
+        val nameMap = fetchUserProfileMap(memberUids)
+        return memberUids.map { memberUid ->
+            val profile = nameMap[memberUid]
+            RemoteTripMember(
+                memberUid = memberUid,
+                role = roleByUid[memberUid]
+                    ?: if (memberUid == ownerUid) TripAccessRole.OWNER.wireValue else TripAccessRole.VIEWER.wireValue,
+                displayName = profile?.first.orEmpty().ifBlank { memberUid },
+                avatarUrl = profile?.second.orEmpty()
+            )
+        }
+    }
+
+    suspend fun fetchTripOptionsBulk(tripKey: TripKey): Map<String, List<EventOption>> {
+        return runCatching {
+            db.collectionGroup("options")
+                .whereEqualTo("ownerUid", tripKey.ownerUid)
+                .whereEqualTo("tripId", tripKey.tripId)
+                .get()
+                .await()
+                .documents
+                .map { document ->
+                    val raw = document.data ?: emptyMap()
+                    EventOption.fromMap(
+                        raw + mapOf(
+                            "optionId" to (raw["optionId"]?.toString() ?: document.id),
+                            "eventId" to raw["eventId"]?.toString().orEmpty(),
+                            "tripId" to (raw["tripId"]?.toString().orEmpty().ifBlank { tripKey.tripId }),
+                            "ownerUid" to (raw["ownerUid"]?.toString().orEmpty().ifBlank { tripKey.ownerUid })
+                        )
+                    )
+                }
+                .groupBy { option -> option.eventId }
+                .filterKeys { eventId -> eventId.isNotBlank() }
+                .mapValues { (_, options) ->
+                    options.sortedByDescending { option -> option.selected }
+                }
+        }.getOrElse { error ->
+            if (!shouldFallbackOptionQuery(error)) throw error
+            fetchTripOptionsByEventFallback(tripKey)
+        }
     }
 
     suspend fun createTrip(ownerUid: String, itinerary: Itinerary, events: List<TravelEvent>) {
@@ -437,6 +529,69 @@ class TripSyncRemoteDataSource(
         ).await()
     }
 
+    private suspend fun fetchTripOptionsByEventFallback(
+        tripKey: TripKey
+    ): Map<String, List<EventOption>> {
+        val events = fetchTripEvents(tripKey)
+        return events.associate { event ->
+            val options = tripDocument(tripKey)
+                .collection("events")
+                .document(event.eventId)
+                .collection("options")
+                .get()
+                .await()
+                .documents
+                .map { document ->
+                    val raw = document.data ?: emptyMap()
+                    EventOption.fromMap(
+                        raw + mapOf(
+                            "optionId" to (raw["optionId"]?.toString() ?: document.id),
+                            "eventId" to (raw["eventId"]?.toString().orEmpty().ifBlank { event.eventId }),
+                            "tripId" to (raw["tripId"]?.toString().orEmpty().ifBlank { tripKey.tripId }),
+                            "ownerUid" to (raw["ownerUid"]?.toString().orEmpty().ifBlank { tripKey.ownerUid })
+                        )
+                    )
+                }
+                .sortedByDescending { option -> option.selected }
+            event.eventId to options
+        }
+    }
+
+    private suspend fun fetchUserProfileMap(
+        uids: List<String>
+    ): Map<String, Pair<String, String>> {
+        if (uids.isEmpty()) return emptyMap()
+
+        return uids.chunked(30).flatMap { chunk ->
+            db.collection("users")
+                .whereIn(com.google.firebase.firestore.FieldPath.documentId(), chunk)
+                .get()
+                .await()
+                .documents
+                .map { document ->
+                    val firstName = document.getString("firstName").orEmpty()
+                    val lastName = document.getString("lastName").orEmpty()
+                    val displayName = "$firstName $lastName".trim()
+                        .ifBlank { document.getString("username").orEmpty() }
+                        .ifBlank { document.id }
+                    val avatarUrl = document.getString("profileImageUrl").orEmpty()
+                    document.id to (displayName to avatarUrl)
+                }
+        }.toMap()
+    }
+
+    private fun shouldFallbackOptionQuery(error: Throwable): Boolean {
+        val firestoreError = error as? FirebaseFirestoreException
+        if (firestoreError?.code == FirebaseFirestoreException.Code.FAILED_PRECONDITION) {
+            return true
+        }
+
+        val message = error.message.orEmpty().lowercase()
+        return "collection_group_contains" in message ||
+            "collections_group_contains" in message ||
+            "requires an index" in message
+    }
+
     private fun buildTripRefMap(
         snapshot: Map<String, Any>,
         ownerUid: String,
@@ -517,4 +672,50 @@ class TripSyncRemoteDataSource(
     private fun eventDocument(tripKey: TripKey, eventId: String) = tripDocument(tripKey)
         .collection("events")
         .document(eventId)
+
+    private fun DocumentSnapshot.toItinerary(ownerUid: String): Itinerary? {
+        return runCatching {
+            Itinerary(
+                itineraryId = id,
+                userId = ownerUid,
+                tripName = resolveTripName(
+                    getString("tripName"),
+                    getString("destination") ?: ""
+                ),
+                destination = getString("destination") ?: "",
+                origin = getString("origin") ?: "",
+                originIata = getString("originIata") ?: "",
+                destinationIata = getString("destinationIata") ?: "",
+                dateFrom = getString("dateFrom") ?: "",
+                dateTo = getString("dateTo") ?: "",
+                durationDays = (getLong("durationDays") ?: 0L).toInt(),
+                currency = getString("currency") ?: "USD",
+                travelStyle = getString("travelStyle") ?: "",
+                adults = (getLong("adults") ?: 1L).toInt(),
+                children = (getLong("children") ?: 0L).toInt(),
+                createdAt = getString("createdAt") ?: "",
+                status = getString("status") ?: "",
+                eventIds = (get("eventIds") as? List<*>)?.filterIsInstance<String>().orEmpty(),
+                homeImageUrl = getString("homeImageUrl") ?: "",
+                ownerUid = ownerUid,
+                memberUids = (get("memberUids") as? List<*>)?.filterIsInstance<String>().orEmpty()
+                    .ifEmpty { listOf(ownerUid) },
+                roleByUid = (get("roleByUid") as? Map<*, *>)
+                    ?.mapNotNull { entry ->
+                        val key = entry.key as? String ?: return@mapNotNull null
+                        val value = entry.value as? String ?: return@mapNotNull null
+                        key to value
+                    }
+                    ?.toMap()
+                    .orEmpty()
+                    .ifEmpty { mapOf(ownerUid to TripAccessRole.OWNER.wireValue) },
+                accessSchemaVersion = (getLong("accessSchemaVersion") ?: Itinerary.ACCESS_SCHEMA_VERSION.toLong()).toInt(),
+                summaryVersion = getLong("summaryVersion") ?: 0L,
+                eventsVersion = getLong("eventsVersion") ?: 0L,
+                optionsVersion = getLong("optionsVersion") ?: 0L,
+                membersVersion = getLong("membersVersion") ?: 0L,
+                updatedAtEpochMs = getLong("updatedAtEpochMs") ?: 0L
+            )
+        }.getOrNull()
+    }
 }

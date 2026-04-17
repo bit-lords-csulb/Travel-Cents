@@ -25,6 +25,7 @@ fun CurrentTripOverlayHost(
     canEditTrip: Boolean,
     eventOptions: Map<String, List<com.example.travelcents.data.trip.model.EventOption>>,
     rejectedOptions: Map<String, Set<String>>,
+    optionsLoading: Set<String>,
     yelpReviews: Map<String, List<com.example.travelcents.data.trip.model.YelpReview>>,
     reviewsLoading: Set<String>,
     shareTargets: List<ShareTarget>,
@@ -50,12 +51,15 @@ fun CurrentTripOverlayHost(
         val event = uiState.events.firstOrNull { it.eventId == eventId }
         if (event != null) {
             val yelpId = event.details["yelp_id"].orEmpty()
+            val canShowAlternatives = canEditTrip &&
+                (eventId !in eventOptions || eventOptions[eventId].orEmpty().size > 1)
             CurrentTripEventDetailsDialog(
                 event = event,
                 currentOptions = eventOptions[eventId].orEmpty(),
                 yelpReviews = yelpReviews[yelpId].orEmpty(),
                 reviewsLoading = reviewsLoading.contains(yelpId),
                 canEditTrip = canEditTrip,
+                canShowAlternatives = canShowAlternatives,
                 onDismiss = { onSelectedEventIdChange(null) },
                 onEdit = {
                     onSelectedEventIdChange(null)
@@ -65,7 +69,7 @@ fun CurrentTripOverlayHost(
                     onSelectedEventIdChange(null)
                     onDeleteCandidateChange(event.toEditablePlan())
                 },
-                onAlternatives = if (canEditTrip && eventOptions[eventId].orEmpty().size > 1) {
+                onAlternatives = if (canShowAlternatives) {
                     {
                         onSelectedEventIdChange(null)
                         onOptionsPanelEventIdChange(eventId)
@@ -96,6 +100,8 @@ fun CurrentTripOverlayHost(
         CurrentPlanEditorDialog(
             initialPlan = plan,
             currentOptions = eventOptions[plan.eventId].orEmpty(),
+            canShowAlternatives = plan.eventId != null &&
+                (plan.eventId !in eventOptions || eventOptions[plan.eventId].orEmpty().size > 1),
             yelpReviews = yelpReviews[yelpId].orEmpty(),
             reviewsLoading = reviewsLoading.contains(yelpId),
             onDismiss = { onEditorPlanChange(null) },
@@ -131,6 +137,7 @@ fun CurrentTripOverlayHost(
                 event = event,
                 options = options,
                 rejectedIds = rejected,
+                isLoading = eventId in optionsLoading,
                 onSelect = { optionId -> onSelectOption(eventId, optionId) },
                 onReject = { optionId -> onRejectOption(eventId, optionId) },
                 onDismiss = { onOptionsPanelEventIdChange(null) },

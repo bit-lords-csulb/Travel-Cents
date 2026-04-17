@@ -2,7 +2,9 @@ package com.example.travelcents.data.local.trip
 
 import androidx.room.withTransaction
 import com.example.travelcents.data.trip.TripKey
+import com.example.travelcents.data.trip.model.EventOption
 import com.example.travelcents.data.trip.model.Itinerary
+import com.example.travelcents.data.trip.model.TravelEvent
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
 
@@ -76,6 +78,199 @@ class TripLocalDataSource(
 
     suspend fun getManifestVersion(viewerUid: String): String? {
         return database.syncStateDao().getById(homeSyncStateId(viewerUid))?.remoteVersion
+    }
+
+    suspend fun getLatestActiveTripKey(viewerUid: String): TripKey? {
+        return database.tripSummaryDao()
+            .getLatestActiveTripSummary(viewerUid)
+            ?.let { entity ->
+                TripKey(ownerUid = entity.ownerUid, tripId = entity.tripId)
+            }
+    }
+
+    fun observeTripSummary(
+        viewerUid: String,
+        tripKey: TripKey
+    ): Flow<Itinerary?> {
+        return database.tripSummaryDao()
+            .observeTripSummary(
+                viewerUid = viewerUid,
+                ownerUid = tripKey.ownerUid,
+                tripId = tripKey.tripId
+            )
+            .map { entity -> entity?.toDomainModel() }
+    }
+
+    suspend fun getTripSummary(
+        viewerUid: String,
+        tripKey: TripKey
+    ): Itinerary? {
+        return database.tripSummaryDao()
+            .getTripSummary(
+                viewerUid = viewerUid,
+                ownerUid = tripKey.ownerUid,
+                tripId = tripKey.tripId
+            )
+            ?.toDomainModel()
+    }
+
+    suspend fun upsertTripSummary(
+        viewerUid: String,
+        itinerary: Itinerary,
+        isCurrentCandidate: Boolean = false
+    ) {
+        database.tripSummaryDao().upsertAll(
+            listOf(
+                itinerary.toTripSummaryEntity(
+                    viewerUid = viewerUid,
+                    updatedAtEpochMs = System.currentTimeMillis(),
+                    isCurrentCandidate = isCurrentCandidate
+                )
+            )
+        )
+    }
+
+    fun observeTripEvents(tripKey: TripKey): Flow<List<TravelEvent>> {
+        return database.tripEventDao()
+            .observeTripEvents(ownerUid = tripKey.ownerUid, tripId = tripKey.tripId)
+            .map { entities -> entities.map(TripEventEntity::toDomainModel) }
+    }
+
+    suspend fun replaceTripEvents(
+        tripKey: TripKey,
+        events: List<TravelEvent>,
+        eventVersionGroup: Long
+    ) {
+        val now = System.currentTimeMillis()
+        database.withTransaction {
+            database.tripEventDao().deleteForTrip(tripKey.ownerUid, tripKey.tripId)
+            if (events.isNotEmpty()) {
+                database.tripEventDao().upsertAll(
+                    events.map { event ->
+                        event.toTripEventEntity(
+                            ownerUid = tripKey.ownerUid,
+                            tripId = tripKey.tripId,
+                            eventVersionGroup = eventVersionGroup,
+                            updatedAtEpochMs = now
+                        )
+                    }
+                )
+            }
+        }
+    }
+
+    suspend fun getTripEventCount(tripKey: TripKey): Int {
+        return database.tripEventDao().countForTrip(tripKey.ownerUid, tripKey.tripId)
+    }
+
+    suspend fun getTripEventIds(tripKey: TripKey): List<String> {
+        return database.tripEventDao().getEventIdsForTrip(tripKey.ownerUid, tripKey.tripId)
+    }
+
+    fun observeTripMembers(tripKey: TripKey): Flow<List<LocalTripMember>> {
+        return database.tripMemberDao()
+            .observeTripMembers(ownerUid = tripKey.ownerUid, tripId = tripKey.tripId)
+            .map { entities ->
+                entities.map { entity ->
+                    LocalTripMember(
+                        memberUid = entity.memberUid,
+                        role = entity.role,
+                        displayName = entity.displayName,
+                        avatarUrl = entity.avatarUrl
+                    )
+                }
+            }
+    }
+
+    suspend fun replaceTripMembers(
+        tripKey: TripKey,
+        members: List<LocalTripMember>,
+        memberVersion: Long
+    ) {
+        val now = System.currentTimeMillis()
+        database.withTransaction {
+            database.tripMemberDao().deleteForTrip(tripKey.ownerUid, tripKey.tripId)
+            if (members.isNotEmpty()) {
+                database.tripMemberDao().upsertAll(
+                    members.map { member ->
+                        TripMemberEntity(
+                            id = tripMemberEntityId(
+                                ownerUid = tripKey.ownerUid,
+                                tripId = tripKey.tripId,
+                                memberUid = member.memberUid
+                            ),
+                            ownerUid = tripKey.ownerUid,
+                            tripId = tripKey.tripId,
+                            memberUid = member.memberUid,
+                            role = member.role,
+                            memberVersion = memberVersion,
+                            displayName = member.displayName,
+                            avatarUrl = member.avatarUrl,
+                            updatedAtEpochMs = now
+                        )
+                    }
+                )
+            }
+        }
+    }
+
+    suspend fun getTripMemberCount(tripKey: TripKey): Int {
+        return database.tripMemberDao().countForTrip(tripKey.ownerUid, tripKey.tripId)
+    }
+
+    fun observeTripOptions(tripKey: TripKey): Flow<Map<String, List<EventOption>>> {
+        return database.eventOptionDao()
+            .observeTripOptions(ownerUid = tripKey.ownerUid, tripId = tripKey.tripId)
+            .map { entities ->
+                entities.groupBy { entity -> entity.eventId }
+                    .mapValues { (_, options) -> options.map(EventOptionEntity::toDomainModel) }
+            }
+    }
+
+    suspend fun getOptionsForEvent(
+        tripKey: TripKey,
+        eventId: String
+    ): List<EventOption> {
+        return database.eventOptionDao()
+            .getOptionsForEvent(
+                ownerUid = tripKey.ownerUid,
+                tripId = tripKey.tripId,
+                eventId = eventId
+            )
+            .map(EventOptionEntity::toDomainModel)
+    }
+
+    suspend fun replaceTripOptions(
+        tripKey: TripKey,
+        optionsByEvent: Map<String, List<EventOption>>,
+        optionsVersionGroup: Long
+    ) {
+        val now = System.currentTimeMillis()
+        val entities = optionsByEvent.flatMap { (eventId, options) ->
+            options.map { option ->
+                option.toEntity(
+                    ownerUid = tripKey.ownerUid,
+                    tripId = tripKey.tripId,
+                    eventId = eventId,
+                    optionsVersionGroup = optionsVersionGroup,
+                    updatedAtEpochMs = now
+                )
+            }
+        }
+
+        database.withTransaction {
+            database.eventOptionDao().deleteForTrip(tripKey.ownerUid, tripKey.tripId)
+            if (entities.isNotEmpty()) {
+                database.eventOptionDao().upsertAll(entities)
+            }
+        }
+    }
+
+    suspend fun getTripOptionsVersionGroup(tripKey: TripKey): Long? {
+        return database.eventOptionDao().getTripOptionsVersionGroup(
+            ownerUid = tripKey.ownerUid,
+            tripId = tripKey.tripId
+        )
     }
 
     suspend fun recordManifestCheck(viewerUid: String, manifestVersion: Long?) {
