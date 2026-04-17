@@ -7,8 +7,9 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
-import com.example.travelcents.data.media.ImageCacheManager
 import com.example.travelcents.data.media.remoteMediaUrls
+import com.example.travelcents.data.media.TripMediaCacheStore
+import com.example.travelcents.data.trip.TripKey
 import com.example.travelcents.data.trip.model.Itinerary
 import com.example.travelcents.data.trip.model.TravelEvent
 import com.example.travelcents.data.trip.model.TravelRequest
@@ -237,10 +238,10 @@ class NewTripViewModel(application: Application) : AndroidViewModel(application)
                 val mediaUrls = (heroImageUrls + selectedHotelGalleryUrls)
                     .filter { it.isNotBlank() }
                     .distinct()
-                val localPaths = ImageCacheManager.cacheTripMedia(
-                    getApplication(),
-                    itinerary.itineraryId,
-                    mediaUrls
+                val localPaths = TripMediaCacheStore.cacheTripMedia(
+                    context = getApplication(),
+                    tripKey = TripKey(ownerUid = uid, tripId = itinerary.itineraryId),
+                    urls = mediaUrls
                 )
 
                 // Keep the remote hero URL intact and persist the local cache path separately.

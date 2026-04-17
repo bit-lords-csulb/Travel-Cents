@@ -119,14 +119,8 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     fun loadAllTrips() {
-        val currentProfile = _uiState.value.profile
         val uid = auth.currentUser?.uid ?: run {
-            _uiState.value = HomeUiState(
-                isLoading = false,
-                viewerUid = "",
-                profile = currentProfile,
-                errorMessage = "Not logged in"
-            )
+            _uiState.update { it.copy(isLoading = false, viewerUid = "", errorMessage = "Not logged in") }
             return
         }
 
@@ -135,7 +129,6 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
             currentState.copy(
                 isLoading = currentState.trips.isEmpty(),
                 viewerUid = uid,
-                profile = currentProfile,
                 errorMessage = null
             )
         }
@@ -148,14 +141,8 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
                     currentState.copy(
                         isLoading = false,
                         viewerUid = uid,
-                        profile = currentProfile,
                         errorMessage = null
                     )
-                }
-                runCatching {
-                    remoteRepository.backfillOwnedTripAccess(uid)
-                }.onFailure { error ->
-                    Log.w("HomeViewModel", "Failed to backfill owned trip access", error)
                 }
                 val trips = _uiState.value.trips
                 fetchDestinationImages(trips.filter { it.homeImageUrl.isBlank() })
@@ -165,7 +152,6 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
                     currentState.copy(
                         isLoading = false,
                         viewerUid = uid,
-                        profile = currentProfile,
                         errorMessage = if (currentState.trips.isEmpty()) {
                             error.message ?: "Failed to load trips"
                         } else {

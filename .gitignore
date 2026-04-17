@@ -14,7 +14,9 @@
 .cxx
 local.properties
 .gradle-home/
+.gradle-local/
 .android/
+.android-local/
 .kotlin/
 plan.md
 .claude/settings.local.json

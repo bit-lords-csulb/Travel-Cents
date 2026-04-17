@@ -14,9 +14,10 @@ import androidx.room.TypeConverters
         AppStateEntity::class,
         TripEventEntity::class,
         TripMemberEntity::class,
-        EventOptionEntity::class
+        EventOptionEntity::class,
+        MediaAssetEntity::class
     ],
-    version = 3,
+    version = 4,
     exportSchema = false
 )
 @TypeConverters(TripLocalConverters::class)
@@ -28,6 +29,7 @@ abstract class TravelCentsDatabase : RoomDatabase() {
     abstract fun userStubDao(): UserStubDao
     abstract fun syncStateDao(): SyncStateDao
     abstract fun appStateDao(): AppStateDao
+    abstract fun mediaAssetDao(): MediaAssetDao
 
     companion object {
         @Volatile
