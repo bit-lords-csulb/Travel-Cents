@@ -127,7 +127,8 @@ service cloud.firestore {
     }
 
     match /directChats/{chatId} {
-      allow get, list, update, delete: if signedIn() && isMemberList(resource.data.members);
+      allow get, update, delete: if signedIn() && isMemberList(resource.data.members);
+      allow list: if signedIn() && request.auth.uid in resource.data.members;
       allow create: if signedIn() && isMemberList(request.resource.data.members);
 
       match /messages/{messageId} {
@@ -138,7 +139,8 @@ service cloud.firestore {
     }
 
     match /groups/{groupId} {
-      allow get, list, update, delete: if signedIn() && isMemberList(resource.data.members);
+      allow get, update, delete: if signedIn() && isMemberList(resource.data.members);
+      allow list: if signedIn() && request.auth.uid in resource.data.members;
       allow create: if signedIn() && isMemberList(request.resource.data.members);
 
       match /messages/{messageId} {
