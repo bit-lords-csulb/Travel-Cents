@@ -43,6 +43,7 @@ import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
@@ -62,6 +63,7 @@ import coil.compose.AsyncImage
 import coil.request.ImageRequest
 import com.example.travelcents.BuildConfig
 import com.example.travelcents.data.trip.TripKey
+import com.example.travelcents.data.trip.TripPerformanceLogger
 import com.example.travelcents.data.trip.model.Itinerary
 import com.example.travelcents.ui.components.ProfileAvatar
 import com.example.travelcents.ui.theme.DeepSea1
@@ -90,6 +92,15 @@ fun HomePage(
     currencyViewModel: CurrencyViewModel = viewModel()
 ) {
     val homeUiState by homeViewModel.uiState.collectAsStateWithLifecycle()
+
+    LaunchedEffect(homeUiState.isLoading, homeUiState.trips.size) {
+        if (!homeUiState.isLoading) {
+            TripPerformanceLogger.recordHomeFirstRender(
+                source = "HomePage",
+                tripCount = homeUiState.trips.size
+            )
+        }
+    }
 
     Column(
         modifier = modifier

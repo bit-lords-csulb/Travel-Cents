@@ -1,18 +1,24 @@
 package com.example.travelcents.ui.main.home
 
+import android.app.Application
 import android.util.Log
-import androidx.lifecycle.ViewModel
+import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.travelcents.data.user.UserProfileRepository
 import com.example.travelcents.data.user.model.CurrentUserProfile
 import com.example.travelcents.BuildConfig
+import com.example.travelcents.data.local.trip.TravelCentsDatabase
+import com.example.travelcents.data.local.trip.TripLocalDataSource
 import com.example.travelcents.data.trip.FirestoreTripRepository
-import com.example.travelcents.data.trip.TripRepository
+import com.example.travelcents.data.trip.LocalFirstTripRepository
+import com.example.travelcents.data.trip.TripKey
+import com.example.travelcents.data.trip.TripPerformanceLogger
 import com.example.travelcents.data.trip.model.Itinerary
 import com.example.travelcents.data.trip.remote.DestinationImageRepository
 import com.example.travelcents.data.trip.remote.WikipediaApiService
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FirebaseFirestore
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -34,12 +40,16 @@ data class HomeUiState(
     val errorMessage: String? = null
 )
 
-class HomeViewModel : ViewModel() {
+class HomeViewModel(application: Application) : AndroidViewModel(application) {
 
     private val db = FirebaseFirestore.getInstance()
     private val auth = FirebaseAuth.getInstance()
     private val userProfileRepository = UserProfileRepository(auth = auth, db = db)
-    private val tripRepository: TripRepository = FirestoreTripRepository(db)
+    private val tripRepository = LocalFirstTripRepository(
+        localDataSource = TripLocalDataSource(TravelCentsDatabase.getInstance(application)),
+        remoteRepository = FirestoreTripRepository(db)
+    )
+    private var homeTripsJob: Job? = null
 
     private val wikipediaClient = OkHttpClient.Builder()
         .addInterceptor { chain ->
@@ -64,6 +74,7 @@ class HomeViewModel : ViewModel() {
 
     init {
         observeProfile()
+        observeHomeTrips()
         loadAllTrips()
         viewModelScope.launch {
             userProfileRepository.syncCurrentUserGoogleProfile()
@@ -74,6 +85,28 @@ class HomeViewModel : ViewModel() {
         viewModelScope.launch {
             userProfileRepository.observeCurrentUserProfile().collect { profile ->
                 _uiState.update { currentState -> currentState.copy(profile = profile) }
+            }
+        }
+    }
+
+    private fun observeHomeTrips() {
+        val uid = auth.currentUser?.uid ?: return
+        homeTripsJob?.cancel()
+        homeTripsJob = viewModelScope.launch {
+            tripRepository.observeHomeTripSummaries(uid).collect { trips ->
+                val cachedImages = trips
+                    .filter { itinerary -> itinerary.homeImageUrl.isNotBlank() }
+                    .associate { itinerary -> itinerary.itineraryId to itinerary.homeImageUrl }
+
+                _uiState.update { currentState ->
+                    currentState.copy(
+                        isLoading = currentState.isLoading && trips.isEmpty(),
+                        viewerUid = uid,
+                        trips = trips,
+                        tripImages = cachedImages,
+                        errorMessage = if (trips.isNotEmpty()) null else currentState.errorMessage
+                    )
+                }
             }
         }
     }
@@ -90,24 +123,28 @@ class HomeViewModel : ViewModel() {
             return
         }
 
-        _uiState.value = HomeUiState(isLoading = true, viewerUid = uid, profile = currentProfile)
+        TripPerformanceLogger.beginHomeLoad(trigger = "HomeViewModel.loadAllTrips", viewerUid = uid)
+        _uiState.update { currentState ->
+            currentState.copy(
+                isLoading = currentState.trips.isEmpty(),
+                viewerUid = uid,
+                profile = currentProfile,
+                errorMessage = null
+            )
+        }
 
         viewModelScope.launch {
             runCatching {
-                tripRepository.getTripSummaries(uid)
-                    .sortedBy { itinerary -> itinerary.dateFrom }
+                tripRepository.refreshHomeTripSummaries(uid)
             }.onSuccess { trips ->
-                val cachedImages = trips
-                    .filter { it.homeImageUrl.isNotBlank() }
-                    .associate { it.itineraryId to it.homeImageUrl }
-
-                _uiState.value = HomeUiState(
-                    isLoading = false,
-                    viewerUid = uid,
-                    trips = trips,
-                    tripImages = cachedImages,
-                    profile = currentProfile
-                )
+                _uiState.update { currentState ->
+                    currentState.copy(
+                        isLoading = false,
+                        viewerUid = uid,
+                        profile = currentProfile,
+                        errorMessage = null
+                    )
+                }
                 runCatching {
                     tripRepository.backfillOwnedTripAccess(uid)
                 }.onFailure { error ->
@@ -116,12 +153,18 @@ class HomeViewModel : ViewModel() {
                 fetchDestinationImages(trips.filter { it.homeImageUrl.isBlank() })
             }.onFailure { error ->
                 Log.e("HomeViewModel", "Failed to load trips: ${error.message}")
-                _uiState.value = HomeUiState(
-                    isLoading = false,
-                    viewerUid = uid,
-                    profile = currentProfile,
-                    errorMessage = error.message ?: "Failed to load trips"
-                )
+                _uiState.update { currentState ->
+                    currentState.copy(
+                        isLoading = false,
+                        viewerUid = uid,
+                        profile = currentProfile,
+                        errorMessage = if (currentState.trips.isEmpty()) {
+                            error.message ?: "Failed to load trips"
+                        } else {
+                            currentState.errorMessage
+                        }
+                    )
+                }
             }
         }
     }
@@ -155,6 +198,15 @@ class HomeViewModel : ViewModel() {
     }
 
     private suspend fun persistHomeImage(ownerUid: String, tripId: String, imageUrl: String) {
+        val viewerUid = _uiState.value.viewerUid
+        if (viewerUid.isNotBlank()) {
+            tripRepository.updateLocalHomeImage(
+                viewerUid = viewerUid,
+                tripKey = TripKey(ownerUid = ownerUid, tripId = tripId),
+                imageUrl = imageUrl
+            )
+        }
+
         runCatching {
             db.collection("users").document(ownerUid)
                 .collection("trips").document(tripId)
