@@ -23,12 +23,22 @@ class UserProfileRepository(
     fun observeCurrentUserProfile(): Flow<CurrentUserProfile> = callbackFlow {
         val authUser = auth.currentUser
         if (authUser == null) {
+            Log.d(TAG, "observeCurrentUserProfile: no auth user, emitting Guest")
             trySend(CurrentUserProfile(firstName = "Guest", isLoading = false))
             close()
             return@callbackFlow
         }
 
-        trySend(profileFrom(authUser = authUser, snapshot = null, isLoading = true))
+        val providers = authUser.providerData.joinToString(",") { it.providerId }
+        Log.d(
+            TAG,
+            "observeCurrentUserProfile: uid=${authUser.uid} providers=[$providers] " +
+                    "authPhotoUrl=${authUser.photoUrl} normalized=${authUser.googleProfilePhotoUrl()}"
+        )
+
+        val initial = profileFrom(authUser = authUser, snapshot = null, isLoading = true)
+        Log.d(TAG, "emit initial: profileImageUrl='${initial.profileImageUrl}' isLoading=true")
+        trySend(initial)
 
         launch { syncCurrentUserGoogleProfile() }
 
@@ -38,13 +48,17 @@ class UserProfileRepository(
                 if (error != null) {
                     Log.w(TAG, "users/${authUser.uid} snapshot error: ${error.message}", error)
                 }
-                trySend(
-                    profileFrom(
-                        authUser = authUser,
-                        snapshot = snapshot,
-                        isLoading = false
-                    )
+                val next = profileFrom(
+                    authUser = authUser,
+                    snapshot = snapshot,
+                    isLoading = false
                 )
+                Log.d(
+                    TAG,
+                    "emit snapshot: exists=${snapshot?.exists()} " +
+                            "profileImageUrl='${next.profileImageUrl}' isLoading=false"
+                )
+                trySend(next)
             }
 
         awaitClose { registration.remove() }

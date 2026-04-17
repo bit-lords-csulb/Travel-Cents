@@ -13,7 +13,8 @@
       "Bash(./gradlew compileDebugKotlin --warning-mode all)",
       "Bash(./gradlew clean *)",
       "Bash(./gradlew lintDebug)",
-      "Bash(grep -E \"\\\\[.*\\\\]$\" \"app/build/intermediates/lint_intermediate_text_report/debug/lintReportDebug/lint-results-debug.txt\")"
+      "Bash(grep -E \"\\\\[.*\\\\]$\" \"app/build/intermediates/lint_intermediate_text_report/debug/lintReportDebug/lint-results-debug.txt\")",
+      "Bash(./gradlew.bat :app:compileDebugKotlin -q)"
     ]
   }
 }
