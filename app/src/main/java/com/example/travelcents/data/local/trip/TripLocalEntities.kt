@@ -180,6 +180,12 @@ data class LocalTripMember(
     val avatarUrl: String
 )
 
+data class LocalUserStub(
+    val userUid: String,
+    val displayName: String,
+    val avatarUrl: String
+)
+
 @Entity(tableName = "event_option")
 data class EventOptionEntity(
     @PrimaryKey val id: String,
@@ -196,6 +202,18 @@ data class EventOptionEntity(
     val details: Map<String, String>,
     val optionsVersionGroup: Long,
     val updatedAtEpochMs: Long
+)
+
+@Entity(tableName = "media_asset")
+data class MediaAssetEntity(
+    @PrimaryKey val id: String,
+    val ownerUid: String,
+    val tripId: String,
+    val remoteUrl: String,
+    val localPath: String,
+    val contentHash: String,
+    val downloadedAtEpochMs: Long,
+    val lastAccessedAtEpochMs: Long
 )
 
 fun TripEventEntity.toDomainModel(): TravelEvent = TravelEvent(
@@ -286,3 +304,9 @@ fun tripMemberEntityId(ownerUid: String, tripId: String, memberUid: String): Str
 
 fun eventOptionEntityId(ownerUid: String, tripId: String, eventId: String, optionId: String): String =
     "$ownerUid:$tripId:$eventId:$optionId"
+
+fun mediaAssetEntityId(ownerUid: String, tripId: String, remoteUrl: String): String =
+    "$ownerUid:$tripId:$remoteUrl"
+
+fun userStubEntityId(viewerUid: String, userUid: String): String =
+    "$viewerUid:$userUid"

@@ -2,6 +2,30 @@
 
 Updated: 2026-04-16
 
+## Status Snapshot
+
+Most of phases 1 through 5 are now represented in code. Home and Current Trip both read from Room-backed local state first, manifest and trip-ref sync metadata exist remotely, and option hydration is lazy with a trip-level bulk query path.
+
+### Remaining Tasks
+
+- Add the phase 6 background hydration layer:
+  - WorkManager-based follow-up sync
+  - `TripHydrationWorker`
+  - media metadata persistence via a `media_asset` table
+- Move launch-time repair work out of the hot path:
+  - remove or gate unconditional `backfillOwnedTripAccess()` from normal Home startup
+- Finish local profile/member hydration:
+  - populate and read `user_stub` rows instead of relying on direct remote profile lookups during trip member refresh
+- Expand sync-state usage beyond Home manifest tracking:
+  - track per-trip summary, events, members, and options freshness explicitly in local sync state
+- Tighten Current Trip refresh behavior:
+  - avoid unconditional canonical trip summary fetches when local version metadata is already sufficient
+- Add targeted test coverage for the local-first sync path:
+  - Room DAO coverage
+  - manifest freshness / stale-path coordinator tests
+  - Current Trip selective refresh tests
+  - lazy options bulk-query and fallback tests
+
 ## Goals
 
 - Make Home and Current Trip render from app-owned local storage first, not from live Firestore reads.

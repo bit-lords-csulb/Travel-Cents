@@ -2,6 +2,7 @@ package com.example.travelcents.data.sync
 
 import com.example.travelcents.data.local.trip.LastOpenedTripState
 import com.example.travelcents.data.local.trip.LocalTripMember
+import com.example.travelcents.data.local.trip.TripSyncSection
 import com.example.travelcents.data.local.trip.TripLocalDataSource
 import com.example.travelcents.data.trip.TripKey
 import com.example.travelcents.data.trip.TripRepository
@@ -33,9 +34,17 @@ class CurrentTripSyncCoordinator(
         tripKey: TripKey
     ): Itinerary? {
         val localSummary = localDataSource.getTripSummary(viewerUid, tripKey)
-        val remoteSummary = remoteDataSource.fetchTripSummary(tripKey)
-            ?: legacyRemoteRepository.getTripSummary(tripKey)
-            ?: return null
+        val remoteSummary = runCatching {
+            remoteDataSource.fetchTripSummary(tripKey)
+                ?: legacyRemoteRepository.getTripSummary(tripKey)
+        }.onFailure { error ->
+            localDataSource.recordTripSectionFailure(
+                tripKey = tripKey,
+                section = TripSyncSection.SUMMARY,
+                remoteVersion = localSummary?.summaryVersion,
+                error = error
+            )
+        }.getOrThrow() ?: return null
 
         localDataSource.upsertTripSummary(
             viewerUid = viewerUid,
@@ -43,29 +52,72 @@ class CurrentTripSyncCoordinator(
             isCurrentCandidate = true
         )
         localDataSource.setLastOpenedTrip(tripKey)
+        localDataSource.recordTripSectionCheck(
+            tripKey = tripKey,
+            section = TripSyncSection.SUMMARY,
+            remoteVersion = remoteSummary.summaryVersion,
+            localVersion = remoteSummary.summaryVersion.toString()
+        )
 
         if (shouldRefreshEvents(localSummary = localSummary, remoteSummary = remoteSummary, tripKey = tripKey)) {
-            val events = remoteDataSource.fetchTripEvents(tripKey)
-            localDataSource.replaceTripEvents(
+            runCatching {
+                val events = remoteDataSource.fetchTripEvents(tripKey)
+                localDataSource.replaceTripEvents(
+                    tripKey = tripKey,
+                    events = events,
+                    eventVersionGroup = remoteSummary.eventsVersion
+                )
+            }.onFailure { error ->
+                localDataSource.recordTripSectionFailure(
+                    tripKey = tripKey,
+                    section = TripSyncSection.EVENTS,
+                    remoteVersion = remoteSummary.eventsVersion,
+                    error = error
+                )
+                throw error
+            }
+        } else {
+            localDataSource.recordTripSectionCheck(
                 tripKey = tripKey,
-                events = events,
-                eventVersionGroup = remoteSummary.eventsVersion
+                section = TripSyncSection.EVENTS,
+                remoteVersion = remoteSummary.eventsVersion
             )
         }
 
         if (shouldRefreshMembers(localSummary = localSummary, remoteSummary = remoteSummary, tripKey = tripKey)) {
-            val members = remoteDataSource.fetchTripMembers(tripKey)
-            localDataSource.replaceTripMembers(
+            runCatching {
+                val cachedUserStubs = localDataSource.getUserStubs(viewerUid, remoteSummary.memberUids)
+                val members = remoteDataSource.fetchTripMembers(
+                    tripKey = tripKey,
+                    cachedUserStubs = cachedUserStubs
+                )
+                localDataSource.replaceTripMembers(
+                    tripKey = tripKey,
+                    viewerUid = viewerUid,
+                    members = members.map { member ->
+                        LocalTripMember(
+                            memberUid = member.memberUid,
+                            role = member.role,
+                            displayName = member.displayName,
+                            avatarUrl = member.avatarUrl
+                        )
+                    },
+                    memberVersion = remoteSummary.membersVersion
+                )
+            }.onFailure { error ->
+                localDataSource.recordTripSectionFailure(
+                    tripKey = tripKey,
+                    section = TripSyncSection.MEMBERS,
+                    remoteVersion = remoteSummary.membersVersion,
+                    error = error
+                )
+                throw error
+            }
+        } else {
+            localDataSource.recordTripSectionCheck(
                 tripKey = tripKey,
-                members = members.map { member ->
-                    LocalTripMember(
-                        memberUid = member.memberUid,
-                        role = member.role,
-                        displayName = member.displayName,
-                        avatarUrl = member.avatarUrl
-                    )
-                },
-                memberVersion = remoteSummary.membersVersion
+                section = TripSyncSection.MEMBERS,
+                remoteVersion = remoteSummary.membersVersion
             )
         }
 
@@ -78,16 +130,31 @@ class CurrentTripSyncCoordinator(
     ): Map<String, List<EventOption>> {
         val localVersion = localDataSource.getTripOptionsVersionGroup(tripKey)
         if (localVersion != null && localVersion == expectedOptionsVersion) {
+            localDataSource.recordTripSectionCheck(
+                tripKey = tripKey,
+                section = TripSyncSection.OPTIONS,
+                remoteVersion = expectedOptionsVersion,
+                localVersion = localVersion.toString()
+            )
             return emptyMap()
         }
 
-        val remoteOptions = remoteDataSource.fetchTripOptionsBulk(tripKey)
-        localDataSource.replaceTripOptions(
-            tripKey = tripKey,
-            optionsByEvent = remoteOptions,
-            optionsVersionGroup = expectedOptionsVersion
-        )
-        return remoteOptions
+        return runCatching {
+            val remoteOptions = remoteDataSource.fetchTripOptionsBulk(tripKey)
+            localDataSource.replaceTripOptions(
+                tripKey = tripKey,
+                optionsByEvent = remoteOptions,
+                optionsVersionGroup = expectedOptionsVersion
+            )
+            remoteOptions
+        }.onFailure { error ->
+            localDataSource.recordTripSectionFailure(
+                tripKey = tripKey,
+                section = TripSyncSection.OPTIONS,
+                remoteVersion = expectedOptionsVersion,
+                error = error
+            )
+        }.getOrThrow()
     }
 
     private suspend fun localLastOpenedTrip(viewerUid: String): TripKey? {

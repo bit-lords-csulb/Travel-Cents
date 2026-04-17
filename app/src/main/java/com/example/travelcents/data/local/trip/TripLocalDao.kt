@@ -90,6 +90,15 @@ interface TripEventDao {
     @Query("SELECT eventId FROM trip_event WHERE ownerUid = :ownerUid AND tripId = :tripId")
     suspend fun getEventIdsForTrip(ownerUid: String, tripId: String): List<String>
 
+    @Query(
+        """
+        SELECT * FROM trip_event
+        WHERE ownerUid = :ownerUid AND tripId = :tripId
+        ORDER BY date ASC, startTime ASC, eventId ASC
+        """
+    )
+    suspend fun getForTrip(ownerUid: String, tripId: String): List<TripEventEntity>
+
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun upsertAll(entities: List<TripEventEntity>)
 
@@ -147,6 +156,15 @@ interface EventOptionDao {
     )
     suspend fun getTripOptionsVersionGroup(ownerUid: String, tripId: String): Long?
 
+    @Query(
+        """
+        SELECT * FROM event_option
+        WHERE ownerUid = :ownerUid AND tripId = :tripId
+        ORDER BY eventId ASC, selected DESC, optionId ASC
+        """
+    )
+    suspend fun getForTrip(ownerUid: String, tripId: String): List<EventOptionEntity>
+
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun upsertAll(entities: List<EventOptionEntity>)
 
@@ -158,6 +176,17 @@ interface EventOptionDao {
 interface UserStubDao {
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun upsert(entity: UserStubEntity)
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun upsertAll(entities: List<UserStubEntity>)
+
+    @Query(
+        """
+        SELECT * FROM user_stub
+        WHERE viewerUid = :viewerUid AND userUid IN (:userUids)
+        """
+    )
+    suspend fun getForViewer(viewerUid: String, userUids: List<String>): List<UserStubEntity>
 }
 
 @Dao
@@ -176,4 +205,13 @@ interface AppStateDao {
 
     @Query("SELECT stringValue FROM app_state WHERE key = :key LIMIT 1")
     suspend fun getStringValue(key: String): String?
+}
+
+@Dao
+interface MediaAssetDao {
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun upsertAll(entities: List<MediaAssetEntity>)
+
+    @Query("DELETE FROM media_asset WHERE ownerUid = :ownerUid AND tripId = :tripId")
+    suspend fun deleteForTrip(ownerUid: String, tripId: String)
 }

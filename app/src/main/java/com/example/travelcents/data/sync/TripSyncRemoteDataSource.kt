@@ -2,6 +2,7 @@ package com.example.travelcents.data.sync
 
 import com.example.travelcents.data.trip.TripAccessRole
 import com.example.travelcents.data.trip.TripKey
+import com.example.travelcents.data.local.trip.LocalUserStub
 import com.example.travelcents.data.trip.model.EventOption
 import com.example.travelcents.data.trip.model.Itinerary
 import com.example.travelcents.data.trip.model.TravelEvent
@@ -130,7 +131,10 @@ class TripSyncRemoteDataSource(
             }
     }
 
-    suspend fun fetchTripMembers(tripKey: TripKey): List<RemoteTripMember> {
+    suspend fun fetchTripMembers(
+        tripKey: TripKey,
+        cachedUserStubs: Map<String, LocalUserStub> = emptyMap()
+    ): List<RemoteTripMember> {
         val snapshot = tripDocument(tripKey).get().await()
         if (!snapshot.exists()) return emptyList()
 
@@ -148,15 +152,22 @@ class TripSyncRemoteDataSource(
             .orEmpty()
             .ifEmpty { mapOf(ownerUid to TripAccessRole.OWNER.wireValue) }
 
-        val nameMap = fetchUserProfileMap(memberUids)
+        val missingUserUids = memberUids.filterNot { memberUid -> memberUid in cachedUserStubs }
+        val fetchedProfiles = fetchUserProfileMap(missingUserUids)
         return memberUids.map { memberUid ->
-            val profile = nameMap[memberUid]
+            val cachedStub = cachedUserStubs[memberUid]
+            val profile = fetchedProfiles[memberUid]
             RemoteTripMember(
                 memberUid = memberUid,
                 role = roleByUid[memberUid]
                     ?: if (memberUid == ownerUid) TripAccessRole.OWNER.wireValue else TripAccessRole.VIEWER.wireValue,
-                displayName = profile?.first.orEmpty().ifBlank { memberUid },
-                avatarUrl = profile?.second.orEmpty()
+                displayName = cachedStub?.displayName
+                    .orEmpty()
+                    .ifBlank { profile?.first.orEmpty() }
+                    .ifBlank { memberUid },
+                avatarUrl = cachedStub?.avatarUrl
+                    .orEmpty()
+                    .ifBlank { profile?.second.orEmpty() }
             )
         }
     }

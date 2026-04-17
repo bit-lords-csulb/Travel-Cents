@@ -4,7 +4,7 @@ import android.app.Application
 import android.util.Log
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
-import com.example.travelcents.data.media.ImageCacheManager
+import com.example.travelcents.data.media.TripMediaCacheStore
 import com.example.travelcents.data.local.trip.TravelCentsDatabase
 import com.example.travelcents.data.local.trip.TripLocalDataSource
 import com.example.travelcents.data.trip.FirestoreTripRepository
@@ -19,6 +19,7 @@ import com.example.travelcents.data.trip.model.YelpReview
 import com.example.travelcents.data.trip.model.resolveTripName
 import com.example.travelcents.data.trip.remote.YelpRepository
 import com.example.travelcents.data.sync.CurrentTripSyncCoordinator
+import com.example.travelcents.data.sync.TripHydrationWorker
 import com.example.travelcents.data.sync.TripSyncCoordinator
 import com.example.travelcents.data.sync.TripSyncRemoteDataSource
 import com.example.travelcents.ui.modules.defaultPlanTimeZoneId
@@ -332,6 +333,8 @@ class CurrentTripViewModel(application: Application) : AndroidViewModel(applicat
                 )
                 if (refreshedSummary == null) {
                     resetTripState(infoMessage = missingTripMessage)
+                } else {
+                    TripHydrationWorker.enqueue(getApplication(), tripKey)
                 }
             } catch (e: Exception) {
                 Log.e("CurrentTripViewModel", "DATABASE ERROR: ${e.message}", e)
@@ -1052,7 +1055,7 @@ class CurrentTripViewModel(application: Application) : AndroidViewModel(applicat
                 tripRepository.deleteTrip(tripKey)
                 viewModelScope.launch(Dispatchers.IO) {
                     runCatching {
-                        ImageCacheManager.deleteTripImages(getApplication(), tripKey.tripId)
+                        TripMediaCacheStore.deleteTripMedia(getApplication(), tripKey)
                     }.onFailure { error ->
                         Log.w("CurrentTripViewModel", "Failed to clear cached trip media", error)
                     }
