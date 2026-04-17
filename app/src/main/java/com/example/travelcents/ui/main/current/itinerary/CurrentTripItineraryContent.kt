@@ -93,6 +93,7 @@ fun CurrentTripItineraryContent(
     events: List<TravelEvent>,
     eventOptions: Map<String, List<EventOption>>,
     rejectedOptions: Map<String, Set<String>>,
+    canEditTrip: Boolean,
     jiggleMode: Boolean,
     onEventClick: (TravelEvent) -> Unit,
     onDeleteClick: (TravelEvent) -> Unit,
@@ -207,11 +208,13 @@ fun CurrentTripItineraryContent(
                             val options = eventOptions[item.event.eventId].orEmpty()
                             val rejected = rejectedOptions[item.event.eventId].orEmpty()
                             val activeOptionCount = options.count { it.optionId !in rejected }
+                            val optionsLoaded = item.event.eventId in eventOptions
                             ReorderableItem(reorderState, key = item.event.eventId) { isDragging ->
                                 CurrentTripItineraryCard(
                                     event = item.event,
                                     isLast = item.isLastInDay,
-                                    hasAlternatives = activeOptionCount > 1,
+                                    canEditTrip = canEditTrip,
+                                    hasAlternatives = !optionsLoaded || activeOptionCount > 1,
                                     isDragging = isDragging,
                                     jiggleMode = jiggleMode,
                                     wobbleAngle = cardRotation,
@@ -260,6 +263,7 @@ private fun ItineraryDateHeader(date: String) {
 private fun CurrentTripItineraryCard(
     event: TravelEvent,
     isLast: Boolean,
+    canEditTrip: Boolean,
     hasAlternatives: Boolean,
     isDragging: Boolean,
     jiggleMode: Boolean,
@@ -422,7 +426,7 @@ private fun CurrentTripItineraryCard(
                     horizontalArrangement = Arrangement.spacedBy(6.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    if (hasAlternatives) {
+                    if (canEditTrip && hasAlternatives) {
                         Surface(
                             color = DeepSea2,
                             shape = RoundedCornerShape(8.dp),
@@ -438,18 +442,20 @@ private fun CurrentTripItineraryCard(
                         }
                     }
 
-                    Surface(
-                        color = DeepSea2,
-                        shape = CircleShape,
-                        modifier = Modifier.clickable(enabled = !jiggleMode, onClick = onDeleteClick)
-                    ) {
-                        Box(modifier = Modifier.size(30.dp), contentAlignment = Alignment.Center) {
-                            Icon(
-                                imageVector = Icons.Default.DeleteOutline,
-                                contentDescription = "Delete plan",
-                                tint = Color(0xFFE77D90),
-                                modifier = Modifier.size(16.dp)
-                            )
+                    if (canEditTrip) {
+                        Surface(
+                            color = DeepSea2,
+                            shape = CircleShape,
+                            modifier = Modifier.clickable(enabled = !jiggleMode, onClick = onDeleteClick)
+                        ) {
+                            Box(modifier = Modifier.size(30.dp), contentAlignment = Alignment.Center) {
+                                Icon(
+                                    imageVector = Icons.Default.DeleteOutline,
+                                    contentDescription = "Delete plan",
+                                    tint = Color(0xFFE77D90),
+                                    modifier = Modifier.size(16.dp)
+                                )
+                            }
                         }
                     }
                 }

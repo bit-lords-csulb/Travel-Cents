@@ -145,8 +145,10 @@ fun EventOptionsPanel(
     event: TravelEvent,
     options: List<EventOption>,
     rejectedIds: Set<String>,
+    isLoading: Boolean = false,
     onSelect: (optionId: String) -> Unit,
     onReject: (optionId: String) -> Unit,
+    onLoadMore: (() -> Unit)? = null,
     onDismiss: () -> Unit,
     selectedNamesElsewhere: Set<String> = emptySet()
 ) {
@@ -226,11 +228,29 @@ fun EventOptionsPanel(
                                 .padding(horizontal = 20.dp, vertical = 24.dp),
                             contentAlignment = Alignment.Center
                         ) {
-                            Text(
-                                text = "No alternative options left for this slot.",
-                                color = OnSurfaceVar,
-                                fontSize = 12.sp
-                            )
+                            if (isLoading) {
+                                Column(
+                                    horizontalAlignment = Alignment.CenterHorizontally,
+                                    verticalArrangement = Arrangement.spacedBy(10.dp)
+                                ) {
+                                    CircularProgressIndicator(
+                                        color = typeColor,
+                                        strokeWidth = 2.dp,
+                                        modifier = Modifier.size(24.dp)
+                                    )
+                                    Text(
+                                        text = "Loading options...",
+                                        color = OnSurfaceVar,
+                                        fontSize = 12.sp
+                                    )
+                                }
+                            } else {
+                                Text(
+                                    text = "No alternative options left for this slot.",
+                                    color = OnSurfaceVar,
+                                    fontSize = 12.sp
+                                )
+                            }
                         }
                     }
                 } else {
@@ -250,6 +270,35 @@ fun EventOptionsPanel(
                             },
                             onReject = { onReject(opt.optionId) }
                         )
+                    }
+                    if (onLoadMore != null) {
+                        item {
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(horizontal = 20.dp, vertical = 8.dp),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                OutlinedButton(
+                                    onClick = onLoadMore,
+                                    enabled = !isLoading,
+                                    border = androidx.compose.foundation.BorderStroke(
+                                        width = 1.dp,
+                                        color = typeColor.copy(alpha = 0.45f)
+                                    ),
+                                    colors = ButtonDefaults.outlinedButtonColors(
+                                        contentColor = typeColor,
+                                        disabledContentColor = OnSurfaceVar
+                                    )
+                                ) {
+                                    Text(
+                                        text = if (isLoading) "Loading more..." else "Show More Options",
+                                        fontSize = 12.sp,
+                                        fontWeight = FontWeight.Medium
+                                    )
+                                }
+                            }
+                        }
                     }
                 }
 

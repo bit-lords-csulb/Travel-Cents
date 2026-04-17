@@ -39,6 +39,7 @@ fun TravelEvent.withSelectedOption(option: EventOption): TravelEvent {
         imageUrl = nextImageUrl,
         localImagePath = nextLocalImagePath,
         photoUrls = nextPhotoUrls,
+        selectedOptionId = option.optionId,
         details = mergedDetails
     )
 }

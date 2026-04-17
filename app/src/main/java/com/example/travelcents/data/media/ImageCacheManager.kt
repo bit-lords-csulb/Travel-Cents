@@ -7,8 +7,15 @@ import kotlinx.coroutines.withContext
 import okhttp3.OkHttpClient
 import okhttp3.Request
 import java.io.File
+import java.io.InputStream
 import java.security.MessageDigest
 import java.util.concurrent.TimeUnit
+
+data class CachedMediaAsset(
+    val remoteUrl: String,
+    val localPath: String,
+    val contentHash: String
+)
 
 object ImageCacheManager {
 
@@ -23,9 +30,18 @@ object ImageCacheManager {
         context: Context,
         tripId: String,
         urls: List<String>
-    ): Map<String, String> = withContext(Dispatchers.IO) {
+    ): Map<String, String> {
+        return cacheTripMediaAssets(context, tripId, urls)
+            .associate { asset -> asset.remoteUrl to asset.localPath }
+    }
+
+    suspend fun cacheTripMediaAssets(
+        context: Context,
+        tripId: String,
+        urls: List<String>
+    ): List<CachedMediaAsset> = withContext(Dispatchers.IO) {
         val dir = File(context.filesDir, "trip_images/$tripId").also { it.mkdirs() }
-        val result = mutableMapOf<String, String>()
+        val result = mutableListOf<CachedMediaAsset>()
 
         urls.asSequence()
             .filter { it.isNotBlank() }
@@ -44,7 +60,13 @@ object ImageCacheManager {
                         }
                     }
                 }
-                if (file.exists()) result[url] = file.absolutePath
+                if (file.exists()) {
+                    result += CachedMediaAsset(
+                        remoteUrl = url,
+                        localPath = file.absolutePath,
+                        contentHash = sha256(file.inputStream())
+                    )
+                }
             } catch (e: Exception) {
                 Log.w("ImageCacheManager", "Failed to download $url: ${e.message}")
             }
@@ -84,9 +106,7 @@ object ImageCacheManager {
     }
 
     internal fun cacheFileNameForUrl(url: String): String {
-        val hash = MessageDigest.getInstance("SHA-256")
-            .digest(url.toByteArray())
-            .joinToString("") { "%02x".format(it) }
+        val hash = sha256(url.byteInputStream())
         val sanitizedUrl = url.substringBefore('?').substringBefore('#')
         val lastPathSegment = sanitizedUrl.substringAfterLast('/')
         val extCandidate = lastPathSegment.substringAfterLast('.', "")
@@ -94,6 +114,19 @@ object ImageCacheManager {
             .takeLast(4)
         val ext = extCandidate.takeIf { it.matches(Regex("[a-z0-9]{2,4}")) } ?: "img"
         return "${hash}.${ext}"
+    }
+
+    private fun sha256(input: InputStream): String {
+        return input.use { stream ->
+            val digest = MessageDigest.getInstance("SHA-256")
+            val buffer = ByteArray(DEFAULT_BUFFER_SIZE)
+            while (true) {
+                val read = stream.read(buffer)
+                if (read <= 0) break
+                digest.update(buffer, 0, read)
+            }
+            digest.digest().joinToString("") { "%02x".format(it) }
+        }
     }
 }
 

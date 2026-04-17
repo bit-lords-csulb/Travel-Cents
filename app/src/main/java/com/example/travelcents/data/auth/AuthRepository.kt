@@ -102,7 +102,7 @@ class AuthRepository {
     private suspend fun lookupEmailByUsername(username: String): Result<String> {
         val normalized = username.trim().lowercase()
 
-        val publicResult = suspendCancellableCoroutine<Result<String>> { continuation ->
+        return suspendCancellableCoroutine { continuation ->
             db.collection("usernames").document(normalized)
                 .get()
                 .addOnSuccessListener { doc ->
@@ -110,33 +110,12 @@ class AuthRepository {
                     if (email != null) {
                         continuation.resume(Result.success(email))
                     } else {
-                        continuation.resume(Result.success(""))
+                        continuation.resume(
+                            Result.failure(Exception("No account found with that username."))
+                        )
                     }
                 }
                 .addOnFailureListener { e -> continuation.resume(Result.failure(e)) }
-        }
-
-        publicResult.getOrNull()?.takeIf { it.isNotEmpty() }?.let { return Result.success(it) }
-        if (publicResult.isFailure) return publicResult
-
-        return suspendCancellableCoroutine { continuation ->
-            db.collection("users")
-                .whereEqualTo("username", normalized)
-                .limit(1)
-                .get()
-                .addOnSuccessListener { snapshot ->
-                    val email = snapshot.documents.firstOrNull()?.getString("email")
-                    if (email != null) {
-                        db.collection("usernames").document(normalized)
-                            .set(mapOf("email" to email))
-                        continuation.resume(Result.success(email))
-                    } else {
-                        continuation.resume(Result.failure(Exception("No account found with that username.")))
-                    }
-                }
-                .addOnFailureListener { e ->
-                    continuation.resume(Result.failure(e))
-                }
         }
     }
 
@@ -147,7 +126,9 @@ class AuthRepository {
         auth.signInWithEmailAndPassword(email, password)
             .addOnCompleteListener { task ->
                 if (task.isSuccessful) {
-                    continuation.resume(Result.success("Login Successful"))
+                    backfillUsernameIndexForCurrentUser {
+                        continuation.resume(Result.success("Login Successful"))
+                    }
                 } else {
                     continuation.resume(Result.failure(task.exception ?: Exception("Login failed")))
                 }
@@ -189,17 +170,21 @@ class AuthRepository {
                             if (success) {
                                 continuation.resume(Result.success("Google account synced to Firestore!"))
                             } else {
+                                Log.e(TAG, "Google sign-in user bootstrap failed: $error")
                                 continuation.resume(Result.failure(Exception(error ?: "Firestore sync failed")))
                             }
                         }
                     } else if (user != null) {
                         syncExistingGoogleProfile(user.uid, user.email.orEmpty(), user.photoUrl?.toString().orEmpty()) {
-                            continuation.resume(Result.success("Login Successful"))
+                            backfillUsernameIndexForCurrentUser {
+                                continuation.resume(Result.success("Login Successful"))
+                            }
                         }
                     } else {
                         continuation.resume(Result.success("Login Successful"))
                     }
                 } else {
+                    Log.e(TAG, "signInWithGoogle:failure", task.exception)
                     continuation.resume(Result.failure(task.exception ?: Exception("Google Login failed")))
                 }
             }
@@ -224,5 +209,28 @@ class AuthRepository {
         db.collection("users").document(uid)
             .set(updates, SetOptions.merge())
             .addOnCompleteListener { onComplete() }
+    }
+
+    private fun backfillUsernameIndexForCurrentUser(onComplete: () -> Unit) {
+        val user = auth.currentUser ?: run {
+            onComplete()
+            return
+        }
+
+        db.collection("users").document(user.uid)
+            .get()
+            .addOnSuccessListener { doc ->
+                val username = doc.getString("username")?.trim()?.lowercase().orEmpty()
+                val email = doc.getString("email")?.trim().orEmpty()
+                if (username.isBlank() || email.isBlank()) {
+                    onComplete()
+                    return@addOnSuccessListener
+                }
+
+                db.collection("usernames").document(username)
+                    .set(mapOf("email" to email), SetOptions.merge())
+                    .addOnCompleteListener { onComplete() }
+            }
+            .addOnFailureListener { onComplete() }
     }
 }

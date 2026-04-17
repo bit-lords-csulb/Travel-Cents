@@ -241,7 +241,10 @@ fun DirectChatRow(dm: DirectChatPreview, onClick: () -> Unit) {
 
 // Nav Wrapper
 @Composable
-fun ChatsScreen(modifier: Modifier = Modifier) {
+fun ChatsScreen(
+    modifier: Modifier = Modifier,
+    onTripCardClick: (String, String) -> Unit = { _, _ -> }
+) {
     var selectedGroup   by remember { mutableStateOf<Group?>(null) }
     var showNewTrip     by remember { mutableStateOf(false) }
     var showFriends     by remember { mutableStateOf(false) }
@@ -283,17 +286,20 @@ fun ChatsScreen(modifier: Modifier = Modifier) {
         selectedGroup != null -> ChatPage(
             group         = selectedGroup!!,
             onBackClick   = { selectedGroup = null },
-            onEventsClick = { showEvents = true }
+            onEventsClick = { showEvents = true },
+            onTripCardClick = onTripCardClick
         )
 
         // DMs and Friends
         selectedFriend != null -> DirectChatPage(
             friend      = selectedFriend!!,
-            onBackClick = { selectedFriend = null }
+            onBackClick = { selectedFriend = null },
+            onTripCardClick = onTripCardClick
         )
         selectedDM != null -> DirectChatPage(
             friend      = Friend(uid = selectedDM!!.otherUid, displayName = selectedDM!!.otherUserName),
-            onBackClick = { selectedDM = null; activeTab = 1 }
+            onBackClick = { selectedDM = null; activeTab = 1 },
+            onTripCardClick = onTripCardClick
         )
         showAddFriend -> AddFriendPage(onBackClick = { showAddFriend = false })
         showRequests  -> FriendRequestsPage(onBackClick = { showRequests = false })

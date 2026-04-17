@@ -112,4 +112,3 @@ This document captures the current pre-refactor behavior for Event Details media
 
 - `SerpHotelMappingTest`
 - `YelpBusinessDetailMappingTest`
-- `YelpPoolDistributionTest`

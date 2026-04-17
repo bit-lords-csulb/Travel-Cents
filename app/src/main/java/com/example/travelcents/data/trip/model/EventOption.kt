@@ -5,6 +5,8 @@ import java.util.UUID
 data class EventOption(
     val optionId: String = UUID.randomUUID().toString(),
     val eventId: String = "",
+    val tripId: String = "",
+    val ownerUid: String = "",
     // "serp", "yelp", "llm"
     val source: String = "",
     val selected: Boolean = false,
@@ -15,9 +17,19 @@ data class EventOption(
     val photoUrls: List<String> = emptyList(),
     val details: Map<String, String> = emptyMap()
 ) {
+    fun scopedTo(ownerUid: String, tripId: String, eventId: String = this.eventId): EventOption {
+        return copy(
+            ownerUid = ownerUid,
+            tripId = tripId,
+            eventId = eventId
+        )
+    }
+
     fun toMap(): Map<String, Any> = buildMap {
         put("optionId", optionId)
         put("eventId", eventId)
+        if (tripId.isNotBlank()) put("tripId", tripId)
+        if (ownerUid.isNotBlank()) put("ownerUid", ownerUid)
         put("source", source)
         put("selected", selected)
         put("votes", votes)
@@ -28,7 +40,8 @@ data class EventOption(
 
     companion object {
         private val RESERVED = setOf(
-            "optionId", "eventId", "source", "selected", "votes", "imageUrl", "localImagePath", "photoUrls"
+            "optionId", "eventId", "tripId", "ownerUid", "source", "selected", "votes",
+            "imageUrl", "localImagePath", "photoUrls"
         )
 
         @Suppress("UNCHECKED_CAST")
@@ -44,6 +57,8 @@ data class EventOption(
             return EventOption(
                 optionId = map["optionId"] as? String ?: UUID.randomUUID().toString(),
                 eventId = map["eventId"] as? String ?: "",
+                tripId = map["tripId"] as? String ?: "",
+                ownerUid = map["ownerUid"] as? String ?: "",
                 source = map["source"] as? String ?: "",
                 selected = map["selected"] as? Boolean ?: false,
                 votes = votes,

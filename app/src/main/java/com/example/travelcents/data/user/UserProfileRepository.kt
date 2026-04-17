@@ -1,5 +1,6 @@
 package com.example.travelcents.data.user
 
+import android.util.Log
 import com.example.travelcents.data.user.model.CurrentUserProfile
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.auth.FirebaseUser
@@ -11,6 +12,7 @@ import com.google.firebase.firestore.SetOptions
 import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.callbackFlow
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.tasks.await
 
 class UserProfileRepository(
@@ -21,23 +23,42 @@ class UserProfileRepository(
     fun observeCurrentUserProfile(): Flow<CurrentUserProfile> = callbackFlow {
         val authUser = auth.currentUser
         if (authUser == null) {
+            Log.d(TAG, "observeCurrentUserProfile: no auth user, emitting Guest")
             trySend(CurrentUserProfile(firstName = "Guest", isLoading = false))
             close()
             return@callbackFlow
         }
 
-        trySend(profileFrom(authUser = authUser, snapshot = null, isLoading = true))
+        val providers = authUser.providerData.joinToString(",") { it.providerId }
+        Log.d(
+            TAG,
+            "observeCurrentUserProfile: uid=${authUser.uid} providers=[$providers] " +
+                    "authPhotoUrl=${authUser.photoUrl} normalized=${authUser.googleProfilePhotoUrl()}"
+        )
+
+        val initial = profileFrom(authUser = authUser, snapshot = null, isLoading = true)
+        Log.d(TAG, "emit initial: profileImageUrl='${initial.profileImageUrl}' isLoading=true")
+        trySend(initial)
+
+        launch { syncCurrentUserGoogleProfile() }
 
         val registration = db.collection(USERS_COLLECTION)
             .document(authUser.uid)
-            .addSnapshotListener { snapshot, _ ->
-                trySend(
-                    profileFrom(
-                        authUser = authUser,
-                        snapshot = snapshot,
-                        isLoading = false
-                    )
+            .addSnapshotListener { snapshot, error ->
+                if (error != null) {
+                    Log.w(TAG, "users/${authUser.uid} snapshot error: ${error.message}", error)
+                }
+                val next = profileFrom(
+                    authUser = authUser,
+                    snapshot = snapshot,
+                    isLoading = false
                 )
+                Log.d(
+                    TAG,
+                    "emit snapshot: exists=${snapshot?.exists()} " +
+                            "profileImageUrl='${next.profileImageUrl}' isLoading=false"
+                )
+                trySend(next)
             }
 
         awaitClose { registration.remove() }
@@ -117,16 +138,17 @@ class UserProfileRepository(
     private fun FirebaseUser.googleProfilePhotoUrl(): String? {
         val photo = photoUrl?.toString()?.trim().orEmpty()
         if (photo.isBlank()) return null
-        return if (photo.contains("googleusercontent.com") && !photo.contains("=s")) {
-            "${photo}=s512-c"
-        } else {
-            photo
-        }
+        if (!photo.contains("googleusercontent.com")) return photo
+
+        val base = GOOGLE_SIZE_SUFFIX.replace(photo, "")
+        return "$base=s256-c"
     }
 
     private companion object {
         private const val USERS_COLLECTION = "users"
         private const val GOOGLE_SOURCE = "google"
+        private const val TAG = "UserProfileRepository"
+        private val GOOGLE_SIZE_SUFFIX = Regex("=s\\d+(-c)?$")
     }
 }
 
