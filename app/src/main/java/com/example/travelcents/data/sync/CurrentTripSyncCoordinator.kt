@@ -1,5 +1,6 @@
 package com.example.travelcents.data.sync
 
+import android.util.Log
 import com.example.travelcents.data.local.trip.LastOpenedTripState
 import com.example.travelcents.data.local.trip.LocalTripMember
 import com.example.travelcents.data.local.trip.TripSyncSection
@@ -24,7 +25,15 @@ class CurrentTripSyncCoordinator(
             remoteDataSource.fetchManifest(viewerUid)
         }.getOrNull()?.latestActiveTripKey?.let { return it }
 
-        homeSyncCoordinator.refreshHomeIfNeeded(viewerUid)
+        runCatching {
+            homeSyncCoordinator.refreshHomeIfNeeded(viewerUid)
+        }.onFailure { error ->
+            Log.w(
+                TAG,
+                "Home trip refresh failed for viewer $viewerUid. Falling back to direct latest-trip lookup.",
+                error
+            )
+        }
         return localDataSource.getLatestActiveTripKey(viewerUid)
             ?: legacyRemoteRepository.getLatestActiveTripKey(viewerUid)
     }
@@ -197,5 +206,9 @@ class CurrentTripSyncCoordinator(
 
     private fun LastOpenedTripState.toTripKey(): TripKey {
         return TripKey(ownerUid = ownerUid, tripId = tripId)
+    }
+
+    private companion object {
+        private const val TAG = "CurrentTripSync"
     }
 }

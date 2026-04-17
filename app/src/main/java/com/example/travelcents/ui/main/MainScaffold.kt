@@ -11,7 +11,6 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.compose.ui.Modifier
-import androidx.navigation.NavGraph.Companion.findStartDestination
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
@@ -110,8 +109,10 @@ fun MainScaffold(modifier: Modifier = Modifier, onLogout: () -> Unit = {}) {
                 MainBottomNavBar(
                     selectedRoute = currentTopLevelRoute,
                     onItemSelected = { route ->
+                        if (route == currentTopLevelRoute) return@MainBottomNavBar
                         navController.navigate(route) {
-                            popUpTo(navController.graph.findStartDestination().id) {
+                            popUpTo(MainRoutes.HOME) {
+                                inclusive = false
                                 saveState = true
                             }
                             launchSingleTop = true
