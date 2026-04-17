@@ -5,6 +5,7 @@ import com.example.travelcents.data.trip.model.EventOption
 import com.example.travelcents.data.trip.model.Itinerary
 import com.example.travelcents.data.trip.model.TravelEvent
 import com.example.travelcents.data.trip.model.resolveTripName
+import com.example.travelcents.data.sync.TripSyncRemoteDataSource
 import com.google.firebase.firestore.DocumentSnapshot
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.FirebaseFirestoreException
@@ -22,6 +23,7 @@ import kotlinx.coroutines.tasks.await
 class FirestoreTripRepository(
     private val db: FirebaseFirestore = FirebaseFirestore.getInstance()
 ) : TripRepository {
+    private val tripSyncRemoteDataSource = TripSyncRemoteDataSource(db)
 
     override suspend fun getLatestActiveTripKey(viewerUid: String): TripKey? {
         findLatestOwnedActiveTripKey(viewerUid)?.let { return it }
@@ -171,6 +173,8 @@ class FirestoreTripRepository(
         memberUids: List<String>,
         defaultRole: TripAccessRole
     ) {
+        val existingSnapshot = tripDocument(key).get().await()
+        val previousMemberUids = existingSnapshot.memberUids().toSet()
         val tripRef = tripDocument(key)
         db.runTransaction { transaction ->
             val snapshot = transaction.get(tripRef)
@@ -197,6 +201,12 @@ class FirestoreTripRepository(
                 SetOptions.merge()
             )
         }.await()
+        val updatedSnapshot = tripDocument(key).get().await()
+        val currentMemberUids = updatedSnapshot.memberUids().toSet().ifEmpty { setOf(key.ownerUid) }
+        tripSyncRemoteDataSource.refreshTripIndexesForTrip(
+            tripKey = key,
+            removedViewerUids = previousMemberUids - currentMemberUids
+        )
     }
 
     override suspend fun backfillOwnedTripAccess(ownerUid: String) = coroutineScope {
@@ -245,6 +255,7 @@ class FirestoreTripRepository(
                     SetOptions.merge()
                 )
             }.await()
+            tripSyncRemoteDataSource.refreshTripIndexesForTrip(tripKey)
         }
     }
 
@@ -258,6 +269,8 @@ class FirestoreTripRepository(
         val eventDocuments = tripRef.collection("events").get().await().documents
         val optionDocuments = loadTripOptionDocumentsForDelete(key, eventDocuments)
 
+        val tripSnapshot = tripRef.get().await()
+        val affectedViewerUids = tripSnapshot.memberUids().toSet().ifEmpty { setOf(key.ownerUid) }
         val deleteRefs = buildList {
             addAll(optionDocuments.map { document -> document.reference })
             addAll(eventDocuments.map { document -> document.reference })
@@ -271,6 +284,7 @@ class FirestoreTripRepository(
                 }
             }.await()
         }
+        tripSyncRemoteDataSource.removeTripIndexes(key, affectedViewerUids)
     }
 
     private suspend fun findLatestOwnedActiveTripKey(ownerUid: String): TripKey? {
@@ -587,7 +601,12 @@ class FirestoreTripRepository(
                 roleByUid = document.roleByUid().ifEmpty {
                     mapOf(ownerUid to TripAccessRole.OWNER.wireValue)
                 },
-                accessSchemaVersion = document.accessSchemaVersion().coerceAtLeast(0)
+                accessSchemaVersion = document.accessSchemaVersion().coerceAtLeast(0),
+                summaryVersion = document.getLong("summaryVersion") ?: 0L,
+                eventsVersion = document.getLong("eventsVersion") ?: 0L,
+                optionsVersion = document.getLong("optionsVersion") ?: 0L,
+                membersVersion = document.getLong("membersVersion") ?: 0L,
+                updatedAtEpochMs = document.getLong("updatedAtEpochMs") ?: 0L
             )
         }.getOrNull()
     }

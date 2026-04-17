@@ -18,7 +18,15 @@ class LocalFirstTripRepository(
             remoteRepository.getTripSummaries(viewerUid)
                 .sortedBy { itinerary -> itinerary.dateFrom }
         }.onSuccess { trips ->
-            localDataSource.replaceHomeTripSummaries(viewerUid, trips)
+            localDataSource.replaceHomeTripSummaries(
+                viewerUid = viewerUid,
+                trips = trips,
+                manifestVersion = null,
+                latestActiveTripKey = trips
+                    .filterNot { trip -> trip.status.equals("archived", ignoreCase = true) }
+                    .maxByOrNull { trip -> trip.createdAt }
+                    ?.let { trip -> TripKey(ownerUid = trip.ownerUid, tripId = trip.itineraryId) }
+            )
         }.onFailure { error ->
             localDataSource.recordHomeRefreshFailure(viewerUid, error)
         }.getOrThrow()

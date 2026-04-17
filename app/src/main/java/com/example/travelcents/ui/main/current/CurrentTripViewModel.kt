@@ -5,6 +5,8 @@ import android.util.Log
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.travelcents.data.media.ImageCacheManager
+import com.example.travelcents.data.local.trip.TravelCentsDatabase
+import com.example.travelcents.data.local.trip.TripLocalDataSource
 import com.example.travelcents.data.trip.FirestoreTripRepository
 import com.example.travelcents.data.trip.TripKey
 import com.example.travelcents.data.trip.TripAccessRole
@@ -16,6 +18,7 @@ import com.example.travelcents.data.trip.model.TravelEvent
 import com.example.travelcents.data.trip.model.YelpReview
 import com.example.travelcents.data.trip.model.resolveTripName
 import com.example.travelcents.data.trip.remote.YelpRepository
+import com.example.travelcents.data.sync.TripSyncRemoteDataSource
 import com.example.travelcents.ui.modules.defaultPlanTimeZoneId
 import com.example.travelcents.ui.modules.normalizeDate
 import com.example.travelcents.ui.modules.normalizeTime
@@ -126,6 +129,8 @@ class CurrentTripViewModel(application: Application) : AndroidViewModel(applicat
     private val db = FirebaseFirestore.getInstance()
     private val auth = FirebaseAuth.getInstance()
     private val tripRepository: TripRepository = FirestoreTripRepository(db)
+    private val tripLocalDataSource = TripLocalDataSource(TravelCentsDatabase.getInstance(application))
+    private val tripSyncRemoteDataSource = TripSyncRemoteDataSource(db)
     private var eventsCollectionJob: Job? = null
     private var currentTripKey: TripKey? = null
     private var currentTripDestination: String = ""
@@ -198,6 +203,9 @@ class CurrentTripViewModel(application: Application) : AndroidViewModel(applicat
     private fun handleTripSummary(tripKey: TripKey, itinerary: Itinerary) {
         currentTripKey = tripKey
         TripPerformanceLogger.bindTrip(tripKey.tripId)
+        viewModelScope.launch {
+            tripLocalDataSource.setLastOpenedTrip(tripKey)
+        }
         currentTripDestination = itinerary.destination
         val viewerUid = auth.currentUser?.uid
         val accessRole = when {
@@ -231,10 +239,10 @@ class CurrentTripViewModel(application: Application) : AndroidViewModel(applicat
         if (canManageTrip && nextTripTitle != storedTripTitle.trim()) {
             viewModelScope.launch {
                 runCatching {
-                    db.collection("users").document(tripKey.ownerUid)
-                        .collection("trips").document(tripKey.tripId)
-                        .update("tripName", nextTripTitle)
-                        .await()
+                    tripSyncRemoteDataSource.updateTripSummaryFields(
+                        tripKey = tripKey,
+                        fields = mapOf("tripName" to nextTripTitle)
+                    )
                 }
             }
         }
@@ -355,14 +363,7 @@ class CurrentTripViewModel(application: Application) : AndroidViewModel(applicat
                     details = mergedDetails
                 )
 
-                db.collection("users")
-                    .document(tripKey.ownerUid)
-                    .collection("trips")
-                    .document(tripKey.tripId)
-                    .collection("events")
-                    .document(eventId)
-                    .set(event.toFirestoreMap())
-                    .await()
+                tripSyncRemoteDataSource.upsertEvent(tripKey = tripKey, event = event)
 
                 _uiState.update {
                     it.copy(
@@ -389,14 +390,7 @@ class CurrentTripViewModel(application: Application) : AndroidViewModel(applicat
 
         viewModelScope.launch {
             try {
-                db.collection("users")
-                    .document(tripKey.ownerUid)
-                    .collection("trips")
-                    .document(tripKey.tripId)
-                    .collection("events")
-                    .document(eventId)
-                    .delete()
-                    .await()
+                tripSyncRemoteDataSource.deleteEvent(tripKey = tripKey, eventId = eventId)
 
                 _uiState.update {
                     it.copy(
@@ -491,28 +485,13 @@ class CurrentTripViewModel(application: Application) : AndroidViewModel(applicat
         eventId: String,
         result: YelpRepository.YelpEventEnrichmentResult
     ) {
-        val eventRef = db.collection("users")
-            .document(tripKey.ownerUid)
-            .collection("trips")
-            .document(tripKey.tripId)
-            .collection("events")
-            .document(eventId)
-
-        db.runBatch { batch ->
-            batch.set(eventRef, result.event.toFirestoreMap())
-            result.options
-                .filter { it.optionId in result.updatedOptionIds }
-                .forEach { option ->
-                    batch.set(
-                        eventRef.collection("options").document(option.optionId),
-                        option.scopedTo(
-                            ownerUid = tripKey.ownerUid,
-                            tripId = tripKey.tripId,
-                            eventId = eventId
-                        ).toMap()
-                    )
-                }
-        }.await()
+        tripSyncRemoteDataSource.persistEventAndOptions(
+            tripKey = tripKey,
+            eventId = eventId,
+            event = result.event,
+            options = result.options,
+            updatedOptionIds = result.updatedOptionIds
+        )
     }
 
     private fun fetchTripMembers(tripKey: TripKey) {
@@ -739,22 +718,12 @@ class CurrentTripViewModel(application: Application) : AndroidViewModel(applicat
 
         viewModelScope.launch {
             try {
-                val eventRef = db.collection("users")
-                    .document(tripKey.ownerUid)
-                    .collection("trips")
-                    .document(tripKey.tripId)
-                    .collection("events")
-                    .document(eventId)
-
-                db.runBatch { batch ->
-                    batch.set(eventRef, updatedEvent.toFirestoreMap())
-                    updatedOptions.forEach { option ->
-                        batch.set(
-                            eventRef.collection("options").document(option.optionId),
-                            option.toMap()
-                        )
-                    }
-                }.await()
+                tripSyncRemoteDataSource.persistEventAndOptions(
+                    tripKey = tripKey,
+                    eventId = eventId,
+                    event = updatedEvent,
+                    options = updatedOptions
+                )
             } catch (e: Exception) {
                 Log.e("CurrentTripViewModel", "Failed to select option", e)
                 _uiState.update { it.copy(errorMessage = e.message ?: "Failed to update selection.") }
@@ -814,14 +783,7 @@ class CurrentTripViewModel(application: Application) : AndroidViewModel(applicat
 
         viewModelScope.launch {
             try {
-                db.collection("users")
-                    .document(tripKey.ownerUid)
-                    .collection("trips")
-                    .document(tripKey.tripId)
-                    .collection("events")
-                    .document(eventId)
-                    .set(updatedEvent.toFirestoreMap())
-                    .await()
+                tripSyncRemoteDataSource.upsertEvent(tripKey = tripKey, event = updatedEvent)
             } catch (e: Exception) {
                 Log.e("CurrentTripViewModel", "Failed to patch event", e)
                 _uiState.update { it.copy(errorMessage = e.message ?: "Failed to save event changes.") }
@@ -890,23 +852,12 @@ class CurrentTripViewModel(application: Application) : AndroidViewModel(applicat
 
         viewModelScope.launch {
             try {
-                db.runBatch { batch ->
-                    affectedEvents.forEach { event ->
-                        val eventRef = db.collection("users")
-                            .document(tripKey.ownerUid)
-                            .collection("trips")
-                            .document(tripKey.tripId)
-                            .collection("events")
-                            .document(event.eventId)
-                        batch.update(
-                            eventRef,
-                            mapOf(
-                                "date" to normalizeDate(event.date),
-                                "sortOrder" to (event.details["sortOrder"] ?: "0")
-                            )
-                        )
+                tripSyncRemoteDataSource.persistEventPlacements(
+                    tripKey = tripKey,
+                    events = affectedEvents.map { event ->
+                        event.copy(date = normalizeDate(event.date))
                     }
-                }.await()
+                )
             } catch (e: Exception) {
                 Log.e("CurrentTripViewModel", "Failed to persist placements", e)
                 _uiState.update { it.copy(errorMessage = e.message ?: "Failed to save event order.") }
@@ -925,17 +876,13 @@ class CurrentTripViewModel(application: Application) : AndroidViewModel(applicat
 
         viewModelScope.launch {
             try {
-                db.collection("users")
-                    .document(tripKey.ownerUid)
-                    .collection("trips")
-                    .document(tripId)
-                    .update(
-                        mapOf(
-                            "status" to "archived",
-                            "archivedAt" to FieldValue.serverTimestamp()
-                        )
+                tripSyncRemoteDataSource.updateTripSummaryFields(
+                    tripKey = tripKey,
+                    fields = mapOf(
+                        "status" to "archived",
+                        "archivedAt" to FieldValue.serverTimestamp()
                     )
-                    .await()
+                )
 
                 _allTrips.update { trips ->
                     trips.map {
@@ -1023,10 +970,10 @@ class CurrentTripViewModel(application: Application) : AndroidViewModel(applicat
 
         viewModelScope.launch {
             try {
-                db.collection("users").document(tripKey.ownerUid)
-                    .collection("trips").document(tripKey.tripId)
-                    .update("tripName", trimmed)
-                    .await()
+                tripSyncRemoteDataSource.updateTripSummaryFields(
+                    tripKey = tripKey,
+                    fields = mapOf("tripName" to trimmed)
+                )
             } catch (e: Exception) {
                 Log.e("CurrentTripViewModel", "Failed to rename trip", e)
                 _uiState.update { it.copy(errorMessage = e.message ?: "Failed to rename trip.") }

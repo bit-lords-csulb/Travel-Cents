@@ -16,6 +16,8 @@ import com.example.travelcents.data.trip.TripPerformanceLogger
 import com.example.travelcents.data.trip.model.Itinerary
 import com.example.travelcents.data.trip.remote.DestinationImageRepository
 import com.example.travelcents.data.trip.remote.WikipediaApiService
+import com.example.travelcents.data.sync.TripSyncCoordinator
+import com.example.travelcents.data.sync.TripSyncRemoteDataSource
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FirebaseFirestore
 import kotlinx.coroutines.Job
@@ -45,9 +47,17 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
     private val db = FirebaseFirestore.getInstance()
     private val auth = FirebaseAuth.getInstance()
     private val userProfileRepository = UserProfileRepository(auth = auth, db = db)
+    private val localDataSource = TripLocalDataSource(TravelCentsDatabase.getInstance(application))
+    private val remoteRepository = FirestoreTripRepository(db)
     private val tripRepository = LocalFirstTripRepository(
-        localDataSource = TripLocalDataSource(TravelCentsDatabase.getInstance(application)),
-        remoteRepository = FirestoreTripRepository(db)
+        localDataSource = localDataSource,
+        remoteRepository = remoteRepository
+    )
+    private val tripSyncRemoteDataSource = TripSyncRemoteDataSource(db)
+    private val tripSyncCoordinator = TripSyncCoordinator(
+        localDataSource = localDataSource,
+        remoteDataSource = tripSyncRemoteDataSource,
+        legacyRemoteRepository = remoteRepository
     )
     private var homeTripsJob: Job? = null
 
@@ -76,9 +86,6 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
         observeProfile()
         observeHomeTrips()
         loadAllTrips()
-        viewModelScope.launch {
-            userProfileRepository.syncCurrentUserGoogleProfile()
-        }
     }
 
     private fun observeProfile() {
@@ -135,8 +142,8 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
 
         viewModelScope.launch {
             runCatching {
-                tripRepository.refreshHomeTripSummaries(uid)
-            }.onSuccess { trips ->
+                tripSyncCoordinator.refreshHomeIfNeeded(uid)
+            }.onSuccess {
                 _uiState.update { currentState ->
                     currentState.copy(
                         isLoading = false,
@@ -146,10 +153,11 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
                     )
                 }
                 runCatching {
-                    tripRepository.backfillOwnedTripAccess(uid)
+                    remoteRepository.backfillOwnedTripAccess(uid)
                 }.onFailure { error ->
                     Log.w("HomeViewModel", "Failed to backfill owned trip access", error)
                 }
+                val trips = _uiState.value.trips
                 fetchDestinationImages(trips.filter { it.homeImageUrl.isBlank() })
             }.onFailure { error ->
                 Log.e("HomeViewModel", "Failed to load trips: ${error.message}")
@@ -208,10 +216,10 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
         }
 
         runCatching {
-            db.collection("users").document(ownerUid)
-                .collection("trips").document(tripId)
-                .update("homeImageUrl", imageUrl)
-                .await()
+            tripSyncRemoteDataSource.updateHomeImage(
+                tripKey = TripKey(ownerUid = ownerUid, tripId = tripId),
+                imageUrl = imageUrl
+            )
         }.onFailure { error ->
             Log.w("HomeViewModel", "Failed to persist home image for trip '$tripId': ${error.message}")
         }
@@ -223,4 +231,3 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
             "TravelCents/${BuildConfig.VERSION_NAME} (Android app; $WIKIMEDIA_CONTACT_URL)"
     }
 }
-

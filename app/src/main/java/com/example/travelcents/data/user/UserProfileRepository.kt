@@ -11,6 +11,7 @@ import com.google.firebase.firestore.SetOptions
 import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.callbackFlow
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.tasks.await
 
 class UserProfileRepository(
@@ -27,6 +28,8 @@ class UserProfileRepository(
         }
 
         trySend(profileFrom(authUser = authUser, snapshot = null, isLoading = true))
+
+        launch { syncCurrentUserGoogleProfile() }
 
         val registration = db.collection(USERS_COLLECTION)
             .document(authUser.uid)

@@ -30,6 +30,12 @@ data class TripSummaryEntity(
     val memberUids: List<String>,
     val roleByUid: Map<String, String>,
     val accessSchemaVersion: Int,
+    val summaryVersion: Long,
+    val eventsVersion: Long,
+    val optionsVersion: Long,
+    val membersVersion: Long,
+    val lastHydratedAtEpochMs: Long,
+    val isCurrentCandidate: Boolean,
     val updatedAtEpochMs: Long
 )
 
@@ -83,12 +89,18 @@ fun TripSummaryEntity.toDomainModel(): Itinerary = Itinerary(
     ownerUid = ownerUid,
     memberUids = memberUids,
     roleByUid = roleByUid,
-    accessSchemaVersion = accessSchemaVersion
+    accessSchemaVersion = accessSchemaVersion,
+    summaryVersion = summaryVersion,
+    eventsVersion = eventsVersion,
+    optionsVersion = optionsVersion,
+    membersVersion = membersVersion,
+    updatedAtEpochMs = updatedAtEpochMs
 )
 
 fun Itinerary.toTripSummaryEntity(
     viewerUid: String,
-    updatedAtEpochMs: Long
+    updatedAtEpochMs: Long,
+    isCurrentCandidate: Boolean
 ): TripSummaryEntity = TripSummaryEntity(
     id = tripSummaryEntityId(viewerUid, ownerUid, itineraryId),
     viewerUid = viewerUid,
@@ -114,6 +126,12 @@ fun Itinerary.toTripSummaryEntity(
     memberUids = memberUids,
     roleByUid = roleByUid,
     accessSchemaVersion = accessSchemaVersion,
+    summaryVersion = summaryVersion,
+    eventsVersion = eventsVersion,
+    optionsVersion = optionsVersion,
+    membersVersion = membersVersion,
+    lastHydratedAtEpochMs = updatedAtEpochMs,
+    isCurrentCandidate = isCurrentCandidate,
     updatedAtEpochMs = updatedAtEpochMs
 )
 
