@@ -109,6 +109,61 @@ class TripSyncRemoteDataSource(
             )
     }
 
+    suspend fun fetchTripRef(
+        viewerUid: String,
+        tripKey: TripKey
+    ): Itinerary? {
+        val snapshot = tripRefDocument(viewerUid, tripKey).get().await()
+        if (!snapshot.exists()) return null
+
+        val ownerUid = snapshot.getString("ownerUid").orEmpty()
+        val tripId = snapshot.getString("tripId").orEmpty()
+        if (ownerUid.isBlank() || tripId.isBlank()) return null
+
+        return Itinerary(
+            itineraryId = tripId,
+            userId = ownerUid,
+            tripName = resolveTripName(
+                snapshot.getString("tripName"),
+                snapshot.getString("destination").orEmpty()
+            ),
+            destination = snapshot.getString("destination").orEmpty(),
+            origin = snapshot.getString("origin").orEmpty(),
+            originIata = snapshot.getString("originIata").orEmpty(),
+            destinationIata = snapshot.getString("destinationIata").orEmpty(),
+            dateFrom = snapshot.getString("dateFrom").orEmpty(),
+            dateTo = snapshot.getString("dateTo").orEmpty(),
+            durationDays = (snapshot.getLong("durationDays") ?: 0L).toInt(),
+            currency = snapshot.getString("currency") ?: "USD",
+            travelStyle = snapshot.getString("travelStyle").orEmpty(),
+            adults = (snapshot.getLong("adults") ?: 1L).toInt(),
+            children = (snapshot.getLong("children") ?: 0L).toInt(),
+            createdAt = snapshot.getString("createdAt").orEmpty(),
+            status = snapshot.getString("status").orEmpty(),
+            eventIds = (snapshot.get("eventIds") as? List<*>)?.filterIsInstance<String>().orEmpty(),
+            homeImageUrl = snapshot.getString("homeImageUrl").orEmpty(),
+            ownerUid = ownerUid,
+            memberUids = (snapshot.get("memberUids") as? List<*>)?.filterIsInstance<String>().orEmpty()
+                .ifEmpty { listOf(ownerUid) },
+            roleByUid = (snapshot.get("roleByUid") as? Map<*, *>)
+                ?.mapNotNull { entry ->
+                    val key = entry.key as? String ?: return@mapNotNull null
+                    val value = entry.value as? String ?: return@mapNotNull null
+                    key to value
+                }
+                ?.toMap()
+                .orEmpty()
+                .ifEmpty { mapOf(ownerUid to TripAccessRole.OWNER.wireValue) },
+            accessSchemaVersion = (snapshot.getLong("accessSchemaVersion")
+                ?: Itinerary.ACCESS_SCHEMA_VERSION.toLong()).toInt(),
+            summaryVersion = snapshot.getLong("summaryVersion") ?: 0L,
+            eventsVersion = snapshot.getLong("eventsVersion") ?: 0L,
+            optionsVersion = snapshot.getLong("optionsVersion") ?: 0L,
+            membersVersion = snapshot.getLong("membersVersion") ?: 0L,
+            updatedAtEpochMs = snapshot.getLong("updatedAtEpochMs") ?: 0L
+        )
+    }
+
     suspend fun fetchTripSummary(tripKey: TripKey): Itinerary? {
         val snapshot = tripDocument(tripKey).get().await()
         if (!snapshot.exists()) return null
