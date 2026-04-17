@@ -15,6 +15,7 @@ import com.example.travelcents.data.trip.model.TravelRequest
 import com.example.travelcents.data.trip.remote.SerpRepository
 import com.example.travelcents.data.ai.repository.TripPlannerRepository
 import com.example.travelcents.data.trip.remote.YelpRepository
+import com.example.travelcents.data.sync.TripSyncRemoteDataSource
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FirebaseFirestore
 import kotlinx.coroutines.async
@@ -268,29 +269,8 @@ class NewTripViewModel(application: Application) : AndroidViewModel(application)
         itinerary: Itinerary,
         events: List<TravelEvent>
     ) {
-        val db = FirebaseFirestore.getInstance()
-        val tripRef = db.collection("users").document(uid)
-            .collection("trips").document(itinerary.itineraryId)
-
-        tripRef.set(itinerary.toFirestoreMap()).await()
-
-        for (event in events) {
-            val eventRef = tripRef.collection("events").document(event.eventId)
-            eventRef.set(event.toFirestoreMap()).await()
-            // Options stored as subcollection: events/{eventId}/options/{optionId}
-            for (option in event.options) {
-                eventRef.collection("options")
-                    .document(option.optionId)
-                    .set(
-                        option.scopedTo(
-                            ownerUid = uid,
-                            tripId = itinerary.itineraryId,
-                            eventId = event.eventId
-                        ).toMap()
-                    )
-                    .await()
-            }
-        }
+        TripSyncRemoteDataSource(FirebaseFirestore.getInstance())
+            .createTrip(ownerUid = uid, itinerary = itinerary, events = events)
     }
 
     fun resetState() {

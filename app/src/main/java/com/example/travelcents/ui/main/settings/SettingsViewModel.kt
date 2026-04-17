@@ -5,7 +5,6 @@ import androidx.lifecycle.viewModelScope
 import com.example.travelcents.data.user.UserProfileRepository
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FirebaseFirestore
-import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -32,9 +31,6 @@ class SettingsViewModel : ViewModel() {
 
     init {
         observeUser()
-        viewModelScope.launch {
-            userProfileRepository.syncCurrentUserGoogleProfile()
-        }
     }
 
     private fun observeUser() {

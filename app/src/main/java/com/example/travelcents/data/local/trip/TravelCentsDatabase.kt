@@ -13,7 +13,7 @@ import androidx.room.TypeConverters
         SyncStateEntity::class,
         AppStateEntity::class
     ],
-    version = 1,
+    version = 2,
     exportSchema = false
 )
 @TypeConverters(TripLocalConverters::class)
@@ -33,7 +33,10 @@ abstract class TravelCentsDatabase : RoomDatabase() {
                     context.applicationContext,
                     TravelCentsDatabase::class.java,
                     "travel_cents.db"
-                ).build().also { built -> instance = built }
+                )
+                    .fallbackToDestructiveMigration()
+                    .build()
+                    .also { built -> instance = built }
             }
         }
     }

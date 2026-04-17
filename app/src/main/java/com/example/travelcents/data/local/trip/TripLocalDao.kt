@@ -17,6 +17,9 @@ interface TripSummaryDao {
     )
     fun observeTripSummaries(viewerUid: String): Flow<List<TripSummaryEntity>>
 
+    @Query("SELECT COUNT(*) FROM trip_summary WHERE viewerUid = :viewerUid")
+    suspend fun countTripSummaries(viewerUid: String): Int
+
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun upsertAll(entities: List<TripSummaryEntity>)
 
@@ -52,10 +55,16 @@ interface UserStubDao {
 interface SyncStateDao {
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun upsert(entity: SyncStateEntity)
+
+    @Query("SELECT * FROM sync_state WHERE id = :id LIMIT 1")
+    suspend fun getById(id: String): SyncStateEntity?
 }
 
 @Dao
 interface AppStateDao {
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun upsert(entity: AppStateEntity)
+
+    @Query("SELECT stringValue FROM app_state WHERE key = :key LIMIT 1")
+    suspend fun getStringValue(key: String): String?
 }
