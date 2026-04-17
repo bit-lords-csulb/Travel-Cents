@@ -34,23 +34,54 @@ class CurrentTripSyncCoordinator(
         tripKey: TripKey
     ): Itinerary? {
         val localSummary = localDataSource.getTripSummary(viewerUid, tripKey)
-        val remoteSummary = runCatching {
-            remoteDataSource.fetchTripSummary(tripKey)
-                ?: legacyRemoteRepository.getTripSummary(tripKey)
-        }.onFailure { error ->
-            localDataSource.recordTripSectionFailure(
-                tripKey = tripKey,
-                section = TripSyncSection.SUMMARY,
-                remoteVersion = localSummary?.summaryVersion,
-                error = error
-            )
-        }.getOrThrow() ?: return null
+        val remoteTripRef = runCatching {
+            remoteDataSource.fetchTripRef(viewerUid, tripKey)
+        }.getOrNull()
+        val localEventCount = localDataSource.getTripEventCount(tripKey)
+        val localEventIds = localDataSource.getTripEventIds(tripKey).toSet()
+        val localMemberCount = localDataSource.getTripMemberCount(tripKey)
 
-        localDataSource.upsertTripSummary(
-            viewerUid = viewerUid,
-            itinerary = remoteSummary,
-            isCurrentCandidate = true
+        val initialPlan = CurrentTripRefreshPlanner.plan(
+            localSummary = localSummary,
+            remoteSummaryCandidate = remoteTripRef,
+            tripKey = tripKey,
+            localEventCount = localEventCount,
+            localEventIds = localEventIds,
+            localMemberCount = localMemberCount
         )
+
+        val remoteSummary = if (initialPlan.shouldFetchCanonicalSummary) {
+            runCatching {
+                remoteDataSource.fetchTripSummary(tripKey)
+                    ?: legacyRemoteRepository.getTripSummary(tripKey)
+            }.onFailure { error ->
+                localDataSource.recordTripSectionFailure(
+                    tripKey = tripKey,
+                    section = TripSyncSection.SUMMARY,
+                    remoteVersion = localSummary?.summaryVersion,
+                    error = error
+                )
+            }.getOrThrow()
+        } else {
+            remoteTripRef
+        } ?: return null
+
+        val refreshPlan = CurrentTripRefreshPlanner.plan(
+            localSummary = localSummary,
+            remoteSummaryCandidate = remoteSummary,
+            tripKey = tripKey,
+            localEventCount = localEventCount,
+            localEventIds = localEventIds,
+            localMemberCount = localMemberCount
+        )
+
+        if (refreshPlan.shouldUpsertSummary) {
+            localDataSource.upsertTripSummary(
+                viewerUid = viewerUid,
+                itinerary = remoteSummary,
+                isCurrentCandidate = true
+            )
+        }
         localDataSource.setLastOpenedTrip(tripKey)
         localDataSource.recordTripSectionCheck(
             tripKey = tripKey,
@@ -59,7 +90,7 @@ class CurrentTripSyncCoordinator(
             localVersion = remoteSummary.summaryVersion.toString()
         )
 
-        if (shouldRefreshEvents(localSummary = localSummary, remoteSummary = remoteSummary, tripKey = tripKey)) {
+        if (refreshPlan.shouldRefreshEvents) {
             runCatching {
                 val events = remoteDataSource.fetchTripEvents(tripKey)
                 localDataSource.replaceTripEvents(
@@ -84,7 +115,7 @@ class CurrentTripSyncCoordinator(
             )
         }
 
-        if (shouldRefreshMembers(localSummary = localSummary, remoteSummary = remoteSummary, tripKey = tripKey)) {
+        if (refreshPlan.shouldRefreshMembers) {
             runCatching {
                 val cachedUserStubs = localDataSource.getUserStubs(viewerUid, remoteSummary.memberUids)
                 val members = remoteDataSource.fetchTripMembers(
@@ -162,34 +193,6 @@ class CurrentTripSyncCoordinator(
         val tripKey = lastOpenedTrip.toTripKey()
         val localSummary = localDataSource.getTripSummary(viewerUid, tripKey) ?: return null
         return tripKey.takeUnless { localSummary.status.equals("archived", ignoreCase = true) }
-    }
-
-    private suspend fun shouldRefreshEvents(
-        localSummary: Itinerary?,
-        remoteSummary: Itinerary,
-        tripKey: TripKey
-    ): Boolean {
-        if (localSummary == null) return true
-        if (localSummary.eventsVersion != remoteSummary.eventsVersion) return true
-        if (tripKey.tripId != remoteSummary.itineraryId) return true
-
-        val localEventCount = localDataSource.getTripEventCount(tripKey)
-        if (localEventCount == 0 && remoteSummary.eventIds.isNotEmpty()) return true
-
-        val localEventIds = localDataSource.getTripEventIds(tripKey).toSet()
-        return localEventIds != remoteSummary.eventIds.toSet()
-    }
-
-    private suspend fun shouldRefreshMembers(
-        localSummary: Itinerary?,
-        remoteSummary: Itinerary,
-        tripKey: TripKey
-    ): Boolean {
-        if (localSummary == null) return true
-        if (localSummary.membersVersion != remoteSummary.membersVersion) return true
-
-        val localMemberCount = localDataSource.getTripMemberCount(tripKey)
-        return localMemberCount == 0 && remoteSummary.memberUids.isNotEmpty()
     }
 
     private fun LastOpenedTripState.toTripKey(): TripKey {

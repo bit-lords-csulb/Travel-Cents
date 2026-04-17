@@ -1,5 +1,6 @@
 package com.example.travelcents.data.user
 
+import android.util.Log
 import com.example.travelcents.data.user.model.CurrentUserProfile
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.auth.FirebaseUser
@@ -33,7 +34,10 @@ class UserProfileRepository(
 
         val registration = db.collection(USERS_COLLECTION)
             .document(authUser.uid)
-            .addSnapshotListener { snapshot, _ ->
+            .addSnapshotListener { snapshot, error ->
+                if (error != null) {
+                    Log.w(TAG, "users/${authUser.uid} snapshot error: ${error.message}", error)
+                }
                 trySend(
                     profileFrom(
                         authUser = authUser,
@@ -120,16 +124,17 @@ class UserProfileRepository(
     private fun FirebaseUser.googleProfilePhotoUrl(): String? {
         val photo = photoUrl?.toString()?.trim().orEmpty()
         if (photo.isBlank()) return null
-        return if (photo.contains("googleusercontent.com") && !photo.contains("=s")) {
-            "${photo}=s512-c"
-        } else {
-            photo
-        }
+        if (!photo.contains("googleusercontent.com")) return photo
+
+        val base = GOOGLE_SIZE_SUFFIX.replace(photo, "")
+        return "$base=s256-c"
     }
 
     private companion object {
         private const val USERS_COLLECTION = "users"
         private const val GOOGLE_SOURCE = "google"
+        private const val TAG = "UserProfileRepository"
+        private val GOOGLE_SIZE_SUFFIX = Regex("=s\\d+(-c)?$")
     }
 }
 
