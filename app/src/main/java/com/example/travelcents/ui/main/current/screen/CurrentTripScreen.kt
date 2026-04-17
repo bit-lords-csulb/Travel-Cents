@@ -347,7 +347,8 @@ fun CurrentTripScreen(
                 },
                 onShareTrip = viewModel::shareTripToChat,
                 onSelectOption = viewModel::selectOption,
-                onRejectOption = viewModel::rejectOption
+                onRejectOption = viewModel::rejectOption,
+                onLoadMoreOptions = viewModel::loadMoreOptions
             )
         }
     }

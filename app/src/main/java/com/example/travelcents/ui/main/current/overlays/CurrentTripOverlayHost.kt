@@ -12,6 +12,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.example.travelcents.data.trip.model.DETAIL_YELP_ID
 import com.example.travelcents.data.trip.model.displayName
 import com.example.travelcents.ui.theme.DeepSea2
 import com.example.travelcents.ui.theme.DeepSea3
@@ -45,7 +46,8 @@ fun CurrentTripOverlayHost(
     onDeletePlan: (EditablePlan) -> Unit,
     onShareTrip: (ShareTarget) -> Unit,
     onSelectOption: (String, String) -> Unit,
-    onRejectOption: (String, String) -> Unit
+    onRejectOption: (String, String) -> Unit,
+    onLoadMoreOptions: (String) -> Unit
 ) {
     selectedEventId?.let { eventId ->
         val event = uiState.events.firstOrNull { it.eventId == eventId }
@@ -125,6 +127,8 @@ fun CurrentTripOverlayHost(
         val options = eventOptions[eventId].orEmpty()
         val rejected = rejectedOptions[eventId].orEmpty()
         if (event != null) {
+            val canLoadMoreOptions = event.details[DETAIL_YELP_ID].orEmpty().isNotBlank() &&
+                event.type.lowercase(Locale.US) in setOf("restaurant", "dining", "food", "activity")
             val selectedNamesElsewhere = uiState.events
                 .filter { it.eventId != eventId && it.type.equals(event.type, ignoreCase = true) }
                 .mapNotNull { other ->
@@ -140,6 +144,11 @@ fun CurrentTripOverlayHost(
                 isLoading = eventId in optionsLoading,
                 onSelect = { optionId -> onSelectOption(eventId, optionId) },
                 onReject = { optionId -> onRejectOption(eventId, optionId) },
+                onLoadMore = if (canLoadMoreOptions) {
+                    { onLoadMoreOptions(eventId) }
+                } else {
+                    null
+                },
                 onDismiss = { onOptionsPanelEventIdChange(null) },
                 selectedNamesElsewhere = selectedNamesElsewhere
             )

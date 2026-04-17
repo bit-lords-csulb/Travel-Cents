@@ -1,5 +1,6 @@
 package com.example.travelcents.data.social.repository
 
+import android.util.Log
 import com.example.travelcents.data.social.model.Group
 import com.example.travelcents.data.social.model.Message
 import com.google.firebase.Timestamp
@@ -15,7 +16,12 @@ class GroupsRepository(
         return db.collection("groups")
             .whereArrayContains("members", uid)
             .orderBy("lastMessageTime", Query.Direction.DESCENDING)
-            .addSnapshotListener { snapshot, _ ->
+            .addSnapshotListener { snapshot, error ->
+                if (error != null) {
+                    Log.e("GroupsRepo", "listenToGroups failed for uid=$uid", error)
+                    onUpdate(emptyList())
+                    return@addSnapshotListener
+                }
                 val groups = snapshot?.documents?.mapNotNull { doc ->
                     doc.toObject(Group::class.java)?.copy(id = doc.id)
                 } ?: emptyList()

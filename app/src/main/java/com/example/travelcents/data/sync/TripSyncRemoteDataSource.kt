@@ -6,6 +6,9 @@ import com.example.travelcents.data.local.trip.LocalUserStub
 import com.example.travelcents.data.trip.model.EventOption
 import com.example.travelcents.data.trip.model.Itinerary
 import com.example.travelcents.data.trip.model.TravelEvent
+import com.example.travelcents.data.trip.model.YelpOptionPoolItem
+import com.example.travelcents.data.trip.model.YELP_POOL_TYPE_ACTIVITIES
+import com.example.travelcents.data.trip.model.YELP_POOL_TYPE_RESTAURANTS
 import com.example.travelcents.data.trip.model.resolveTripName
 import com.google.firebase.firestore.DocumentReference
 import com.google.firebase.firestore.DocumentSnapshot
@@ -258,7 +261,58 @@ class TripSyncRemoteDataSource(
         }
     }
 
-    suspend fun createTrip(ownerUid: String, itinerary: Itinerary, events: List<TravelEvent>) {
+    suspend fun fetchYelpOptionPool(
+        tripKey: TripKey,
+        poolType: String
+    ): List<YelpOptionPoolItem> {
+        return yelpPoolItemsCollection(tripKey, poolType)
+            .get()
+            .await()
+            .documents
+            .mapNotNull { document ->
+                val data = document.data ?: return@mapNotNull null
+                YelpOptionPoolItem.fromFirestoreMap(
+                    documentId = document.id,
+                    map = data
+                )
+            }
+            .sortedBy(YelpOptionPoolItem::providerId)
+    }
+
+    suspend fun upsertYelpOptionPoolItems(
+        tripKey: TripKey,
+        poolType: String,
+        items: List<YelpOptionPoolItem>
+    ) {
+        if (poolType !in SUPPORTED_YELP_POOL_TYPES || items.isEmpty()) return
+
+        val version = nextVersionToken()
+        items
+            .filter { item -> item.providerId.isNotBlank() }
+            .distinctBy(YelpOptionPoolItem::providerId)
+            .chunked(MAX_CREATE_TRIP_BATCH_WRITES)
+            .forEach { chunk ->
+                val batch = db.batch()
+                chunk.forEach { item ->
+                    batch.set(
+                        yelpPoolItemDocument(
+                            tripKey = tripKey,
+                            poolType = poolType,
+                            providerId = item.providerId
+                        ),
+                        item.toFirestoreMap() + timestampMetadata(version)
+                    )
+                }
+                batch.commit().await()
+            }
+    }
+
+    suspend fun createTrip(
+        ownerUid: String,
+        itinerary: Itinerary,
+        events: List<TravelEvent>,
+        yelpOptionPools: Map<String, List<YelpOptionPoolItem>> = emptyMap()
+    ) {
         val tripKey = TripKey(ownerUid = ownerUid, tripId = itinerary.itineraryId)
         val version = nextVersionToken()
         val tripData = itinerary.copy(
@@ -274,6 +328,24 @@ class TripSyncRemoteDataSource(
         ).toFirestoreMap() + timestampMetadata(version)
 
         val pendingWrites = buildList<PendingSet> {
+            yelpOptionPools.forEach { (poolType, items) ->
+                if (poolType !in SUPPORTED_YELP_POOL_TYPES) return@forEach
+                items
+                    .filter { item -> item.providerId.isNotBlank() }
+                    .distinctBy(YelpOptionPoolItem::providerId)
+                    .forEach { item ->
+                        add(
+                            PendingSet(
+                                reference = yelpPoolItemDocument(
+                                    tripKey = tripKey,
+                                    poolType = poolType,
+                                    providerId = item.providerId
+                                ),
+                                data = item.toFirestoreMap() + timestampMetadata(version)
+                            )
+                        )
+                    }
+            }
             events.forEach { event ->
                 val eventRef = eventDocument(tripKey, event.eventId)
                 add(
@@ -744,6 +816,17 @@ class TripSyncRemoteDataSource(
         .collection("trips")
         .document(tripKey.tripId)
 
+    private fun yelpPoolItemsCollection(tripKey: TripKey, poolType: String) = tripDocument(tripKey)
+        .collection("optionPools")
+        .document(poolType)
+        .collection("items")
+
+    private fun yelpPoolItemDocument(
+        tripKey: TripKey,
+        poolType: String,
+        providerId: String
+    ) = yelpPoolItemsCollection(tripKey, poolType).document(providerId)
+
     private fun eventDocument(tripKey: TripKey, eventId: String) = tripDocument(tripKey)
         .collection("events")
         .document(eventId)
@@ -796,6 +879,10 @@ class TripSyncRemoteDataSource(
 
     private companion object {
         private const val MAX_CREATE_TRIP_BATCH_WRITES = 200
+        private val SUPPORTED_YELP_POOL_TYPES = setOf(
+            YELP_POOL_TYPE_RESTAURANTS,
+            YELP_POOL_TYPE_ACTIVITIES
+        )
     }
 }
 

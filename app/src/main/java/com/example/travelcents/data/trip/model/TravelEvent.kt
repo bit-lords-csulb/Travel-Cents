@@ -13,6 +13,7 @@ data class TravelEvent(
     val imageUrl: String = "",
     val localImagePath: String = "",
     val photoUrls: List<String> = emptyList(),
+    val selectedOptionId: String = "",
     val details: Map<String, String> = emptyMap(),
     // options are stored as a Firestore subcollection; populated in-memory only
     val options: List<EventOption> = emptyList()
@@ -28,6 +29,7 @@ data class TravelEvent(
         put("endTime", endTime)
         put("imageUrl", imageUrl)
         put("photoUrls", photoUrls)
+        if (selectedOptionId.isNotBlank()) put("selectedOptionId", selectedOptionId)
         putAll(details)
     }
 
@@ -42,7 +44,8 @@ data class TravelEvent(
     companion object {
         private val RESERVED = setOf(
             "eventId", "type", "itineraryId", "tz", "date",
-            "startTime", "endTime", "imageUrl", "localImagePath", "photoUrls", "options"
+            "startTime", "endTime", "imageUrl", "localImagePath", "photoUrls",
+            "selectedOptionId", "options"
         )
 
         fun fromFirestoreMap(
@@ -97,6 +100,7 @@ data class TravelEvent(
                 imageUrl = imageUrl,
                 localImagePath = localImagePath,
                 photoUrls = photos,
+                selectedOptionId = map["selectedOptionId"] as? String ?: "",
                 details = map.filterKeys { it !in RESERVED }.mapValues { it.value.toString() },
                 options = options
             )

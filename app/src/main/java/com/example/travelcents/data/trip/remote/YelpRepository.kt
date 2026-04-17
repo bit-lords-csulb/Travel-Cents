@@ -6,7 +6,10 @@ import com.example.travelcents.data.trip.model.EventOption
 import com.example.travelcents.data.trip.model.TravelEvent
 import com.example.travelcents.data.trip.model.YelpBusiness
 import com.example.travelcents.data.trip.model.YelpEvent
+import com.example.travelcents.data.trip.model.YelpOptionPoolItem
 import com.example.travelcents.data.trip.model.YelpReview
+import com.example.travelcents.data.trip.model.YELP_POOL_TYPE_ACTIVITIES
+import com.example.travelcents.data.trip.model.YELP_POOL_TYPE_RESTAURANTS
 import com.example.travelcents.data.trip.model.ATTR_AVERAGE_RATING
 import com.example.travelcents.data.trip.model.ATTR_BUSINESS_ADDRESS
 import com.example.travelcents.data.trip.model.ATTR_BUSINESS_NAME
@@ -76,84 +79,6 @@ object YelpRepository {
         .build()
         .create(YelpApiService::class.java)
 
-    // 1 call per day for the given location. Returns a TravelEvent with 5 options.
-    suspend fun searchRestaurants(
-        location: String,
-        date: String,
-        itineraryId: String
-    ): TravelEvent? {
-        return try {
-            val params = mapOf(
-                "location" to location,
-                "categories" to "restaurants",
-                "limit" to "5",
-                "sort_by" to "rating"
-            )
-
-            val response = api.searchBusinesses(params)
-            if (response.businesses.isEmpty()) return null
-
-            val eventId = UUID.randomUUID().toString()
-            val options = response.businesses.mapIndexed { idx, biz ->
-                mapBusinessToEventOption(biz, eventId, isSelected = idx == 0, source = "yelp")
-            }
-            val selected = response.businesses.first()
-
-            TravelEvent(
-                eventId = eventId,
-                type = "restaurant",
-                itineraryId = itineraryId,
-                date = date,
-                startTime = "19:00",
-                endTime = "21:00",
-                imageUrl = selected.imageUrl,
-                details = businessEventDetails(selected),
-                options = options
-            )
-        } catch (_: Exception) {
-            null
-        }
-    }
-
-    // 1 call per day for the given location. Returns a TravelEvent with 5 options.
-    suspend fun searchActivities(
-        location: String,
-        date: String,
-        itineraryId: String
-    ): TravelEvent? {
-        return try {
-            val params = mapOf(
-                "location" to location,
-                "categories" to "arts,museums,tours,landmarks",
-                "limit" to "5",
-                "sort_by" to "rating"
-            )
-
-            val response = api.searchBusinesses(params)
-            if (response.businesses.isEmpty()) return null
-
-            val eventId = UUID.randomUUID().toString()
-            val options = response.businesses.mapIndexed { idx, biz ->
-                mapBusinessToEventOption(biz, eventId, isSelected = idx == 0, source = "yelp")
-            }
-            val selected = response.businesses.first()
-
-            TravelEvent(
-                eventId = eventId,
-                type = "activity",
-                itineraryId = itineraryId,
-                date = date,
-                startTime = "10:00",
-                endTime = "12:00",
-                imageUrl = selected.imageUrl,
-                details = businessEventDetails(selected),
-                options = options
-            )
-        } catch (_: Exception) {
-            null
-        }
-    }
-
     // 1 call per trip covering the full date range. Returns up to 20 local events as TravelEvents.
     suspend fun searchEvents(
         location: String,
@@ -215,6 +140,25 @@ object YelpRepository {
         }
     }
 
+    suspend fun fetchAdditionalPoolItems(
+        location: String,
+        poolType: String,
+        existingProviderIds: Set<String>,
+        targetCount: Int = OPTIONS_PER_EVENT
+    ): List<YelpOptionPoolItem> {
+        val categories = categoriesForPoolType(poolType) ?: return emptyList()
+        return try {
+            fetchAdditionalBusinessPool(
+                location = location,
+                categories = categories,
+                existingProviderIds = existingProviderIds,
+                targetCount = targetCount
+            ).let(::mapBusinessesToPoolItems)
+        } catch (_: Exception) {
+            emptyList()
+        }
+    }
+
     private suspend fun fetchBusinessPool(
         location: String,
         categories: String,
@@ -256,11 +200,55 @@ object YelpRepository {
         return businesses
     }
 
-    // Distribute a Yelp business pool across trip days.
-    // Each day keeps only its preferred chunk so option docs scale linearly with trip length.
-    // Small pools still stay fully available until they are exhausted across days.
-    fun distributePoolToEvents(
-        pool: List<YelpBusiness>,
+    private suspend fun fetchAdditionalBusinessPool(
+        location: String,
+        categories: String,
+        existingProviderIds: Set<String>,
+        targetCount: Int
+    ): List<YelpBusiness> {
+        val desiredCount = targetCount
+            .coerceAtLeast(1)
+            .coerceAtMost(SEARCH_MAX_RESULTS)
+
+        val businesses = mutableListOf<YelpBusiness>()
+        val seenIds = existingProviderIds.toMutableSet()
+        var offset = existingProviderIds.size.coerceAtMost(SEARCH_MAX_RESULTS)
+
+        while (businesses.size < desiredCount && offset < SEARCH_MAX_RESULTS) {
+            val remaining = desiredCount - businesses.size
+            val limit = minOf(SEARCH_PAGE_SIZE, remaining, SEARCH_MAX_RESULTS - offset)
+            if (limit <= 0) break
+
+            val page = api.searchBusinesses(
+                mapOf(
+                    "location" to location,
+                    "categories" to categories,
+                    "limit" to limit.toString(),
+                    "offset" to offset.toString(),
+                    "sort_by" to "rating"
+                )
+            ).businesses
+
+            if (page.isEmpty()) break
+
+            businesses += page.filter { business -> seenIds.add(business.id) }
+
+            if (page.size < limit) break
+            offset += limit
+        }
+
+        return businesses
+    }
+
+    fun mapBusinessesToPoolItems(pool: List<YelpBusiness>): List<YelpOptionPoolItem> {
+        return pool
+            .filter { business -> business.id.isNotBlank() }
+            .distinctBy(YelpBusiness::id)
+            .map(::mapBusinessToPoolItem)
+    }
+
+    fun distributePoolToSelectedEvents(
+        pool: List<YelpOptionPoolItem>,
         dates: List<String>,
         type: String,
         itineraryId: String
@@ -269,35 +257,78 @@ object YelpRepository {
         val (startTime, endTime) = if (type == "restaurant") "19:00" to "21:00" else "10:00" to "12:00"
 
         return dates.mapIndexedNotNull { dayIndex, date ->
-            val primary = selectPrimaryBusiness(pool, dayIndex) ?: return@mapIndexedNotNull null
-            val eventId = UUID.randomUUID().toString()
-            val orderedBusinesses = orderedBusinessesForDay(pool, dayIndex, primary)
-            val options = orderedBusinesses.mapIndexed { optionIndex, business ->
-                mapBusinessToEventOption(
-                    biz = business,
-                    eventId = eventId,
-                    isSelected = optionIndex == 0,
-                    source = "yelp"
-                )
-            }
+            val primary = selectPrimaryPoolItem(pool, dayIndex) ?: return@mapIndexedNotNull null
             TravelEvent(
-                eventId = eventId,
+                eventId = UUID.randomUUID().toString(),
                 type = type,
                 itineraryId = itineraryId,
                 date = date,
                 startTime = startTime,
                 endTime = endTime,
                 imageUrl = primary.imageUrl,
-                details = businessEventDetails(primary),
-                options = options
+                selectedOptionId = primary.providerId,
+                details = primary.toEventDetails(),
+                options = emptyList()
             )
         }
     }
 
-    private fun selectPrimaryBusiness(
-        pool: List<YelpBusiness>,
+    fun orderedPoolItemsForEvent(
+        pool: List<YelpOptionPoolItem>,
+        tripId: String,
+        eventId: String,
+        selectedProviderId: String? = null
+    ): List<YelpOptionPoolItem> {
+        if (pool.isEmpty()) return emptyList()
+
+        val selected = selectedProviderId
+            ?.takeIf { it.isNotBlank() }
+            ?.let { providerId -> pool.firstOrNull { item -> item.providerId == providerId } }
+
+        val remainder = pool
+            .asSequence()
+            .filterNot { item -> item.providerId == selected?.providerId }
+            .sortedWith(
+                compareBy<YelpOptionPoolItem>(
+                    { stablePoolSortKey(tripId, eventId, it.providerId) },
+                    { it.providerId }
+                )
+            )
+            .toList()
+
+        return buildList {
+            selected?.let(::add)
+            addAll(remainder)
+        }
+    }
+
+    private fun mapBusinessToPoolItem(biz: YelpBusiness): YelpOptionPoolItem {
+        return YelpOptionPoolItem(
+            providerId = biz.id,
+            source = "yelp",
+            name = biz.name,
+            imageUrl = biz.imageUrl,
+            rating = biz.rating,
+            reviewCount = biz.reviewCount,
+            priceTier = biz.price.orEmpty(),
+            categories = biz.categories.mapNotNull { category ->
+                category.title.takeIf { it.isNotBlank() }
+            },
+            shortAddress = biz.location?.displayAddress
+                ?.joinToString(", ")
+                .orEmpty(),
+            latitude = biz.coordinates?.latitude,
+            longitude = biz.coordinates?.longitude,
+            staticMapUrl = buildStaticMapMetadata(biz)?.get(ATTR_STATIC_MAP_URL).orEmpty(),
+            staticMapProvider = buildStaticMapMetadata(biz)?.get(ATTR_STATIC_MAP_PROVIDER).orEmpty(),
+            yelpUrl = biz.url.orEmpty()
+        )
+    }
+
+    private fun selectPrimaryPoolItem(
+        pool: List<YelpOptionPoolItem>,
         dayIndex: Int
-    ): YelpBusiness? {
+    ): YelpOptionPoolItem? {
         val preferredGroup = pool.drop(dayIndex * OPTIONS_PER_EVENT).take(OPTIONS_PER_EVENT)
         return when {
             preferredGroup.isNotEmpty() -> preferredGroup.first()
@@ -306,31 +337,21 @@ object YelpRepository {
         }
     }
 
-    private fun orderedBusinessesForDay(
-        pool: List<YelpBusiness>,
-        dayIndex: Int,
-        primary: YelpBusiness
-    ): List<YelpBusiness> {
-        if (pool.size <= OPTIONS_PER_EVENT) {
-            return pool
+    private fun stablePoolSortKey(
+        tripId: String,
+        eventId: String,
+        providerId: String
+    ): Long {
+        val stableKey = "$tripId|$eventId|$providerId"
+        return stableKey.hashCode().toLong() and 0x00000000ffffffffL
+    }
+
+    private fun categoriesForPoolType(poolType: String): String? {
+        return when (poolType) {
+            YELP_POOL_TYPE_RESTAURANTS -> "restaurants"
+            YELP_POOL_TYPE_ACTIVITIES -> "arts,museums,tours,landmarks"
+            else -> null
         }
-
-        val preferredIds = linkedSetOf<String>()
-        val ordered = mutableListOf<YelpBusiness>()
-
-        pool.drop(dayIndex * OPTIONS_PER_EVENT)
-            .take(OPTIONS_PER_EVENT)
-            .forEach { business ->
-                if (preferredIds.add(business.id)) {
-                    ordered += business
-                }
-            }
-
-        if (ordered.isEmpty() && preferredIds.add(primary.id)) {
-            ordered += primary
-        }
-
-        return ordered
     }
 
     // Fetch full business details (photos, hours, etc.) — called lazily on first expand
@@ -427,20 +448,6 @@ object YelpRepository {
             yelpId = yelpId
         )
     }
-
-    internal fun mapBusinessToEventOption(
-        biz: YelpBusiness,
-        eventId: String,
-        isSelected: Boolean,
-        source: String
-    ): EventOption = EventOption(
-        optionId = UUID.randomUUID().toString(),
-        eventId = eventId,
-        source = source,
-        selected = isSelected,
-        imageUrl = biz.imageUrl,
-        details = businessDetailAttributes(biz)
-    )
 
     internal fun businessEventDetails(biz: YelpBusiness): Map<String, String> {
         return businessDetailAttributes(biz)

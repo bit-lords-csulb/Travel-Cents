@@ -155,6 +155,7 @@ data class TripEventEntity(
     val imageUrl: String,
     val localImagePath: String,
     val photoUrls: List<String>,
+    val selectedOptionId: String,
     val details: Map<String, String>,
     val eventVersionGroup: Long,
     val updatedAtEpochMs: Long
@@ -227,6 +228,7 @@ fun TripEventEntity.toDomainModel(): TravelEvent = TravelEvent(
     imageUrl = imageUrl,
     localImagePath = localImagePath,
     photoUrls = photoUrls,
+    selectedOptionId = selectedOptionId,
     details = details
 )
 
@@ -249,6 +251,7 @@ fun TravelEvent.toTripEventEntity(
     imageUrl = imageUrl,
     localImagePath = localImagePath,
     photoUrls = photoUrls,
+    selectedOptionId = selectedOptionId,
     details = details,
     eventVersionGroup = eventVersionGroup,
     updatedAtEpochMs = updatedAtEpochMs

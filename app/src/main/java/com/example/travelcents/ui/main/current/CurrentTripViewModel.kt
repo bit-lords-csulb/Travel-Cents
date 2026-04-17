@@ -12,11 +12,16 @@ import com.example.travelcents.data.trip.TripKey
 import com.example.travelcents.data.trip.TripAccessRole
 import com.example.travelcents.data.trip.TripPerformanceLogger
 import com.example.travelcents.data.trip.TripRepository
+import com.example.travelcents.data.trip.model.DETAIL_YELP_ID
 import com.example.travelcents.data.trip.model.EventOption
 import com.example.travelcents.data.trip.model.Itinerary
 import com.example.travelcents.data.trip.model.TravelEvent
+import com.example.travelcents.data.trip.model.YelpOptionPoolItem
 import com.example.travelcents.data.trip.model.YelpReview
+import com.example.travelcents.data.trip.model.detailValue
 import com.example.travelcents.data.trip.model.resolveTripName
+import com.example.travelcents.data.trip.model.YELP_POOL_TYPE_ACTIVITIES
+import com.example.travelcents.data.trip.model.YELP_POOL_TYPE_RESTAURANTS
 import com.example.travelcents.data.trip.remote.YelpRepository
 import com.example.travelcents.data.sync.CurrentTripSyncCoordinator
 import com.example.travelcents.data.sync.TripHydrationWorker
@@ -93,7 +98,8 @@ class CurrentTripViewModel(application: Application) : AndroidViewModel(applicat
         private const val DEFAULT_TRIP_TITLE = "Loading Trip..."
         private const val EMPTY_PLANS_MESSAGE = "No plans yet. Tap + to add one."
         private const val NO_TRIP_MESSAGE = "No trip found yet. Create one from the New Trip tab."
-        private val YELP_PREFETCH_TYPES = setOf("restaurant", "activity")
+        private const val SHARED_YELP_VISIBLE_OPTIONS = 5
+        private const val SHARED_YELP_POOL_EXPANSION_SIZE = 10
     }
 
     private val _events = MutableStateFlow<List<TravelEvent>>(emptyList())
@@ -156,6 +162,8 @@ class CurrentTripViewModel(application: Application) : AndroidViewModel(applicat
     private var currentTripSummary: Itinerary? = null
     private var currentTripDestination: String = ""
     private var localEventsSnapshot: List<TravelEvent> = emptyList()
+    private val sharedYelpPools = mutableMapOf<String, List<YelpOptionPoolItem>>()
+    private val sharedYelpWindowBoost = mutableMapOf<String, Int>()
     private val mediaDetailPipeline = TripMediaDetailPipeline(application)
 
     private fun resetTripState(
@@ -176,6 +184,8 @@ class CurrentTripViewModel(application: Application) : AndroidViewModel(applicat
         currentTripSummary = null
         currentTripDestination = ""
         localEventsSnapshot = emptyList()
+        sharedYelpPools.clear()
+        sharedYelpWindowBoost.clear()
         _events.value = emptyList()
         _tripTitle.value = tripTitle
         _eventOptions.value = emptyMap()
@@ -297,9 +307,13 @@ class CurrentTripViewModel(application: Application) : AndroidViewModel(applicat
         baseEvents: List<TravelEvent>,
         optionsByEvent: Map<String, List<EventOption>>
     ) {
+        val alignedOptionsByEvent = alignEventOptionsWithSelectedState(baseEvents, optionsByEvent)
+        if (alignedOptionsByEvent != _eventOptions.value) {
+            _eventOptions.value = alignedOptionsByEvent
+        }
         val enrichedEvents = mediaDetailPipeline.applySelectedOptions(
             events = baseEvents,
-            optionsByEvent = optionsByEvent,
+            optionsByEvent = alignedOptionsByEvent,
             sortEvents = ::sortPlanEvents
         )
         _events.value = enrichedEvents
@@ -317,7 +331,49 @@ class CurrentTripViewModel(application: Application) : AndroidViewModel(applicat
             )
         }
         prefetchSharedEventMedia(enrichedEvents)
-        prefetchYelpEnrichment(enrichedEvents)
+    }
+
+    private fun alignEventOptionsWithSelectedState(
+        events: List<TravelEvent>,
+        optionsByEvent: Map<String, List<EventOption>>
+    ): Map<String, List<EventOption>> {
+        if (events.isEmpty() || optionsByEvent.isEmpty()) return optionsByEvent
+
+        var changed = false
+        val eventById = events.associateBy(TravelEvent::eventId)
+        val alignedOptions = optionsByEvent.mapValues { (eventId, options) ->
+            val event = eventById[eventId] ?: return@mapValues options
+            val selectedOptionId = event.selectedOptionId
+                .takeIf { it.isNotBlank() }
+                ?: event.detailValue(DETAIL_YELP_ID)?.takeIf { it.isNotBlank() }
+                ?: return@mapValues options
+
+            val normalizedOptions = options.map { option ->
+                option.copy(selected = option.optionId == selectedOptionId)
+            }.toMutableList()
+
+            if (normalizedOptions.none(EventOption::selected) && yelpPoolTypeForEvent(event) != null) {
+                normalizedOptions.add(
+                    index = 0,
+                    element = EventOption(
+                        optionId = selectedOptionId,
+                        eventId = eventId,
+                        source = "yelp",
+                        selected = true,
+                        imageUrl = event.imageUrl,
+                        localImagePath = event.localImagePath,
+                        photoUrls = event.photoUrls,
+                        details = event.details
+                    )
+                )
+            }
+
+            val dedupedOptions = normalizedOptions.distinctBy(EventOption::optionId)
+            if (dedupedOptions != options) changed = true
+            dedupedOptions
+        }
+
+        return if (changed) alignedOptions else optionsByEvent
     }
 
     private fun refreshCurrentTrip(
@@ -522,14 +578,6 @@ class CurrentTripViewModel(application: Application) : AndroidViewModel(applicat
         }
     }
 
-    private fun prefetchYelpEnrichment(events: List<TravelEvent>) {
-        if (currentTripWriteKeyIfOwner() == null) return
-        events.forEach { event ->
-            if (event.type.lowercase(Locale.US) !in YELP_PREFETCH_TYPES) return@forEach
-            ensureYelpEventEnriched(event.eventId)
-        }
-    }
-
     private fun applyEnrichedEventState(
         eventId: String,
         enrichedEvent: TravelEvent,
@@ -558,18 +606,27 @@ class CurrentTripViewModel(application: Application) : AndroidViewModel(applicat
         eventId: String,
         result: YelpRepository.YelpEventEnrichmentResult
     ) {
-        tripSyncRemoteDataSource.persistEventAndOptions(
-            tripKey = tripKey,
-            eventId = eventId,
-            event = result.event,
-            options = result.options,
-            updatedOptionIds = result.updatedOptionIds
-        )
+        val shouldPersistEventOnly = yelpPoolTypeForEvent(result.event) != null &&
+            result.event.selectedOptionId.isNotBlank()
+        if (shouldPersistEventOnly) {
+            tripSyncRemoteDataSource.upsertEvent(
+                tripKey = tripKey,
+                event = result.event
+            )
+        } else {
+            tripSyncRemoteDataSource.persistEventAndOptions(
+                tripKey = tripKey,
+                eventId = eventId,
+                event = result.event,
+                options = result.options,
+                updatedOptionIds = result.updatedOptionIds
+            )
+        }
         persistLocalTripSnapshot(
             tripKey = tripKey,
             events = localEventsSnapshot,
             options = _eventOptions.value,
-            persistOptions = true
+            persistOptions = !shouldPersistEventOnly
         )
         refreshCurrentTripInBackground(tripKey)
     }
@@ -579,13 +636,26 @@ class CurrentTripViewModel(application: Application) : AndroidViewModel(applicat
         val summary = currentTripSummary ?: return
         viewModelScope.launch {
             if (eventId in _optionsLoading.value) return@launch
+            if (_eventOptions.value[eventId].orEmpty().isNotEmpty()) return@launch
             try {
+                _optionsLoading.update { it + eventId }
+                val event = localEventsSnapshot.firstOrNull { it.eventId == eventId }
+                    ?: _uiState.value.events.firstOrNull { it.eventId == eventId }
+                if (event != null) {
+                    val sharedYelpOptions = loadSharedYelpOptions(tripKey, event)
+                    if (sharedYelpOptions != null) {
+                        val updatedOptions = _eventOptions.value + (eventId to sharedYelpOptions)
+                        _eventOptions.value = updatedOptions
+                        publishCurrentEvents(localEventsSnapshot, updatedOptions)
+                        return@launch
+                    }
+                }
+
                 val localVersion = tripLocalDataSource.getTripOptionsVersionGroup(tripKey)
                 if (localVersion != null && localVersion == summary.optionsVersion) {
                     return@launch
                 }
 
-                _optionsLoading.update { it + eventId }
                 currentTripSyncCoordinator.hydrateOptionsIfNeeded(
                     tripKey = tripKey,
                     expectedOptionsVersion = summary.optionsVersion
@@ -596,6 +666,185 @@ class CurrentTripViewModel(application: Application) : AndroidViewModel(applicat
             } finally {
                 _optionsLoading.update { it - eventId }
             }
+        }
+    }
+
+    private suspend fun loadSharedYelpOptions(
+        tripKey: TripKey,
+        event: TravelEvent
+    ): List<EventOption>? {
+        val poolType = yelpPoolTypeForEvent(event) ?: return null
+        val initialPoolItems = sharedYelpPools[poolType] ?: tripSyncRemoteDataSource
+            .fetchYelpOptionPool(tripKey, poolType)
+            .also { items ->
+                if (items.isNotEmpty()) {
+                    sharedYelpPools[poolType] = items
+                }
+            }
+
+        if (initialPoolItems.isEmpty()) return null
+
+        val poolItems = maybeExpandSharedYelpPool(
+            tripKey = tripKey,
+            event = event,
+            poolType = poolType,
+            poolItems = initialPoolItems,
+            rejectedIds = _rejectedOptions.value[event.eventId].orEmpty()
+        )
+
+        return synthesizeSharedYelpOptions(
+            tripId = tripKey.tripId,
+            event = event,
+            poolItems = poolItems,
+            rejectedIds = _rejectedOptions.value[event.eventId].orEmpty()
+        )
+    }
+
+    private fun synthesizeSharedYelpOptions(
+        tripId: String,
+        event: TravelEvent,
+        poolItems: List<YelpOptionPoolItem>,
+        rejectedIds: Set<String>
+    ): List<EventOption> {
+        val selectedProviderId = event.selectedOptionId
+            .takeIf { it.isNotBlank() }
+            ?: event.detailValue(DETAIL_YELP_ID)
+        val orderedPool = YelpRepository.orderedPoolItemsForEvent(
+            pool = poolItems,
+            tripId = tripId,
+            eventId = event.eventId,
+            selectedProviderId = selectedProviderId
+        )
+
+        val orderedAlternatives = orderedPool.filterNot { item ->
+            item.providerId == selectedProviderId
+        }
+        val visibleAlternativeCount = SHARED_YELP_VISIBLE_OPTIONS +
+            rejectedIds.count { rejectedId -> orderedAlternatives.any { item -> item.providerId == rejectedId } } +
+            (sharedYelpWindowBoost[event.eventId] ?: 0)
+
+        val synthesizedOptions = orderedAlternatives
+            .take(visibleAlternativeCount)
+            .map { item ->
+                item.toEventOption(
+                    eventId = event.eventId,
+                    selected = false
+                )
+            }
+            .toMutableList()
+
+        if (!selectedProviderId.isNullOrBlank()) {
+            synthesizedOptions.add(
+                index = 0,
+                element = EventOption(
+                    optionId = selectedProviderId,
+                    eventId = event.eventId,
+                    source = "yelp",
+                    selected = true,
+                    imageUrl = event.imageUrl,
+                    localImagePath = event.localImagePath,
+                    photoUrls = event.photoUrls,
+                    details = event.details
+                )
+            )
+        }
+
+        return synthesizedOptions
+            .distinctBy(EventOption::optionId)
+            .map { option ->
+                option.copy(selected = option.optionId == selectedProviderId)
+            }
+    }
+
+    fun loadMoreOptions(eventId: String) {
+        val tripKey = currentTripKey ?: return
+        val event = localEventsSnapshot.firstOrNull { it.eventId == eventId }
+            ?: _uiState.value.events.firstOrNull { it.eventId == eventId }
+            ?: return
+        val poolType = yelpPoolTypeForEvent(event) ?: return
+        val poolItems = sharedYelpPools[poolType].orEmpty()
+        if (poolItems.isEmpty()) return
+
+        viewModelScope.launch {
+            if (eventId in _optionsLoading.value) return@launch
+            _optionsLoading.update { it + eventId }
+            try {
+                sharedYelpWindowBoost[eventId] =
+                    (sharedYelpWindowBoost[eventId] ?: 0) + SHARED_YELP_VISIBLE_OPTIONS
+                val expandedPool = maybeExpandSharedYelpPool(
+                    tripKey = tripKey,
+                    event = event,
+                    poolType = poolType,
+                    poolItems = poolItems,
+                    rejectedIds = _rejectedOptions.value[eventId].orEmpty()
+                )
+                val updatedOptions = synthesizeSharedYelpOptions(
+                    tripId = tripKey.tripId,
+                    event = event,
+                    poolItems = expandedPool,
+                    rejectedIds = _rejectedOptions.value[eventId].orEmpty()
+                )
+                val updatedOptionsByEvent = _eventOptions.value + (eventId to updatedOptions)
+                _eventOptions.value = updatedOptionsByEvent
+                publishCurrentEvents(localEventsSnapshot, updatedOptionsByEvent)
+            } catch (e: Exception) {
+                Log.w("CurrentTripViewModel", "Failed to load more shared Yelp options", e)
+            } finally {
+                _optionsLoading.update { it - eventId }
+            }
+        }
+    }
+
+    private suspend fun maybeExpandSharedYelpPool(
+        tripKey: TripKey,
+        event: TravelEvent,
+        poolType: String,
+        poolItems: List<YelpOptionPoolItem>,
+        rejectedIds: Set<String>
+    ): List<YelpOptionPoolItem> {
+        val selectedProviderId = event.selectedOptionId
+            .takeIf { it.isNotBlank() }
+            ?: event.detailValue(DETAIL_YELP_ID)
+        val currentAlternativeCount = poolItems.count { item ->
+            item.providerId != selectedProviderId
+        }
+        val requiredAlternativeCount = SHARED_YELP_VISIBLE_OPTIONS + rejectedIds.size
+        if (currentAlternativeCount >= requiredAlternativeCount) {
+            return poolItems
+        }
+
+        val location = currentTripDestination
+            .ifBlank { currentTripSummary?.destination.orEmpty() }
+            .ifBlank { return poolItems }
+        val additionalItems = YelpRepository.fetchAdditionalPoolItems(
+            location = location,
+            poolType = poolType,
+            existingProviderIds = poolItems.map(YelpOptionPoolItem::providerId).toSet(),
+            targetCount = maxOf(
+                SHARED_YELP_POOL_EXPANSION_SIZE,
+                requiredAlternativeCount - currentAlternativeCount
+            )
+        )
+        if (additionalItems.isEmpty()) return poolItems
+
+        val mergedItems = (poolItems + additionalItems).distinctBy(YelpOptionPoolItem::providerId)
+        tripSyncRemoteDataSource.upsertYelpOptionPoolItems(
+            tripKey = tripKey,
+            poolType = poolType,
+            items = additionalItems
+        )
+        sharedYelpPools[poolType] = mergedItems
+        return mergedItems
+    }
+
+    private fun yelpPoolTypeForEvent(event: TravelEvent): String? {
+        val yelpBusinessId = event.detailValue(DETAIL_YELP_ID)?.takeIf { it.isNotBlank() } ?: return null
+        if (yelpBusinessId.isBlank()) return null
+
+        return when (event.type.lowercase(Locale.US)) {
+            "restaurant", "dining", "food" -> YELP_POOL_TYPE_RESTAURANTS
+            "activity" -> YELP_POOL_TYPE_ACTIVITIES
+            else -> null
         }
     }
 
@@ -810,6 +1059,8 @@ class CurrentTripViewModel(application: Application) : AndroidViewModel(applicat
         val event = localEventsSnapshot.firstOrNull { it.eventId == eventId }
             ?: _uiState.value.events.firstOrNull { it.eventId == eventId }
             ?: return
+        val isYelpSelectionEvent = selectedOption.source.equals("yelp", ignoreCase = true) &&
+            yelpPoolTypeForEvent(event) != null
 
         val updatedOptions = options.map { option ->
             option.copy(selected = option.optionId == optionId)
@@ -836,18 +1087,25 @@ class CurrentTripViewModel(application: Application) : AndroidViewModel(applicat
         persistLocalTripSnapshot(
             events = localEventsSnapshot,
             options = updatedOptionsByEvent,
-            persistOptions = true
+            persistOptions = !isYelpSelectionEvent
         )
         prefetchSharedEventMedia(listOf(updatedEvent))
 
         viewModelScope.launch {
             try {
-                tripSyncRemoteDataSource.persistEventAndOptions(
-                    tripKey = tripKey,
-                    eventId = eventId,
-                    event = updatedEvent,
-                    options = updatedOptions
-                )
+                if (isYelpSelectionEvent) {
+                    tripSyncRemoteDataSource.upsertEvent(
+                        tripKey = tripKey,
+                        event = updatedEvent
+                    )
+                } else {
+                    tripSyncRemoteDataSource.persistEventAndOptions(
+                        tripKey = tripKey,
+                        eventId = eventId,
+                        event = updatedEvent,
+                        options = updatedOptions
+                    )
+                }
             } catch (e: Exception) {
                 Log.e("CurrentTripViewModel", "Failed to select option", e)
                 _uiState.update { it.copy(errorMessage = e.message ?: "Failed to update selection.") }
@@ -865,7 +1123,58 @@ class CurrentTripViewModel(application: Application) : AndroidViewModel(applicat
             return
         }
         _rejectedOptions.update { current ->
-            current + (eventId to (current[eventId].orEmpty() + optionId))
+            val updatedRejected = current[eventId].orEmpty() + optionId
+            val event = localEventsSnapshot.firstOrNull { it.eventId == eventId }
+                ?: _uiState.value.events.firstOrNull { it.eventId == eventId }
+            if (event != null) {
+                val poolType = yelpPoolTypeForEvent(event)
+                val poolItems = poolType?.let { sharedYelpPools[it] }.orEmpty()
+                if (poolItems.isNotEmpty()) {
+                    val updatedOptions = synthesizeSharedYelpOptions(
+                        tripId = currentTripKey?.tripId ?: event.itineraryId,
+                        event = event,
+                        poolItems = poolItems,
+                        rejectedIds = updatedRejected
+                    )
+                    _eventOptions.value = _eventOptions.value + (eventId to updatedOptions)
+                }
+            }
+            current + (eventId to updatedRejected)
+        }
+
+        val tripKey = currentTripKey ?: return
+        val event = localEventsSnapshot.firstOrNull { it.eventId == eventId }
+            ?: _uiState.value.events.firstOrNull { it.eventId == eventId }
+            ?: return
+        val poolType = yelpPoolTypeForEvent(event) ?: return
+        val poolItems = sharedYelpPools[poolType].orEmpty()
+        if (poolItems.isEmpty()) return
+
+        viewModelScope.launch {
+            if (eventId in _optionsLoading.value) return@launch
+            _optionsLoading.update { it + eventId }
+            try {
+                val expandedPool = maybeExpandSharedYelpPool(
+                    tripKey = tripKey,
+                    event = event,
+                    poolType = poolType,
+                    poolItems = poolItems,
+                    rejectedIds = _rejectedOptions.value[eventId].orEmpty()
+                )
+                val updatedOptions = synthesizeSharedYelpOptions(
+                    tripId = tripKey.tripId,
+                    event = event,
+                    poolItems = expandedPool,
+                    rejectedIds = _rejectedOptions.value[eventId].orEmpty()
+                )
+                val updatedOptionsByEvent = _eventOptions.value + (eventId to updatedOptions)
+                _eventOptions.value = updatedOptionsByEvent
+                publishCurrentEvents(localEventsSnapshot, updatedOptionsByEvent)
+            } catch (e: Exception) {
+                Log.w("CurrentTripViewModel", "Failed to expand shared Yelp options", e)
+            } finally {
+                _optionsLoading.update { it - eventId }
+            }
         }
     }
 

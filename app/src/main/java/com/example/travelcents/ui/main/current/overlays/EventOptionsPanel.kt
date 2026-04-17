@@ -148,6 +148,7 @@ fun EventOptionsPanel(
     isLoading: Boolean = false,
     onSelect: (optionId: String) -> Unit,
     onReject: (optionId: String) -> Unit,
+    onLoadMore: (() -> Unit)? = null,
     onDismiss: () -> Unit,
     selectedNamesElsewhere: Set<String> = emptySet()
 ) {
@@ -269,6 +270,35 @@ fun EventOptionsPanel(
                             },
                             onReject = { onReject(opt.optionId) }
                         )
+                    }
+                    if (onLoadMore != null) {
+                        item {
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(horizontal = 20.dp, vertical = 8.dp),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                OutlinedButton(
+                                    onClick = onLoadMore,
+                                    enabled = !isLoading,
+                                    border = androidx.compose.foundation.BorderStroke(
+                                        width = 1.dp,
+                                        color = typeColor.copy(alpha = 0.45f)
+                                    ),
+                                    colors = ButtonDefaults.outlinedButtonColors(
+                                        contentColor = typeColor,
+                                        disabledContentColor = OnSurfaceVar
+                                    )
+                                ) {
+                                    Text(
+                                        text = if (isLoading) "Loading more..." else "Show More Options",
+                                        fontSize = 12.sp,
+                                        fontWeight = FontWeight.Medium
+                                    )
+                                }
+                            }
+                        }
                     }
                 }
 
