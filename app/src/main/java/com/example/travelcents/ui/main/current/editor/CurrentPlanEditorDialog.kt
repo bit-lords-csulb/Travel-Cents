@@ -112,6 +112,7 @@ private data class PlanDetailField(
 fun CurrentPlanEditorDialog(
     initialPlan: EditablePlan,
     currentOptions: List<EventOption>,
+    canShowAlternatives: Boolean = initialPlan.eventId != null && currentOptions.size > 1,
     yelpReviews: List<YelpReview>,
     reviewsLoading: Boolean,
     onDismiss: () -> Unit,
@@ -148,7 +149,6 @@ fun CurrentPlanEditorDialog(
     var restaurantName by remember(initialPlan) { mutableStateOf(initialPlan.existingDetails.firstNonBlank(ATTR_BUSINESS_NAME, "restaurant_name").orEmpty()) }
     var cuisine by remember(initialPlan) { mutableStateOf(initialPlan.existingDetails["cuisine"].orEmpty()) }
 
-    val canShowAlternatives = initialPlan.eventId != null && currentOptions.size > 1
     val colorOptions = remember {
         listOf(
             "rose" to Color(0xFFFF677C),

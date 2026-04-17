@@ -208,12 +208,13 @@ fun CurrentTripItineraryContent(
                             val options = eventOptions[item.event.eventId].orEmpty()
                             val rejected = rejectedOptions[item.event.eventId].orEmpty()
                             val activeOptionCount = options.count { it.optionId !in rejected }
+                            val optionsLoaded = item.event.eventId in eventOptions
                             ReorderableItem(reorderState, key = item.event.eventId) { isDragging ->
                                 CurrentTripItineraryCard(
                                     event = item.event,
                                     isLast = item.isLastInDay,
                                     canEditTrip = canEditTrip,
-                                    hasAlternatives = activeOptionCount > 1,
+                                    hasAlternatives = !optionsLoaded || activeOptionCount > 1,
                                     isDragging = isDragging,
                                     jiggleMode = jiggleMode,
                                     wobbleAngle = cardRotation,

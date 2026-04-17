@@ -80,6 +80,7 @@ fun CurrentTripEventDetailsDialog(
     yelpReviews: List<YelpReview>,
     reviewsLoading: Boolean,
     canEditTrip: Boolean,
+    canShowAlternatives: Boolean = currentOptions.size > 1,
     onDismiss: () -> Unit,
     onEdit: () -> Unit,
     onDelete: () -> Unit,
@@ -162,7 +163,7 @@ fun CurrentTripEventDetailsDialog(
                                         onEdit()
                                     }
                                 )
-                                if (onAlternatives != null && currentOptions.size > 1) {
+                                if (onAlternatives != null && canShowAlternatives) {
                                     DropdownMenuItem(
                                         text = { Text("Change option", color = CardText) },
                                         onClick = {
