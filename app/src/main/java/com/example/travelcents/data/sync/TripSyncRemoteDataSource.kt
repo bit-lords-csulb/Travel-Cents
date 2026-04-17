@@ -7,6 +7,7 @@ import com.example.travelcents.data.trip.model.EventOption
 import com.example.travelcents.data.trip.model.Itinerary
 import com.example.travelcents.data.trip.model.TravelEvent
 import com.example.travelcents.data.trip.model.resolveTripName
+import com.google.firebase.firestore.DocumentReference
 import com.google.firebase.firestore.DocumentSnapshot
 import com.google.firebase.firestore.FieldValue
 import com.google.firebase.firestore.FirebaseFirestore
@@ -272,23 +273,43 @@ class TripSyncRemoteDataSource(
             updatedAtEpochMs = version
         ).toFirestoreMap() + timestampMetadata(version)
 
-        db.runBatch { batch ->
-            batch.set(tripDocument(tripKey), tripData)
+        val pendingWrites = buildList<PendingSet> {
             events.forEach { event ->
                 val eventRef = eventDocument(tripKey, event.eventId)
-                batch.set(eventRef, event.toFirestoreMap() + timestampMetadata(version))
+                add(
+                    PendingSet(
+                        reference = eventRef,
+                        data = event.toFirestoreMap() + timestampMetadata(version)
+                    )
+                )
                 event.options.forEach { option ->
-                    batch.set(
-                        eventRef.collection("options").document(option.optionId),
-                        option.scopedTo(
-                            ownerUid = ownerUid,
-                            tripId = itinerary.itineraryId,
-                            eventId = event.eventId
-                        ).toMap() + timestampMetadata(version)
+                    add(
+                        PendingSet(
+                            reference = eventRef.collection("options").document(option.optionId),
+                            data = option.scopedTo(
+                                ownerUid = ownerUid,
+                                tripId = itinerary.itineraryId,
+                                eventId = event.eventId
+                            ).toMap() + timestampMetadata(version)
+                        )
                     )
                 }
             }
-        }.await()
+        }
+
+        val writeChunks = pendingWrites.chunked(MAX_CREATE_TRIP_BATCH_WRITES - 1)
+        writeChunks.dropLast(1).forEach { chunk ->
+            val batch = db.batch()
+            chunk.forEach { write -> batch.set(write.reference, write.data) }
+            batch.commit().await()
+        }
+
+        val finalBatch = db.batch()
+        writeChunks.lastOrNull().orEmpty().forEach { write ->
+            finalBatch.set(write.reference, write.data)
+        }
+        finalBatch.set(tripDocument(tripKey), tripData)
+        finalBatch.commit().await()
 
         runCatching {
             refreshTripIndexesForTrip(tripKey)
@@ -646,18 +667,6 @@ class TripSyncRemoteDataSource(
         }.toMap()
     }
 
-    private fun shouldFallbackOptionQuery(error: Throwable): Boolean {
-        val firestoreError = error as? FirebaseFirestoreException
-        if (firestoreError?.code == FirebaseFirestoreException.Code.FAILED_PRECONDITION) {
-            return true
-        }
-
-        val message = error.message.orEmpty().lowercase()
-        return "collection_group_contains" in message ||
-            "collections_group_contains" in message ||
-            "requires an index" in message
-    }
-
     private fun buildTripRefMap(
         snapshot: Map<String, Any>,
         ownerUid: String,
@@ -784,4 +793,36 @@ class TripSyncRemoteDataSource(
             )
         }.getOrNull()
     }
+
+    private companion object {
+        private const val MAX_CREATE_TRIP_BATCH_WRITES = 200
+    }
+}
+
+private data class PendingSet(
+    val reference: DocumentReference,
+    val data: Map<String, Any>
+)
+
+internal fun shouldFallbackOptionQuery(error: Throwable): Boolean {
+    val firestoreCodeName = runCatching {
+        if (error::class.java.name != "com.google.firebase.firestore.FirebaseFirestoreException") {
+            null
+        } else {
+            error.javaClass.getMethod("getCode").invoke(error)?.toString()?.substringAfterLast('.')
+        }
+    }.getOrNull()
+
+    if (firestoreCodeName == "FAILED_PRECONDITION" || firestoreCodeName == "PERMISSION_DENIED") {
+        return true
+    }
+
+    val message = error.message.orEmpty().lowercase()
+    if ("permission denied" in message || "missing or insufficient permissions" in message) {
+        return true
+    }
+
+    return "collection_group_contains" in message ||
+        "collections_group_contains" in message ||
+        "requires an index" in message
 }

@@ -257,9 +257,8 @@ object YelpRepository {
     }
 
     // Distribute a Yelp business pool across trip days.
-    // Each day keeps the full loaded pool as switchable options so no fetched business is discarded.
-    // The day's preferred 5-business chunk is ordered first to preserve varied defaults across days.
-    // Days beyond pool size are skipped until undersized-pool duplication behavior is implemented.
+    // Each day keeps only its preferred chunk so option docs scale linearly with trip length.
+    // Small pools still stay fully available until they are exhausted across days.
     fun distributePoolToEvents(
         pool: List<YelpBusiness>,
         dates: List<String>,
@@ -312,8 +311,12 @@ object YelpRepository {
         dayIndex: Int,
         primary: YelpBusiness
     ): List<YelpBusiness> {
-        val preferredIds = linkedSetOf(primary.id)
-        val ordered = mutableListOf(primary)
+        if (pool.size <= OPTIONS_PER_EVENT) {
+            return pool
+        }
+
+        val preferredIds = linkedSetOf<String>()
+        val ordered = mutableListOf<YelpBusiness>()
 
         pool.drop(dayIndex * OPTIONS_PER_EVENT)
             .take(OPTIONS_PER_EVENT)
@@ -323,10 +326,8 @@ object YelpRepository {
                 }
             }
 
-        pool.forEach { business ->
-            if (preferredIds.add(business.id)) {
-                ordered += business
-            }
+        if (ordered.isEmpty() && preferredIds.add(primary.id)) {
+            ordered += primary
         }
 
         return ordered

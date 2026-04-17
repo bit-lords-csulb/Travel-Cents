@@ -38,7 +38,18 @@ class FirestoreTripRepository(
 
     override suspend fun getTripSummaries(viewerUid: String): List<Itinerary> = coroutineScope {
         val ownedTrips = async { getOwnedTripSummaries(viewerUid) }
-        val sharedTrips = async { getSharedTripSummariesSafe(viewerUid) }
+        val sharedTrips = async {
+            runCatching {
+                getSharedTripSummariesSafe(viewerUid)
+            }.getOrElse { error ->
+                Log.w(
+                    TAG,
+                    "Shared trip discovery failed for viewer $viewerUid. Returning owned trips only.",
+                    error
+                )
+                emptyList()
+            }
+        }
 
         (ownedTrips.await() + sharedTrips.await())
             .distinctBy { trip -> "${trip.ownerUid}:${trip.itineraryId}" }
@@ -657,18 +668,6 @@ class FirestoreTripRepository(
         return (getLong("accessSchemaVersion") ?: 0L).toInt()
     }
 
-    private fun shouldFallbackSharedTripQuery(error: Throwable): Boolean {
-        val firestoreError = error as? FirebaseFirestoreException
-        if (firestoreError?.code == FirebaseFirestoreException.Code.FAILED_PRECONDITION) {
-            return true
-        }
-
-        val message = error.message.orEmpty().lowercase()
-        return "collection_group_contains" in message ||
-            "collections_group_contains" in message ||
-            "requires an index" in message
-    }
-
     private fun tripDocument(key: TripKey) = tripsCollection(key.ownerUid).document(key.tripId)
 
     private fun tripsCollection(ownerUid: String) = db.collection("users")
@@ -679,4 +678,27 @@ class FirestoreTripRepository(
         private const val MAX_BATCH_DELETE_SIZE = 450
         private const val TAG = "FirestoreTripRepository"
     }
+}
+
+internal fun shouldFallbackSharedTripQuery(error: Throwable): Boolean {
+    val firestoreCodeName = runCatching {
+        if (error::class.java.name != "com.google.firebase.firestore.FirebaseFirestoreException") {
+            null
+        } else {
+            error.javaClass.getMethod("getCode").invoke(error)?.toString()?.substringAfterLast('.')
+        }
+    }.getOrNull()
+
+    if (firestoreCodeName == "FAILED_PRECONDITION" || firestoreCodeName == "PERMISSION_DENIED") {
+        return true
+    }
+
+    val message = error.message.orEmpty().lowercase()
+    if ("permission denied" in message || "missing or insufficient permissions" in message) {
+        return true
+    }
+
+    return "collection_group_contains" in message ||
+        "collections_group_contains" in message ||
+        "requires an index" in message
 }

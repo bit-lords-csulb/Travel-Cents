@@ -11,7 +11,7 @@ import org.junit.Test
 class YelpPoolDistributionTest {
 
     @Test
-    fun distributePoolToEvents_forSevenDaysPreservesAllLoadedBusinessesAsOptions() {
+    fun distributePoolToEvents_forSevenDaysKeepsOnlyEachDayPreferredChunk() {
         val pool = (0 until 35).map(::business)
         val dates = (1..7).map { "2026-06-0$it" }
 
@@ -22,22 +22,17 @@ class YelpPoolDistributionTest {
             itineraryId = "trip-1"
         )
 
-        val usedBusinessIds = events
-            .flatMap { event -> event.options.mapNotNull { it.details["yelp_id"] } }
-            .toSet()
         val selectedBusinessIds = events
             .mapNotNull { event -> event.options.firstOrNull { it.selected }?.details?.get("yelp_id") }
             .toSet()
 
         assertEquals(7, events.size)
-        assertTrue(events.all { it.options.size == 35 })
-        assertEquals(35, usedBusinessIds.size)
-        assertEquals((0 until 35).map { "biz-$it" }.toSet(), usedBusinessIds)
+        assertTrue(events.all { it.options.size == 5 })
         assertEquals(setOf("biz-0", "biz-5", "biz-10", "biz-15", "biz-20", "biz-25", "biz-30"), selectedBusinessIds)
     }
 
     @Test
-    fun distributePoolToEvents_ordersEachDayByItsPreferredChunkBeforeGlobalBackups() {
+    fun distributePoolToEvents_ordersOnlyItsPreferredChunk() {
         val pool = (0 until 12).map(::business)
         val dates = listOf("2026-06-01", "2026-06-02", "2026-06-03")
 
@@ -51,7 +46,7 @@ class YelpPoolDistributionTest {
         val dayTwoOptionIds = events[1].options.mapNotNull { it.details["yelp_id"] }
 
         assertEquals(listOf("biz-5", "biz-6", "biz-7", "biz-8", "biz-9"), dayTwoOptionIds.take(5))
-        assertEquals(12, dayTwoOptionIds.size)
+        assertEquals(5, dayTwoOptionIds.size)
     }
 
     @Test
