@@ -4,11 +4,18 @@ import android.app.Application
 import android.util.Log
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
+import com.example.travelcents.data.trip.TripKey
+import com.example.travelcents.data.trip.model.DETAIL_YELP_ID
 import com.example.travelcents.data.trip.model.EventOption
 import com.example.travelcents.data.trip.model.Itinerary
 import com.example.travelcents.data.trip.model.TravelEvent
+import com.example.travelcents.data.trip.model.YelpOptionPoolItem
 import com.example.travelcents.data.trip.model.YelpReview
+import com.example.travelcents.data.trip.model.YELP_POOL_TYPE_ACTIVITIES
+import com.example.travelcents.data.trip.model.YELP_POOL_TYPE_RESTAURANTS
+import com.example.travelcents.data.trip.model.detailValue
 import com.example.travelcents.data.trip.remote.YelpRepository
+import com.example.travelcents.data.sync.TripSyncRemoteDataSource
 import com.example.travelcents.ui.main.current.CurrentTripUiState
 import com.example.travelcents.ui.main.shared.TripMediaDetailPipeline
 import com.example.travelcents.ui.modules.normalizeDate
@@ -40,6 +47,8 @@ class ItineraryViewModel(application: Application) : AndroidViewModel(applicatio
     companion object {
         private const val DEFAULT_TRIP_TITLE = "Loading Trip..."
         private const val EMPTY_PLANS_MESSAGE = "No plans yet. Tap + to add one."
+        private const val SHARED_YELP_VISIBLE_OPTIONS = 5
+        private const val SHARED_YELP_POOL_EXPANSION_SIZE = 10
     }
 
     private val _uiState = MutableStateFlow(CurrentTripUiState())
@@ -66,8 +75,11 @@ class ItineraryViewModel(application: Application) : AndroidViewModel(applicatio
 
     private val db = FirebaseFirestore.getInstance()
     private val auth = FirebaseAuth.getInstance()
+    private val tripSyncRemoteDataSource = TripSyncRemoteDataSource(db)
     private var eventsListener: ListenerRegistration? = null
     private var currentTripDestination: String = ""
+    private val sharedYelpPools = mutableMapOf<String, List<YelpOptionPoolItem>>()
+    private val sharedYelpWindowBoost = mutableMapOf<String, Int>()
     private val mediaDetailPipeline = TripMediaDetailPipeline(application)
 
     private fun resetTripState(
@@ -79,6 +91,8 @@ class ItineraryViewModel(application: Application) : AndroidViewModel(applicatio
         eventsListener?.remove()
         eventsListener = null
         currentTripDestination = ""
+        sharedYelpPools.clear()
+        sharedYelpWindowBoost.clear()
         _eventOptions.value = emptyMap()
         _rejectedOptions.value = emptyMap()
         _yelpReviews.value = emptyMap()
@@ -189,20 +203,20 @@ class ItineraryViewModel(application: Application) : AndroidViewModel(applicatio
 
                 viewModelScope.launch {
                     val optionsByEvent = loadOptionsForEvents(uid, tripId, sortedEvents)
+                    val alignedOptionsByEvent = alignEventOptionsWithSelectedState(sortedEvents, optionsByEvent)
                     val enrichedEvents = mediaDetailPipeline.applySelectedOptions(
                         events = sortedEvents,
-                        optionsByEvent = optionsByEvent,
+                        optionsByEvent = alignedOptionsByEvent,
                         sortEvents = ::sortPlanEvents
                     )
-                    _eventOptions.value = optionsByEvent
+                    _eventOptions.value = alignedOptionsByEvent
                     _rejectedOptions.update { current ->
-                        current.filterKeys { key -> optionsByEvent.containsKey(key) }
+                        current.filterKeys { key -> alignedOptionsByEvent.containsKey(key) }
                     }
                     _uiState.update { state ->
                         state.copy(events = enrichedEvents)
                     }
                     prefetchSharedEventMedia(enrichedEvents)
-                    prefetchYelpEnrichment(enrichedEvents)
                 }
             }
     }
@@ -216,29 +230,204 @@ class ItineraryViewModel(application: Application) : AndroidViewModel(applicatio
 
         return events.map { event ->
             viewModelScope.async {
-                val options = db.collection("users")
-                    .document(uid)
-                    .collection("trips")
-                    .document(tripId)
-                    .collection("events")
-                    .document(event.eventId)
-                    .collection("options")
-                    .get()
-                    .await()
-                    .documents
-                    .map { doc ->
-                        val raw = doc.data ?: emptyMap()
-                        EventOption.fromMap(
-                            raw + mapOf(
-                                "optionId" to (raw["optionId"]?.toString() ?: doc.id),
-                                "eventId" to event.eventId
+                val options = loadSharedYelpOptions(uid, tripId, event)
+                    ?: db.collection("users")
+                        .document(uid)
+                        .collection("trips")
+                        .document(tripId)
+                        .collection("events")
+                        .document(event.eventId)
+                        .collection("options")
+                        .get()
+                        .await()
+                        .documents
+                        .map { doc ->
+                            val raw = doc.data ?: emptyMap()
+                            EventOption.fromMap(
+                                raw + mapOf(
+                                    "optionId" to (raw["optionId"]?.toString() ?: doc.id),
+                                    "eventId" to event.eventId
+                                )
                             )
-                        )
-                    }
-                    .sortedByDescending { it.selected }
+                        }
+                        .sortedByDescending { it.selected }
                 event.eventId to options
             }
         }.awaitAll().toMap()
+    }
+
+    private suspend fun loadSharedYelpOptions(
+        uid: String,
+        tripId: String,
+        event: TravelEvent
+    ): List<EventOption>? {
+        val poolType = yelpPoolTypeForEvent(event) ?: return null
+        val tripKey = TripKey(ownerUid = uid, tripId = tripId)
+        val initialPoolItems = sharedYelpPools[poolType] ?: tripSyncRemoteDataSource
+            .fetchYelpOptionPool(tripKey, poolType)
+            .also { items ->
+                if (items.isNotEmpty()) {
+                    sharedYelpPools[poolType] = items
+                }
+            }
+        if (initialPoolItems.isEmpty()) return null
+
+        val poolItems = maybeExpandSharedYelpPool(
+            uid = uid,
+            tripId = tripId,
+            event = event,
+            poolType = poolType,
+            poolItems = initialPoolItems,
+            rejectedIds = _rejectedOptions.value[event.eventId].orEmpty()
+        )
+        return synthesizeSharedYelpOptions(
+            tripId = tripId,
+            event = event,
+            poolItems = poolItems,
+            rejectedIds = _rejectedOptions.value[event.eventId].orEmpty()
+        )
+    }
+
+    private fun synthesizeSharedYelpOptions(
+        tripId: String,
+        event: TravelEvent,
+        poolItems: List<YelpOptionPoolItem>,
+        rejectedIds: Set<String>
+    ): List<EventOption> {
+        val selectedProviderId = event.selectedOptionId
+            .takeIf { it.isNotBlank() }
+            ?: event.detailValue(DETAIL_YELP_ID)
+        val orderedPool = YelpRepository.orderedPoolItemsForEvent(
+            pool = poolItems,
+            tripId = tripId,
+            eventId = event.eventId,
+            selectedProviderId = selectedProviderId
+        )
+        val orderedAlternatives = orderedPool.filterNot { item -> item.providerId == selectedProviderId }
+        val visibleAlternativeCount = SHARED_YELP_VISIBLE_OPTIONS +
+            rejectedIds.count { rejectedId -> orderedAlternatives.any { item -> item.providerId == rejectedId } } +
+            (sharedYelpWindowBoost[event.eventId] ?: 0)
+        val synthesizedOptions = orderedAlternatives
+            .take(visibleAlternativeCount)
+            .map { item ->
+                item.toEventOption(
+                    eventId = event.eventId,
+                    selected = false
+                )
+            }
+            .toMutableList()
+
+        if (!selectedProviderId.isNullOrBlank()) {
+            synthesizedOptions.add(
+                index = 0,
+                element = EventOption(
+                    optionId = selectedProviderId,
+                    eventId = event.eventId,
+                    source = "yelp",
+                    selected = true,
+                    imageUrl = event.imageUrl,
+                    localImagePath = event.localImagePath,
+                    photoUrls = event.photoUrls,
+                    details = event.details
+                )
+            )
+        }
+
+        return synthesizedOptions
+            .distinctBy(EventOption::optionId)
+            .map { option -> option.copy(selected = option.optionId == selectedProviderId) }
+    }
+
+    private suspend fun maybeExpandSharedYelpPool(
+        uid: String,
+        tripId: String,
+        event: TravelEvent,
+        poolType: String,
+        poolItems: List<YelpOptionPoolItem>,
+        rejectedIds: Set<String>
+    ): List<YelpOptionPoolItem> {
+        val selectedProviderId = event.selectedOptionId
+            .takeIf { it.isNotBlank() }
+            ?: event.detailValue(DETAIL_YELP_ID)
+        val currentAlternativeCount = poolItems.count { item -> item.providerId != selectedProviderId }
+        val requiredAlternativeCount =
+            SHARED_YELP_VISIBLE_OPTIONS + rejectedIds.size + (sharedYelpWindowBoost[event.eventId] ?: 0)
+        if (currentAlternativeCount >= requiredAlternativeCount) {
+            return poolItems
+        }
+
+        val location = currentTripDestination.ifBlank { _uiState.value.destination }.ifBlank { return poolItems }
+        val additionalItems = YelpRepository.fetchAdditionalPoolItems(
+            location = location,
+            poolType = poolType,
+            existingProviderIds = poolItems.map(YelpOptionPoolItem::providerId).toSet(),
+            targetCount = maxOf(
+                SHARED_YELP_POOL_EXPANSION_SIZE,
+                requiredAlternativeCount - currentAlternativeCount
+            )
+        )
+        if (additionalItems.isEmpty()) return poolItems
+
+        val mergedItems = (poolItems + additionalItems).distinctBy(YelpOptionPoolItem::providerId)
+        tripSyncRemoteDataSource.upsertYelpOptionPoolItems(
+            tripKey = TripKey(ownerUid = uid, tripId = tripId),
+            poolType = poolType,
+            items = additionalItems
+        )
+        sharedYelpPools[poolType] = mergedItems
+        return mergedItems
+    }
+
+    private fun alignEventOptionsWithSelectedState(
+        events: List<TravelEvent>,
+        optionsByEvent: Map<String, List<EventOption>>
+    ): Map<String, List<EventOption>> {
+        if (events.isEmpty() || optionsByEvent.isEmpty()) return optionsByEvent
+
+        val eventById = events.associateBy(TravelEvent::eventId)
+        var changed = false
+        val alignedOptions = optionsByEvent.mapValues { (eventId, options) ->
+            val event = eventById[eventId] ?: return@mapValues options
+            val selectedOptionId = event.selectedOptionId
+                .takeIf { it.isNotBlank() }
+                ?: event.detailValue(DETAIL_YELP_ID)?.takeIf { it.isNotBlank() }
+                ?: return@mapValues options
+
+            val normalizedOptions = options.map { option ->
+                option.copy(selected = option.optionId == selectedOptionId)
+            }.toMutableList()
+
+            if (normalizedOptions.none(EventOption::selected) && yelpPoolTypeForEvent(event) != null) {
+                normalizedOptions.add(
+                    index = 0,
+                    element = EventOption(
+                        optionId = selectedOptionId,
+                        eventId = eventId,
+                        source = "yelp",
+                        selected = true,
+                        imageUrl = event.imageUrl,
+                        localImagePath = event.localImagePath,
+                        photoUrls = event.photoUrls,
+                        details = event.details
+                    )
+                )
+            }
+
+            val dedupedOptions = normalizedOptions.distinctBy(EventOption::optionId)
+            if (dedupedOptions != options) changed = true
+            dedupedOptions
+        }
+
+        return if (changed) alignedOptions else optionsByEvent
+    }
+
+    private fun yelpPoolTypeForEvent(event: TravelEvent): String? {
+        val yelpBusinessId = event.detailValue(DETAIL_YELP_ID)?.takeIf { it.isNotBlank() } ?: return null
+        return when (event.type.lowercase()) {
+            "restaurant", "dining", "food" -> YELP_POOL_TYPE_RESTAURANTS
+            "activity" -> YELP_POOL_TYPE_ACTIVITIES
+            else -> null
+        }
     }
 
     fun fetchYelpReviews(yelpId: String) {
@@ -287,12 +476,6 @@ class ItineraryViewModel(application: Application) : AndroidViewModel(applicatio
         }
     }
 
-    private fun prefetchYelpEnrichment(events: List<TravelEvent>) {
-        events.forEach { event ->
-            ensureYelpEventEnriched(event.eventId)
-        }
-    }
-
     private fun applyEnrichedEventState(
         eventId: String,
         enrichedEvent: TravelEvent,
@@ -325,17 +508,23 @@ class ItineraryViewModel(application: Application) : AndroidViewModel(applicatio
             .collection("events")
             .document(eventId)
 
-        db.runBatch { batch ->
-            batch.set(eventRef, result.event.toFirestoreMap())
-            result.options
-                .filter { it.optionId in result.updatedOptionIds }
-                .forEach { option ->
-                    batch.set(
-                        eventRef.collection("options").document(option.optionId),
-                        option.toMap()
-                    )
-                }
-        }.await()
+        val shouldPersistEventOnly = yelpPoolTypeForEvent(result.event) != null &&
+            result.event.selectedOptionId.isNotBlank()
+        if (shouldPersistEventOnly) {
+            eventRef.set(result.event.toFirestoreMap()).await()
+        } else {
+            db.runBatch { batch ->
+                batch.set(eventRef, result.event.toFirestoreMap())
+                result.options
+                    .filter { it.optionId in result.updatedOptionIds }
+                    .forEach { option ->
+                        batch.set(
+                            eventRef.collection("options").document(option.optionId),
+                            option.toMap()
+                        )
+                    }
+            }.await()
+        }
     }
 
     fun fetchShareTargets() {
@@ -451,6 +640,8 @@ class ItineraryViewModel(application: Application) : AndroidViewModel(applicatio
         val options = _eventOptions.value[eventId].orEmpty()
         val selectedOption = options.firstOrNull { it.optionId == optionId } ?: return
         val event = _uiState.value.events.firstOrNull { it.eventId == eventId } ?: return
+        val isYelpSelectionEvent = selectedOption.source.equals("yelp", ignoreCase = true) &&
+            yelpPoolTypeForEvent(event) != null
 
         val updatedOptions = options.map { it.copy(selected = it.optionId == optionId) }
         val updatedEvent = mediaDetailPipeline.mergeEventWithOptions(event, updatedOptions)
@@ -477,15 +668,19 @@ class ItineraryViewModel(application: Application) : AndroidViewModel(applicatio
                     .collection("events")
                     .document(eventId)
 
-                db.runBatch { batch ->
-                    batch.set(eventRef, updatedEvent.toFirestoreMap())
-                    updatedOptions.forEach { option ->
-                        batch.set(
-                            eventRef.collection("options").document(option.optionId),
-                            option.toMap()
-                        )
-                    }
-                }.await()
+                if (isYelpSelectionEvent) {
+                    eventRef.set(updatedEvent.toFirestoreMap()).await()
+                } else {
+                    db.runBatch { batch ->
+                        batch.set(eventRef, updatedEvent.toFirestoreMap())
+                        updatedOptions.forEach { option ->
+                            batch.set(
+                                eventRef.collection("options").document(option.optionId),
+                                option.toMap()
+                            )
+                        }
+                    }.await()
+                }
             } catch (e: Exception) {
                 Log.e("ItineraryViewModel", "Failed to select option", e)
                 _uiState.update { it.copy(errorMessage = e.message ?: "Failed to update selection.") }
@@ -499,6 +694,41 @@ class ItineraryViewModel(application: Application) : AndroidViewModel(applicatio
     fun rejectOption(eventId: String, optionId: String) {
         _rejectedOptions.update { current ->
             current + (eventId to (current[eventId].orEmpty() + optionId))
+        }
+        val uid = auth.currentUser?.uid ?: return
+        val tripId = _uiState.value.currentTripId ?: return
+        val event = _uiState.value.events.firstOrNull { it.eventId == eventId } ?: return
+        val poolType = yelpPoolTypeForEvent(event) ?: return
+        val poolItems = sharedYelpPools[poolType].orEmpty()
+        if (poolItems.isEmpty()) return
+
+        viewModelScope.launch {
+            try {
+                val expandedPool = maybeExpandSharedYelpPool(
+                    uid = uid,
+                    tripId = tripId,
+                    event = event,
+                    poolType = poolType,
+                    poolItems = poolItems,
+                    rejectedIds = _rejectedOptions.value[eventId].orEmpty()
+                )
+                val updatedOptions = synthesizeSharedYelpOptions(
+                    tripId = tripId,
+                    event = event,
+                    poolItems = expandedPool,
+                    rejectedIds = _rejectedOptions.value[eventId].orEmpty()
+                )
+                _eventOptions.update { it + (eventId to updatedOptions) }
+                _uiState.update { state ->
+                    state.copy(events = mediaDetailPipeline.applySelectedOptions(
+                        events = state.events,
+                        optionsByEvent = _eventOptions.value,
+                        sortEvents = ::sortPlanEvents
+                    ))
+                }
+            } catch (e: Exception) {
+                Log.w("ItineraryViewModel", "Failed to expand shared Yelp options", e)
+            }
         }
     }
 
@@ -672,6 +902,16 @@ class ItineraryViewModel(application: Application) : AndroidViewModel(applicatio
                     .collection("trips")
                     .document(tripId)
 
+                listOf(YELP_POOL_TYPE_RESTAURANTS, YELP_POOL_TYPE_ACTIVITIES).forEach { poolType ->
+                    val poolItems = tripRef.collection("optionPools")
+                        .document(poolType)
+                        .collection("items")
+                        .get()
+                        .await()
+                        .documents
+                    poolItems.forEach { it.reference.delete().await() }
+                    tripRef.collection("optionPools").document(poolType).delete().await()
+                }
                 val eventDocs = tripRef.collection("events").get().await().documents
                 eventDocs.forEach { eventDoc ->
                     val optionDocs = eventDoc.reference.collection("options").get().await().documents

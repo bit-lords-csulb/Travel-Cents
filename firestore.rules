@@ -105,6 +105,16 @@ service cloud.firestore {
             allow create, update, delete: if canMutateTripEvents(userUid, tripId);
           }
         }
+
+        match /optionPools/{poolType} {
+          allow read: if canReadTrip(userUid, tripId);
+          allow create, update, delete: if canMutateTripEvents(userUid, tripId);
+
+          match /items/{itemId} {
+            allow read: if canReadTrip(userUid, tripId);
+            allow create, update, delete: if canMutateTripEvents(userUid, tripId);
+          }
+        }
       }
 
       match /tripRefs/{tripRefId} {

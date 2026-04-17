@@ -34,7 +34,11 @@ import java.util.concurrent.TimeUnit
 
 object SerpRepository {
 
-    private const val FLIGHT_CACHE_VERSION = "v2"
+    private const val FLIGHT_CACHE_VERSION = "v3"
+    private const val HOTEL_CACHE_VERSION = "v2"
+    private const val MAX_FLIGHT_OPTIONS = 8
+    private const val MAX_HOTEL_OPTIONS = 8
+    private const val MAX_HOTEL_PHOTOS = 5
 
     private val client = OkHttpClient.Builder()
         .addInterceptor(HttpLoggingInterceptor().apply {
@@ -247,7 +251,8 @@ object SerpRepository {
                 returnDate?.let { "return_date" to it }
             ).toMap()
             val response = api.searchFlights(params)
-            val allOptions = (response.bestFlights ?: emptyList()) + (response.otherFlights ?: emptyList())
+            val allOptions = ((response.bestFlights ?: emptyList()) + (response.otherFlights ?: emptyList()))
+                .take(MAX_FLIGHT_OPTIONS)
             if (allOptions.isEmpty()) {
                 null
             } else {
@@ -286,7 +291,8 @@ object SerpRepository {
                 "api_key" to BuildConfig.SERP_API_KEY
             )
             val response = api.searchFlights(params)
-            val allOptions = (response.bestFlights ?: emptyList()) + (response.otherFlights ?: emptyList())
+            val allOptions = ((response.bestFlights ?: emptyList()) + (response.otherFlights ?: emptyList()))
+                .take(MAX_FLIGHT_OPTIONS)
             if (allOptions.isEmpty()) {
                 null
             } else {
@@ -467,7 +473,11 @@ object SerpRepository {
     }
 
     internal fun mapHotelPhotos(hotel: SerpHotelProperty): List<String> {
-        return hotel.images?.mapNotNull { it.originalImage ?: it.thumbnail } ?: emptyList()
+        return hotel.images.orEmpty()
+            .mapNotNull { it.originalImage ?: it.thumbnail }
+            .filter { it.isNotBlank() }
+            .distinct()
+            .take(MAX_HOTEL_PHOTOS)
     }
 
     internal fun mapHotelSearchResultToEvent(
@@ -475,10 +485,11 @@ object SerpRepository {
         itinerary: Itinerary,
         properties: List<SerpHotelProperty>
     ): TravelEvent {
+        val cappedProperties = properties.take(MAX_HOTEL_OPTIONS)
         val roomsNeeded = maxOf(1, request.adults / 2)
         val eventId = UUID.randomUUID().toString()
-        val selectedHotel = properties.firstOrNull()
-        val eventOptions = properties.mapIndexed { idx, hotel ->
+        val selectedHotel = cappedProperties.firstOrNull()
+        val eventOptions = cappedProperties.mapIndexed { idx, hotel ->
             hotelToEventOption(hotel, eventId, isSelected = idx == 0, roomsNeeded = roomsNeeded)
         }
         val selectedPhotos = selectedHotel?.let(::mapHotelPhotos).orEmpty()
@@ -525,7 +536,7 @@ object SerpRepository {
         itinerary: Itinerary
     ): List<TravelEvent> {
         val destNorm = itinerary.destination.lowercase().trim()
-        val cacheKey = "${destNorm}_${request.dateFrom}_${request.dateTo}_${request.adults}_${request.children}_${request.currency}_rated"
+        val cacheKey = "${HOTEL_CACHE_VERSION}_${destNorm}_${request.dateFrom}_${request.dateTo}_${request.adults}_${request.children}_${request.currency}_rated"
 
         SerpCache.getHotels(cacheKey)?.let { cached ->
             return cached.map { it.copy(itineraryId = itinerary.itineraryId) }
@@ -548,7 +559,7 @@ object SerpRepository {
             mapHotelSearchResultToEvent(
                 request = request,
                 itinerary = itinerary,
-                properties = response.properties ?: emptyList()
+                properties = response.properties.orEmpty().take(MAX_HOTEL_OPTIONS)
             )
         } catch (_: Exception) {
             TravelEvent(

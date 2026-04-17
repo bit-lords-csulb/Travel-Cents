@@ -4,6 +4,8 @@ import android.util.Log
 import com.example.travelcents.data.trip.model.EventOption
 import com.example.travelcents.data.trip.model.Itinerary
 import com.example.travelcents.data.trip.model.TravelEvent
+import com.example.travelcents.data.trip.model.YELP_POOL_TYPE_ACTIVITIES
+import com.example.travelcents.data.trip.model.YELP_POOL_TYPE_RESTAURANTS
 import com.example.travelcents.data.trip.model.resolveTripName
 import com.example.travelcents.data.sync.TripSyncRemoteDataSource
 import com.google.firebase.firestore.DocumentSnapshot
@@ -279,11 +281,13 @@ class FirestoreTripRepository(
         val tripRef = tripDocument(key)
         val eventDocuments = tripRef.collection("events").get().await().documents
         val optionDocuments = loadTripOptionDocumentsForDelete(key, eventDocuments)
+        val yelpPoolDocuments = loadTripYelpPoolDocumentsForDelete(key)
 
         val tripSnapshot = tripRef.get().await()
         val affectedViewerUids = tripSnapshot.memberUids().toSet().ifEmpty { setOf(key.ownerUid) }
         val deleteRefs = buildList {
             addAll(optionDocuments.map { document -> document.reference })
+            addAll(yelpPoolDocuments.map { document -> document.reference })
             addAll(eventDocuments.map { document -> document.reference })
             add(tripRef)
         }.distinctBy { reference -> reference.path }
@@ -543,6 +547,35 @@ class FirestoreTripRepository(
                 }
             }.awaitAll().flatten()
         }
+    }
+
+    private suspend fun loadTripYelpPoolDocumentsForDelete(
+        key: TripKey
+    ): List<DocumentSnapshot> = coroutineScope {
+        listOf(
+            YELP_POOL_TYPE_RESTAURANTS,
+            YELP_POOL_TYPE_ACTIVITIES
+        ).map { poolType ->
+            async {
+                val poolDocument = tripDocument(key)
+                    .collection("optionPools")
+                    .document(poolType)
+                    .get()
+                    .await()
+                val itemDocuments = tripDocument(key)
+                    .collection("optionPools")
+                    .document(poolType)
+                    .collection("items")
+                    .get()
+                    .await()
+                    .documents
+
+                buildList {
+                    if (poolDocument.exists()) add(poolDocument)
+                    addAll(itemDocuments)
+                }
+            }
+        }.awaitAll().flatten()
     }
 
     private suspend fun backfillMissingOptionScope(
