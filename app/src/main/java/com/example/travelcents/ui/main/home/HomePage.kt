@@ -172,6 +172,7 @@ private fun HomeHeader(
             Box(
                 modifier = Modifier
                     .size(40.dp)
+                    .clip(CircleShape)
                     .clickable(onClick = onProfileClick),
                 contentAlignment = Alignment.Center
             ) {
