@@ -13,6 +13,8 @@ This baseline captures the trip read paths that existed before the phase 1 clean
   - `option_query`
   - `yelp_enrichment_attempt`
   - `first_render`
+  - `home_first_render`
+- Render logs now also include `coldStartDurationMs` when the process startup time is available from `TravelCentsApplication`.
 
 ## Pre-Phase-1 Query Paths
 
