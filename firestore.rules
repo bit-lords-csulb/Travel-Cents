@@ -106,6 +106,14 @@ service cloud.firestore {
           }
         }
       }
+
+      match /tripRefs/{tripRefId} {
+        allow read, write: if isSelf(userUid);
+      }
+
+      match /sync/{syncDocId} {
+        allow read, write: if isSelf(userUid);
+      }
     }
 
     match /directChats/{chatId} {

@@ -170,6 +170,7 @@ class AuthRepository {
                             if (success) {
                                 continuation.resume(Result.success("Google account synced to Firestore!"))
                             } else {
+                                Log.e(TAG, "Google sign-in user bootstrap failed: $error")
                                 continuation.resume(Result.failure(Exception(error ?: "Firestore sync failed")))
                             }
                         }
@@ -183,6 +184,7 @@ class AuthRepository {
                         continuation.resume(Result.success("Login Successful"))
                     }
                 } else {
+                    Log.e(TAG, "signInWithGoogle:failure", task.exception)
                     continuation.resume(Result.failure(task.exception ?: Exception("Google Login failed")))
                 }
             }

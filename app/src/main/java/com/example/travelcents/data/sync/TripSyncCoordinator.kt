@@ -4,6 +4,7 @@ import com.example.travelcents.data.local.trip.TripLocalDataSource
 import com.example.travelcents.data.trip.TripKey
 import com.example.travelcents.data.trip.TripRepository
 import com.example.travelcents.data.trip.model.Itinerary
+import com.google.firebase.firestore.FirebaseFirestoreException
 
 class TripSyncCoordinator(
     private val localDataSource: TripLocalDataSource,
@@ -13,7 +14,12 @@ class TripSyncCoordinator(
     suspend fun refreshHomeIfNeeded(viewerUid: String) {
         val localTripCount = localDataSource.getHomeTripCount(viewerUid)
         val localManifestVersion = localDataSource.getManifestVersion(viewerUid)
-        val remoteManifest = remoteDataSource.fetchManifest(viewerUid)
+        val remoteManifest = runCatching {
+            remoteDataSource.fetchManifest(viewerUid)
+        }.getOrElse { error ->
+            if (!isPermissionDenied(error)) throw error
+            null
+        }
 
         if (remoteManifest != null) {
             localDataSource.recordManifestCheck(viewerUid, remoteManifest.manifestVersion)
@@ -21,7 +27,12 @@ class TripSyncCoordinator(
                 return
             }
 
-            val tripRefs = remoteDataSource.fetchTripRefs(viewerUid)
+            val tripRefs = runCatching {
+                remoteDataSource.fetchTripRefs(viewerUid)
+            }.getOrElse { error ->
+                if (!isPermissionDenied(error)) throw error
+                fallbackTrips(viewerUid)
+            }
             localDataSource.replaceHomeTripSummaries(
                 viewerUid = viewerUid,
                 trips = tripRefs,
@@ -31,20 +42,32 @@ class TripSyncCoordinator(
             return
         }
 
-        val fallbackTrips = legacyRemoteRepository.getTripSummaries(viewerUid)
-            .sortedBy { itinerary -> itinerary.dateFrom }
+        val fallbackTrips = fallbackTrips(viewerUid)
         localDataSource.replaceHomeTripSummaries(
             viewerUid = viewerUid,
             trips = fallbackTrips,
             manifestVersion = null,
             latestActiveTripKey = fallbackTrips.latestActiveTripKey()
         )
-        remoteDataSource.backfillTripRefsForViewer(viewerUid, fallbackTrips)
+        runCatching {
+            remoteDataSource.backfillTripRefsForViewer(viewerUid, fallbackTrips)
+        }.getOrElse { error ->
+            if (!isPermissionDenied(error)) throw error
+        }
     }
 
     private fun List<Itinerary>.latestActiveTripKey(): TripKey? {
         return filterNot { trip -> trip.status.equals("archived", ignoreCase = true) }
             .maxByOrNull { trip -> trip.createdAt }
             ?.let { trip -> TripKey(ownerUid = trip.ownerUid, tripId = trip.itineraryId) }
+    }
+
+    private suspend fun fallbackTrips(viewerUid: String): List<Itinerary> {
+        return legacyRemoteRepository.getTripSummaries(viewerUid)
+            .sortedBy { itinerary -> itinerary.dateFrom }
+    }
+
+    private fun isPermissionDenied(error: Throwable): Boolean {
+        return (error as? FirebaseFirestoreException)?.code == FirebaseFirestoreException.Code.PERMISSION_DENIED
     }
 }

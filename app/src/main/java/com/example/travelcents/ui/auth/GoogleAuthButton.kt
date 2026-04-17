@@ -10,6 +10,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -33,7 +34,7 @@ import kotlinx.coroutines.launch
 import androidx.compose.foundation.shape.RoundedCornerShape
 import com.example.travelcents.ui.components.TcButton
 
-private const val GOOGLE_SERVER_CLIENT_ID =
+private const val FALLBACK_GOOGLE_SERVER_CLIENT_ID =
     "805994740096-d31i7240546h0701vh3m2kphrtsqqqtt.apps.googleusercontent.com"
 
 @Composable
@@ -46,6 +47,7 @@ fun GoogleAuthButton(
 ) {
     val context = LocalContext.current
     val coroutineScope = rememberCoroutineScope()
+    val serverClientId = remember(context) { resolveGoogleServerClientId(context) }
 
     TcButton(
         onClick = {
@@ -54,7 +56,7 @@ fun GoogleAuthButton(
             coroutineScope.launch {
                 val credentialManager = CredentialManager.create(context)
 
-                val googleIdOption = GetSignInWithGoogleOption.Builder(GOOGLE_SERVER_CLIENT_ID)
+                val googleIdOption = GetSignInWithGoogleOption.Builder(serverClientId)
                     .build()
 
                 val request = GetCredentialRequest.Builder()
@@ -115,6 +117,21 @@ fun GoogleAuthButton(
             fontFamily = fontFamily
         )
     }
+}
+
+private fun resolveGoogleServerClientId(context: android.content.Context): String {
+    val resourceId = context.resources.getIdentifier(
+        "default_web_client_id",
+        "string",
+        context.packageName
+    )
+    if (resourceId != 0) {
+        val generatedValue = context.getString(resourceId).trim()
+        if (generatedValue.isNotBlank()) {
+            return generatedValue
+        }
+    }
+    return FALLBACK_GOOGLE_SERVER_CLIENT_ID
 }
 
 private fun handleCredentialResult(
