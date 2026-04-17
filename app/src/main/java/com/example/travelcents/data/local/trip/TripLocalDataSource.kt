@@ -2,6 +2,7 @@ package com.example.travelcents.data.local.trip
 
 import androidx.room.withTransaction
 import com.example.travelcents.data.media.CachedMediaAsset
+import com.example.travelcents.data.sync.HomeSyncLocalStore
 import com.example.travelcents.data.trip.TripKey
 import com.example.travelcents.data.trip.model.EventOption
 import com.example.travelcents.data.trip.model.Itinerary
@@ -23,14 +24,14 @@ enum class TripSyncSection(val wireValue: String) {
 
 class TripLocalDataSource(
     private val database: TravelCentsDatabase
-) {
+) : HomeSyncLocalStore {
     fun observeHomeTripSummaries(viewerUid: String): Flow<List<Itinerary>> {
         return database.tripSummaryDao()
             .observeTripSummaries(viewerUid)
             .map { entities -> entities.map(TripSummaryEntity::toDomainModel) }
     }
 
-    suspend fun replaceHomeTripSummaries(
+    override suspend fun replaceHomeTripSummaries(
         viewerUid: String,
         trips: List<Itinerary>,
         manifestVersion: Long?,
@@ -92,11 +93,11 @@ class TripLocalDataSource(
         }
     }
 
-    suspend fun getHomeTripCount(viewerUid: String): Int {
+    override suspend fun getHomeTripCount(viewerUid: String): Int {
         return database.tripSummaryDao().countTripSummaries(viewerUid)
     }
 
-    suspend fun getManifestVersion(viewerUid: String): String? {
+    override suspend fun getManifestVersion(viewerUid: String): String? {
         return database.syncStateDao().getById(homeSyncStateId(viewerUid))?.remoteVersion
     }
 
@@ -345,7 +346,7 @@ class TripLocalDataSource(
             .mapValues { (_, entities) -> entities.map(EventOptionEntity::toDomainModel) }
     }
 
-    suspend fun recordManifestCheck(viewerUid: String, manifestVersion: Long?) {
+    override suspend fun recordManifestCheck(viewerUid: String, manifestVersion: Long?) {
         val now = System.currentTimeMillis()
         val current = database.syncStateDao().getById(homeSyncStateId(viewerUid))
         upsertSyncState(

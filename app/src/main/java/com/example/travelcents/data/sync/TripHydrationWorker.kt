@@ -12,10 +12,7 @@ import androidx.work.workDataOf
 import com.example.travelcents.data.local.trip.TravelCentsDatabase
 import com.example.travelcents.data.local.trip.TripLocalDataSource
 import com.example.travelcents.data.media.TripMediaCacheStore
-import com.example.travelcents.data.media.remoteMediaUrls
 import com.example.travelcents.data.trip.TripKey
-import com.example.travelcents.data.trip.model.ATTR_STATIC_MAP_URL
-import com.example.travelcents.data.trip.model.detailValue
 
 class TripHydrationWorker(
     appContext: Context,
@@ -32,20 +29,7 @@ class TripHydrationWorker(
         val events = localDataSource.getTripEvents(tripKey)
         val optionsByEvent = localDataSource.getTripOptions(tripKey)
 
-        val urls = buildSet {
-            events.forEach { event ->
-                addAll(event.remoteMediaUrls())
-                event.detailValue(ATTR_STATIC_MAP_URL)
-                    ?.takeIf { it.isNotBlank() }
-                    ?.let(::add)
-            }
-            optionsByEvent.values.flatten().forEach { option ->
-                addAll(option.remoteMediaUrls())
-                option.detailValue(ATTR_STATIC_MAP_URL)
-                    ?.takeIf { it.isNotBlank() }
-                    ?.let(::add)
-            }
-        }.toList()
+        val urls = TripHydrationMediaCollector.collectUrls(events, optionsByEvent)
 
         if (urls.isEmpty()) return Result.success()
 

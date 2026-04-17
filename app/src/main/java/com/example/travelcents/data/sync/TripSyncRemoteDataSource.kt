@@ -30,8 +30,8 @@ data class RemoteTripMember(
 
 class TripSyncRemoteDataSource(
     private val db: FirebaseFirestore = FirebaseFirestore.getInstance()
-) {
-    suspend fun fetchManifest(viewerUid: String): TripManifestRemote? {
+) : HomeSyncRemoteSource {
+    override suspend fun fetchManifest(viewerUid: String): TripManifestRemote? {
         val snapshot = manifestDocument(viewerUid).get().await()
         if (!snapshot.exists()) return null
 
@@ -50,7 +50,7 @@ class TripSyncRemoteDataSource(
         )
     }
 
-    suspend fun fetchTripRefs(viewerUid: String): List<Itinerary> {
+    override suspend fun fetchTripRefs(viewerUid: String): List<Itinerary> {
         return tripRefsCollection(viewerUid)
             .get()
             .await()
@@ -506,7 +506,7 @@ class TripSyncRemoteDataSource(
         }
     }
 
-    suspend fun backfillTripRefsForViewer(
+    override suspend fun backfillTripRefsForViewer(
         viewerUid: String,
         trips: List<Itinerary>
     ) {
