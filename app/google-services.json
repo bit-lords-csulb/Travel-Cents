@@ -12,7 +12,44 @@
           "package_name": "com.example.travelcents"
         }
       },
-      "oauth_client": [],
+      "oauth_client": [
+        {
+          "client_id": "805994740096-3673lhn465vah8ifr6ms04l7ar0jlrqs.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.example.travelcents",
+            "certificate_hash": "16ade85752b9005f81ac45419bb33b5b14ba532b"
+          }
+        },
+        {
+          "client_id": "805994740096-3nb7sme5nc8mfh3ga7in6fpead2neni0.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.example.travelcents",
+            "certificate_hash": "870adc3b9a5a41fb1ff8313606ada21a75de8d69"
+          }
+        },
+        {
+          "client_id": "805994740096-4fg4ph540hhhrkhsnp4bs62td4ld59gn.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.example.travelcents",
+            "certificate_hash": "d508864c6dda8c4c969b544a9b6d8514dc0bd7db"
+          }
+        },
+        {
+          "client_id": "805994740096-bdehq8t7f21g4q8o02oh9qg5uoovqqav.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.example.travelcents",
+            "certificate_hash": "79b1b779363ca93bddcaf2f6e6d40b42e1089108"
+          }
+        },
+        {
+          "client_id": "805994740096-d31i7240546h0701vh3m2kphrtsqqqtt.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
       "api_key": [
         {
           "current_key": "AIzaSyDJIQCD888-mQ1MRRt6sRPAvF1EktwIDv4"
@@ -20,7 +57,12 @@
       ],
       "services": {
         "appinvite_service": {
-          "other_platform_oauth_client": []
+          "other_platform_oauth_client": [
+            {
+              "client_id": "805994740096-d31i7240546h0701vh3m2kphrtsqqqtt.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
         }
       }
     }

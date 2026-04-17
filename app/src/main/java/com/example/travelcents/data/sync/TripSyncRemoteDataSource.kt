@@ -132,7 +132,9 @@ class TripSyncRemoteDataSource(
             }
         }.await()
 
-        refreshTripIndexesForTrip(tripKey)
+        runCatching {
+            refreshTripIndexesForTrip(tripKey)
+        }
     }
 
     suspend fun updateTripSummaryFields(
@@ -146,7 +148,9 @@ class TripSyncRemoteDataSource(
             ) + timestampMetadata(version),
             SetOptions.merge()
         ).await()
-        refreshTripIndexesForTrip(tripKey)
+        runCatching {
+            refreshTripIndexesForTrip(tripKey)
+        }
     }
 
     suspend fun updateHomeImage(
@@ -178,7 +182,9 @@ class TripSyncRemoteDataSource(
                 SetOptions.merge()
             )
         }.await()
-        refreshTripIndexesForTrip(tripKey)
+        runCatching {
+            refreshTripIndexesForTrip(tripKey)
+        }
     }
 
     suspend fun deleteEvent(
@@ -197,7 +203,9 @@ class TripSyncRemoteDataSource(
                 SetOptions.merge()
             )
         }.await()
-        refreshTripIndexesForTrip(tripKey)
+        runCatching {
+            refreshTripIndexesForTrip(tripKey)
+        }
     }
 
     suspend fun persistEventPlacements(
@@ -224,7 +232,9 @@ class TripSyncRemoteDataSource(
                 SetOptions.merge()
             )
         }.await()
-        refreshTripIndexesForTrip(tripKey)
+        runCatching {
+            refreshTripIndexesForTrip(tripKey)
+        }
     }
 
     suspend fun persistEventAndOptions(
@@ -256,7 +266,9 @@ class TripSyncRemoteDataSource(
                 SetOptions.merge()
             )
         }.await()
-        refreshTripIndexesForTrip(tripKey)
+        runCatching {
+            refreshTripIndexesForTrip(tripKey)
+        }
     }
 
     suspend fun refreshTripIndexesForTrip(
@@ -401,7 +413,9 @@ class TripSyncRemoteDataSource(
         }.await()
 
         affectedViewerUids.forEach { viewerUid ->
-            refreshManifest(viewerUid)
+            runCatching {
+                refreshManifest(viewerUid)
+            }
         }
     }
 
