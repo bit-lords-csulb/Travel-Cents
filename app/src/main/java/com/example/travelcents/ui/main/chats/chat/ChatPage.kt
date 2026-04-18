@@ -97,6 +97,7 @@ fun ChatPage(
         factory = ChatViewModel.Factory(group)
     ),
     onEventsClick: () -> Unit,
+    onEditClick: () -> Unit = {},
     onTripCardClick: ((tripId: String, ownerUid: String) -> Unit)? = null
 ) {
     val messages by viewModel.messages.collectAsState()
@@ -178,9 +179,9 @@ fun ChatPage(
                     Text("EVENTS", fontSize = 11.sp, fontWeight = FontWeight.SemiBold)
                 }
 
-                // More Options Dots
-                IconButton(onClick = { }) {
-                    Icon(Icons.Default.MoreVert, contentDescription = "More", tint = DeepSea5)
+                // Edit Chat Button Dots
+                IconButton(onClick = onEditClick) {
+                    Icon(Icons.Default.MoreVert, contentDescription = "Edit Chat", tint = DeepSea5)
                 }
             }
         }
