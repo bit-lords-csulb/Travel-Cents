@@ -1,18 +1,26 @@
 package com.example.travelcents.ui.main.chats.chat
 
+import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyRow
+import androidx.compose.foundation.lazy.items as lazyRowItems
+import androidx.compose.foundation.lazy.grid.GridCells
+import androidx.compose.foundation.lazy.grid.GridItemSpan
+import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.CameraAlt
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.Search
+import kotlinx.coroutines.flow.combine
+import com.example.travelcents.data.social.model.Friend
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -42,6 +50,7 @@ fun EditChatPage(
 ) {
     val isOwner = viewModel.isOwner
 
+    // State Collection
     val chatName by viewModel.chatName.collectAsState()
     val destination by viewModel.destination.collectAsState()
     val description by viewModel.description.collectAsState()
@@ -49,44 +58,52 @@ fun EditChatPage(
     val members by viewModel.members.collectAsState()
     val memberNames by viewModel.memberNames.collectAsState()
     val isLoading by viewModel.isLoading.collectAsState()
-
     val availableTrips by viewModel.availableTrips.collectAsState()
     val selectedTrip by viewModel.selectedTrip.collectAsState()
-    var dropdownExpanded by remember { mutableStateOf(false) }
 
+    // Member Search & Staging
+    val friendSearch by viewModel.searchQuery.collectAsState()
+    val filteredFriends by viewModel.filteredFriends.collectAsState()
+    val stagedFriends by viewModel.stagedFriends.collectAsState()
+
+    var dropdownExpanded by remember { mutableStateOf(false) }
     val currentUid = Firebase.auth.currentUser?.uid ?: ""
 
+    // Image Picker
     val imagePickerLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.GetContent()
     ) { uri ->
         viewModel.updateImageUri(uri)
     }
 
-    Column(
-        modifier = Modifier.fillMaxSize().background(DeepSea1)
-    ) {
+    BackHandler { onBackClick() }
+
+    Column(modifier = Modifier.fillMaxSize().background(DeepSea1)) {
         // Header
         Box(
             modifier = Modifier
                 .fillMaxWidth()
                 .clip(RoundedCornerShape(bottomStart = 24.dp, bottomEnd = 24.dp))
                 .background(DeepSea2)
-                .padding(top = 48.dp, bottom = 16.dp, start = 8.dp, end = 16.dp)
+                .padding(top = 48.dp, start = 12.dp, end = 20.dp, bottom = 20.dp)
         ) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
+            Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
                 IconButton(onClick = onBackClick) {
                     Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back", tint = DeepSea5)
                 }
-                Text(text = "Edit Chat", color = DeepSea5, fontSize = 20.sp, fontWeight = FontWeight.Bold)
+                Text("Edit Chat", fontSize = 24.sp, fontWeight = FontWeight.Bold, color = DeepSea5)
             }
         }
 
-        LazyColumn(
-            modifier = Modifier.fillMaxSize().padding(horizontal = 20.dp),
-            contentPadding = PaddingValues(top = 24.dp, bottom = 40.dp)
+        LazyVerticalGrid(
+            columns = GridCells.Fixed(2),
+            modifier = Modifier.fillMaxSize().padding(horizontal = 16.dp),
+            verticalArrangement = Arrangement.spacedBy(16.dp),
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
+            contentPadding = PaddingValues(top = 24.dp, bottom = 100.dp)
         ) {
-            // Profile Picture
-            item {
+            // Group Image
+            item(span = { GridItemSpan(maxLineSpan) }) {
                 Box(modifier = Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
                     Box(modifier = Modifier.size(100.dp)) {
                         Box(
@@ -113,131 +130,191 @@ fun EditChatPage(
                         }
                     }
                 }
-                Spacer(modifier = Modifier.height(32.dp))
             }
 
             // Input Fields
-            item {
+            item(span = { GridItemSpan(maxLineSpan) }) {
                 if (isOwner) {
-                    EditTextField(label = "Chat Name", value = chatName, onValueChange = viewModel::updateName)
-                    Spacer(modifier = Modifier.height(16.dp))
-                    EditTextField(label = "Destination", value = destination, onValueChange = viewModel::updateDestination)
-                    Spacer(modifier = Modifier.height(16.dp))
-
-                    Text("Description", color = DeepSea5, fontSize = 12.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(bottom = 8.dp))
-                    TextField(
-                        value = description,
-                        onValueChange = viewModel::updateDescription,
-                        modifier = Modifier.fillMaxWidth().height(100.dp).clip(RoundedCornerShape(16.dp)),
-                        colors = TextFieldDefaults.colors(focusedContainerColor = DeepSea3, unfocusedContainerColor = DeepSea3, focusedIndicatorColor = Color.Transparent, unfocusedIndicatorColor = Color.Transparent, focusedTextColor = DeepSea5, unfocusedTextColor = DeepSea5)
-                    )
-                } else {
-                    ReadOnlyField("Chat Name", chatName)
-                    Spacer(modifier = Modifier.height(16.dp))
-                    ReadOnlyField("Destination", destination.ifBlank { "Not set" })
-                    Spacer(modifier = Modifier.height(16.dp))
-                    ReadOnlyField("Description", description.ifBlank { "No description" })
-                }
-                Spacer(modifier = Modifier.height(16.dp))
-
-                // Linked Itinerary
-                Text("Linked Itinerary", color = DeepSea5, fontSize = 12.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(bottom = 8.dp))
-                if (isOwner) {
-                    ExposedDropdownMenuBox(expanded = dropdownExpanded, onExpandedChange = { dropdownExpanded = it }) {
-                        TextField(
-                            value = selectedTrip?.name ?: "Select a trip...",
-                            onValueChange = {}, readOnly = true,
-                            modifier = Modifier.menuAnchor(type = ExposedDropdownMenuAnchorType.PrimaryNotEditable).fillMaxWidth().clip(RoundedCornerShape(16.dp)),
-                            trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = dropdownExpanded) },
-                            colors = TextFieldDefaults.colors(focusedContainerColor = DeepSea3, unfocusedContainerColor = DeepSea3, focusedTextColor = DeepSea5, unfocusedTextColor = DeepSea5, focusedIndicatorColor = Color.Transparent, unfocusedIndicatorColor = Color.Transparent)
-                        )
-                        ExposedDropdownMenu(expanded = dropdownExpanded, onDismissRequest = { dropdownExpanded = false }, modifier = Modifier.background(DeepSea2)) {
-                            availableTrips.forEach { trip ->
-                                DropdownMenuItem(text = { Text(trip.name, color = DeepSea5) }, onClick = { viewModel.selectTrip(trip); dropdownExpanded = false })
-                            }
-                        }
+                    Column {
+                        LabeledTextField(label = "Chat Name", value = chatName, onValueChange = viewModel::updateName, placeholder = "e.g. Bali Trip")
+                        Spacer(modifier = Modifier.height(16.dp))
+                        LabeledTextField(label = "Destination", value = destination, onValueChange = viewModel::updateDestination, placeholder = "Where to?")
+                        Spacer(modifier = Modifier.height(16.dp))
+                        LabeledTextField(label = "Description", value = description, onValueChange = viewModel::updateDescription, placeholder = "What's the plan?", singleLine = false, modifier = Modifier.height(100.dp))
                     }
                 } else {
-                    ReadOnlyField(value = selectedTrip?.name ?: "None linked")
+                    Column {
+                        ReadOnlyField("Chat Name", chatName)
+                        Spacer(modifier = Modifier.height(16.dp))
+                        ReadOnlyField("Destination", destination.ifBlank { "Not set" })
+                        Spacer(modifier = Modifier.height(16.dp))
+                        ReadOnlyField("Description", description.ifBlank { "No description" })
+                    }
                 }
-                Spacer(modifier = Modifier.height(32.dp))
             }
 
-            // Members section
-            item {
-                Text(text = "Members ( ${members.size} )", color = DeepSea5, fontSize = 12.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(bottom = 12.dp))
-                Column(modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(16.dp)).background(DeepSea3).padding(vertical = 8.dp)) {
-                    members.forEach { memberId ->
-                        val isMe = memberId == currentUid
-                        val displayName = if (isMe) "You" else (memberNames[memberId] ?: "Loading...")
-                        val isGroupOwner = memberId == group.ownerId
-
-                        Row(modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
-                            Box(modifier = Modifier.size(40.dp).clip(CircleShape).background(DeepSea4), contentAlignment = Alignment.Center) {
-                                Text(text = if (isMe) "Y" else displayName.take(1).uppercase(), color = DeepSea1, fontWeight = FontWeight.Bold)
-                            }
-                            Spacer(modifier = Modifier.width(12.dp))
-                            Column(modifier = Modifier.weight(1f)) {
-                                Text(text = displayName, color = DeepSea5, fontSize = 16.sp, fontWeight = FontWeight.Medium)
-                                if (isGroupOwner) {
-                                    Text("Owner", color = DeepSea5.copy(alpha = 0.5f), fontSize = 11.sp)
+            // Linked Itinerary
+            item(span = { GridItemSpan(maxLineSpan) }) {
+                Column {
+                    Text("Linked Itinerary", color = DeepSea5, fontWeight = FontWeight.SemiBold, fontSize = 16.sp)
+                    Spacer(modifier = Modifier.height(8.dp))
+                    if (isOwner) {
+                        ExposedDropdownMenuBox(expanded = dropdownExpanded, onExpandedChange = { dropdownExpanded = it }) {
+                            TextField(
+                                value = selectedTrip?.name ?: "Select a trip...",
+                                onValueChange = {}, readOnly = true,
+                                modifier = Modifier.menuAnchor(type = ExposedDropdownMenuAnchorType.PrimaryNotEditable).fillMaxWidth().clip(RoundedCornerShape(16.dp)),
+                                trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = dropdownExpanded) },
+                                colors = TextFieldDefaults.colors(focusedContainerColor = DeepSea3, unfocusedContainerColor = DeepSea3, focusedTextColor = DeepSea5, unfocusedTextColor = DeepSea5, focusedIndicatorColor = Color.Transparent, unfocusedIndicatorColor = Color.Transparent)
+                            )
+                            ExposedDropdownMenu(expanded = dropdownExpanded, onDismissRequest = { dropdownExpanded = false }, modifier = Modifier.background(DeepSea2)) {
+                                availableTrips.forEach { trip ->
+                                    DropdownMenuItem(text = { Text(trip.name, color = DeepSea5) }, onClick = { viewModel.selectTrip(trip); dropdownExpanded = false })
                                 }
                             }
-                            if (isOwner && !isMe) {
-                                IconButton(onClick = { viewModel.removeMember(memberId) }) { Icon(Icons.Default.Close, contentDescription = "Remove", tint = DeepSea5.copy(alpha = 0.5f)) }
+                        }
+                    } else {
+                        ReadOnlyField(value = selectedTrip?.name ?: "None linked")
+                    }
+                }
+            }
+
+            // Member Search & Staged Chips
+            if (isOwner) {
+                item(span = { GridItemSpan(maxLineSpan) }) {
+                    Column {
+                        Text("Add New Members", color = DeepSea5, fontWeight = FontWeight.SemiBold, fontSize = 16.sp)
+                        Spacer(modifier = Modifier.height(8.dp))
+                        TextField(
+                            value = friendSearch,
+                            onValueChange = { viewModel.onSearchQueryChange(it) },
+                            modifier = Modifier.fillMaxWidth().height(52.dp).clip(RoundedCornerShape(48.dp)),
+                            placeholder = { Text("Search friends...", color = DeepSea5.copy(alpha = 0.5f)) },
+                            leadingIcon = { Icon(Icons.Default.Search, null, tint = DeepSea5.copy(alpha = 0.7f)) },
+                            singleLine = true,
+                            colors = TextFieldDefaults.colors(
+                                focusedContainerColor = DeepSea3, unfocusedContainerColor = DeepSea3,
+                                focusedIndicatorColor = Color.Transparent, unfocusedIndicatorColor = Color.Transparent,
+                                cursorColor = DeepSea5, focusedTextColor = DeepSea5, unfocusedTextColor = DeepSea5
+                            )
+                        )
+                    }
+                }
+
+                // Chips for Staged Friends
+                if (stagedFriends.isNotEmpty()) {
+                    item(span = { GridItemSpan(maxLineSpan) }) {
+                        LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            lazyRowItems(stagedFriends) { friend ->
+                                Row(
+                                    modifier = Modifier.clip(RoundedCornerShape(48.dp)).background(DeepSea3).padding(start = 10.dp, end = 6.dp, top = 6.dp, bottom = 6.dp),
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Box(modifier = Modifier.size(22.dp).clip(CircleShape).background(DeepSea2), contentAlignment = Alignment.Center) {
+                                        Text(friend.displayName.take(1).uppercase(), color = DeepSea5, fontSize = 10.sp, fontWeight = FontWeight.Bold)
+                                    }
+                                    Spacer(modifier = Modifier.width(6.dp))
+                                    Text(friend.displayName.split(" ").first(), color = DeepSea5, fontSize = 13.sp)
+                                    Spacer(modifier = Modifier.width(4.dp))
+                                    Icon(Icons.Default.Close, null, tint = DeepSea5.copy(alpha = 0.6f), modifier = Modifier.size(16.dp).clickable { viewModel.removeStagedFriend(friend) })
+                                }
                             }
                         }
                     }
                 }
-                Spacer(modifier = Modifier.height(32.dp))
+
+                // Search Results
+                if (filteredFriends.isNotEmpty()) {
+                    items(filteredFriends.size, span = { GridItemSpan(maxLineSpan) }) { index ->
+                        val friend = filteredFriends[index]
+                        Row(
+                            modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp)).background(DeepSea2)
+                                .clickable { viewModel.selectFriend(friend) }
+                                .padding(horizontal = 14.dp, vertical = 10.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Box(modifier = Modifier.size(36.dp).clip(CircleShape).background(DeepSea3), contentAlignment = Alignment.Center) {
+                                Text(friend.displayName.take(2).uppercase(), color = DeepSea5, fontWeight = FontWeight.Bold, fontSize = 13.sp)
+                            }
+                            Spacer(modifier = Modifier.width(12.dp))
+                            Text(friend.displayName, color = DeepSea5, fontWeight = FontWeight.SemiBold, fontSize = 14.sp)
+                        }
+                    }
+                }
+            }
+
+            // Official Members List
+            item(span = { GridItemSpan(maxLineSpan) }) {
+                Column {
+                    Text(text = "Current Members ( ${members.size} )", color = DeepSea5, fontSize = 16.sp, fontWeight = FontWeight.SemiBold)
+                    Spacer(modifier = Modifier.height(12.dp))
+                    Column(modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(16.dp)).background(DeepSea3).padding(vertical = 8.dp)) {
+                        members.forEach { memberId ->
+                            val isMe = memberId == currentUid
+                            val displayName = if (isMe) "You" else (memberNames[memberId] ?: "Loading...")
+                            val isGroupOwner = memberId == group.ownerId
+
+                            Row(modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
+                                Box(modifier = Modifier.size(40.dp).clip(CircleShape).background(DeepSea4), contentAlignment = Alignment.Center) {
+                                    Text(text = if (isMe) "Y" else displayName.take(1).uppercase(), color = DeepSea1, fontWeight = FontWeight.Bold)
+                                }
+                                Spacer(modifier = Modifier.width(12.dp))
+                                Column(modifier = Modifier.weight(1f)) {
+                                    Text(text = displayName, color = DeepSea5, fontSize = 16.sp, fontWeight = FontWeight.Medium)
+                                    if (isGroupOwner) {
+                                        Text("Owner", color = DeepSea5.copy(alpha = 0.5f), fontSize = 11.sp)
+                                    }
+                                }
+                                if (isOwner && !isMe) {
+                                    IconButton(onClick = { viewModel.removeMember(memberId) }) { Icon(Icons.Default.Close, contentDescription = "Remove", tint = DeepSea5.copy(alpha = 0.5f)) }
+                                }
+                            }
+                        }
+                    }
+                }
             }
 
             // Buttons
-            item {
-                if (isOwner) {
-                    Button(
-                        onClick = { viewModel.saveChanges(onComplete = onBackClick) },
-                        modifier = Modifier.fillMaxWidth().height(50.dp),
-                        colors = ButtonDefaults.buttonColors(containerColor = DeepSea4, disabledContainerColor = DeepSea4.copy(alpha = 0.5f)),
-                        shape = RoundedCornerShape(25.dp), enabled = !isLoading
-                    ) {
-                        if (isLoading) CircularProgressIndicator(color = DeepSea1, modifier = Modifier.size(24.dp), strokeWidth = 2.dp)
-                        else Text("Save Changes", color = DeepSea1, fontSize = 16.sp, fontWeight = FontWeight.Bold)
+            item(span = { GridItemSpan(maxLineSpan) }) {
+                Column {
+                    if (isOwner) {
+                        Button(
+                            onClick = { viewModel.saveChanges(onComplete = onBackClick) },
+                            modifier = Modifier.fillMaxWidth().height(52.dp),
+                            colors = ButtonDefaults.buttonColors(containerColor = DeepSea3, disabledContainerColor = DeepSea3.copy(alpha = 0.4f)),
+                            shape = RoundedCornerShape(14.dp), enabled = !isLoading
+                        ) {
+                            if (isLoading) CircularProgressIndicator(color = DeepSea5, modifier = Modifier.size(20.dp), strokeWidth = 2.dp)
+                            else Text("Save Changes", color = DeepSea5, fontSize = 15.sp, fontWeight = FontWeight.SemiBold)
+                        }
+                        Spacer(modifier = Modifier.height(16.dp))
                     }
-                    Spacer(modifier = Modifier.height(16.dp))
-                }
 
-                OutlinedButton(
-                    onClick = {
-                        viewModel.leaveChat(onComplete = onNavigateToChats)
-                    },
-                    modifier = Modifier.fillMaxWidth().height(50.dp),
-                    colors = ButtonDefaults.outlinedButtonColors(contentColor = Color(0xFFEF5350)),
-                    border = BorderStroke(1.dp, Color(0xFFEF5350).copy(alpha = 0.5f)),
-                    shape = RoundedCornerShape(25.dp),
-                    enabled = !isLoading
-                ) {
-                    Text(if (isOwner) "Delete & Leave Chat" else "Leave Chat", fontSize = 16.sp, fontWeight = FontWeight.Bold)
+                    OutlinedButton(
+                        onClick = { viewModel.leaveChat(onComplete = onNavigateToChats) },
+                        modifier = Modifier.fillMaxWidth().height(52.dp),
+                        colors = ButtonDefaults.outlinedButtonColors(contentColor = Color(0xFFEF5350)),
+                        border = BorderStroke(1.dp, Color(0xFFEF5350).copy(alpha = 0.5f)),
+                        shape = RoundedCornerShape(14.dp), enabled = !isLoading
+                    ) {
+                        Text(if (isOwner) "Delete & Leave Chat" else "Leave Chat", fontSize = 15.sp, fontWeight = FontWeight.SemiBold)
+                    }
                 }
             }
         }
     }
 }
 
+// Helpers
 @Composable
-fun EditTextField(label: String, value: String, onValueChange: (String) -> Unit) {
-    Column {
-        Text(text = label, color = DeepSea5, fontSize = 12.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(bottom = 8.dp))
+fun LabeledTextField(label: String, value: String, onValueChange: (String) -> Unit, modifier: Modifier = Modifier, placeholder: String = "", singleLine: Boolean = true) {
+    Column(modifier = modifier) {
+        Text(label, color = DeepSea5, fontWeight = FontWeight.Bold, fontSize = 14.sp)
+        Spacer(modifier = Modifier.height(8.dp))
         TextField(
-            value = value,
-            onValueChange = onValueChange,
-            singleLine = true,
-            modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(24.dp)),
-            colors = TextFieldDefaults.colors(
-                focusedContainerColor = DeepSea3, unfocusedContainerColor = DeepSea3,
-                focusedIndicatorColor = Color.Transparent, unfocusedIndicatorColor = Color.Transparent,
-                focusedTextColor = DeepSea5, unfocusedTextColor = DeepSea5
-            )
+            value = value, onValueChange = onValueChange, placeholder = { Text(placeholder, color = DeepSea5.copy(alpha = 0.5f)) },
+            modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(16.dp)), singleLine = singleLine,
+            colors = TextFieldDefaults.colors(focusedContainerColor = DeepSea3, unfocusedContainerColor = DeepSea3, focusedIndicatorColor = Color.Transparent, unfocusedIndicatorColor = Color.Transparent, cursorColor = DeepSea5, focusedTextColor = DeepSea5, unfocusedTextColor = DeepSea5)
         )
     }
 }
@@ -246,11 +323,9 @@ fun EditTextField(label: String, value: String, onValueChange: (String) -> Unit)
 fun ReadOnlyField(label: String? = null, value: String) {
     Column {
         if (label != null) {
-            Text(text = label, color = DeepSea5, fontSize = 12.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(bottom = 8.dp))
+            Text(text = label, color = DeepSea5, fontSize = 14.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(bottom = 8.dp))
         }
-        Box(
-            modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(16.dp)).background(DeepSea2).padding(16.dp)
-        ) {
+        Box(modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(16.dp)).background(DeepSea2).padding(16.dp)) {
             Text(text = value, color = DeepSea5, fontSize = 16.sp)
         }
     }

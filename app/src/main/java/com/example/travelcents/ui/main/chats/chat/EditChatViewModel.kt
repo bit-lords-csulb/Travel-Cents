@@ -4,14 +4,18 @@ import android.net.Uri
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
+import com.example.travelcents.data.social.model.Friend
 import com.example.travelcents.data.social.model.Group
 import com.example.travelcents.data.social.repository.GroupsRepository
 import com.example.travelcents.data.social.repository.SocialUserRepository
 import com.google.firebase.Firebase
 import com.google.firebase.auth.auth
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 
 data class TripPreview(val id: String, val name: String, val ownerId: String)
@@ -55,6 +59,14 @@ class EditChatViewModel(
     private val _groupsList = MutableStateFlow<List<Group>>(emptyList())
     val groupsList: StateFlow<List<Group>> = _groupsList
 
+    private val _searchQuery = MutableStateFlow("")
+    val searchQuery: StateFlow<String> = _searchQuery.asStateFlow()
+
+    private val _stagedFriends = MutableStateFlow<List<Friend>>(emptyList())
+    val stagedFriends: StateFlow<List<Friend>> = _stagedFriends.asStateFlow()
+
+    private val _allFriends = MutableStateFlow<List<Friend>>(emptyList())
+
     init {
         viewModelScope.launch {
             repository.observeGroups().collect { groups ->
@@ -81,6 +93,31 @@ class EditChatViewModel(
                 _memberNames.value = currentMap
             }
         }
+    }
+
+    val filteredFriends: StateFlow<List<Friend>> = combine(
+        _allFriends,
+        _searchQuery
+    ) { friends, query ->
+        if (query.isBlank()) emptyList()
+        else friends.filter {
+            it.displayName.contains(query, ignoreCase = true) &&
+                    it.uid !in initialGroup.members
+        }
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+
+    // Add the missing functions the UI calls:
+    fun onSearchQueryChange(query: String) { _searchQuery.value = query }
+
+    fun selectFriend(friend: Friend) {
+        if (!_stagedFriends.value.contains(friend)) {
+            _stagedFriends.value += friend
+        }
+        _searchQuery.value = ""
+    }
+
+    fun removeStagedFriend(friend: Friend) {
+        _stagedFriends.value = _stagedFriends.value - friend
     }
 
     fun updateName(name: String) { _chatName.value = name }
