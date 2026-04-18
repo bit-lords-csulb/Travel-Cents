@@ -132,6 +132,7 @@ fun ChatPage(
                     Icon(Icons.AutoMirrored.Filled.ArrowBack, modifier = Modifier.size(32.dp), contentDescription = "Back", tint = DeepSea5)
                 }
 
+                // Group Chat Image
                 Box(
                     modifier = Modifier
                         .size(42.dp)
@@ -139,13 +140,16 @@ fun ChatPage(
                         .background(DeepSea3),
                     contentAlignment = Alignment.Center
                 ) {
-                    if (group.groupImageUrl.isNotEmpty()) {
+                    val url = group.groupImageUrl
+                    if (url.startsWith("http")) {
                         AsyncImage(
-                            model = group.groupImageUrl,
+                            model = url,
                             contentDescription = null,
                             contentScale = ContentScale.Crop,
-                            modifier = Modifier.size(42.dp).clip(CircleShape)
+                            modifier = Modifier.fillMaxSize()
                         )
+                    } else if (url.isNotEmpty() && url.length <= 4) {
+                        Text(url, fontSize = 20.sp)
                     } else {
                         Text(
                             text = group.name.take(2).uppercase(),

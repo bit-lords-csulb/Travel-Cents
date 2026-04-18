@@ -8,6 +8,7 @@ data class Group(
     val destination: String = "",
     val description: String = "",
     val members: List<String> = emptyList(),
+    val ownerId: String = "",
     val lastMessage: String = "",
     val lastMessageTime: Timestamp? = null,
     val groupImageUrl: String = "",

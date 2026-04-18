@@ -3,22 +3,28 @@ package com.example.travelcents.ui.main.chats.chat
 import android.net.Uri
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
-import com.example.travelcents.data.FirestoreRepository
-import com.example.travelcents.data.model.Group
+import androidx.lifecycle.viewModelScope
+import com.example.travelcents.data.social.model.Group
+import com.example.travelcents.data.social.repository.GroupsRepository
+import com.example.travelcents.data.social.repository.SocialUserRepository
 import com.google.firebase.Firebase
 import com.google.firebase.auth.auth
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.launch
 
 data class TripPreview(val id: String, val name: String, val ownerId: String)
 
 class EditChatViewModel(
     private val initialGroup: Group,
-    private val repository: FirestoreRepository = FirestoreRepository()
+    private val repository: GroupsRepository = GroupsRepository(),
+    private val userRepository: SocialUserRepository = SocialUserRepository()
 ) : ViewModel() {
 
     private val currentUid = Firebase.auth.currentUser?.uid ?: ""
+
+    val isOwner: Boolean = initialGroup.ownerId == currentUid
 
     private val _chatName = MutableStateFlow(initialGroup.name)
     val chatName: StateFlow<String> = _chatName.asStateFlow()
@@ -46,7 +52,15 @@ class EditChatViewModel(
     private val _isLoading = MutableStateFlow(false)
     val isLoading: StateFlow<Boolean> = _isLoading.asStateFlow()
 
+    private val _groupsList = MutableStateFlow<List<Group>>(emptyList())
+    val groupsList: StateFlow<List<Group>> = _groupsList
+
     init {
+        viewModelScope.launch {
+            repository.observeGroups().collect { groups ->
+                _groupsList.value = groups
+            }
+        }
         fetchAvailableTrips()
         fetchMemberNames()
     }
@@ -58,12 +72,13 @@ class EditChatViewModel(
             _selectedTrip.value = trips.find { it.id == initialGroup.linkedTripId }
         }
     }
+
     private fun fetchMemberNames() {
         initialGroup.members.forEach { uid ->
-            repository.fetchUser(uid) { displayName ->
-                _memberNames.value = _memberNames.value.toMutableMap().apply {
-                    put(uid, displayName)
-                }
+            userRepository.fetchUserDisplayName(uid) { displayName ->
+                val currentMap = _memberNames.value.toMutableMap()
+                currentMap[uid] = displayName
+                _memberNames.value = currentMap
             }
         }
     }
@@ -117,6 +132,15 @@ class EditChatViewModel(
                 onComplete()
             }
         )
+    }
+
+    fun leaveChat(onComplete: () -> Unit) {
+        if (_isLoading.value) return
+        _isLoading.value = true
+        repository.leaveGroup(initialGroup.id, currentUid) {
+            _isLoading.value = false
+            onComplete()
+        }
     }
 
     class Factory(private val group: Group) : ViewModelProvider.Factory {
