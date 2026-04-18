@@ -85,13 +85,23 @@ fun EditChatPage(
                 .fillMaxWidth()
                 .clip(RoundedCornerShape(bottomStart = 24.dp, bottomEnd = 24.dp))
                 .background(DeepSea2)
-                .padding(top = 48.dp, start = 12.dp, end = 20.dp, bottom = 20.dp)
+                .padding(top = 48.dp, bottom = 16.dp, start = 8.dp, end = 16.dp)
         ) {
             Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
                 IconButton(onClick = onBackClick) {
-                    Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back", tint = DeepSea5)
+                    Icon(Icons.AutoMirrored.Filled.ArrowBack, modifier = Modifier.size(32.dp), contentDescription = "Back", tint = DeepSea5)
                 }
                 Text("Edit Chat", fontSize = 24.sp, fontWeight = FontWeight.Bold, color = DeepSea5)
+            }
+        }
+
+        // Reorder the list so the current user is always first
+        val sortedMembers = remember(members, currentUid) {
+            val others = members.filter { it != currentUid }
+            if (members.contains(currentUid)) {
+                listOf(currentUid) + others
+            } else {
+                others
             }
         }
 
@@ -248,15 +258,32 @@ fun EditChatPage(
                 Column {
                     Text(text = "Current Members ( ${members.size} )", color = DeepSea5, fontSize = 16.sp, fontWeight = FontWeight.SemiBold)
                     Spacer(modifier = Modifier.height(12.dp))
-                    Column(modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(16.dp)).background(DeepSea3).padding(vertical = 8.dp)) {
-                        members.forEach { memberId ->
+
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clip(RoundedCornerShape(16.dp))
+                            .background(DeepSea3)
+                            .padding(vertical = 8.dp)
+                    ) {
+                        sortedMembers.forEach { memberId ->
                             val isMe = memberId == currentUid
                             val displayName = if (isMe) "You" else (memberNames[memberId] ?: "Loading...")
                             val isGroupOwner = memberId == group.ownerId
 
-                            Row(modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
-                                Box(modifier = Modifier.size(40.dp).clip(CircleShape).background(DeepSea4), contentAlignment = Alignment.Center) {
-                                    Text(text = if (isMe) "Y" else displayName.take(1).uppercase(), color = DeepSea1, fontWeight = FontWeight.Bold)
+                            Row(
+                                modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Box(
+                                    modifier = Modifier.size(40.dp).clip(CircleShape).background(DeepSea4),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Text(
+                                        text = if (isMe) "Y" else displayName.take(1).uppercase(),
+                                        color = DeepSea1,
+                                        fontWeight = FontWeight.Bold
+                                    )
                                 }
                                 Spacer(modifier = Modifier.width(12.dp))
                                 Column(modifier = Modifier.weight(1f)) {
@@ -266,7 +293,9 @@ fun EditChatPage(
                                     }
                                 }
                                 if (isOwner && !isMe) {
-                                    IconButton(onClick = { viewModel.removeMember(memberId) }) { Icon(Icons.Default.Close, contentDescription = "Remove", tint = DeepSea5.copy(alpha = 0.5f)) }
+                                    IconButton(onClick = { viewModel.removeMember(memberId) }) {
+                                        Icon(Icons.Default.Close, contentDescription = "Remove", tint = DeepSea5.copy(alpha = 0.5f))
+                                    }
                                 }
                             }
                         }
