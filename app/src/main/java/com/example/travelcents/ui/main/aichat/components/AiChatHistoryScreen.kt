@@ -2,6 +2,7 @@ package com.example.travelcents.ui.main.aichat.components
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -18,8 +19,13 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.outlined.OpenInNew
+import androidx.compose.material.icons.outlined.DeleteOutline
 import androidx.compose.material.icons.outlined.History
+import androidx.compose.material.icons.outlined.MoreHoriz
 import androidx.compose.material.icons.outlined.Search
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.ProvideTextStyle
@@ -54,9 +60,12 @@ fun AiChatHistoryScreen(
     entries: List<AiChatHistoryEntry>,
     onBackClick: () -> Unit,
     onSessionSelected: (String) -> Unit,
+    onDeleteSession: (String) -> Unit,
+    onClearAllHistory: () -> Unit,
     modifier: Modifier = Modifier
 ) {
     var query by remember { mutableStateOf("") }
+    var showHeaderMenu by remember { mutableStateOf(false) }
     val filteredEntries = remember(entries, query) {
         if (query.isBlank()) {
             entries
@@ -104,6 +113,44 @@ fun AiChatHistoryScreen(
                         fontFamily = TravelCentsFonts.Headline,
                         modifier = Modifier.weight(1f)
                     )
+
+                    Box {
+                        IconButton(
+                            onClick = { showHeaderMenu = true },
+                            enabled = entries.isNotEmpty()
+                        ) {
+                            Icon(
+                                imageVector = Icons.Outlined.MoreHoriz,
+                                contentDescription = "History options",
+                                tint = if (entries.isNotEmpty()) TripWizardColors.Blue else DeepSea4
+                            )
+                        }
+
+                        DropdownMenu(
+                            expanded = showHeaderMenu,
+                            onDismissRequest = { showHeaderMenu = false }
+                        ) {
+                            DropdownMenuItem(
+                                text = {
+                                    Text(
+                                        text = "Clear all history",
+                                        fontFamily = TravelCentsFonts.Body
+                                    )
+                                },
+                                leadingIcon = {
+                                    Icon(
+                                        imageVector = Icons.Outlined.DeleteOutline,
+                                        contentDescription = null
+                                    )
+                                },
+                                enabled = entries.isNotEmpty(),
+                                onClick = {
+                                    showHeaderMenu = false
+                                    onClearAllHistory()
+                                }
+                            )
+                        }
+                    }
                 }
             }
 
@@ -162,7 +209,8 @@ fun AiChatHistoryScreen(
                             items(itemsForBucket, key = { it.sessionId }) { entry ->
                                 HistoryRow(
                                     entry = entry,
-                                    onClick = { onSessionSelected(entry.sessionId) }
+                                    onClick = { onSessionSelected(entry.sessionId) },
+                                    onDeleteClick = { onDeleteSession(entry.sessionId) }
                                 )
                             }
                         }
@@ -176,8 +224,11 @@ fun AiChatHistoryScreen(
 @Composable
 private fun HistoryRow(
     entry: AiChatHistoryEntry,
-    onClick: () -> Unit
+    onClick: () -> Unit,
+    onDeleteClick: () -> Unit
 ) {
+    var showMenu by remember(entry.sessionId) { mutableStateOf(false) }
+
     Surface(
         modifier = Modifier
             .fillMaxWidth()
@@ -227,13 +278,70 @@ private fun HistoryRow(
                     fontSize = 11.sp,
                     fontFamily = TravelCentsFonts.Body
                 )
-                Text(
-                    text = ">",
-                    color = TripWizardColors.Blue,
-                    fontSize = 18.sp,
-                    fontWeight = FontWeight.SemiBold,
-                    fontFamily = TravelCentsFonts.Body
-                )
+
+                Box {
+                    Surface(
+                        modifier = Modifier.clickable { showMenu = true },
+                        color = TripWizardColors.ContainerHighest,
+                        shape = RoundedCornerShape(12.dp)
+                    ) {
+                        Box(
+                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 6.dp),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Icon(
+                                imageVector = Icons.Outlined.MoreHoriz,
+                                contentDescription = "Conversation options",
+                                tint = TripWizardColors.Blue,
+                                modifier = Modifier.size(18.dp)
+                            )
+                        }
+                    }
+
+                    DropdownMenu(
+                        expanded = showMenu,
+                        onDismissRequest = { showMenu = false }
+                    ) {
+                        DropdownMenuItem(
+                            text = {
+                                Text(
+                                    text = "Open chat",
+                                    fontFamily = TravelCentsFonts.Body
+                                )
+                            },
+                            leadingIcon = {
+                                Icon(
+                                    imageVector = Icons.AutoMirrored.Outlined.OpenInNew,
+                                    contentDescription = null
+                                )
+                            },
+                            contentPadding = PaddingValues(horizontal = 12.dp, vertical = 4.dp),
+                            onClick = {
+                                showMenu = false
+                                onClick()
+                            }
+                        )
+                        DropdownMenuItem(
+                            text = {
+                                Text(
+                                    text = "Delete chat",
+                                    fontFamily = TravelCentsFonts.Body
+                                )
+                            },
+                            leadingIcon = {
+                                Icon(
+                                    imageVector = Icons.Outlined.DeleteOutline,
+                                    contentDescription = null
+                                )
+                            },
+                            contentPadding = PaddingValues(horizontal = 12.dp, vertical = 4.dp),
+                            onClick = {
+                                showMenu = false
+                                onDeleteClick()
+                            }
+                        )
+                    }
+                }
             }
         }
     }
