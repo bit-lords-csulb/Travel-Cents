@@ -1,36 +1,39 @@
 package com.example.travelcents.ui.main.aichat
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxScope
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
-import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
-import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.automirrored.filled.Send
+import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.outlined.AutoAwesome
+import androidx.compose.material.icons.outlined.History
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.ProvideTextStyle
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextField
-import androidx.compose.material3.TextFieldDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
@@ -43,17 +46,27 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
+import com.example.travelcents.data.ai.chat.AiChatCardOption
+import com.example.travelcents.data.ai.chat.AiChatItem
+import com.example.travelcents.ui.main.aichat.components.AiChatBubble
+import com.example.travelcents.ui.main.aichat.components.AiChatComposer
+import com.example.travelcents.ui.main.aichat.components.AiCuratedTripRow as AiCuratedTripRowSection
+import com.example.travelcents.ui.main.aichat.components.AiChatHistoryScreen
+import com.example.travelcents.ui.main.aichat.components.AiPromptCardGrid
+import com.example.travelcents.ui.main.aichat.components.AiResponseCardGroup
+import com.example.travelcents.ui.main.aichat.components.AiSelectedDraftBar
+import com.example.travelcents.ui.main.newTrip.TripWizardColors
 import com.example.travelcents.ui.theme.DeepSea1
-import com.example.travelcents.ui.theme.DeepSea2
-import com.example.travelcents.ui.theme.DeepSea3
 import com.example.travelcents.ui.theme.DeepSea4
 import com.example.travelcents.ui.theme.DeepSea5
-
-private val ChatBlue = Color(0xFF64B5F6)
+import com.example.travelcents.ui.theme.TravelCentsFonts
+import kotlinx.coroutines.delay
 
 @Composable
 fun AiTripChatPage(
@@ -61,142 +74,191 @@ fun AiTripChatPage(
     onBackClick: () -> Unit = {},
     viewModel: AiChatViewModel = viewModel()
 ) {
-    val messages = viewModel.messages
-    val isLoading by viewModel.isLoading.collectAsState()
-    var inputText by remember { mutableStateOf("") }
+    val uiState by viewModel.uiState.collectAsState()
     val listState = rememberLazyListState()
+    var showHistory by remember { mutableStateOf(false) }
+    val density = LocalDensity.current
+    val userMessageSettleOffset = with(density) { 92.dp.roundToPx() }
+    val responseSettleOffset = with(density) { 132.dp.roundToPx() }
+    val restoreSettleOffset = with(density) { 72.dp.roundToPx() }
 
-    // Scroll to bottom when new message arrives
-    LaunchedEffect(messages.size) {
-        if (messages.isNotEmpty()) listState.animateScrollToItem(messages.size - 1)
+    val showStarterLanding = uiState.items.isEmpty() && !uiState.isLoading && uiState.starterCards.isNotEmpty()
+
+    LaunchedEffect(
+        uiState.anchorMessageId,
+        uiState.activeResponseCardGroupId,
+        uiState.activeCuratedTripRowId,
+        uiState.isLoading,
+        uiState.items.size,
+        showStarterLanding
+    ) {
+        if (showStarterLanding) return@LaunchedEffect
+
+        when {
+            uiState.isLoading && uiState.anchorMessageId != null -> {
+                val anchorIndex = uiState.items.indexOfFirst { item ->
+                    item.id == uiState.anchorMessageId
+                }
+                if (anchorIndex >= 0) {
+                    delay(90)
+                    listState.animateScrollToItem(
+                        index = anchorIndex,
+                        scrollOffset = -userMessageSettleOffset
+                    )
+                }
+            }
+
+            !uiState.isLoading && uiState.activeCuratedTripRowId != null -> {
+                val curatedRowIndex = uiState.items.indexOfFirst { item ->
+                    item.id == uiState.activeCuratedTripRowId
+                }
+                if (curatedRowIndex >= 0) {
+                    delay(140)
+                    listState.animateScrollToItem(
+                        index = curatedRowIndex,
+                        scrollOffset = -responseSettleOffset
+                    )
+                }
+            }
+
+            !uiState.isLoading && uiState.activeResponseCardGroupId != null -> {
+                val responseIndex = uiState.items.indexOfFirst { item ->
+                    item.id == uiState.activeResponseCardGroupId
+                }
+                if (responseIndex >= 0) {
+                    delay(140)
+                    listState.animateScrollToItem(
+                        index = responseIndex,
+                        scrollOffset = -responseSettleOffset
+                    )
+                }
+            }
+
+            uiState.items.isNotEmpty() -> {
+                listState.animateScrollToItem(
+                    index = uiState.items.lastIndex.coerceAtLeast(0),
+                    scrollOffset = -restoreSettleOffset
+                )
+            }
+        }
     }
 
-    Column(
-        modifier = modifier
-            .fillMaxSize()
-            .background(DeepSea1)
-    ) {
-        // Header
-        Column(modifier = Modifier.fillMaxWidth().background(Color(0xFF010E24))) {
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .statusBarsPadding()
-                    .padding(horizontal = 8.dp, vertical = 4.dp),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
+    ProvideTextStyle(value = TextStyle(fontFamily = TravelCentsFonts.Body)) {
+        Box(
+            modifier = modifier
+                .fillMaxSize()
+                .background(DeepSea1)
+        ) {
+            AiChatBackdrop()
+
+            Column(
+                modifier = Modifier.fillMaxSize()
             ) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    IconButton(onClick = onBackClick) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back", tint = ChatBlue)
-                    }
-                    Column {
-                        Text("AI Travel Assistant", fontSize = 15.sp, fontWeight = FontWeight.Bold, color = DeepSea5)
-                        Text(
-                            "Describe your dream trip in your own words",
-                            fontSize = 11.sp,
-                            color = DeepSea5.copy(alpha = 0.5f)
-                        )
-                    }
-                }
-                // Right side: small AI icon badge
-                Box(
-                    modifier = Modifier
-                        .size(32.dp)
-                        .background(ChatBlue.copy(alpha = 0.12f), CircleShape)
-                        .padding(end = 8.dp),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Icon(
-                        Icons.Outlined.AutoAwesome,
-                        contentDescription = null,
-                        tint = ChatBlue,
-                        modifier = Modifier.size(18.dp)
-                    )
-                }
-            }
-            // Accent line at bottom of header (same as wizard steps)
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(2.dp)
-                    .background(
-                        Brush.horizontalGradient(
-                            listOf(ChatBlue, ChatBlue.copy(alpha = 0.4f))
-                        )
-                    )
-            )
-        }
-
-        // Messages
-        LazyColumn(
-            state = listState,
-            modifier = Modifier
-                .weight(1f)
-                .fillMaxWidth()
-                .padding(horizontal = 16.dp),
-            verticalArrangement = Arrangement.spacedBy(4.dp),
-            contentPadding = PaddingValues(top = 16.dp, bottom = 8.dp)
-        ) {
-            items(messages) { message ->
-                AiChatBubble(text = message.text, isFromUser = message.isFromUser)
-            }
-
-            if (isLoading) {
-                item {
-                    TypingIndicator()
-                }
-            }
-        }
-
-        // Input bar
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .background(DeepSea2)
-                .padding(horizontal = 16.dp, vertical = 12.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            TextField(
-                value = inputText,
-                onValueChange = { inputText = it },
-                modifier = Modifier
-                    .weight(1f)
-                    .clip(RoundedCornerShape(28.dp)),
-                placeholder = {
-                    Text("Ask about destinations, budgets, itineraries...", color = DeepSea5.copy(alpha = 0.4f))
-                },
-                singleLine = false,
-                maxLines = 4,
-                colors = TextFieldDefaults.colors(
-                    focusedContainerColor = DeepSea3,
-                    unfocusedContainerColor = DeepSea3,
-                    focusedIndicatorColor = Color.Transparent,
-                    unfocusedIndicatorColor = Color.Transparent,
-                    cursorColor = DeepSea5,
-                    focusedTextColor = DeepSea5,
-                    unfocusedTextColor = DeepSea5
+                AiChatHeader(
+                    onBackClick = onBackClick,
+                    onHistoryClick = { showHistory = true },
+                    onNewChatClick = { viewModel.startNewChat() }
                 )
-            )
 
-            Spacer(modifier = Modifier.width(10.dp))
+                if (showStarterLanding) {
+                    AiStarterLanding(
+                        options = uiState.starterCards.take(4),
+                        selectedOptionIds = uiState.selectedDraftOptions.mapTo(mutableSetOf()) { option ->
+                            option.id
+                        },
+                        onOptionClick = viewModel::toggleStarterCard,
+                        modifier = Modifier
+                            .weight(1f)
+                            .fillMaxWidth()
+                    )
+                } else {
+                    LazyColumn(
+                        state = listState,
+                        modifier = Modifier
+                            .weight(1f)
+                            .fillMaxWidth(),
+                        verticalArrangement = Arrangement.spacedBy(16.dp),
+                        contentPadding = PaddingValues(horizontal = 16.dp, vertical = 20.dp)
+                    ) {
+                        items(uiState.items, key = { it.id }) { item ->
+                            when (item) {
+                                is AiChatItem.TextMessage -> {
+                                    AiChatBubble(
+                                        text = item.text,
+                                        sender = item.sender
+                                    )
+                                }
 
-            Box(
-                modifier = Modifier
-                    .size(48.dp)
-                    .clip(CircleShape)
-                    .background(if (inputText.isBlank() || isLoading) DeepSea3.copy(alpha = 0.5f) else DeepSea3)
-                    .clickable(enabled = inputText.isNotBlank() && !isLoading) {
-                        viewModel.sendMessage(inputText.trim())
-                        inputText = ""
+                                is AiChatItem.SystemStatus -> {
+                                    AiSystemStatusCard(
+                                        title = item.title,
+                                        detail = item.detail
+                                    )
+                                }
+
+                                is AiChatItem.ResponseCardGroup -> {
+                                    AiResponseCardGroup(
+                                        group = item.group,
+                                        selectedOptionIds = uiState.selectedDraftOptions.mapTo(mutableSetOf()) { option ->
+                                            option.id
+                                        },
+                                        enabled = uiState.activeResponseCardGroupId == item.group.id && !uiState.isLoading,
+                                        onOptionClick = { option ->
+                                            viewModel.toggleResponseCard(option, item.group)
+                                        }
+                                    )
+                                }
+
+                                is AiChatItem.CuratedTripRow -> {
+                                    AiCuratedTripRowSection(
+                                        row = item.row,
+                                        onTripSelected = viewModel::selectCuratedTrip
+                                    )
+                                }
+                            }
+                        }
+
+                        if (uiState.isLoading) {
+                            item("loading") {
+                                AiLoadingCard()
+                            }
+                        }
+                    }
+                }
+
+                if (uiState.selectedDraftOptions.isNotEmpty()) {
+                    AiSelectedDraftBar(
+                        options = uiState.selectedDraftOptions,
+                        onRemove = viewModel::removeDraftOption
+                    )
+                }
+
+                Surface(
+                    modifier = Modifier
+                        .fillMaxWidth(),
+                    color = Color(0xFF041329).copy(alpha = 0.96f)
+                ) {
+                    AiChatComposer(
+                        value = uiState.draftText,
+                        onValueChange = viewModel::updateDraftText,
+                        onSendClick = viewModel::sendDraft,
+                        canSend = uiState.draftText.isNotBlank() || uiState.selectedDraftOptions.isNotEmpty(),
+                        isSending = uiState.isLoading
+                    )
+                }
+            }
+
+            if (showHistory) {
+                AiChatHistoryScreen(
+                    entries = uiState.historyEntries,
+                    onBackClick = { showHistory = false },
+                    onSessionSelected = { sessionId ->
+                        showHistory = false
+                        viewModel.loadSession(sessionId)
                     },
-                contentAlignment = Alignment.Center
-            ) {
-                Icon(
-                    Icons.AutoMirrored.Filled.Send,
-                    contentDescription = "Send",
-                    tint = if (inputText.isBlank() || isLoading) DeepSea5.copy(alpha = 0.4f) else DeepSea5,
-                    modifier = Modifier.size(20.dp)
+                    onDeleteSession = viewModel::deleteSession,
+                    onClearAllHistory = viewModel::clearAllHistory,
+                    modifier = Modifier.fillMaxSize()
                 )
             }
         }
@@ -204,58 +266,307 @@ fun AiTripChatPage(
 }
 
 @Composable
-private fun AiChatBubble(text: String, isFromUser: Boolean) {
-    Column(
-        modifier = Modifier.fillMaxWidth(),
-        horizontalAlignment = if (isFromUser) Alignment.End else Alignment.Start
-    ) {
-        if (!isFromUser) {
-            Text(
-                text = "AI Assistant",
-                color = DeepSea5.copy(alpha = 0.5f),
-                fontSize = 11.sp,
-                modifier = Modifier.padding(start = 4.dp, bottom = 2.dp)
+private fun BoxScope.AiChatBackdrop() {
+    Box(
+        modifier = Modifier
+            .align(Alignment.TopCenter)
+            .offset(y = 104.dp)
+            .size(320.dp)
+            .clip(CircleShape)
+            .background(
+                Brush.radialGradient(
+                    colors = listOf(
+                        TripWizardColors.Blue.copy(alpha = 0.18f),
+                        Color.Transparent
+                    )
+                )
             )
+    )
+
+    Box(
+        modifier = Modifier
+            .align(Alignment.CenterStart)
+            .offset(x = (-88).dp, y = 40.dp)
+            .size(220.dp)
+            .clip(CircleShape)
+            .background(
+                Brush.radialGradient(
+                    colors = listOf(
+                        Color(0xFFFFB875).copy(alpha = 0.08f),
+                        Color.Transparent
+                    )
+                )
+            )
+    )
+}
+
+@Composable
+private fun AiStarterLanding(
+    options: List<AiChatCardOption>,
+    selectedOptionIds: Set<String>,
+    onOptionClick: (AiChatCardOption) -> Unit,
+    modifier: Modifier = Modifier
+) {
+    BoxWithConstraints(
+        modifier = modifier
+            .fillMaxWidth()
+            .padding(horizontal = 16.dp)
+    ) {
+        val panelModifier = if (maxWidth < 420.dp) {
+            Modifier.fillMaxWidth()
+        } else {
+            Modifier.widthIn(max = 420.dp)
+        }
+
+        Column(
+            modifier = panelModifier
+                .align(Alignment.Center)
+                .fillMaxWidth(),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(20.dp)
+        ) {
+            Surface(
+                modifier = Modifier.size(72.dp),
+                shape = CircleShape,
+                color = TripWizardColors.ContainerHighest.copy(alpha = 0.92f),
+                border = BorderStroke(
+                    width = 1.dp,
+                    color = TripWizardColors.Blue.copy(alpha = 0.28f)
+                )
+            ) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .background(
+                            Brush.radialGradient(
+                                colors = listOf(
+                                    TripWizardColors.Blue.copy(alpha = 0.22f),
+                                    Color.Transparent
+                                )
+                            )
+                        ),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(
+                        imageVector = Icons.Outlined.AutoAwesome,
+                        contentDescription = null,
+                        tint = TripWizardColors.Blue,
+                        modifier = Modifier.size(30.dp)
+                    )
+                }
+            }
+
+            Column(
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                Text(
+                    text = "Where to next?",
+                    color = DeepSea5,
+                    fontSize = 28.sp,
+                    fontWeight = FontWeight.ExtraBold,
+                    fontFamily = TravelCentsFonts.Headline
+                )
+                Text(
+                    text = "Pick a direction to start, or type your own trip idea below.",
+                    color = DeepSea4,
+                    fontSize = 14.sp,
+                    lineHeight = 20.sp,
+                    fontFamily = TravelCentsFonts.Body
+                )
+            }
+
+            Surface(
+                modifier = Modifier.fillMaxWidth(),
+                color = Color(0xE610223C),
+                shape = RoundedCornerShape(28.dp),
+                border = BorderStroke(
+                    width = 1.dp,
+                    color = Color.White.copy(alpha = 0.06f)
+                )
+            ) {
+                AiPromptCardGrid(
+                    title = "",
+                    subtitle = "",
+                    options = options,
+                    selectedOptionIds = selectedOptionIds,
+                    onOptionClick = onOptionClick,
+                    modifier = Modifier.padding(18.dp)
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun AiChatHeader(
+    onBackClick: () -> Unit,
+    onHistoryClick: () -> Unit,
+    onNewChatClick: () -> Unit
+) {
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .background(Color(0xFF010E24))
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .statusBarsPadding()
+                .padding(horizontal = 8.dp, vertical = 6.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            IconButton(onClick = onBackClick) {
+                Icon(
+                    imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+                    contentDescription = "Back",
+                    tint = TripWizardColors.Blue
+                )
+            }
+
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = "TravelCents AI",
+                    color = DeepSea5,
+                    fontSize = 18.sp,
+                    fontWeight = FontWeight.ExtraBold,
+                    fontFamily = TravelCentsFonts.Headline
+                )
+            }
+
+            Row(
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Surface(
+                    modifier = Modifier.clickable(onClick = onHistoryClick),
+                    color = TripWizardColors.ContainerHigh,
+                    shape = RoundedCornerShape(12.dp)
+                ) {
+                    Box(
+                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 10.dp),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Icon(
+                            imageVector = Icons.Outlined.History,
+                            contentDescription = "History",
+                            tint = TripWizardColors.Blue,
+                            modifier = Modifier.size(18.dp)
+                        )
+                    }
+                }
+
+                Surface(
+                    modifier = Modifier.clickable(onClick = onNewChatClick),
+                    color = TripWizardColors.ContainerHigh,
+                    shape = RoundedCornerShape(12.dp)
+                ) {
+                    Box(
+                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 10.dp),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Add,
+                            contentDescription = "New chat",
+                            tint = TripWizardColors.Blue,
+                            modifier = Modifier.size(18.dp)
+                        )
+                    }
+                }
+            }
         }
 
         Box(
             modifier = Modifier
-                .widthIn(max = 300.dp)
-                .clip(
-                    RoundedCornerShape(
-                        topStart = 18.dp,
-                        topEnd = 18.dp,
-                        bottomStart = if (isFromUser) 18.dp else 4.dp,
-                        bottomEnd = if (isFromUser) 4.dp else 18.dp
+                .fillMaxWidth()
+                .height(3.dp)
+                .background(
+                    Brush.horizontalGradient(
+                        listOf(
+                            TripWizardColors.Blue,
+                            TripWizardColors.Blue.copy(alpha = 0.35f)
+                        )
                     )
                 )
-                .background(if (isFromUser) DeepSea3 else DeepSea2)
-                .padding(horizontal = 14.dp, vertical = 10.dp)
-        ) {
-            Text(text = text, color = DeepSea5, fontSize = 14.sp)
-        }
-
-        Spacer(modifier = Modifier.size(10.dp))
+        )
     }
 }
 
 @Composable
-private fun TypingIndicator() {
+private fun AiLoadingCard() {
     Row(
-        modifier = Modifier.padding(start = 4.dp, top = 4.dp),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(6.dp)
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.Start
     ) {
-        CircularProgressIndicator(
-            modifier = Modifier.size(14.dp),
-            color = DeepSea4,
-            strokeWidth = 2.dp
-        )
-        Text(
-            text = "AI is thinking...",
-            color = DeepSea4,
-            fontSize = 12.sp
-        )
+        Surface(
+            modifier = Modifier
+                .widthIn(max = 280.dp),
+            color = TripWizardColors.ContainerLow,
+            shape = RoundedCornerShape(
+                topStart = 22.dp,
+                topEnd = 22.dp,
+                bottomStart = 8.dp,
+                bottomEnd = 22.dp
+            ),
+            border = BorderStroke(
+                width = 1.dp,
+                color = Color.White.copy(alpha = 0.06f)
+            )
+        ) {
+            Row(
+                modifier = Modifier.padding(horizontal = 16.dp, vertical = 16.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(10.dp)
+            ) {
+                CircularProgressIndicator(
+                    modifier = Modifier.size(18.dp),
+                    color = TripWizardColors.Blue,
+                    strokeWidth = 2.dp
+                )
+                Text(
+                    text = "TravelCents AI is thinking...",
+                    color = DeepSea4,
+                    fontSize = 13.sp,
+                    fontFamily = TravelCentsFonts.Body
+                )
+            }
+        }
     }
 }
 
+@Composable
+private fun AiSystemStatusCard(
+    title: String,
+    detail: String
+) {
+    Surface(
+        color = TripWizardColors.ContainerLow,
+        shape = RoundedCornerShape(22.dp),
+        border = BorderStroke(
+            width = 1.dp,
+            color = Color.White.copy(alpha = 0.06f)
+        )
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 16.dp, vertical = 14.dp),
+            verticalArrangement = Arrangement.spacedBy(4.dp)
+        ) {
+            Text(
+                text = title,
+                color = DeepSea5,
+                fontSize = 14.sp,
+                fontWeight = FontWeight.Bold,
+                fontFamily = TravelCentsFonts.Body
+            )
+            Text(
+                text = detail,
+                color = DeepSea4,
+                fontSize = 12.sp,
+                lineHeight = 17.sp,
+                fontFamily = TravelCentsFonts.Body
+            )
+        }
+    }
+}

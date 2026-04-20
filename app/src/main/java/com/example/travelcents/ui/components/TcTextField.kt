@@ -49,13 +49,17 @@ fun TcTextField(
     TextField(
         value = value,
         onValueChange = onValueChange,
-        label = {
-            Text(
-                text = label,
-                color = TripWizardColors.OnSurfaceVariant,
-                fontSize = 12.sp,
-                fontFamily = labelFontFamily
-            )
+        label = if (label.isNotBlank()) {
+            {
+                Text(
+                    text = label,
+                    color = TripWizardColors.OnSurfaceVariant,
+                    fontSize = 12.sp,
+                    fontFamily = labelFontFamily
+                )
+            }
+        } else {
+            null
         },
         placeholder = if (placeholder.isNotEmpty()) {
             {
