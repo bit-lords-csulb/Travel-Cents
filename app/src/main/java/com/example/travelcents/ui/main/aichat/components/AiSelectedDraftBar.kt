@@ -5,12 +5,11 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.lazy.LazyRow
-import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Close
@@ -27,18 +26,21 @@ import com.example.travelcents.ui.main.newTrip.TripWizardColors
 import com.example.travelcents.ui.theme.DeepSea5
 import com.example.travelcents.ui.theme.TravelCentsFonts
 
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 fun AiSelectedDraftBar(
     options: List<AiChatCardOption>,
     onRemove: (String) -> Unit,
     modifier: Modifier = Modifier
 ) {
-    LazyRow(
-        modifier = modifier.fillMaxWidth(),
+    FlowRow(
+        modifier = modifier
+            .fillMaxWidth()
+            .padding(horizontal = 12.dp, vertical = 6.dp),
         horizontalArrangement = Arrangement.spacedBy(8.dp),
-        contentPadding = PaddingValues(horizontal = 16.dp, vertical = 6.dp)
+        verticalArrangement = Arrangement.spacedBy(6.dp)
     ) {
-        items(options, key = { it.id }) { option ->
+        options.forEach { option ->
             Box(
                 modifier = Modifier
                     .background(
@@ -51,29 +53,29 @@ fun AiSelectedDraftBar(
                         shape = RoundedCornerShape(999.dp)
                     )
                     .clickable { onRemove(option.id) }
-                    .padding(start = 12.dp, top = 8.dp, end = 10.dp, bottom = 8.dp),
+                    .padding(start = 10.dp, top = 5.dp, end = 8.dp, bottom = 5.dp),
                 contentAlignment = Alignment.Center
             ) {
                 androidx.compose.foundation.layout.Row(
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    horizontalArrangement = Arrangement.spacedBy(6.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Text(
                         text = option.label,
                         color = DeepSea5,
-                        fontSize = 12.sp,
+                        fontSize = 11.sp,
                         fontWeight = FontWeight.SemiBold,
                         fontFamily = TravelCentsFonts.Body
                     )
                     Box(
-                        modifier = Modifier.size(16.dp),
+                        modifier = Modifier.size(14.dp),
                         contentAlignment = Alignment.Center
                     ) {
                         Icon(
                             imageVector = Icons.Default.Close,
                             contentDescription = "Remove",
                             tint = TripWizardColors.Blue,
-                            modifier = Modifier.size(12.dp)
+                            modifier = Modifier.size(11.dp)
                         )
                     }
                 }

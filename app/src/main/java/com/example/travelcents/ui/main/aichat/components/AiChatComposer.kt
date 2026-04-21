@@ -51,7 +51,7 @@ fun AiChatComposer(
     Surface(
         modifier = modifier
             .fillMaxWidth()
-            .padding(horizontal = 16.dp, vertical = 14.dp),
+            .padding(horizontal = 16.dp, vertical = 10.dp),
         shape = RoundedCornerShape(22.dp),
         color = TripWizardColors.ContainerHigh,
         border = BorderStroke(
@@ -70,9 +70,9 @@ fun AiChatComposer(
             androidx.compose.foundation.layout.Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(horizontal = 14.dp, vertical = 10.dp),
+                    .padding(horizontal = 12.dp, vertical = 6.dp),
                 verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(10.dp)
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
             TcCompactTextField(
                 value = value,
@@ -119,9 +119,9 @@ fun AiChatComposer(
 
             Surface(
                 modifier = Modifier
-                    .size(40.dp)
+                    .size(32.dp)
                     .clickable(enabled = canSend && !isSending, onClick = onSendClick),
-                shape = RoundedCornerShape(14.dp),
+                shape = RoundedCornerShape(12.dp),
                 color = TripWizardColors.ContainerHighest
             ) {
                 Box(
@@ -129,7 +129,7 @@ fun AiChatComposer(
                 ) {
                     if (isSending) {
                         CircularProgressIndicator(
-                            modifier = Modifier.size(18.dp),
+                            modifier = Modifier.size(16.dp),
                             color = TripWizardColors.Blue,
                             strokeWidth = 2.dp
                         )
@@ -138,7 +138,7 @@ fun AiChatComposer(
                             imageVector = Icons.AutoMirrored.Filled.Send,
                             contentDescription = "Send",
                             tint = if (canSend) DeepSea5 else DeepSea4,
-                            modifier = Modifier.size(18.dp)
+                            modifier = Modifier.size(16.dp)
                         )
                     }
                 }
