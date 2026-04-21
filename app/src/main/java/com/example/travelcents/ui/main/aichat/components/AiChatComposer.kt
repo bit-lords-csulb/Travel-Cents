@@ -4,6 +4,7 @@ import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -29,6 +30,7 @@ import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.example.travelcents.data.ai.chat.AiChatCardOption
 import com.example.travelcents.ui.components.TcCompactTextField
 import com.example.travelcents.ui.main.newTrip.TripWizardColors
 import com.example.travelcents.ui.theme.DeepSea4
@@ -42,6 +44,8 @@ fun AiChatComposer(
     onSendClick: () -> Unit,
     canSend: Boolean,
     isSending: Boolean,
+    selectedDraftOptions: List<AiChatCardOption> = emptyList(),
+    onRemoveDraftOption: (String) -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     Surface(
@@ -55,13 +59,21 @@ fun AiChatComposer(
             color = Color.White.copy(alpha = 0.08f)
         )
     ) {
-        androidx.compose.foundation.layout.Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 14.dp, vertical = 10.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(10.dp)
-        ) {
+        Column(modifier = Modifier.fillMaxWidth()) {
+            if (selectedDraftOptions.isNotEmpty()) {
+                AiSelectedDraftBar(
+                    options = selectedDraftOptions,
+                    onRemove = onRemoveDraftOption
+                )
+            }
+
+            androidx.compose.foundation.layout.Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 14.dp, vertical = 10.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(10.dp)
+            ) {
             TcCompactTextField(
                 value = value,
                 onValueChange = onValueChange,
@@ -132,5 +144,6 @@ fun AiChatComposer(
                 }
             }
         }
+h        }
     }
 }

@@ -12,6 +12,9 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Close
+import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
@@ -66,12 +69,11 @@ fun AiSelectedDraftBar(
                         modifier = Modifier.size(16.dp),
                         contentAlignment = Alignment.Center
                     ) {
-                        Text(
-                            text = "×",
-                            color = TripWizardColors.Blue,
-                            fontSize = 13.sp,
-                            fontWeight = FontWeight.Bold,
-                            fontFamily = TravelCentsFonts.Body
+                        Icon(
+                            imageVector = Icons.Default.Close,
+                            contentDescription = "Remove",
+                            tint = TripWizardColors.Blue,
+                            modifier = Modifier.size(12.dp)
                         )
                     }
                 }

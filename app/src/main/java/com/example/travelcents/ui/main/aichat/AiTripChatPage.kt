@@ -55,6 +55,9 @@ import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.travelcents.data.ai.chat.AiChatCardOption
 import com.example.travelcents.data.ai.chat.AiChatItem
+import com.example.travelcents.data.ai.chat.AiCuratedTripStarter
+import com.example.travelcents.data.ai.chat.AiTripIntakeProfile
+import com.example.travelcents.data.trip.TripKey
 import com.example.travelcents.ui.main.aichat.components.AiChatBubble
 import com.example.travelcents.ui.main.aichat.components.AiChatComposer
 import com.example.travelcents.ui.main.aichat.components.AiCuratedTripRow as AiCuratedTripRowSection
@@ -73,6 +76,8 @@ import kotlinx.coroutines.delay
 fun AiTripChatPage(
     modifier: Modifier = Modifier,
     onBackClick: () -> Unit = {},
+    onOpenTrip: (TripKey) -> Unit = {},
+    onCreateDraftTrip: (AiCuratedTripStarter, AiTripIntakeProfile) -> Unit = { _, _ -> },
     viewModel: AiChatViewModel = viewModel()
 ) {
     val uiState by viewModel.uiState.collectAsState()
@@ -213,7 +218,13 @@ fun AiTripChatPage(
                                 is AiChatItem.CuratedTripRow -> {
                                     AiCuratedTripRowSection(
                                         row = item.row,
-                                        onTripSelected = viewModel::selectCuratedTrip
+                                        onTripSelected = { starter ->
+                                            viewModel.handleRecommendedStarterSelection(
+                                                starter = starter,
+                                                onOpenTrip = onOpenTrip,
+                                                onCreateDraftTrip = onCreateDraftTrip
+                                            )
+                                        }
                                     )
                                 }
                             }

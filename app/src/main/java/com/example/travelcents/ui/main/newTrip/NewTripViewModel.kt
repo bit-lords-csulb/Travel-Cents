@@ -7,9 +7,13 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
+import com.example.travelcents.data.ai.chat.AiCuratedTripStarter
+import com.example.travelcents.data.ai.chat.AiTripIntakeProfile
+import com.example.travelcents.data.ai.chat.AiTripType
 import com.example.travelcents.data.media.remoteMediaUrls
 import com.example.travelcents.data.media.TripMediaCacheStore
 import com.example.travelcents.data.trip.TripKey
+import com.example.travelcents.data.trip.TripAccessRole
 import com.example.travelcents.data.trip.model.Itinerary
 import com.example.travelcents.data.trip.model.TravelEvent
 import com.example.travelcents.data.trip.model.TravelRequest
@@ -28,10 +32,12 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.tasks.await
+import java.time.Instant
 import java.time.Duration
 import java.time.LocalDate
 import java.time.LocalTime
 import java.time.format.DateTimeFormatter
+import java.util.UUID
 
 enum class GenerationStep {
     IDLE,
@@ -302,6 +308,45 @@ class NewTripViewModel(application: Application) : AndroidViewModel(application)
         _generationStep.value = GenerationStep.IDLE
     }
 
+    fun createDraftTripFromAiStarter(
+        starter: AiCuratedTripStarter,
+        intakeProfile: AiTripIntakeProfile,
+        onTripReady: (TripKey) -> Unit = {}
+    ) {
+        val uid = FirebaseAuth.getInstance().currentUser?.uid
+        if (uid == null) {
+            _uiState.value = TripUiState.Error("You must be logged in to create a trip.")
+            return
+        }
+
+        viewModelScope.launch {
+            try {
+                val tripKey = TripKey(ownerUid = uid, tripId = UUID.randomUUID().toString())
+                val itinerary = buildDraftItinerary(
+                    tripKey = tripKey,
+                    starter = starter,
+                    intakeProfile = intakeProfile
+                )
+
+                _generationStep.value = GenerationStep.SAVING
+                _uiState.value = TripUiState.Loading("Creating your AI trip starter...")
+                TripSyncRemoteDataSource(FirebaseFirestore.getInstance())
+                    .createTrip(
+                        ownerUid = uid,
+                        itinerary = itinerary,
+                        events = emptyList()
+                    )
+
+                _generationStep.value = GenerationStep.COMPLETE
+                _uiState.value = TripUiState.Success(itinerary, emptyList())
+                onTripReady(tripKey)
+            } catch (e: Exception) {
+                _generationStep.value = GenerationStep.IDLE
+                _uiState.value = TripUiState.Error(e.message ?: "Failed to create AI trip starter.")
+            }
+        }
+    }
+
     fun toggleInterest(item: String) {
         interests = if (item in interests) interests - item else interests + item
     }
@@ -429,6 +474,46 @@ class NewTripViewModel(application: Application) : AndroidViewModel(application)
             "Storing your itinerary...",
             "Almost done — saving to the clouds..."
         )
+    }
+
+    private fun buildDraftItinerary(
+        tripKey: TripKey,
+        starter: AiCuratedTripStarter,
+        intakeProfile: AiTripIntakeProfile
+    ): Itinerary {
+        val (draftAdults, draftChildren) = inferTravelerCounts(intakeProfile)
+        return Itinerary(
+            itineraryId = tripKey.tripId,
+            userId = tripKey.ownerUid,
+            tripName = starter.title.ifBlank { starter.destination.ifBlank { "AI Trip Starter" } },
+            destination = starter.destination,
+            origin = intakeProfile.origin,
+            dateFrom = "",
+            dateTo = "",
+            durationDays = starter.durationDays.coerceAtLeast(1),
+            currency = currency.ifBlank { "USD" },
+            travelStyle = starter.travelStyle.ifBlank { "comfort" },
+            adults = draftAdults,
+            children = draftChildren,
+            createdAt = Instant.now().toString(),
+            status = "draft",
+            eventIds = emptyList(),
+            ownerUid = tripKey.ownerUid,
+            memberUids = listOf(tripKey.ownerUid),
+            roleByUid = mapOf(tripKey.ownerUid to TripAccessRole.OWNER.wireValue)
+        )
+    }
+
+    private fun inferTravelerCounts(intakeProfile: AiTripIntakeProfile): Pair<Int, Int> {
+        val normalizedParty = intakeProfile.partySummary.lowercase()
+
+        return when {
+            intakeProfile.tripType == AiTripType.SOLO || "solo" in normalizedParty -> 1 to 0
+            intakeProfile.tripType == AiTripType.ROMANTIC || "two adults" in normalizedParty || "for two" in normalizedParty -> 2 to 0
+            intakeProfile.tripType == AiTripType.FAMILY || "family" in normalizedParty || "kids" in normalizedParty || "children" in normalizedParty -> 2 to 2
+            intakeProfile.tripType == AiTripType.FRIENDS || "friends" in normalizedParty || "group" in normalizedParty -> 4 to 0
+            else -> 2 to 0
+        }
     }
 }
 

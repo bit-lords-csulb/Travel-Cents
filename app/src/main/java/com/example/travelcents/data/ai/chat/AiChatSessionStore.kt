@@ -17,6 +17,7 @@ data class PersistedAiChatSnapshot(
     val stage: AiChatStage = AiChatStage.ONBOARDING,
     val quickReplies: List<AiChatQuickReply> = emptyList(),
     val llmHistory: List<LlmMessage> = emptyList(),
+    val askedFollowUpGroupIds: List<String> = emptyList(),
     val activeResponseCardGroup: PersistedAiChatCardGroup? = null,
     val activeCuratedTripRow: PersistedAiCuratedTripRow? = null,
     val anchorMessageId: String? = null

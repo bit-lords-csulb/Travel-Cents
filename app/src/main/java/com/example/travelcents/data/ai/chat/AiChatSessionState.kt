@@ -13,6 +13,7 @@ data class AiChatSessionState(
     val starterCards: List<AiChatCardOption> = emptyList(),
     val draftText: String = "",
     val selectedDraftOptions: List<AiChatCardOption> = emptyList(),
+    val askedFollowUpGroupIds: List<String> = emptyList(),
     val activeResponseCardGroup: AiChatCardGroup? = null,
     val activeCuratedTripRow: AiCuratedTripRow? = null,
     val anchorMessageId: String? = null
