@@ -23,10 +23,12 @@ import com.example.travelcents.data.trip.model.detailValue
 @Composable
 fun HotelPricingCard(event: TravelEvent) {
     val uriHandler = LocalUriHandler.current
-    val nightly = event.detailValue(ATTR_RATE_PER_NIGHT, "rate_per_night")?.let { "$$it / night" } ?: "Price unavailable"
+    val nightlyRate = event.detailValue(ATTR_RATE_PER_NIGHT, "rate_per_night")
+    val nightly = nightlyRate?.let { "$$it / night" } ?: "Booking details"
     val group = event.detailValue(ATTR_GROUP_RATE_PER_NIGHT, "group_rate_per_night")?.let { "$$it / night" }
     val rooms = event.detailValue(ATTR_ROOMS_NEEDED, "rooms_needed")
     val bookingUrl = event.detailValue(ATTR_BOOKING_URL, "booking_url")
+    if (nightlyRate == null && group == null && rooms == null && bookingUrl == null) return
 
     DetailCardFrame(accent = CardLavender) {
         DetailCardHeader(eyebrow = "Pricing", title = nightly)

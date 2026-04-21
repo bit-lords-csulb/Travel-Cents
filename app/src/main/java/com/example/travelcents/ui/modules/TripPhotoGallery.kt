@@ -80,10 +80,11 @@ private fun cachedOrRemoteModelFor(
 fun PhotoGalleryButton(
     photoCount: Int,
     onClick: () -> Unit,
+    containerAlpha: Float = 0.48f,
     modifier: Modifier = Modifier
 ) {
     Surface(
-        color = Color.Black.copy(alpha = 0.48f),
+        color = Color.Black.copy(alpha = containerAlpha),
         shape = RoundedCornerShape(14.dp),
         modifier = modifier
     ) {

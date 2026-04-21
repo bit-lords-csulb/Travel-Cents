@@ -26,7 +26,9 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImage
+import com.example.travelcents.data.trip.model.ATTR_BUSINESS_ADDRESS
 import com.example.travelcents.data.trip.model.TravelEvent
+import com.example.travelcents.data.trip.model.firstNonBlank
 import com.example.travelcents.ui.main.current.eventSubtitle
 import com.example.travelcents.ui.main.current.eventTitle
 import com.example.travelcents.ui.modules.PhotoGalleryButton
@@ -43,6 +45,16 @@ fun EventSummaryCard(
 ) {
     val accent = accentForType(event.type)
     val title = eventTitle(event)
+    if (event.type.equals("hotel", ignoreCase = true)) {
+        HotelSummaryCard(
+            event = event,
+            heroImage = heroImage,
+            photoCount = photoCount,
+            title = title,
+            onOpenGallery = onOpenGallery
+        )
+        return
+    }
 
     DetailCardFrame(accent = accent) {
         Row(
@@ -150,6 +162,95 @@ fun EventSummaryCard(
                             )
                         }
                     }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun HotelSummaryCard(
+    event: TravelEvent,
+    heroImage: String?,
+    photoCount: Int,
+    title: String,
+    onOpenGallery: (() -> Unit)?
+) {
+    val subtitle = event.details.firstNonBlank(ATTR_BUSINESS_ADDRESS, "address")
+        ?.takeIf { it.isNotBlank() }
+
+    DetailCardFrame(accent = CardLavender) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(16.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Box(
+                modifier = Modifier
+                    .weight(0.42f)
+                    .aspectRatio(0.92f)
+                    .clip(RoundedCornerShape(24.dp))
+                    .background(CardSurfaceHighest)
+                    .then(if (onOpenGallery != null) Modifier.clickable(onClick = onOpenGallery) else Modifier)
+            ) {
+                if (!heroImage.isNullOrBlank()) {
+                    AsyncImage(
+                        model = heroImage,
+                        contentDescription = title,
+                        modifier = Modifier.matchParentSize(),
+                        contentScale = ContentScale.Crop
+                    )
+                    Box(
+                        modifier = Modifier
+                            .matchParentSize()
+                            .background(
+                                Brush.verticalGradient(
+                                    colors = listOf(
+                                        androidx.compose.ui.graphics.Color.Transparent,
+                                        CardBackground.copy(alpha = 0.12f),
+                                        CardBackground.copy(alpha = 0.42f)
+                                    )
+                                )
+                            )
+                    )
+                } else {
+                    Box(
+                        modifier = Modifier
+                            .matchParentSize()
+                            .background(accentGradientForType(event.type))
+                    )
+                }
+
+                if (photoCount > 1 && onOpenGallery != null) {
+                    PhotoGalleryButton(
+                        photoCount = photoCount,
+                        onClick = onOpenGallery,
+                        containerAlpha = 0.28f,
+                        modifier = Modifier
+                            .align(Alignment.TopEnd)
+                            .padding(10.dp)
+                    )
+                }
+            }
+
+            Column(
+                modifier = Modifier.weight(0.58f),
+                verticalArrangement = Arrangement.spacedBy(10.dp)
+            ) {
+                Text(
+                    text = title,
+                    color = CardText,
+                    fontSize = 28.sp,
+                    lineHeight = 32.sp,
+                    fontWeight = FontWeight.ExtraBold
+                )
+                subtitle?.let {
+                    Text(
+                        text = it,
+                        color = CardTextMuted,
+                        fontSize = 13.sp,
+                        lineHeight = 18.sp
+                    )
                 }
             }
         }
