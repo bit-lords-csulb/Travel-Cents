@@ -3,6 +3,7 @@ import java.util.Properties
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.compose)
+    alias(libs.plugins.ksp)
     alias(libs.plugins.google.gms.google.services)
 }
 
@@ -25,8 +26,20 @@ android {
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
 
         buildConfigField(
-            "String", "GROQ_API_KEY",
-            "\"${localProperties.getProperty("GROQ_API_KEY") ?: ""}\""
+            "String", "LLM_API_KEY",
+            "\"${localProperties.getProperty("LLM_API_KEY") ?: localProperties.getProperty("GROQ_API_KEY") ?: ""}\""
+        )
+        buildConfigField(
+            "String", "LLM_BASE_URL",
+            "\"${localProperties.getProperty("LLM_BASE_URL") ?: "https://api.groq.com/openai/v1/"}\""
+        )
+        buildConfigField(
+            "String", "LLM_MODEL",
+            "\"${localProperties.getProperty("LLM_MODEL") ?: "llama-3.3-70b-versatile"}\""
+        )
+        buildConfigField(
+            "String", "LLM_INTAKE_MODEL",
+            "\"${localProperties.getProperty("LLM_INTAKE_MODEL") ?: "openai/gpt-oss-20b"}\""
         )
         buildConfigField(
             "String", "SERP_API_KEY",
@@ -80,7 +93,7 @@ dependencies {
     // Coroutines support for Firebase Tasks (.await())
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-play-services:1.8.1")
 
-    // Retrofit + OkHttp for Groq API
+    // Retrofit + OkHttp for AI provider integrations
     implementation("com.squareup.retrofit2:retrofit:2.11.0")
     implementation("com.squareup.retrofit2:converter-gson:2.11.0")
     implementation("com.squareup.okhttp3:okhttp:4.12.0")
@@ -98,6 +111,10 @@ dependencies {
 
     implementation(libs.androidx.material3)
     implementation(libs.androidx.lifecycle.viewmodel.ktx)
+    implementation(libs.androidx.room.runtime)
+    implementation(libs.androidx.room.ktx)
+    implementation(libs.androidx.work.runtime.ktx)
+    ksp(libs.androidx.room.compiler)
     implementation(libs.play.services.location)
     implementation("sh.calvin.reorderable:reorderable:2.4.0")
     testImplementation(libs.junit)

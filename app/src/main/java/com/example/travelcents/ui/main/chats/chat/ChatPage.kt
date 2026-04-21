@@ -25,8 +25,8 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import coil.compose.AsyncImage
-import com.example.travelcents.data.model.Message
-import com.example.travelcents.data.model.Group
+import com.example.travelcents.data.social.model.Message
+import com.example.travelcents.data.social.model.Group
 import com.example.travelcents.ui.theme.*
 import com.google.firebase.Timestamp
 import java.text.SimpleDateFormat
@@ -92,7 +92,8 @@ fun ChatPage(
                 .fillMaxWidth()
                 .clip(RoundedCornerShape(bottomStart = 24.dp, bottomEnd = 24.dp))
                 .background(DeepSea2)
-                .padding(top = 48.dp, bottom = 16.dp, start = 8.dp, end = 16.dp)
+                .statusBarsPadding()
+                .padding(top = 8.dp, bottom = 12.dp, start = 8.dp, end = 16.dp)
         ) {
             Row(
                 verticalAlignment = Alignment.CenterVertically,
@@ -180,8 +181,7 @@ fun ChatPage(
             modifier = Modifier
                 .fillMaxWidth()
                 .background(DeepSea2)
-                .padding(horizontal = 16.dp, vertical = 12.dp)
-                .navigationBarsPadding(),
+                .padding(horizontal = 16.dp, vertical = 12.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
             TextField(
@@ -363,3 +363,4 @@ private fun TripCardBubble(
         }
     }
 }
+
