@@ -12,6 +12,8 @@ import com.example.travelcents.data.trip.model.ATTR_CHECK_OUT_TIME
 import com.example.travelcents.data.trip.model.ATTR_HOTEL_RATING
 import com.example.travelcents.data.trip.model.ATTR_HOURS_SUMMARY
 import com.example.travelcents.data.trip.model.ATTR_IS_CLOSED
+import com.example.travelcents.data.trip.model.ATTR_LATITUDE
+import com.example.travelcents.data.trip.model.ATTR_LONGITUDE
 import com.example.travelcents.data.trip.model.ATTR_MENU_URL
 import com.example.travelcents.data.trip.model.ATTR_REVIEW_COUNT
 import com.example.travelcents.data.trip.model.ATTR_YELP_URL
@@ -22,6 +24,8 @@ import com.example.travelcents.ui.main.current.eventSubtitle
 import com.example.travelcents.ui.main.current.eventTitle
 import com.example.travelcents.ui.modules.formatDisplayTime
 import com.example.travelcents.ui.modules.formatDisplayTimeRange
+import com.example.travelcents.ui.modules.formatTimeZoneLabel
+import com.example.travelcents.ui.modules.formatTripDate
 import com.example.travelcents.ui.modules.parseFlexibleTime
 import java.time.Duration
 import java.util.Locale
@@ -38,6 +42,11 @@ internal fun eventOfficialUrl(event: TravelEvent): String? {
 }
 
 internal fun eventMapsQuery(event: TravelEvent): String {
+    val latitude = event.detailValue(ATTR_LATITUDE)?.toDoubleOrNull()
+    val longitude = event.detailValue(ATTR_LONGITUDE)?.toDoubleOrNull()
+    if (latitude != null && longitude != null) {
+        return "%.6f,%.6f".format(Locale.US, latitude, longitude)
+    }
     return listOf(
         event.detailValue(ATTR_BUSINESS_ADDRESS, "address"),
         event.details["location"],
@@ -50,6 +59,22 @@ internal fun eventMapsQuery(event: TravelEvent): String {
 }
 
 internal fun eventLocationLabel(event: TravelEvent): String {
+    if (event.type.equals("hotel", ignoreCase = true)) {
+        val latitude = event.detailValue(ATTR_LATITUDE)?.toDoubleOrNull()
+        val longitude = event.detailValue(ATTR_LONGITUDE)?.toDoubleOrNull()
+        val coordinateLabel = if (latitude != null && longitude != null) {
+            "%.6f, %.6f".format(Locale.US, latitude, longitude)
+        } else {
+            null
+        }
+        return listOfNotNull(
+            event.detailValue(ATTR_BUSINESS_ADDRESS, "address"),
+            event.details["location"],
+            coordinateLabel,
+            event.detailValue("attr_hotel_name", "hotel_name")
+        ).firstOrNull { it.isNotBlank() } ?: "Location information unavailable"
+    }
+
     return listOf(
         event.detailValue(ATTR_BUSINESS_ADDRESS, "address"),
         event.details["location"],
@@ -122,6 +147,59 @@ internal fun hotelStayWindow(event: TravelEvent): String {
     val checkIn = event.detailValue(ATTR_CHECK_IN_TIME, "check_in_time", "check_in") ?: "Check-in TBD"
     val checkOut = event.detailValue(ATTR_CHECK_OUT_TIME, "check_out_time", "check_out") ?: "Check-out TBD"
     return "$checkIn to $checkOut"
+}
+
+internal fun hotelStayDateSummary(event: TravelEvent): String? {
+    val checkInDate = event.details["check_in_date"]?.takeIf { it.isNotBlank() }
+    val checkOutDate = event.details["check_out_date"]?.takeIf { it.isNotBlank() }
+    return when {
+        checkInDate != null && checkOutDate != null -> "$checkInDate to $checkOutDate"
+        checkInDate != null -> "Check-in $checkInDate"
+        checkOutDate != null -> "Check-out $checkOutDate"
+        else -> null
+    }
+}
+
+internal data class HotelStayMoment(
+    val label: String,
+    val date: String?,
+    val time: String?,
+    val timeZoneLabel: String?
+)
+
+internal fun hotelStayMoments(event: TravelEvent): List<HotelStayMoment> {
+    val zoneLabel = event.tz
+        .takeIf { it.isNotBlank() }
+        ?.let { tz ->
+            val date = event.details["check_in_date"]
+                ?: event.details["check_out_date"]
+                ?: event.date
+            val time = event.detailValue(ATTR_CHECK_IN_TIME, "check_in_time", "check_in")
+                ?: event.detailValue(ATTR_CHECK_OUT_TIME, "check_out_time", "check_out")
+                ?: event.startTime
+            if (date.isBlank() || time.isBlank()) null else formatTimeZoneLabel(tz, date, time)
+        }
+
+    return listOf(
+        HotelStayMoment(
+            label = "Check-in",
+            date = event.details["check_in_date"]?.takeIf { it.isNotBlank() }?.let(::formatTripDate),
+            time = event.detailValue(ATTR_CHECK_IN_TIME, "check_in_time", "check_in")
+                ?.takeIf { it.isNotBlank() }
+                ?.let(::formatDisplayTime),
+            timeZoneLabel = zoneLabel
+        ),
+        HotelStayMoment(
+            label = "Check-out",
+            date = event.details["check_out_date"]?.takeIf { it.isNotBlank() }?.let(::formatTripDate),
+            time = event.detailValue(ATTR_CHECK_OUT_TIME, "check_out_time", "check_out")
+                ?.takeIf { it.isNotBlank() }
+                ?.let(::formatDisplayTime),
+            timeZoneLabel = zoneLabel
+        )
+    ).filter { moment ->
+        !moment.date.isNullOrBlank() || !moment.time.isNullOrBlank()
+    }
 }
 
 internal fun eventExperienceText(event: TravelEvent): String {

@@ -58,8 +58,8 @@ fun MainBottomNavBar(
     Column(
         modifier = modifier
             .fillMaxWidth()
-            .background(DeepSea2)
             .navigationBarsPadding()
+            .background(DeepSea2)
     ) {
         HorizontalDivider(color = DeepSea3, thickness = 1.dp)
         Row(

@@ -110,13 +110,17 @@ fun MainScaffold(modifier: Modifier = Modifier, onLogout: () -> Unit = {}) {
                     selectedRoute = currentTopLevelRoute,
                     onItemSelected = { route ->
                         if (route == currentTopLevelRoute) return@MainBottomNavBar
-                        navController.navigate(route) {
-                            popUpTo(MainRoutes.HOME) {
-                                inclusive = false
-                                saveState = true
+                        if (route == MainRoutes.HOME) {
+                            navController.popBackStack(MainRoutes.HOME, inclusive = false)
+                        } else {
+                            navController.navigate(route) {
+                                popUpTo(MainRoutes.HOME) {
+                                    inclusive = false
+                                    saveState = true
+                                }
+                                launchSingleTop = true
+                                restoreState = true
                             }
-                            launchSingleTop = true
-                            restoreState = true
                         }
                     }
                 )
@@ -286,7 +290,25 @@ fun MainScaffold(modifier: Modifier = Modifier, onLogout: () -> Unit = {}) {
                 composable(MainRoutes.AI_TRIP_CHAT) {
                     AiTripChatPage(
                         modifier = Modifier.fillMaxSize(),
-                        onBackClick = { navController.popBackStack() }
+                        onBackClick = { navController.popBackStack() },
+                        onOpenTrip = { tripKey ->
+                            currentTripViewModel.loadTrip(tripKey)
+                            navController.navigate(MainRoutes.CURRENT_ITINERARY) {
+                                launchSingleTop = true
+                            }
+                        },
+                        onCreateDraftTrip = { starter, intakeProfile ->
+                            newTripViewModel.createDraftTripFromAiStarter(
+                                starter = starter,
+                                intakeProfile = intakeProfile,
+                                onTripReady = { tripKey ->
+                                    currentTripViewModel.loadTrip(tripKey)
+                                    navController.navigate(MainRoutes.CURRENT_ITINERARY) {
+                                        launchSingleTop = true
+                                    }
+                                }
+                            )
+                        }
                     )
                 }
             }
