@@ -13,6 +13,7 @@ data class PersistedAiChatSnapshot(
     val updatedAtEpochMs: Long = System.currentTimeMillis(),
     val messages: List<PersistedAiChatMessage> = emptyList(),
     val profile: AiTravelerProfile = AiTravelerProfile(),
+    val intakeProfile: AiTripIntakeProfile? = null,
     val stage: AiChatStage = AiChatStage.ONBOARDING,
     val quickReplies: List<AiChatQuickReply> = emptyList(),
     val llmHistory: List<LlmMessage> = emptyList(),

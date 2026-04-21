@@ -7,7 +7,7 @@ data class LlmRequest(
     val messages: List<LlmMessage>,
     val temperature: Double = 0.7,
     @SerializedName("max_tokens") val maxTokens: Int = 1024,
-    @SerializedName("response_format") val responseFormat: Map<String, String>? = null
+    @SerializedName("response_format") val responseFormat: Map<String, @JvmSuppressWildcards Any>? = null
 )
 
 data class LlmMessage(
