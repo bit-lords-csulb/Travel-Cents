@@ -39,16 +39,17 @@ object LlmClient {
 
     suspend fun complete(
         messages: List<LlmMessage>,
+        model: String = LlmConfig.model,
         temperature: Double = 0.7,
         maxTokens: Int = 1024,
-        responseFormat: Map<String, String>? = null
+        responseFormat: Map<String, @JvmSuppressWildcards Any>? = null
     ): String {
         check(LlmConfig.apiKey.isNotBlank()) {
             "LLM_API_KEY is missing. Add it to local.properties before using AI features."
         }
 
         val request = LlmRequest(
-            model = LlmConfig.model,
+            model = model,
             messages = messages,
             temperature = temperature,
             maxTokens = maxTokens,

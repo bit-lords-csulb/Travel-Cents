@@ -10,6 +10,7 @@ import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -222,6 +223,10 @@ fun AiTripChatPage(
                             item("loading") {
                                 AiLoadingCard()
                             }
+                        }
+
+                        item("bottom_anchor_spacer") {
+                            Spacer(modifier = Modifier.fillParentMaxHeight(0.9f))
                         }
                     }
                 }

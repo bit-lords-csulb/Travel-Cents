@@ -24,6 +24,10 @@ data class AiTravelerProfile(
             dislikes.isNotEmpty() ||
             notes.isNotEmpty()
 
+    fun intakeProfile(): AiTripIntakeProfile = toIntakeProfile()
+
+    fun intakeProfileJson(): String = intakeProfile().toJson()
+
     fun promptSummary(): String {
         if (!hasSignals) {
             return "No structured traveler preferences have been captured yet."

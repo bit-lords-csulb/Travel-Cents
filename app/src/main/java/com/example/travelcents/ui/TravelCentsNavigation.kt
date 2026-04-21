@@ -1,6 +1,7 @@
 package com.example.travelcents.ui
 
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.navigation.compose.NavHost
@@ -11,12 +12,17 @@ import com.example.travelcents.ui.auth.ForgotPassword
 import com.example.travelcents.ui.auth.LoginPage
 import com.example.travelcents.ui.auth.SignUpPage
 import com.example.travelcents.ui.main.MainScaffold
+import com.google.firebase.Firebase
+import com.google.firebase.auth.auth
 
 @Composable
 fun TravelCentsNavigation(modifier: Modifier = Modifier, authViewModel: AuthViewModel) {
     val navController = rememberNavController()
+    val startDestination = remember {
+        if (Firebase.auth.currentUser != null) "home" else "login"
+    }
 
-    NavHost(navController = navController, startDestination = "login", builder = {
+    NavHost(navController = navController, startDestination = startDestination, builder = {
         composable("login") {
             LoginPage(modifier, navController, authViewModel)
         }

@@ -110,13 +110,17 @@ fun MainScaffold(modifier: Modifier = Modifier, onLogout: () -> Unit = {}) {
                     selectedRoute = currentTopLevelRoute,
                     onItemSelected = { route ->
                         if (route == currentTopLevelRoute) return@MainBottomNavBar
-                        navController.navigate(route) {
-                            popUpTo(MainRoutes.HOME) {
-                                inclusive = false
-                                saveState = true
+                        if (route == MainRoutes.HOME) {
+                            navController.popBackStack(MainRoutes.HOME, inclusive = false)
+                        } else {
+                            navController.navigate(route) {
+                                popUpTo(MainRoutes.HOME) {
+                                    inclusive = false
+                                    saveState = true
+                                }
+                                launchSingleTop = true
+                                restoreState = true
                             }
-                            launchSingleTop = true
-                            restoreState = true
                         }
                     }
                 )

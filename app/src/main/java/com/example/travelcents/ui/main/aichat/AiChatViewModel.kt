@@ -14,6 +14,11 @@ import com.example.travelcents.data.ai.chat.AiChatSender
 import com.example.travelcents.data.ai.chat.AiChatSessionState
 import com.example.travelcents.data.ai.chat.AiChatSessionStore
 import com.example.travelcents.data.ai.chat.AiChatUiState
+import com.example.travelcents.data.ai.chat.AiTripIntakeDecisionType
+import com.example.travelcents.data.ai.chat.AiTripIntakeOrchestrator
+import com.example.travelcents.data.ai.chat.mergeIntakeProfile
+import com.example.travelcents.data.ai.chat.mergePatch
+import com.example.travelcents.data.ai.chat.toCardGroup
 import com.example.travelcents.data.ai.chat.AiTravelerProfile
 import com.example.travelcents.data.ai.chat.AiTravelerProfileReducer
 import com.example.travelcents.data.ai.chat.PersistedAiChatMessage
@@ -33,6 +38,7 @@ class AiChatViewModel(application: Application) : AndroidViewModel(application) 
     private val conversationItems = mutableListOf<AiChatItem.TextMessage>()
     private val sessionStore = AiChatSessionStore(application)
     private val curatedTripCatalog = AiCuratedTripCatalog()
+    private val intakeOrchestrator = AiTripIntakeOrchestrator()
     private val auth = FirebaseAuth.getInstance()
 
     private var sessionState = AiChatSessionState()
@@ -67,6 +73,7 @@ class AiChatViewModel(application: Application) : AndroidViewModel(application) 
         conversationItems += userMessage
 
         val updatedProfile = AiTravelerProfileReducer.merge(sessionState.profile, llmUserMessage)
+        val updatedIntakeProfile = sessionState.intakeProfile.mergePatch(updatedProfile.intakeProfile())
         val assistantMessage = AiChatItem.TextMessage(
             text = buildCuratedTripAssistantReply(starter),
             sender = AiChatSender.ASSISTANT
@@ -80,6 +87,7 @@ class AiChatViewModel(application: Application) : AndroidViewModel(application) 
 
         sessionState = sessionState.copy(
             profile = updatedProfile,
+            intakeProfile = updatedIntakeProfile,
             stage = AiTravelerProfileReducer.stageFor(updatedProfile),
             quickReplies = AiTravelerProfileReducer.quickRepliesFor(updatedProfile),
             llmHistory = sessionState.llmHistory +
@@ -118,8 +126,10 @@ class AiChatViewModel(application: Application) : AndroidViewModel(application) 
         conversationItems += submittedMessage
 
         val updatedProfile = AiTravelerProfileReducer.merge(sessionState.profile, llmUserMessage)
+        val updatedIntakeProfile = sessionState.intakeProfile.mergePatch(updatedProfile.intakeProfile())
         sessionState = sessionState.copy(
             profile = updatedProfile,
+            intakeProfile = updatedIntakeProfile,
             stage = AiTravelerProfileReducer.stageFor(updatedProfile),
             quickReplies = AiTravelerProfileReducer.quickRepliesFor(updatedProfile),
             llmHistory = sessionState.llmHistory + LlmMessage(role = "user", content = llmUserMessage),
@@ -134,9 +144,23 @@ class AiChatViewModel(application: Application) : AndroidViewModel(application) 
         publishUiState()
 
         viewModelScope.launch {
+            val intakeResult = runCatching {
+                intakeOrchestrator.analyzeTurn(
+                    currentProfile = sessionState.intakeProfile,
+                    latestUserInput = llmUserMessage
+                )
+            }.getOrNull()
+
+            val mergedIntakeProfile = sessionState.intakeProfile.mergePatch(intakeResult?.profilePatch)
+            val mergedProfile = sessionState.profile.mergeIntakeProfile(mergedIntakeProfile)
+
             val assistantResponse = runCatching {
                 LlmClient.complete(
-                    messages = buildLlmMessages(sessionState.profile, sessionState.llmHistory)
+                    messages = buildLlmMessages(
+                        profile = mergedProfile,
+                        intakeProfile = mergedIntakeProfile,
+                        history = sessionState.llmHistory
+                    )
                 )
             }.getOrElse { error ->
                 val errorMessage = error.localizedMessage
@@ -151,16 +175,35 @@ class AiChatViewModel(application: Application) : AndroidViewModel(application) 
                 sender = AiChatSender.ASSISTANT
             )
 
-            val followUpGroup = AiChatCardCatalog.nextFollowUpGroup(
-                profile = sessionState.profile,
-                lastUserInput = llmUserMessage
-            )
-            val curatedTripRow = curatedTripCatalog.recommendTrips(
-                profile = sessionState.profile,
-                viewerUid = currentUserId()
-            )
+            val followUpGroup = when (intakeResult?.decision?.type) {
+                AiTripIntakeDecisionType.RECOMMEND_CURATED,
+                AiTripIntakeDecisionType.BUILD_FROM_SCRATCH -> null
+
+                else -> intakeResult?.followUpQuestion?.toCardGroup()
+                    ?: AiChatCardCatalog.nextFollowUpGroup(
+                        profile = mergedProfile,
+                        lastUserInput = llmUserMessage
+                    )
+            }
+            val curatedTripRow = when (intakeResult?.decision?.type) {
+                AiTripIntakeDecisionType.ASK_MORE -> null
+                AiTripIntakeDecisionType.BUILD_FROM_SCRATCH -> curatedTripCatalog.recommendTrips(
+                    profile = mergedProfile,
+                    viewerUid = null
+                )
+
+                AiTripIntakeDecisionType.RECOMMEND_CURATED,
+                null -> curatedTripCatalog.recommendTrips(
+                    profile = mergedProfile,
+                    viewerUid = currentUserId()
+                )
+            }
 
             sessionState = sessionState.copy(
+                profile = mergedProfile,
+                intakeProfile = mergedIntakeProfile,
+                stage = AiTravelerProfileReducer.stageFor(mergedProfile),
+                quickReplies = AiTravelerProfileReducer.quickRepliesFor(mergedProfile),
                 llmHistory = sessionState.llmHistory + LlmMessage(
                     role = "assistant",
                     content = assistantResponse
@@ -187,6 +230,7 @@ class AiChatViewModel(application: Application) : AndroidViewModel(application) 
 
         sessionStore.setActiveSession(currentUserId(), sessionId)
         restoreSnapshot(snapshot)
+        processSnapshot = snapshot
         publishUiState()
     }
 
@@ -263,18 +307,18 @@ class AiChatViewModel(application: Application) : AndroidViewModel(application) 
     }
 
     private fun restoreLastSessionOrStartFresh() {
-        val restored = sessionStore.loadActiveSession(currentUserId())
+        val cached = processSnapshot
             ?.takeIf { snapshot ->
                 snapshot.messages.any { message -> message.sender == AiChatSender.USER }
             }
 
-        if (restored == null) {
+        if (cached == null) {
             resetToFreshSession()
             publishUiState()
             return
         }
 
-        restoreSnapshot(restored)
+        restoreSnapshot(cached)
         publishUiState()
     }
 
@@ -290,6 +334,7 @@ class AiChatViewModel(application: Application) : AndroidViewModel(application) 
             sessionId = snapshot.sessionId,
             title = snapshot.title,
             profile = snapshot.profile,
+            intakeProfile = snapshot.intakeProfile ?: snapshot.profile.intakeProfile(),
             stage = snapshot.stage,
             quickReplies = snapshot.quickReplies.ifEmpty {
                 AiTravelerProfileReducer.quickRepliesFor(snapshot.profile)
@@ -311,6 +356,7 @@ class AiChatViewModel(application: Application) : AndroidViewModel(application) 
             starterCards = AiChatCardCatalog.starterCards(sessionId)
         )
         isLoading = false
+        processSnapshot = null
     }
 
     private fun persistLastSession() {
@@ -318,27 +364,31 @@ class AiChatViewModel(application: Application) : AndroidViewModel(application) 
             return
         }
 
+        val snapshot = PersistedAiChatSnapshot(
+            sessionId = sessionState.sessionId ?: UUID.randomUUID().toString(),
+            title = sessionState.title,
+            createdAtEpochMs = existingSessionCreatedAt(),
+            updatedAtEpochMs = System.currentTimeMillis(),
+            messages = conversationItems.map { message ->
+                PersistedAiChatMessage(
+                    text = message.text,
+                    sender = message.sender
+                )
+            },
+            profile = sessionState.profile,
+            intakeProfile = sessionState.intakeProfile,
+            stage = sessionState.stage,
+            quickReplies = sessionState.quickReplies,
+            llmHistory = sessionState.llmHistory,
+            activeResponseCardGroup = sessionState.activeResponseCardGroup?.toPersisted(),
+            activeCuratedTripRow = sessionState.activeCuratedTripRow?.toPersisted(),
+            anchorMessageId = sessionState.anchorMessageId
+        )
+
+        processSnapshot = snapshot
         sessionStore.upsertSession(
             userId = currentUserId(),
-            snapshot = PersistedAiChatSnapshot(
-                sessionId = sessionState.sessionId ?: UUID.randomUUID().toString(),
-                title = sessionState.title,
-                createdAtEpochMs = existingSessionCreatedAt(),
-                updatedAtEpochMs = System.currentTimeMillis(),
-                messages = conversationItems.map { message ->
-                    PersistedAiChatMessage(
-                        text = message.text,
-                        sender = message.sender
-                    )
-                },
-                profile = sessionState.profile,
-                stage = sessionState.stage,
-                quickReplies = sessionState.quickReplies,
-                llmHistory = sessionState.llmHistory,
-                activeResponseCardGroup = sessionState.activeResponseCardGroup?.toPersisted(),
-                activeCuratedTripRow = sessionState.activeCuratedTripRow?.toPersisted(),
-                anchorMessageId = sessionState.anchorMessageId
-            ),
+            snapshot = snapshot,
             makeActive = true
         )
     }
@@ -500,11 +550,13 @@ class AiChatViewModel(application: Application) : AndroidViewModel(application) 
 
     private fun buildLlmMessages(
         profile: AiTravelerProfile,
+        intakeProfile: com.example.travelcents.data.ai.chat.AiTripIntakeProfile,
         history: List<LlmMessage>
     ): List<LlmMessage> {
         return buildList {
             add(LlmMessage(role = "system", content = BASE_SYSTEM_PROMPT))
             add(LlmMessage(role = "system", content = profile.promptSummary()))
+            add(LlmMessage(role = "system", content = "Structured intake profile JSON:\n${intakeProfile.toJson()}"))
             addAll(history)
         }
     }
@@ -515,5 +567,7 @@ class AiChatViewModel(application: Application) : AndroidViewModel(application) 
                 "Be concise, helpful, and practical. Keep replies to short acknowledgment paragraphs. " +
                 "The app may present follow-up choices separately, so do not stack multiple questions or long questionnaires. " +
                 "Use the traveler profile context when available. Do not mention model vendors or say you are a generic AI chatbot."
+
+        private var processSnapshot: PersistedAiChatSnapshot? = null
     }
 }

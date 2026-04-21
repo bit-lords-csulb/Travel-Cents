@@ -6,6 +6,7 @@ data class AiChatSessionState(
     val sessionId: String? = null,
     val title: String = "",
     val profile: AiTravelerProfile = AiTravelerProfile(),
+    val intakeProfile: AiTripIntakeProfile = AiTravelerProfile().intakeProfile(),
     val stage: AiChatStage = AiChatStage.ONBOARDING,
     val quickReplies: List<AiChatQuickReply> = emptyList(),
     val llmHistory: List<LlmMessage> = emptyList(),
