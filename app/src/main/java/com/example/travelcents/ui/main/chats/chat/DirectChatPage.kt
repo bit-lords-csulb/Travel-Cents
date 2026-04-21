@@ -22,7 +22,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.travelcents.ui.main.chats.chat.DirectChatViewModel
-import com.example.travelcents.ui.main.chats.friends.Friend
+import com.example.travelcents.data.social.model.Friend
 import com.example.travelcents.ui.theme.*
 import com.google.firebase.Timestamp
 
@@ -63,7 +63,8 @@ fun DirectChatPage(
                 .fillMaxWidth()
                 .clip(RoundedCornerShape(bottomStart = 24.dp, bottomEnd = 24.dp))
                 .background(DeepSea2)
-                .padding(top = 48.dp, bottom = 16.dp, start = 12.dp, end = 12.dp)
+                .statusBarsPadding()
+                .padding(top = 8.dp, bottom = 12.dp, start = 12.dp, end = 12.dp)
         ) {
             Row(
                 verticalAlignment = Alignment.CenterVertically,
@@ -130,8 +131,7 @@ fun DirectChatPage(
             modifier = Modifier
                 .fillMaxWidth()
                 .background(DeepSea2)
-                .padding(horizontal = 16.dp, vertical = 12.dp)
-                .navigationBarsPadding(),
+                .padding(horizontal = 16.dp, vertical = 12.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
             TextField(
@@ -171,3 +171,4 @@ fun DirectChatPage(
         }
     }
 }
+

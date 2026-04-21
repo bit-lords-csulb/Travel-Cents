@@ -1,6 +1,6 @@
 package com.example.travelcents.data.remote
 
-import com.example.travelcents.data.model.SerpFlightResponse
+import com.example.travelcents.data.trip.model.SerpFlightResponse
 import com.google.gson.Gson
 import org.junit.Assert.assertEquals
 import org.junit.Test

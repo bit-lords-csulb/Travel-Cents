@@ -1,13 +1,13 @@
 package com.example.travelcents.ui.main.chats.chat
 
-import com.example.travelcents.ui.main.chats.friends.Friend
+import com.example.travelcents.data.social.model.Friend
 import com.example.travelcents.ui.main.chats.friends.AddFriendPage
+import com.example.travelcents.data.social.model.DirectChatPreview
+import com.example.travelcents.ui.main.chats.groups.NewTripChatPage
+import com.example.travelcents.data.social.model.Group
+import com.example.travelcents.data.trip.model.Event
 import com.example.travelcents.ui.main.chats.friends.FriendRequestsPage
 import com.example.travelcents.ui.main.chats.friends.FriendsPage
-import com.example.travelcents.data.model.DirectChatPreview
-import com.example.travelcents.ui.main.chats.groups.NewTripChatPage
-import com.example.travelcents.data.model.Group
-import com.example.travelcents.data.model.Event
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
@@ -72,7 +72,8 @@ fun ChatsPage(
                 .fillMaxWidth()
                 .clip(RoundedCornerShape(bottomStart = 24.dp, bottomEnd = 24.dp))
                 .background(DeepSea2)
-                .padding(top = 48.dp, start = 20.dp, end = 20.dp, bottom = 20.dp)
+                .statusBarsPadding()
+                .padding(top = 8.dp, start = 20.dp, end = 20.dp, bottom = 16.dp)
         ) {
             Column(modifier = Modifier.fillMaxWidth()) {
                 Row(
@@ -139,7 +140,7 @@ fun ChatsPage(
             }
         }
 
-        Spacer(modifier = Modifier.height(12.dp))
+        Spacer(modifier = Modifier.height(8.dp))
 
         when (selectedTab) {
             0 -> {
@@ -240,7 +241,10 @@ fun DirectChatRow(dm: DirectChatPreview, onClick: () -> Unit) {
 
 // Nav Wrapper
 @Composable
-fun ChatsScreen(modifier: Modifier = Modifier) {
+fun ChatsScreen(
+    modifier: Modifier = Modifier,
+    onTripCardClick: (String, String) -> Unit = { _, _ -> }
+) {
     var selectedGroup   by remember { mutableStateOf<Group?>(null) }
     var showNewTrip     by remember { mutableStateOf(false) }
     var showFriends     by remember { mutableStateOf(false) }
@@ -282,17 +286,20 @@ fun ChatsScreen(modifier: Modifier = Modifier) {
         selectedGroup != null -> ChatPage(
             group         = selectedGroup!!,
             onBackClick   = { selectedGroup = null },
-            onEventsClick = { showEvents = true }
+            onEventsClick = { showEvents = true },
+            onTripCardClick = onTripCardClick
         )
 
         // DMs and Friends
         selectedFriend != null -> DirectChatPage(
             friend      = selectedFriend!!,
-            onBackClick = { selectedFriend = null }
+            onBackClick = { selectedFriend = null },
+            onTripCardClick = onTripCardClick
         )
         selectedDM != null -> DirectChatPage(
             friend      = Friend(uid = selectedDM!!.otherUid, displayName = selectedDM!!.otherUserName),
-            onBackClick = { selectedDM = null; activeTab = 1 }
+            onBackClick = { selectedDM = null; activeTab = 1 },
+            onTripCardClick = onTripCardClick
         )
         showAddFriend -> AddFriendPage(onBackClick = { showAddFriend = false })
         showRequests  -> FriendRequestsPage(onBackClick = { showRequests = false })
@@ -316,3 +323,4 @@ fun ChatsScreen(modifier: Modifier = Modifier) {
         )
     }
 }
+

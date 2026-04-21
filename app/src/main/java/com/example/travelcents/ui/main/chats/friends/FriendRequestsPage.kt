@@ -21,6 +21,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
+import com.example.travelcents.data.social.model.Friend
 import com.example.travelcents.ui.theme.*
 
 @Composable
@@ -40,7 +41,8 @@ fun FriendRequestsPage(
                 .fillMaxWidth()
                 .clip(RoundedCornerShape(bottomStart = 24.dp, bottomEnd = 24.dp))
                 .background(DeepSea2)
-                .padding(top = 48.dp, start = 20.dp, end = 20.dp, bottom = 20.dp)
+                .statusBarsPadding()
+                .padding(top = 8.dp, start = 20.dp, end = 20.dp, bottom = 16.dp)
         ) {
             Column(modifier = Modifier.fillMaxWidth()) {
                 Row(
@@ -195,3 +197,4 @@ fun FriendRequestRow(
         }
     }
 }
+

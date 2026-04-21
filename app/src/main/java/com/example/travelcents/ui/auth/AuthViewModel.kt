@@ -1,19 +1,23 @@
 package com.example.travelcents.ui.auth
 
 import android.util.Log
-import androidx.compose.runtime.mutableStateOf
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.example.travelcents.data.AuthModel
+import com.example.travelcents.data.auth.AuthRepository
+import com.google.firebase.FirebaseNetworkException
+import com.google.firebase.FirebaseTooManyRequestsException
+import com.google.firebase.auth.FirebaseAuthException
+import com.google.firebase.auth.FirebaseAuthInvalidCredentialsException
+import com.google.firebase.auth.FirebaseAuthInvalidUserException
+import com.google.firebase.auth.FirebaseAuthUserCollisionException
+import com.google.firebase.firestore.FirebaseFirestoreException
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
-import kotlin.Result
-import kotlin.runCatching
 
 class AuthViewModel : ViewModel() {
-    private val authModel = AuthModel()
+    private val authRepository = AuthRepository()
 
     companion object {
         private const val MIN_PASSWORD_LENGTH = 8
@@ -48,7 +52,7 @@ class AuthViewModel : ViewModel() {
             _errorMessage.value = null
             _statusMessage.value = null
 
-            val result = authModel.createAccountWithEmailAndPassword(firstName, lastName, username, email, password)
+            val result = authRepository.createAccountWithEmailAndPassword(firstName, lastName, username, email, password)
 
             _isLoading.value = false
             result.fold(
@@ -57,9 +61,8 @@ class AuthViewModel : ViewModel() {
                     _statusMessage.value = message
                 },
                 onFailure = { error ->
-                    Log.e("AuthViewModel", "Google sign in failed: ${error.message}")
-
-                    _errorMessage.value = "Google Login failed. Please try again."
+                    Log.e("AuthViewModel", "Sign up failed", error)
+                    _errorMessage.value = mapSignUpError(error)
                 }
             )
         }
@@ -73,25 +76,14 @@ class AuthViewModel : ViewModel() {
             _isLoading.value = true
             _errorMessage.value = null
 
-            val result = authModel.signInWithEmailOrUsername(emailOrUsername, password)
+            val result = authRepository.signInWithEmailOrUsername(emailOrUsername, password)
 
             _isLoading.value = false
             result.fold(
                 onSuccess = { _isLoggedIn.value = true },
                 onFailure = { error ->
-                    _errorMessage.value = when {
-                        error.message?.contains("No account found", ignoreCase = true) == true
-                            -> error.message
-                        error.message?.contains("credential is incorrect", ignoreCase = true) == true ||
-                                error.message?.contains("malformed", ignoreCase = true) == true ||
-                                error.message?.contains("expired", ignoreCase = true) == true
-                            -> "Incorrect email/username or password."
-                        error.message?.contains("network", ignoreCase = true) == true
-                            -> "Network error. Please check your connection."
-                        error.message?.contains("too-many-requests", ignoreCase = true) == true
-                            -> "Too many attempts. Please try again later."
-                        else -> "Login failed. Please try again."
-                    }
+                    Log.e("AuthViewModel", "Login failed", error)
+                    _errorMessage.value = mapLoginError(error)
                 }
             )
         }
@@ -99,7 +91,7 @@ class AuthViewModel : ViewModel() {
 
     // Log out and reset all state
     fun signOut() {
-        authModel.signOut()
+        authRepository.signOut()
         _isLoggedIn.value = false
         _isAccountCreated.value = false
         _errorMessage.value = null
@@ -115,6 +107,19 @@ class AuthViewModel : ViewModel() {
 
     fun clearError() {
         _errorMessage.value = null
+    }
+
+    fun clearMessages() {
+        _errorMessage.value = null
+        _statusMessage.value = null
+    }
+
+    fun setStatusMessage(message: String?) {
+        _statusMessage.value = message
+    }
+
+    fun setErrorMessage(message: String?) {
+        _errorMessage.value = message
     }
 
     // Validation
@@ -165,17 +170,71 @@ class AuthViewModel : ViewModel() {
         viewModelScope.launch {
             _isLoading.value = true
             _errorMessage.value = null
+            _statusMessage.value = null
 
-            val result = authModel.signInWithGoogle(idToken)
+            val result = authRepository.signInWithGoogle(idToken)
 
             _isLoading.value = false
             result.fold(
-                onSuccess = { _isLoggedIn.value = true },
-                onFailure = { _ ->
-                    _errorMessage.value = "Google Login failed. Please try again."
+                onSuccess = {
+                    _statusMessage.value = null
+                    _isLoggedIn.value = true
+                },
+                onFailure = { error ->
+                    Log.e("AuthViewModel", "Google login failed", error)
+                    _statusMessage.value = null
+                    _errorMessage.value = mapGoogleLoginError(error)
                 }
             )
         }
     }
+
+    private fun mapSignUpError(error: Throwable): String = when (error) {
+        is FirebaseAuthUserCollisionException -> "An account with this email already exists."
+        is FirebaseAuthInvalidCredentialsException -> "Please enter a valid email address."
+        is FirebaseNetworkException -> "Sign-up needs a network connection."
+        is FirebaseTooManyRequestsException -> "Too many attempts. Please try again later."
+        else -> "Sign-up failed. Please try again."
+    }
+
+    private fun mapLoginError(error: Throwable): String = when (error) {
+        is FirebaseAuthInvalidUserException,
+        is FirebaseAuthInvalidCredentialsException -> "Incorrect email/username or password."
+        is FirebaseNetworkException -> "Network error. Please check your connection."
+        is FirebaseTooManyRequestsException -> "Too many attempts. Please try again later."
+        is FirebaseFirestoreException -> when (error.code) {
+            FirebaseFirestoreException.Code.PERMISSION_DENIED ->
+                "Username login is unavailable right now. Try your email address."
+            FirebaseFirestoreException.Code.UNAVAILABLE ->
+                "Network error. Please check your connection."
+            else -> "Login failed. Please try again."
+        }
+        else -> when {
+            error.message?.contains("No account found", ignoreCase = true) == true ->
+                error.message ?: "No account found."
+            error.message?.contains("network", ignoreCase = true) == true ->
+                "Network error. Please check your connection."
+            else -> "Login failed. Please try again."
+        }
+    }
+
+    private fun mapGoogleLoginError(error: Throwable): String = when (error) {
+        is FirebaseAuthInvalidCredentialsException ->
+            "Google sign-in is misconfigured for this app. Verify the web OAuth client, SHA fingerprints, and download a fresh google-services.json."
+        is FirebaseAuthException -> when (error.errorCode.uppercase()) {
+            "ERROR_OPERATION_NOT_ALLOWED" ->
+                "Google sign-in is disabled in Firebase Authentication."
+            "ERROR_ACCOUNT_EXISTS_WITH_DIFFERENT_CREDENTIAL" ->
+                "This email already exists with a different sign-in method."
+            "ERROR_INVALID_CREDENTIAL",
+            "ERROR_INVALID_IDP_RESPONSE" ->
+                "Google sign-in is misconfigured for this app. Verify the web OAuth client, SHA fingerprints, and download a fresh google-services.json."
+            else -> error.message ?: "Google login failed. Please try again."
+        }
+        is FirebaseNetworkException -> "Google sign-in needs a network connection."
+        is FirebaseTooManyRequestsException -> "Too many sign-in attempts. Please try again later."
+        else -> error.message ?: "Google login failed. Please try again."
+    }
 }
+
 

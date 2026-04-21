@@ -2,10 +2,12 @@ package com.example.travelcents.ui.main.chats.chat
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.example.travelcents.data.FirestoreRepository
-import com.example.travelcents.data.model.DirectChatPreview
-import com.example.travelcents.data.model.Group
+import com.example.travelcents.data.social.model.DirectChatPreview
+import com.example.travelcents.data.social.model.Group
+import com.example.travelcents.data.social.repository.DirectMessagesRepository
+import com.example.travelcents.data.social.repository.GroupsRepository
 import com.google.firebase.Firebase
+import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.auth.auth
 import com.google.firebase.firestore.ListenerRegistration
 import kotlinx.coroutines.launch
@@ -17,7 +19,8 @@ import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.stateIn
 
 class ChatsViewModel(
-    private val repository: FirestoreRepository = FirestoreRepository()
+    private val groupsRepository: GroupsRepository = GroupsRepository(),
+    private val directMessagesRepository: DirectMessagesRepository = DirectMessagesRepository()
 ) : ViewModel() {
 
     private val auth = Firebase.auth
@@ -60,18 +63,29 @@ class ChatsViewModel(
     private var groupsListener:      ListenerRegistration? = null
     private var directChatsListener: ListenerRegistration? = null
 
-    init { viewModelScope.launch { startListening() } }
+    private val authListener = FirebaseAuth.AuthStateListener { firebaseAuth ->
+        if (firebaseAuth.currentUser == null) {
+            groupsListener?.remove(); groupsListener = null
+            directChatsListener?.remove(); directChatsListener = null
+        } else if (groupsListener == null && directChatsListener == null) {
+            startListening()
+        }
+    }
+
+    init {
+        auth.addAuthStateListener(authListener)
+    }
 
     fun startListening() {
         if (currentUid.isEmpty()) return
 
         groupsListener?.remove()
-        groupsListener = repository.listenToGroups(currentUid) { groups ->
+        groupsListener = groupsRepository.listenToGroups(currentUid) { groups ->
             _groups.value = groups
         }
 
         directChatsListener?.remove()
-        directChatsListener = repository.listenToDirectChatPreviews(currentUid) { chats ->
+        directChatsListener = directMessagesRepository.listenToDirectChatPreviews(currentUid) { chats ->
             android.util.Log.d("DirectChats", "got ${chats.size} chats")
             _directChats.value = chats
         }
@@ -81,7 +95,10 @@ class ChatsViewModel(
 
     override fun onCleared() {
         super.onCleared()
+        auth.removeAuthStateListener(authListener)
         groupsListener?.remove()
+        groupsListener = null
         directChatsListener?.remove()
+        directChatsListener = null
     }
 }

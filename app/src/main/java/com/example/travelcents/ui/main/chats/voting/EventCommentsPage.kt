@@ -22,8 +22,8 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
-import com.example.travelcents.data.model.Event
-import com.example.travelcents.data.model.EventComment
+import com.example.travelcents.data.trip.model.Event
+import com.example.travelcents.data.trip.model.EventComment
 import com.example.travelcents.ui.theme.*
 import java.text.SimpleDateFormat
 import java.util.*
@@ -57,7 +57,8 @@ fun EventCommentsPage(
                 .fillMaxWidth()
                 .clip(RoundedCornerShape(bottomStart = 24.dp, bottomEnd = 24.dp))
                 .background(DeepSea2)
-                .padding(top = 48.dp, bottom = 20.dp)
+                .statusBarsPadding()
+                .padding(top = 8.dp, bottom = 16.dp)
         ) {
             // Back button
             IconButton(
@@ -116,8 +117,7 @@ fun EventCommentsPage(
             modifier = Modifier
                 .fillMaxWidth()
                 .background(DeepSea2)
-                .padding(horizontal = 16.dp, vertical = 12.dp)
-                .navigationBarsPadding(),
+                .padding(horizontal = 16.dp, vertical = 12.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
             TextField(
@@ -219,3 +219,4 @@ fun CommentBubble(comment: EventComment, isMe: Boolean) {
         }
     }
 }
+

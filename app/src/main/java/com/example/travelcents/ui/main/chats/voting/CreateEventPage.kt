@@ -34,7 +34,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import coil.compose.AsyncImage
-import com.example.travelcents.data.model.Group
+import com.example.travelcents.data.social.model.Group
 import com.example.travelcents.ui.theme.*
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
@@ -164,7 +164,8 @@ fun CreateEventPage(
                 .fillMaxWidth()
                 .clip(RoundedCornerShape(bottomStart = 24.dp, bottomEnd = 24.dp))
                 .background(DeepSea2)
-                .padding(top = 48.dp, bottom = 20.dp)
+                .statusBarsPadding()
+                .padding(top = 8.dp, bottom = 16.dp)
         ) {
             IconButton(
                 onClick = onBackClick,
@@ -726,3 +727,4 @@ fun WheelPickerColumn(
         }
     }
 }
+

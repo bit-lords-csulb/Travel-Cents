@@ -19,13 +19,9 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
-import androidx.compose.material3.Button
-import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
-import androidx.compose.material3.TextField
-import androidx.compose.material3.TextFieldDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -37,9 +33,11 @@ import androidx.core.content.edit
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.FocusDirection
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.key.Key
 import androidx.compose.ui.input.key.KeyEventType
 import androidx.compose.ui.input.key.isShiftPressed
@@ -49,8 +47,6 @@ import androidx.compose.ui.input.key.type
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.LocalView
-import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
@@ -59,27 +55,17 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.NavController
+import com.example.travelcents.ui.components.TcButton
+import com.example.travelcents.ui.components.TcTextField
 import com.example.travelcents.ui.theme.DeepSea1
-import com.example.travelcents.ui.theme.DeepSea2
 import com.example.travelcents.ui.theme.DeepSea4
-import com.example.travelcents.ui.theme.DeepSea5
-import kotlin.Result
-import kotlin.runCatching
-import androidx.compose.runtime.rememberCoroutineScope
-import androidx.compose.ui.platform.LocalContext
-import androidx.credentials.CredentialManager
-import androidx.credentials.CustomCredential
-import androidx.credentials.GetCredentialRequest
-import androidx.credentials.exceptions.GetCredentialException
-import com.google.android.libraries.identity.googleid.GetGoogleIdOption
-import com.google.android.libraries.identity.googleid.GoogleIdTokenCredential
-import kotlinx.coroutines.launch
-import android.util.Log
+import com.example.travelcents.ui.theme.TravelCentsFonts
 
 private const val LOGIN_PREFS = "login_preferences"
 private const val KEY_REMEMBER_ME = "remember_me"
 private const val KEY_SAVED_EMAIL = "saved_email_or_username"
 private const val KEY_SAVED_PASSWORD = "saved_password"
+
 @Composable
 fun LoginPage(modifier: Modifier = Modifier, navController: NavController, authViewModel: AuthViewModel) {
     val context = LocalContext.current
@@ -101,7 +87,6 @@ fun LoginPage(modifier: Modifier = Modifier, navController: NavController, authV
         onDispose { view.importantForAutofill = previous }
     }
 
-    // Collect StateFlows as Compose state
     val isLoggedIn by authViewModel.isLoggedIn.collectAsStateWithLifecycle()
     val isLoading by authViewModel.isLoading.collectAsStateWithLifecycle()
     val errorMessage by authViewModel.errorMessage.collectAsStateWithLifecycle()
@@ -116,7 +101,6 @@ fun LoginPage(modifier: Modifier = Modifier, navController: NavController, authV
         }
     }
 
-    // Navigate to the home screen if the user is logged in
     LaunchedEffect(isLoggedIn) {
         if (isLoggedIn) {
             sharedPreferences.edit {
@@ -146,12 +130,12 @@ fun LoginPage(modifier: Modifier = Modifier, navController: NavController, authV
     ) {
         Spacer(modifier = Modifier.height(180.dp))
 
-        // LOG IN TITLE
         Text(
             text = "Log In",
             fontSize = 32.sp,
             fontWeight = FontWeight.Bold,
-            color = Color.White
+            color = Color.White,
+            fontFamily = TravelCentsFonts.Headline
         )
 
         Box(
@@ -164,19 +148,13 @@ fun LoginPage(modifier: Modifier = Modifier, navController: NavController, authV
 
         Spacer(modifier = Modifier.height(40.dp))
 
-        // EMAIL / USERNAME SECTION
-        Text(text = "Email or Username", color = Color.White, fontSize = 16.sp)
-        TextField(
+        TcTextField(
             value = email,
-            onValueChange = {
-                email = it
-                authViewModel.clearError()
-            },
-            placeholder = { Text("email or username", color = Color.Gray, fontSize = 14.sp) },
-            singleLine = true,
+            onValueChange = { email = it; authViewModel.clearError() },
+            label = "Email or Username",
+            placeholder = "email or username",
             modifier = Modifier
                 .fillMaxWidth()
-                .height(50.dp)
                 .focusRequester(emailFocusRequester)
                 .onPreviewKeyEvent { event ->
                     when {
@@ -205,32 +183,21 @@ fun LoginPage(modifier: Modifier = Modifier, navController: NavController, authV
             keyboardActions = KeyboardActions(
                 onNext = { passwordFocusRequester.requestFocus() }
             ),
-            colors = TextFieldDefaults.colors(
-                focusedContainerColor = Color.Transparent,
-                unfocusedContainerColor = Color.Transparent,
-                focusedTextColor = Color.White,
-                unfocusedTextColor = Color.White,
-                focusedIndicatorColor = Color.White,
-                unfocusedIndicatorColor = DeepSea4
-            )
+            textFontFamily = TravelCentsFonts.Body,
+            labelFontFamily = TravelCentsFonts.Body,
+            placeholderFontFamily = TravelCentsFonts.Body
         )
 
         Spacer(modifier = Modifier.height(20.dp))
 
-        // PASSWORD SECTION
-        Text(text = "Password", color = Color.White, fontSize = 16.sp)
-        TextField(
+        TcTextField(
             value = password,
-            onValueChange = {
-                password = it
-                authViewModel.clearError()
-            },
-            placeholder = { Text("enter password", color = Color.Gray, fontSize = 14.sp) },
+            onValueChange = { password = it; authViewModel.clearError() },
+            label = "Password",
+            placeholder = "enter password",
             visualTransformation = PasswordVisualTransformation(),
-            singleLine = true,
             modifier = Modifier
                 .fillMaxWidth()
-                .height(50.dp)
                 .focusRequester(passwordFocusRequester)
                 .onPreviewKeyEvent { event ->
                     when {
@@ -254,17 +221,12 @@ fun LoginPage(modifier: Modifier = Modifier, navController: NavController, authV
             keyboardActions = KeyboardActions(
                 onDone = { authViewModel.logIn(email, password) }
             ),
-            colors = TextFieldDefaults.colors(
-                focusedContainerColor = Color.Transparent,
-                unfocusedContainerColor = Color.Transparent,
-                focusedTextColor = Color.White,
-                unfocusedTextColor = Color.White,
-                focusedIndicatorColor = Color.White,
-                unfocusedIndicatorColor = DeepSea4
-            )
+            textFontFamily = TravelCentsFonts.Body,
+            labelFontFamily = TravelCentsFonts.Body,
+            placeholderFontFamily = TravelCentsFonts.Body
         )
 
-        // REMEMBER ME & FORGOT PASSWORD
+        // Remember Me & Forgot Password
         Row(
             modifier = Modifier.fillMaxWidth().padding(top = 12.dp),
             horizontalArrangement = Arrangement.SpaceBetween,
@@ -297,56 +259,71 @@ fun LoginPage(modifier: Modifier = Modifier, navController: NavController, authV
                     text = "Remember Me",
                     color = Color.White,
                     fontSize = 12.sp,
-                    fontWeight = FontWeight.Medium
+                    fontWeight = FontWeight.Medium,
+                    fontFamily = TravelCentsFonts.Body
                 )
             }
             TextButton(onClick = { navController.navigate("forgot_password") }) {
-                Text("Forgot Password?", color = DeepSea4, fontSize = 12.sp)
+                Text(
+                    text = "Forgot Password?",
+                    color = DeepSea4,
+                    fontSize = 12.sp,
+                    fontFamily = TravelCentsFonts.Body
+                )
             }
         }
 
-        // SUCCESS MESSAGE (e.g. "Account created! Please log in.")
         statusMessage?.let { message ->
             Text(
                 text = message,
                 color = Color.Green,
                 fontSize = 12.sp,
-                modifier = Modifier.padding(vertical = 8.dp)
+                modifier = Modifier.padding(vertical = 8.dp),
+                fontFamily = TravelCentsFonts.Body
             )
         }
 
-        // ERROR MESSAGE
         errorMessage?.let { message ->
             Text(
                 text = message,
                 color = Color.Red,
                 fontSize = 12.sp,
-                modifier = Modifier.padding(vertical = 8.dp)
+                modifier = Modifier.padding(vertical = 8.dp),
+                fontFamily = TravelCentsFonts.Body
             )
         }
 
         Spacer(modifier = Modifier.height(32.dp))
 
-        // LOGIN BUTTON
-        Button(
+        TcButton(
             onClick = { authViewModel.logIn(email, password) },
             enabled = !isLoading,
             modifier = Modifier
                 .fillMaxWidth()
-                .height(48.dp),
-            shape = RoundedCornerShape(12.dp),
-            colors = ButtonDefaults.buttonColors(containerColor = DeepSea2)
+                .height(48.dp)
         ) {
             if (isLoading) {
                 CircularProgressIndicator(color = Color.White, modifier = Modifier.requiredSize(24.dp))
             } else {
-                Text("Login", color = Color.White, fontSize = 18.sp)
+                Text(
+                    text = "Login",
+                    color = Color.White,
+                    fontSize = 18.sp,
+                    fontFamily = TravelCentsFonts.Body
+                )
             }
         }
 
         Spacer(modifier = Modifier.height(16.dp))
 
-        GoogleSignInButton(authViewModel = authViewModel)
+        GoogleAuthButton(
+            text = "Signin with Google",
+            authViewModel = authViewModel,
+            enabled = !isLoading,
+            fontFamily = TravelCentsFonts.Body
+        )
+
+        Spacer(modifier = Modifier.height(24.dp))
 
         Row(
             modifier = Modifier.fillMaxWidth(),
@@ -356,13 +333,15 @@ fun LoginPage(modifier: Modifier = Modifier, navController: NavController, authV
             Text(
                 text = "Don't have an Account? ",
                 color = Color.White,
-                fontSize = 12.sp
+                fontSize = 12.sp,
+                fontFamily = TravelCentsFonts.Body
             )
             Text(
                 text = "Sign Up",
                 color = DeepSea4,
                 fontSize = 12.sp,
                 fontWeight = FontWeight.SemiBold,
+                fontFamily = TravelCentsFonts.Body,
                 modifier = Modifier.clickable(enabled = !isLoading) {
                     navController.navigate("signup") {
                         launchSingleTop = true
@@ -373,55 +352,3 @@ fun LoginPage(modifier: Modifier = Modifier, navController: NavController, authV
     }
 }
 
-@Composable
-fun GoogleSignInButton(authViewModel: AuthViewModel) {
-    val context = LocalContext.current
-    val coroutineScope = rememberCoroutineScope()
-
-    Button(
-        onClick = {
-            coroutineScope.launch {
-                val credentialManager = CredentialManager.create(context)
-
-                // 1. Build the Google ID Option
-                val googleIdOption = GetGoogleIdOption.Builder()
-                    .setFilterByAuthorizedAccounts(false)
-                    .setServerClientId("805994740096-d31i7240546h0701vh3m2kphrtsqqqtt.apps.googleusercontent.com")
-                    .setAutoSelectEnabled(false)
-                    .build()
-
-                // 2. Build the Credential Request
-                val request = GetCredentialRequest.Builder()
-                    .addCredentialOption(googleIdOption)
-                    .build()
-
-                try {
-                    // 3. Launch the Android Bottom Sheet Prompt
-                    val result = credentialManager.getCredential(
-                        request = request,
-                        context = context,
-                    )
-
-                    // 4. Extract the ID Token if successful
-                    val credential = result.credential
-                    if (credential is CustomCredential && credential.type == GoogleIdTokenCredential.TYPE_GOOGLE_ID_TOKEN_CREDENTIAL) {
-                        val googleIdTokenCredential = GoogleIdTokenCredential.createFrom(credential.data)
-                        val idToken = googleIdTokenCredential.idToken
-
-                        Log.d("GoogleAuth", "Google ID token received")
-                        authViewModel.logInWithGoogle(idToken)
-                    }
-                } catch (e: GetCredentialException) {
-                    Log.e("GoogleAuth", "Google Sign-In failed", e)
-                }
-            }
-        },
-        modifier = Modifier
-            .fillMaxWidth()
-            .height(48.dp),
-        shape = RoundedCornerShape(12.dp),
-        colors = ButtonDefaults.buttonColors(containerColor = Color.White)
-    ) {
-        Text("Continue with Google", color = Color.Black, fontSize = 16.sp, fontWeight = FontWeight.SemiBold)
-    }
-}
