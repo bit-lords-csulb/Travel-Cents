@@ -64,7 +64,6 @@ import com.example.travelcents.ui.main.aichat.components.AiCuratedTripRow as AiC
 import com.example.travelcents.ui.main.aichat.components.AiChatHistoryScreen
 import com.example.travelcents.ui.main.aichat.components.AiPromptCardGrid
 import com.example.travelcents.ui.main.aichat.components.AiResponseCardGroup
-import com.example.travelcents.ui.main.aichat.components.AiSelectedDraftBar
 import com.example.travelcents.ui.main.newTrip.TripWizardColors
 import com.example.travelcents.ui.theme.DeepSea1
 import com.example.travelcents.ui.theme.DeepSea4
@@ -242,13 +241,6 @@ fun AiTripChatPage(
                     }
                 }
 
-                if (uiState.selectedDraftOptions.isNotEmpty()) {
-                    AiSelectedDraftBar(
-                        options = uiState.selectedDraftOptions,
-                        onRemove = viewModel::removeDraftOption
-                    )
-                }
-
                 Surface(
                     modifier = Modifier
                         .fillMaxWidth(),
@@ -259,7 +251,9 @@ fun AiTripChatPage(
                         onValueChange = viewModel::updateDraftText,
                         onSendClick = viewModel::sendDraft,
                         canSend = uiState.draftText.isNotBlank() || uiState.selectedDraftOptions.isNotEmpty(),
-                        isSending = uiState.isLoading
+                        isSending = uiState.isLoading,
+                        selectedDraftOptions = uiState.selectedDraftOptions,
+                        onRemoveDraftOption = viewModel::removeDraftOption
                     )
                 }
             }
