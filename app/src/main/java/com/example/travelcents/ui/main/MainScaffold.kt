@@ -290,7 +290,25 @@ fun MainScaffold(modifier: Modifier = Modifier, onLogout: () -> Unit = {}) {
                 composable(MainRoutes.AI_TRIP_CHAT) {
                     AiTripChatPage(
                         modifier = Modifier.fillMaxSize(),
-                        onBackClick = { navController.popBackStack() }
+                        onBackClick = { navController.popBackStack() },
+                        onOpenTrip = { tripKey ->
+                            currentTripViewModel.loadTrip(tripKey)
+                            navController.navigate(MainRoutes.CURRENT_ITINERARY) {
+                                launchSingleTop = true
+                            }
+                        },
+                        onCreateDraftTrip = { starter, intakeProfile ->
+                            newTripViewModel.createDraftTripFromAiStarter(
+                                starter = starter,
+                                intakeProfile = intakeProfile,
+                                onTripReady = { tripKey ->
+                                    currentTripViewModel.loadTrip(tripKey)
+                                    navController.navigate(MainRoutes.CURRENT_ITINERARY) {
+                                        launchSingleTop = true
+                                    }
+                                }
+                            )
+                        }
                     )
                 }
             }
