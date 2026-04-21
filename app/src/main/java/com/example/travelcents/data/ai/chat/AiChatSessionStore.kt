@@ -14,12 +14,15 @@ data class PersistedAiChatSnapshot(
     val messages: List<PersistedAiChatMessage> = emptyList(),
     val profile: AiTravelerProfile = AiTravelerProfile(),
     val intakeProfile: AiTripIntakeProfile? = null,
+    val planningObjective: String = "",
     val stage: AiChatStage = AiChatStage.ONBOARDING,
     val quickReplies: List<AiChatQuickReply> = emptyList(),
     val llmHistory: List<LlmMessage> = emptyList(),
     val askedFollowUpGroupIds: List<String> = emptyList(),
     val activeResponseCardGroup: PersistedAiChatCardGroup? = null,
+    val activeDestinationRecommendationRow: PersistedAiDestinationRecommendationRow? = null,
     val activeCuratedTripRow: PersistedAiCuratedTripRow? = null,
+    val activePlaceRecommendationRow: PersistedAiPlaceRecommendationRow? = null,
     val anchorMessageId: String? = null
 )
 
@@ -32,7 +35,8 @@ data class PersistedAiChatCardOption(
     val id: String,
     val label: String,
     val message: String,
-    val groupId: String
+    val groupId: String,
+    val requiresText: Boolean = false
 )
 
 data class PersistedAiChatCardGroup(
@@ -40,7 +44,9 @@ data class PersistedAiChatCardGroup(
     val title: String,
     val subtitle: String,
     val options: List<PersistedAiChatCardOption>,
-    val allowMultiple: Boolean
+    val allowMultiple: Boolean,
+    val allowOther: Boolean = false,
+    val otherPromptHint: String = ""
 )
 
 data class PersistedAiCuratedTripStarter(
@@ -53,7 +59,10 @@ data class PersistedAiCuratedTripStarter(
     val matchReason: String,
     val source: String,
     val ownerUid: String = "",
-    val tripId: String = ""
+    val tripId: String = "",
+    val seedId: String? = null,
+    val durationOptions: List<Int>? = null,
+    val highlights: List<String>? = null
 )
 
 data class PersistedAiCuratedTripRow(
@@ -61,6 +70,37 @@ data class PersistedAiCuratedTripRow(
     val title: String,
     val subtitle: String,
     val trips: List<PersistedAiCuratedTripStarter>
+)
+
+data class PersistedAiDestinationRecommendation(
+    val id: String,
+    val destination: String,
+    val summary: String,
+    val matchReason: String,
+    val seedId: String? = null
+)
+
+data class PersistedAiDestinationRecommendationRow(
+    val id: String,
+    val title: String,
+    val subtitle: String,
+    val recommendations: List<PersistedAiDestinationRecommendation>
+)
+
+data class PersistedAiPlaceRecommendation(
+    val id: String,
+    val name: String,
+    val category: String,
+    val area: String,
+    val summary: String,
+    val matchReason: String
+)
+
+data class PersistedAiPlaceRecommendationRow(
+    val id: String,
+    val title: String,
+    val subtitle: String,
+    val recommendations: List<PersistedAiPlaceRecommendation>
 )
 
 data class PersistedAiChatStoreState(
@@ -254,10 +294,13 @@ fun AiChatCardGroup.toPersisted(): PersistedAiChatCardGroup {
                 id = option.id,
                 label = option.label,
                 message = option.message,
-                groupId = option.groupId
+                groupId = option.groupId,
+                requiresText = option.requiresText
             )
         },
-        allowMultiple = allowMultiple
+        allowMultiple = allowMultiple,
+        allowOther = allowOther,
+        otherPromptHint = otherPromptHint
     )
 }
 
@@ -271,10 +314,47 @@ fun PersistedAiChatCardGroup.toModel(): AiChatCardGroup {
                 id = option.id,
                 label = option.label,
                 message = option.message,
-                groupId = option.groupId
+                groupId = option.groupId,
+                requiresText = option.requiresText
             )
         },
-        allowMultiple = allowMultiple
+        allowMultiple = allowMultiple,
+        allowOther = allowOther,
+        otherPromptHint = otherPromptHint
+    )
+}
+
+fun AiDestinationRecommendationRow.toPersisted(): PersistedAiDestinationRecommendationRow {
+    return PersistedAiDestinationRecommendationRow(
+        id = id,
+        title = title,
+        subtitle = subtitle,
+        recommendations = recommendations.map { recommendation ->
+            PersistedAiDestinationRecommendation(
+                id = recommendation.id,
+                destination = recommendation.destination,
+                summary = recommendation.summary,
+                matchReason = recommendation.matchReason,
+                seedId = recommendation.seedId
+            )
+        }
+    )
+}
+
+fun PersistedAiDestinationRecommendationRow.toModel(): AiDestinationRecommendationRow {
+    return AiDestinationRecommendationRow(
+        id = id,
+        title = title,
+        subtitle = subtitle,
+        recommendations = recommendations.map { recommendation ->
+            AiDestinationRecommendation(
+                id = recommendation.id,
+                destination = recommendation.destination,
+                summary = recommendation.summary,
+                matchReason = recommendation.matchReason,
+                seedId = recommendation.seedId
+            )
+        }
     )
 }
 
@@ -294,7 +374,10 @@ fun AiCuratedTripRow.toPersisted(): PersistedAiCuratedTripRow {
                 matchReason = starter.matchReason,
                 source = starter.source.name,
                 ownerUid = starter.tripKey?.ownerUid.orEmpty(),
-                tripId = starter.tripKey?.tripId.orEmpty()
+                tripId = starter.tripKey?.tripId.orEmpty(),
+                seedId = starter.seedId,
+                durationOptions = starter.durationOptions,
+                highlights = starter.highlights
             )
         }
     )
@@ -324,7 +407,46 @@ fun PersistedAiCuratedTripRow.toModel(): AiCuratedTripRow {
                     )
                 } else {
                     null
-                }
+                },
+                seedId = starter.seedId,
+                durationOptions = starter.durationOptions.orEmpty(),
+                highlights = starter.highlights.orEmpty()
+            )
+        }
+    )
+}
+
+fun AiPlaceRecommendationRow.toPersisted(): PersistedAiPlaceRecommendationRow {
+    return PersistedAiPlaceRecommendationRow(
+        id = id,
+        title = title,
+        subtitle = subtitle,
+        recommendations = recommendations.map { recommendation ->
+            PersistedAiPlaceRecommendation(
+                id = recommendation.id,
+                name = recommendation.name,
+                category = recommendation.category,
+                area = recommendation.area,
+                summary = recommendation.summary,
+                matchReason = recommendation.matchReason
+            )
+        }
+    )
+}
+
+fun PersistedAiPlaceRecommendationRow.toModel(): AiPlaceRecommendationRow {
+    return AiPlaceRecommendationRow(
+        id = id,
+        title = title,
+        subtitle = subtitle,
+        recommendations = recommendations.map { recommendation ->
+            AiPlaceRecommendation(
+                id = recommendation.id,
+                name = recommendation.name,
+                category = recommendation.category,
+                area = recommendation.area,
+                summary = recommendation.summary,
+                matchReason = recommendation.matchReason
             )
         }
     )

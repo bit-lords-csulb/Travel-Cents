@@ -17,6 +17,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.AutoAwesome
 import androidx.compose.material.icons.outlined.CollectionsBookmark
+import androidx.compose.material.icons.outlined.Place
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -38,6 +39,7 @@ import com.example.travelcents.ui.theme.TravelCentsFonts
 @Composable
 fun AiCuratedTripRow(
     row: AiCuratedTripRow,
+    onDurationSelected: (AiCuratedTripStarter, Int) -> Unit,
     onTripSelected: (AiCuratedTripStarter) -> Unit,
     modifier: Modifier = Modifier
 ) {
@@ -71,6 +73,9 @@ fun AiCuratedTripRow(
             items(row.trips, key = { starter -> starter.id }) { starter ->
                 AiCuratedTripCard(
                     starter = starter,
+                    onDurationSelected = { durationDays ->
+                        onDurationSelected(starter, durationDays)
+                    },
                     onClick = { onTripSelected(starter) }
                 )
             }
@@ -81,6 +86,7 @@ fun AiCuratedTripRow(
 @Composable
 private fun AiCuratedTripCard(
     starter: AiCuratedTripStarter,
+    onDurationSelected: (Int) -> Unit,
     onClick: () -> Unit
 ) {
     Surface(
@@ -152,6 +158,45 @@ private fun AiCuratedTripCard(
                 )
             }
 
+            if (starter.highlights.isNotEmpty()) {
+                Row(
+                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                ) {
+                    starter.highlights.take(3).forEach { highlight ->
+                        DetailPill(
+                            label = highlight,
+                            selected = false,
+                            onClick = null
+                        )
+                    }
+                }
+            }
+
+            if (starter.durationOptions.size > 1) {
+                Column(
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    Text(
+                        text = "Adjust days",
+                        color = DeepSea4,
+                        fontSize = 11.sp,
+                        fontWeight = FontWeight.Medium,
+                        fontFamily = TravelCentsFonts.Body
+                    )
+                    Row(
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        starter.durationOptions.sorted().distinct().forEach { option ->
+                            DetailPill(
+                                label = "${option}d",
+                                selected = option == starter.durationDays,
+                                onClick = { onDurationSelected(option) }
+                            )
+                        }
+                    }
+                }
+            }
+
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
@@ -180,6 +225,7 @@ private fun AiCuratedTripCard(
 private fun SourcePill(source: AiCuratedTripSource) {
     val (label, icon) = when (source) {
         AiCuratedTripSource.FIRESTORE -> "Saved trip" to Icons.Outlined.CollectionsBookmark
+        AiCuratedTripSource.SEEDED -> "Curated" to Icons.Outlined.Place
         AiCuratedTripSource.GENERATED -> "Fresh start" to Icons.Outlined.AutoAwesome
     }
 
@@ -215,5 +261,43 @@ private fun SourcePill(source: AiCuratedTripSource) {
                 fontFamily = TravelCentsFonts.Body
             )
         }
+    }
+}
+
+@Composable
+private fun DetailPill(
+    label: String,
+    selected: Boolean,
+    onClick: (() -> Unit)?
+) {
+    Surface(
+        modifier = if (onClick != null) {
+            Modifier.clickable(onClick = onClick)
+        } else {
+            Modifier
+        },
+        shape = RoundedCornerShape(999.dp),
+        color = if (selected) {
+            TripWizardColors.Blue.copy(alpha = 0.16f)
+        } else {
+            TripWizardColors.ContainerHighest
+        },
+        border = BorderStroke(
+            width = 1.dp,
+            color = if (selected) {
+                TripWizardColors.Blue.copy(alpha = 0.42f)
+            } else {
+                Color.White.copy(alpha = 0.08f)
+            }
+        )
+    ) {
+        Text(
+            text = label,
+            modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
+            color = if (selected) TripWizardColors.Blue else DeepSea5.copy(alpha = 0.88f),
+            fontSize = 11.sp,
+            fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Medium,
+            fontFamily = TravelCentsFonts.Body
+        )
     }
 }

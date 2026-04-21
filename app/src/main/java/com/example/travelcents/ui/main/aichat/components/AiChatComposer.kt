@@ -16,6 +16,7 @@ import androidx.compose.material.icons.automirrored.filled.Send
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Surface
+import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -45,6 +46,7 @@ fun AiChatComposer(
     canSend: Boolean,
     isSending: Boolean,
     selectedDraftOptions: List<AiChatCardOption> = emptyList(),
+    helperText: String = "",
     onRemoveDraftOption: (String) -> Unit = {},
     modifier: Modifier = Modifier
 ) {
@@ -64,6 +66,17 @@ fun AiChatComposer(
                 AiSelectedDraftBar(
                     options = selectedDraftOptions,
                     onRemove = onRemoveDraftOption
+                )
+            }
+
+            if (helperText.isNotBlank()) {
+                Text(
+                    text = helperText,
+                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 2.dp),
+                    color = DeepSea4.copy(alpha = 0.88f),
+                    fontSize = 12.sp,
+                    lineHeight = 17.sp,
+                    fontFamily = TravelCentsFonts.Body
                 )
             }
 

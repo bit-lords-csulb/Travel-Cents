@@ -19,33 +19,38 @@ Key interaction rules:
 
 ## Current Status
 
-### Done
+### Real Stage Right Now
 
-- done: replaced the old flat message flow with a richer AI chat model and state layer
-- done: rebuilt the screen around TravelCents visual standards and shared components
-- done: removed the visible traveler-profile summary from the UI while keeping profile context in the background
-- done: added session resume so the last user-started chat reopens instead of creating a new one every time
-- done: added a fresh-session reset action
-- done: added Enter-to-send support
-- done: simplified the header and composer spacing
-- done: added chat history access from the header with searchable local session history
-- done: replaced the quick-prompt strip with rotating starter cards
-- done: added tappable AI follow-up response card groups
-- done: added mixed draft input so users can combine card picks with written text before sending
-- done: added post-send scroll behavior that biases the last user turn upward to make room for incoming cards
-- done: removed the default assistant welcome message and replaced it with a centered starter-question landing state
-- done: restyled the middle UI to a more modern card-first layout while preserving the existing top and bottom chrome
-- done: removed descriptive placeholder copy from the composer so it stays visually quiet until the user types
-- done: changed post-send motion from a hard snap to a gentler upward scroll that settles the latest turn higher in the viewport
-- done: preserved visible thread context above the latest turn so older messages remain reachable after sending
-- done: corrected mismatched starter-card icons so the visible symbols better match the trip themes
+TravelCents AI chat is currently between `Phase 1C` and `Phase 2`.
 
-### Still To Do In The Redesign
+What is already live:
 
-- pending: add curated editable trip starters for popular destinations
-- pending: add recommendation cards and editable trip suggestions deeper in the flow
-- pending: refine send/receive motion further so bubbles and follow-up cards animate in, not only the list scroll
-- pending: validate icon semantics across the full starter-card pool and follow-up card system, not only the first visible set
+- card-first chat shell, session restore/history, mixed draft input, and starter landing state
+- persisted follow-up card groups and session resume behavior
+- structured intake analysis that can patch trip fields, ask one LLM-generated follow-up, and decide whether to ask more, recommend curated, or build from scratch
+- curated trip starter rows backed by saved-trip matching plus a generated starter fallback
+
+What is still blocking the intended experience:
+
+- most follow-up questions still fall back to a static card catalog, so they repeat and feel rule-authored instead of model-authored
+- assistant acknowledgement copy is still generic, so the conversation does not visibly drive toward a concrete plan
+- response cards do not yet support `2-6` options, `allow_other`, or a typed handoff when `Other` is selected
+- there is no dedicated destination-recommendation row or place-recommendation row yet
+- curated starters exist, but the hotspot seed catalog and location-first recommendation flow are not finished
+
+### Done So Far
+
+- foundation: richer chat state, redesigned shell, session resume, fresh chat reset, header history, and Enter-to-send
+- card-first UI: rotating starter cards, tappable follow-up card groups, mixed draft input, and centered landing state
+- motion and polish: gentler post-send repositioning, preserved thread context, and starter-card icon cleanup
+- persistence: saved active follow-up cards and searchable local chat history
+- early AI plumbing: structured intake JSON analysis and curated starter surfacing
+
+### Active Focus
+
+- replace static fallback questions with LLM-authored planning turns as the primary path
+- make answer cards short, varied, and schema-driven
+- add destination recommendations first, then place recommendations once direction is set
 
 ## UX Direction
 
@@ -74,10 +79,11 @@ The center of the page should mix:
 - user messages
 - AI messages
 - response card groups
+- destination recommendation rows
 - curated trip starter cards
-- later recommendation cards
+- place recommendation rows
 
-The important change is that AI questions should not rely on the user typing long answers. If the AI asks about food preferences, pace, budget, or trip type, the response should usually appear as a dedicated card group the user can tap.
+The important change is that AI questions should not rely on the user typing long answers. If the AI asks about food preferences, pace, budget, party shape, or trip type, the response should usually appear as a dedicated card group the user can tap. Those questions should feel specific to what is already known, move the conversation toward the next concrete planning decision, and not read like the same template every time.
 
 Motion behavior to add:
 
@@ -90,13 +96,15 @@ Current implementation notes:
 
 - the sent message now animates upward with a delayed settle instead of snapping immediately
 - the thread preserves some visible context above the latest turn so older messages remain easier to reach
-- this still needs a second pass for bubble/card entrance animation and keyboard-dismiss timing polish
+- intake-generated follow-up cards already exist, but the static fallback path is still too dominant and needs to become last-resort only
+- this still needs a second pass for bubble/card entrance animation, keyboard-dismiss timing polish, and `Other`-option composer handoff
 
 ### Composer
 
 The composer should support mixed input:
 
 - select one or more cards
+- select `Other` when the preset cards are close but not enough
 - optionally type additional context
 - press send once
 
@@ -129,30 +137,45 @@ Requirements:
 - rotate from a larger curated pool, not the same fixed 4 every time
 - allow these cards to be reused later as AI follow-up choices
 
-## 2. AI Follow-Up Cards
+## 2. LLM-Authored Follow-Up Cards
 
 When the AI asks a question, it should usually return:
 
 - short acknowledgement text
-- one or more related answer-card groups
+- one concrete next-step question tied to the current planning gap
+- exactly one primary answer-card group with `2-6` options
+- explicit selection-mode metadata that says whether the group is single-select or multi-select
+- explicit `Other` handling metadata when the answer space is open-ended
+
+Question requirements:
+
+- the wording should feel naturally authored by the model, not like a reused template
+- the same underlying field can be phrased differently between sessions as long as the meaning stays clear
+- the question should move the user toward a concrete plan, not just collect trivia
+- the AI should not ask for information it already has
+
+Option requirements:
+
+- each visible option label should be no more than `2` words
+- each group should return between `2` and `6` options
+- the model should decide whether the group is single-choice or multi-choice
+- `Other` should be available whenever the likely answer set is open-ended or the presets are only examples
 
 Examples:
 
-- food preference question:
-  - `Street food`
+- traveler question, single-choice:
+  - `Couple`
+  - `Family`
+  - `Friends`
+  - `Solo`
+  - `Other`
+- food question, multi-choice:
   - `Seafood`
-  - `Fine dining`
   - `Vegan`
-  - `Coffee and bakeries`
-- pace question:
-  - `Relaxed`
-  - `Balanced`
-  - `Packed`
-- budget question:
-  - `Budget`
-  - `Comfort`
-  - `Luxury`
-  - `A few splurges`
+  - `Street food`
+  - `Cafes`
+  - `Fine dining`
+  - `Other`
 
 These cards should be first-class response objects, not just quick-reply chips.
 
@@ -172,6 +195,15 @@ Example:
 
 This means the chat needs a draft-input state separate from final submitted messages.
 
+## 3A. `Other` Handoff
+
+When a card group includes `Other`:
+
+- tapping `Other` should keep the draft open instead of forcing an immediate fake preset answer
+- the composer should clearly direct the user to type what they mean
+- the submitted turn should preserve both the structured selection and the typed explanation
+- `Other` should be especially available for party shape, food preferences, trip constraints, hotel area preferences, and destination ideas
+
 ## 3B. Sent Message Repositioning
 
 After submission, the UI should bias toward preserving space for the next interactive response.
@@ -189,7 +221,25 @@ Recommended implementation direction:
 - when the next AI response is card-heavy, bias the scroll so the first response cards are visible without extra manual scrolling
 - avoid abrupt snapping if the keyboard is still dismissing
 
-## 4. Curated Trip Starters
+## 4. Destination Recommendations
+
+The AI should be able to recommend locations before the user has locked in a destination.
+
+These are not full itineraries. They are:
+
+- destination or neighborhood suggestion rows
+- grounded in known signals like trip type, pace, budget, food interests, season, and origin
+- presented with short match reasons so the user sees why the AI suggested them
+- editable stepping stones into either curated trip starters or place recommendations
+
+Example behavior:
+
+- user says they want a warm food-forward anniversary trip with a relaxed pace
+- AI suggests `Barcelona`, `Mexico City`, and `Honolulu`
+- user taps one location
+- AI follows with either a refinement question or place recommendations for that location
+
+## 5. Curated Trip Starters
 
 The AI should be able to immediately suggest editable starter itineraries for popular destinations.
 
@@ -206,9 +256,23 @@ Example behavior:
 - user accepts it
 - AI continues refining duration, budget, dining, hotel area, and activity mix
 
+## 6. Place Recommendations
+
+Once the destination is known or narrow enough, the AI should be able to recommend places inside the trip.
+
+These can include:
+
+- restaurants
+- hotels or hotel areas
+- activities
+- neighborhoods
+- day-trip ideas
+
+Each recommendation row should explain the fit in plain language and support later actions such as swap, save, or add to trip.
+
 ## Curated Destination Seed List
 
-This is the first list of hotspots worth supporting with curated editable trip starters.
+This is the first list of hotspots worth supporting with curated editable trip starters and destination recommendation logic.
 
 ### Tropical / Beach
 
@@ -282,8 +346,9 @@ The current model should evolve from simple text + system items into UI objects 
 
 - `AiChatItem.TextMessage`
 - `AiChatItem.ResponseCardGroup`
+- `AiChatItem.DestinationRecommendationRow`
 - `AiChatItem.CuratedTripRow`
-- `AiChatItem.RecommendationRow`
+- `AiChatItem.PlaceRecommendationRow`
 - `AiChatItem.SystemStatus`
 - `AiChatItem.ErrorState`
 
@@ -307,7 +372,9 @@ Likely affected files:
 - active follow-up card groups
 - selected draft cards
 - draft free-text input
-- current recommendation groups
+- pending `Other` handoff state
+- current destination recommendation groups
+- current place recommendation groups
 - active session id
 
 Likely new or changed files:
@@ -321,10 +388,14 @@ Likely new or changed files:
 The LLM should receive a structured prompt that asks it to return:
 
 - acknowledgement copy
+- next planning objective
 - next follow-up question
 - response card options
+- selection mode metadata
+- `allow_other` metadata and typed handoff hint
+- optional destination recommendations
 - optional curated trip starter suggestions
-- optional recommendation intents
+- optional place recommendation intents
 
 This should move out of the view model and into a dedicated prompt/response layer.
 
@@ -351,6 +422,23 @@ Likely new files:
 - `data/ai/chat/AiCuratedTripCatalog.kt`
 - `data/ai/chat/AiCuratedTripMapper.kt`
 
+## 5. Recommendation Layer
+
+TravelCents needs a recommendation layer that can bridge intake signals into destination and place suggestions.
+
+Recommended approach:
+
+- use structured intake plus prompt output to decide whether to suggest locations, curated trip starters, or in-destination places
+- support destination recommendations even when the user only knows the vibe, not the city
+- support place recommendations once destination confidence is high enough
+- combine curated internal seed data with remote providers where available
+
+Likely new files:
+
+- `data/ai/chat/AiDestinationRecommendationEngine.kt`
+- `data/ai/chat/AiPlaceRecommendationCoordinator.kt`
+- `data/ai/chat/AiRecommendationMapper.kt`
+
 ## UI Components To Add Or Update
 
 ### Header
@@ -369,12 +457,14 @@ Likely new files:
 
 - assistant/user bubble support
 - AI response card groups
+- destination recommendation rows
 - curated trip starter rows
-- later recommendation rows
+- place recommendation rows
 
 ### Composer
 
 - draft selected-card tray
+- `Other` input prompt state
 - optional text input
 - single send action for text + selected cards
 
@@ -383,6 +473,7 @@ Likely files:
 - `ui/main/aichat/AiTripChatPage.kt`
 - `ui/main/aichat/components/AiPromptCardGrid.kt`
 - `ui/main/aichat/components/AiResponseCardGroup.kt`
+- `ui/main/aichat/components/AiRecommendationRow.kt`
 - `ui/main/aichat/components/AiSelectedDraftBar.kt`
 - `ui/main/aichat/components/AiCuratedTripCard.kt`
 - `ui/main/aichat/components/AiCuratedTripRow.kt`
@@ -442,18 +533,24 @@ Files most likely affected:
 
 Status:
 
-- pending
+- in progress
 
 Goal:
 
 - let the AI quickly suggest editable trip skeletons for popular destinations
 
-Changes:
+Completed:
 
-- curated destination catalog
-- editable starter trip cards
+- curated trip row UI and selection flow
+- saved-trip matching against the user's existing itineraries
+- generated starter fallback when no saved match is available
+
+Remaining:
+
+- hotspot destination seed catalog
+- editable starter trip cards for the seed set, not only saved/generated fallbacks
 - duration-change flows
-- follow-up refinement around budget, pace, food, hotel area, and activity mix
+- deeper refinement around budget, pace, food, hotel area, and activity mix
 
 Files most likely affected:
 
@@ -461,22 +558,32 @@ Files most likely affected:
 - `ui/main/aichat/AiChatViewModel.kt`
 - `ui/main/aichat/components/*`
 
-### Phase 2: Structured LLM Responses
+### Phase 2: Dynamic Structured Questioning
 
 Status:
 
-- pending
+- in progress
 
 Goal:
 
-- make AI outputs deterministic enough to drive card-first UI
+- make the model author the next best planning question instead of relying on repetitive fallback cards
 
-Changes:
+Completed:
 
-- prompt factory extraction
-- JSON response parsing
-- explicit follow-up card payloads
-- curated trip surfacing decisions
+- intake prompt/schema extraction through the intake orchestrator
+- JSON parsing for structured intake patches and follow-up question payloads
+- decisioning for `ask_more`, `recommend_curated`, and `build_from_scratch`
+- initial single-vs-multi-select follow-up support
+
+Remaining:
+
+- unify assistant text, planning goal, follow-up cards, and recommendation payloads into one response envelope
+- expand follow-up groups to `2-6` options instead of the current tighter cap
+- enforce max `2` words per visible option label
+- add `allow_other` plus composer handoff for typed answers
+- make static fallback questions last-resort only
+- strengthen variation and anti-repetition rules so similar sessions do not feel cloned
+- make each question visibly move the user toward a concrete plan
 
 Files most likely affected:
 
@@ -484,7 +591,7 @@ Files most likely affected:
 - `data/ai/chat/AiChatResponseParser.kt`
 - `data/ai/chat/AiChatCoordinator.kt`
 
-### Phase 3: Recommendation Cards
+### Phase 3: Destination And Place Recommendations
 
 Status:
 
@@ -492,16 +599,19 @@ Status:
 
 Goal:
 
-- show real restaurant/activity/hotel/flight recommendations in-card
+- recommend where to go first, then what to do, eat, and stay once the direction is clear
 
 Changes:
 
-- provider orchestration through Yelp/Serp
-- recommendation rows
-- editable option actions
+- destination recommendation rows for cities, regions, and neighborhoods
+- short match reasons grounded in the intake profile
+- place recommendation rows for restaurants, activities, hotels, and day trips
+- provider orchestration through Yelp/Serp plus curated seed data
 
 Files most likely affected:
 
+- `data/ai/chat/AiDestinationRecommendationEngine.kt`
+- `data/ai/chat/AiPlaceRecommendationCoordinator.kt`
 - `data/trip/remote/YelpRepository.kt`
 - `data/trip/remote/SerpRepository.kt`
 - `ui/main/aichat/components/*`
@@ -597,16 +707,18 @@ Changes:
 
 ## Immediate Next Slice
 
-The next concrete implementation slice should be Phase 1C:
+The next concrete implementation slice should be `Phase 2`, because that is the main blocker behind the current "hardcoded" feel:
 
-1. scaffold curated editable trip cards for the initial hotspot set
-2. add destination-specific starter trip shells for Bali, Tokyo, Paris, Rome, Barcelona, Honolulu, Cancun, and Bangkok
-3. let the AI surface those trip cards as editable starting points deeper in the flow
-4. add duration adjustment and trip-detail refinement once a starter is chosen
+1. replace the static follow-up catalog as the normal path with a single structured LLM response envelope
+2. require every AI-authored answer-card group to return `2-6` options, max `2` words per label, and explicit single vs multi-select metadata
+3. add `Other` handling that pushes the user into the composer for typed clarification instead of forcing a weak preset answer
+4. make the assistant acknowledgement and follow-up question vary naturally while still driving toward the next concrete planning decision
+5. allow that same envelope to optionally return destination recommendations when the user has a vibe but not a locked location
 
 ## Next Recommended Steps
 
-1. Add a dedicated motion pass so user bubbles, assistant bubbles, and follow-up card groups animate into place instead of relying only on list scrolling.
-2. Tune the scroll behavior against real device keyboard dismissal so the thread settles consistently without overshooting or feeling locked near the bottom.
-3. Finish a full icon audit for all starter and response-card themes so every visible symbol is literal, travel-relevant, and consistent.
-4. Start Phase 1C with curated trip starter cards, since the onboarding shell is now stable enough to support destination-specific entry points.
+1. Move static fallback questions to a guarded recovery path only, not the normal experience.
+2. Add parser validation and tests for option count, label length, `allow_other`, and repeated-question suppression.
+3. Add destination recommendation rows before broader place recommendations so the chat can narrow the map before suggesting venues.
+4. Once the response envelope is stable, finish the hotspot seed catalog and editable starter-trip flows for the initial destination set.
+5. Keep the motion pass on the list, but treat it as secondary to fixing the repetitive question/answer generation path.

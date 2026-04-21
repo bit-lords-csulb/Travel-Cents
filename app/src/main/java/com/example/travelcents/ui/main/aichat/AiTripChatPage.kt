@@ -63,6 +63,7 @@ import com.example.travelcents.ui.main.aichat.components.AiChatComposer
 import com.example.travelcents.ui.main.aichat.components.AiCuratedTripRow as AiCuratedTripRowSection
 import com.example.travelcents.ui.main.aichat.components.AiChatHistoryScreen
 import com.example.travelcents.ui.main.aichat.components.AiPromptCardGrid
+import com.example.travelcents.ui.main.aichat.components.AiRecommendationRow
 import com.example.travelcents.ui.main.aichat.components.AiResponseCardGroup
 import com.example.travelcents.ui.main.newTrip.TripWizardColors
 import com.example.travelcents.ui.theme.DeepSea1
@@ -92,7 +93,9 @@ fun AiTripChatPage(
     LaunchedEffect(
         uiState.anchorMessageId,
         uiState.activeResponseCardGroupId,
+        uiState.activeDestinationRecommendationRowId,
         uiState.activeCuratedTripRowId,
+        uiState.activePlaceRecommendationRowId,
         uiState.isLoading,
         uiState.items.size,
         showStarterLanding
@@ -113,19 +116,6 @@ fun AiTripChatPage(
                 }
             }
 
-            !uiState.isLoading && uiState.activeCuratedTripRowId != null -> {
-                val curatedRowIndex = uiState.items.indexOfFirst { item ->
-                    item.id == uiState.activeCuratedTripRowId
-                }
-                if (curatedRowIndex >= 0) {
-                    delay(140)
-                    listState.animateScrollToItem(
-                        index = curatedRowIndex,
-                        scrollOffset = -responseSettleOffset
-                    )
-                }
-            }
-
             !uiState.isLoading && uiState.activeResponseCardGroupId != null -> {
                 val responseIndex = uiState.items.indexOfFirst { item ->
                     item.id == uiState.activeResponseCardGroupId
@@ -134,6 +124,45 @@ fun AiTripChatPage(
                     delay(140)
                     listState.animateScrollToItem(
                         index = responseIndex,
+                        scrollOffset = -responseSettleOffset
+                    )
+                }
+            }
+
+            !uiState.isLoading && uiState.activeDestinationRecommendationRowId != null -> {
+                val destinationRowIndex = uiState.items.indexOfFirst { item ->
+                    item.id == uiState.activeDestinationRecommendationRowId
+                }
+                if (destinationRowIndex >= 0) {
+                    delay(140)
+                    listState.animateScrollToItem(
+                        index = destinationRowIndex,
+                        scrollOffset = -responseSettleOffset
+                    )
+                }
+            }
+
+            !uiState.isLoading && uiState.activePlaceRecommendationRowId != null -> {
+                val placeRowIndex = uiState.items.indexOfFirst { item ->
+                    item.id == uiState.activePlaceRecommendationRowId
+                }
+                if (placeRowIndex >= 0) {
+                    delay(140)
+                    listState.animateScrollToItem(
+                        index = placeRowIndex,
+                        scrollOffset = -responseSettleOffset
+                    )
+                }
+            }
+
+            !uiState.isLoading && uiState.activeCuratedTripRowId != null -> {
+                val curatedRowIndex = uiState.items.indexOfFirst { item ->
+                    item.id == uiState.activeCuratedTripRowId
+                }
+                if (curatedRowIndex >= 0) {
+                    delay(140)
+                    listState.animateScrollToItem(
+                        index = curatedRowIndex,
                         scrollOffset = -responseSettleOffset
                     )
                 }
@@ -214,15 +243,71 @@ fun AiTripChatPage(
                                     )
                                 }
 
+                                is AiChatItem.DestinationRecommendationRow -> {
+                                    AiRecommendationRow(
+                                        title = item.row.title,
+                                        subtitle = item.row.subtitle,
+                                        recommendations = item.row.recommendations.map { recommendation ->
+                                            com.example.travelcents.ui.main.aichat.components.AiRecommendationCardModel(
+                                                id = recommendation.id,
+                                                headline = recommendation.destination,
+                                                supporting = recommendation.summary,
+                                                meta = recommendation.matchReason,
+                                                kind = "Destination"
+                                            )
+                                        },
+                                        onRecommendationSelected = { recommendationId ->
+                                            item.row.recommendations
+                                                .firstOrNull { recommendation -> recommendation.id == recommendationId }
+                                                ?.let { recommendation ->
+                                                    viewModel.selectDestinationRecommendation(recommendation.destination)
+                                                }
+                                        }
+                                    )
+                                }
+
                                 is AiChatItem.CuratedTripRow -> {
                                     AiCuratedTripRowSection(
                                         row = item.row,
+                                        onDurationSelected = { starter, durationDays ->
+                                            viewModel.updateCuratedStarterDuration(
+                                                starterId = starter.id,
+                                                durationDays = durationDays
+                                            )
+                                        },
                                         onTripSelected = { starter ->
                                             viewModel.handleRecommendedStarterSelection(
                                                 starter = starter,
                                                 onOpenTrip = onOpenTrip,
                                                 onCreateDraftTrip = onCreateDraftTrip
                                             )
+                                        }
+                                    )
+                                }
+
+                                is AiChatItem.PlaceRecommendationRow -> {
+                                    AiRecommendationRow(
+                                        title = item.row.title,
+                                        subtitle = item.row.subtitle,
+                                        recommendations = item.row.recommendations.map { recommendation ->
+                                            com.example.travelcents.ui.main.aichat.components.AiRecommendationCardModel(
+                                                id = recommendation.id,
+                                                headline = recommendation.name,
+                                                supporting = recommendation.summary.ifBlank { recommendation.area },
+                                                meta = recommendation.matchReason,
+                                                kind = recommendation.category
+                                            )
+                                        },
+                                        onRecommendationSelected = { recommendationId ->
+                                            item.row.recommendations
+                                                .firstOrNull { recommendation -> recommendation.id == recommendationId }
+                                                ?.let { recommendation ->
+                                                    viewModel.selectPlaceRecommendation(
+                                                        name = recommendation.name,
+                                                        category = recommendation.category,
+                                                        area = recommendation.area
+                                                    )
+                                                }
                                         }
                                     )
                                 }
@@ -250,9 +335,14 @@ fun AiTripChatPage(
                         value = uiState.draftText,
                         onValueChange = viewModel::updateDraftText,
                         onSendClick = viewModel::sendDraft,
-                        canSend = uiState.draftText.isNotBlank() || uiState.selectedDraftOptions.isNotEmpty(),
+                        canSend = if (uiState.requiresTypedDraft) {
+                            uiState.draftText.isNotBlank()
+                        } else {
+                            uiState.draftText.isNotBlank() || uiState.selectedDraftOptions.isNotEmpty()
+                        },
                         isSending = uiState.isLoading,
                         selectedDraftOptions = uiState.selectedDraftOptions,
+                        helperText = uiState.composerHint,
                         onRemoveDraftOption = viewModel::removeDraftOption
                     )
                 }
