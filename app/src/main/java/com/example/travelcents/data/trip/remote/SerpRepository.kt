@@ -498,6 +498,7 @@ object SerpRepository {
             eventId = eventId,
             type = "hotel",
             itineraryId = itinerary.itineraryId,
+            tz = AirportTimeZones.zoneIdForIata(itinerary.destinationIata).id,
             date = request.dateFrom,
             startTime = selectedHotel?.checkInTime ?: "15:00",
             endTime = selectedHotel?.checkOutTime ?: "11:00",

@@ -167,10 +167,12 @@ class NewTripViewModel(application: Application) : AndroidViewModel(application)
                 val remainingBudget = if (budget > 0) maxOf(0.0, budget - flightPrice - hotelTotal) else 0.0
 
                 val outboundFlight = realFlights.firstOrNull { it.details["trip_segment"] == "outbound" }
+                val returnFlight = realFlights.firstOrNull { it.details["trip_segment"] == "return" }
                 val flightArrivalDate = outboundFlight?.details?.get("arrival_date")
                     ?.takeIf { it.isNotBlank() }
                     ?: request.dateFrom
                 val minimumStartTime = minimumActivityStartTime(outboundFlight, request.dateFrom)
+                val maximumEndTime = maximumActivityEndTime(returnFlight, request.dateTo)
                 val tripDates = generateActivityDates(request.dateFrom, request.dateTo, flightArrivalDate)
                 val yelpOptionPools = linkedMapOf<String, List<YelpOptionPoolItem>>()
 
@@ -189,12 +191,14 @@ class NewTripViewModel(application: Application) : AndroidViewModel(application)
                     if (restaurantPool.isNotEmpty()) {
                         yelpOptionPools[YELP_POOL_TYPE_RESTAURANTS] = restaurantPool
                     }
-                    deferSyntheticEvents(
+                    applyActivityWindow(
                         YelpRepository.distributePoolToSelectedEvents(
                             restaurantPool, tripDates, "restaurant", itinerary.itineraryId
                         ),
-                        flightArrivalDate,
-                        minimumStartTime
+                        earliestDate = flightArrivalDate,
+                        minimumStartTime = minimumStartTime,
+                        latestDate = request.dateTo,
+                        maximumEndTime = maximumEndTime
                     )
                 }
 
@@ -227,17 +231,23 @@ class NewTripViewModel(application: Application) : AndroidViewModel(application)
                     if (activityPool.isNotEmpty()) {
                         yelpOptionPools[YELP_POOL_TYPE_ACTIVITIES] = activityPool
                     }
-                    activityEvents = deferSyntheticEvents(
+                    activityEvents = applyActivityWindow(
                         YelpRepository.distributePoolToSelectedEvents(
                             activityPool, tripDates, "activity", itinerary.itineraryId
                         ),
-                        flightArrivalDate,
-                        minimumStartTime
+                        earliestDate = flightArrivalDate,
+                        minimumStartTime = minimumStartTime,
+                        latestDate = request.dateTo,
+                        maximumEndTime = maximumEndTime
                     )
-                    localEvents = filterEventsBeforeTime(
-                        yelpEventsDeferred.await(),
-                        flightArrivalDate,
-                        minimumStartTime
+                    localEvents = filterEventsAfterTime(
+                        filterEventsBeforeTime(
+                            yelpEventsDeferred.await(),
+                            flightArrivalDate,
+                            minimumStartTime
+                        ),
+                        request.dateTo,
+                        maximumEndTime
                     )
                 }
 
@@ -391,6 +401,35 @@ class NewTripViewModel(application: Application) : AndroidViewModel(application)
             ?.format(TRIP_TIME_FORMATTER)
     }
 
+    private fun maximumActivityEndTime(returnFlight: TravelEvent?, returnDate: String): String? {
+        if (returnFlight == null) return null
+        val departureDate = returnFlight.date.takeIf { it.isNotBlank() } ?: returnDate
+        if (departureDate != returnDate) return null
+
+        val departureTime = returnFlight.startTime
+            .takeIf { it.isNotBlank() }
+            ?: returnFlight.details["departure_time"]
+                ?.substringAfterLast(" ")
+                ?.takeIf { it.isNotBlank() }
+            ?: return null
+
+        return parseTripTime(departureTime)?.format(TRIP_TIME_FORMATTER)
+    }
+
+    private fun applyActivityWindow(
+        events: List<TravelEvent>,
+        earliestDate: String,
+        minimumStartTime: String?,
+        latestDate: String,
+        maximumEndTime: String?
+    ): List<TravelEvent> {
+        return filterEventsAfterTime(
+            deferSyntheticEvents(events, earliestDate, minimumStartTime),
+            latestDate,
+            maximumEndTime
+        )
+    }
+
     private fun deferSyntheticEvents(
         events: List<TravelEvent>,
         targetDate: String,
@@ -424,6 +463,22 @@ class NewTripViewModel(application: Application) : AndroidViewModel(application)
         val minTime = parseTripTime(minimumStartTime) ?: return events
         return events.filterNot { event ->
             event.date == targetDate && (parseTripTime(event.startTime)?.isBefore(minTime) == true)
+        }
+    }
+
+    private fun filterEventsAfterTime(
+        events: List<TravelEvent>,
+        targetDate: String,
+        maximumEndTime: String?
+    ): List<TravelEvent> {
+        val maxTime = parseTripTime(maximumEndTime) ?: return events
+        return events.filterNot { event ->
+            if (event.date != targetDate) return@filterNot false
+
+            val start = parseTripTime(event.startTime)
+            val end = parseTripTime(event.endTime)
+            (start != null && !start.isBefore(maxTime)) ||
+                (end != null && end.isAfter(maxTime))
         }
     }
 
