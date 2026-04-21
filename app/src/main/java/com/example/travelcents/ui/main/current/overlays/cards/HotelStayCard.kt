@@ -1,41 +1,72 @@
 package com.example.travelcents.ui.main.current.overlays.cards
 
-import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.example.travelcents.data.trip.model.ATTR_HOTEL_CLASS
 import com.example.travelcents.data.trip.model.TravelEvent
-import com.example.travelcents.data.trip.model.detailValue
-import com.example.travelcents.ui.main.current.eventTitle
 
 @Composable
 fun HotelStayCard(event: TravelEvent) {
+    val stayMoments = hotelStayMoments(event)
+    if (stayMoments.isEmpty()) return
+
     DetailCardFrame(accent = CardLavender) {
-        DetailCardHeader(
-            eyebrow = "Stay",
-            title = eventTitle(event)
-        )
-        Spacer(modifier = Modifier.height(12.dp))
-        DetailBadgeRow(
-            badges = listOf(
-                hotelStayWindow(event),
-                event.detailValue(ATTR_HOTEL_CLASS, "hotel_class")?.let { "$it-star hotel" } ?: "",
-                event.detailValue("attr_hotel_rating", "attr_average_rating", "rating")?.let { "★$it" } ?: ""
-            ),
-            accent = CardLavender
-        )
-        Spacer(modifier = Modifier.height(12.dp))
-        Text(
-            text = eventLocationLabel(event),
-            color = CardTextMuted,
-            fontSize = 13.sp,
-            fontWeight = FontWeight.Medium,
-            lineHeight = 18.sp
-        )
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(10.dp)
+        ) {
+            stayMoments.forEach { moment ->
+                Column(
+                    modifier = Modifier
+                        .weight(1f)
+                        .background(CardSurfaceHigh, RoundedCornerShape(18.dp))
+                        .padding(14.dp),
+                    verticalArrangement = Arrangement.spacedBy(4.dp)
+                ) {
+                    Text(
+                        text = moment.label.uppercase(),
+                        color = CardTextMuted,
+                        fontSize = 10.sp,
+                        fontWeight = FontWeight.Bold,
+                        letterSpacing = 1.2.sp
+                    )
+                    moment.date?.let {
+                        Text(
+                            text = it,
+                            color = CardText,
+                            fontSize = 16.sp,
+                            fontWeight = FontWeight.SemiBold
+                        )
+                    }
+                    moment.time?.let {
+                        Text(
+                            text = it,
+                            color = CardLavender,
+                            fontSize = 14.sp,
+                            fontWeight = FontWeight.SemiBold
+                        )
+                    }
+                }
+            }
+        }
+        stayMoments.firstOrNull()?.timeZoneLabel?.let {
+            Text(
+                text = it,
+                color = CardTextMuted,
+                fontSize = 12.sp,
+                lineHeight = 16.sp,
+                modifier = Modifier.padding(top = 12.dp)
+            )
+        }
     }
 }
