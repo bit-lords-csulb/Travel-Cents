@@ -9,6 +9,7 @@ import com.example.travelcents.data.trip.model.ATTR_BUSINESS_NAME
 import com.example.travelcents.data.trip.model.ATTR_CATEGORIES
 import com.example.travelcents.data.trip.model.ATTR_CHECK_IN_TIME
 import com.example.travelcents.data.trip.model.ATTR_CHECK_OUT_TIME
+import com.example.travelcents.data.trip.model.ATTR_CUISINE
 import com.example.travelcents.data.trip.model.ATTR_HOTEL_CITY
 import com.example.travelcents.data.trip.model.ATTR_HOTEL_NAME
 import com.example.travelcents.data.trip.model.ATTR_HOTEL_RATING
@@ -219,7 +220,7 @@ internal fun eventExperienceText(event: TravelEvent): String {
         event.details["notes"],
         eventSubtitle(event).takeIf { it != "Tap to edit details" },
         event.detailValue(ATTR_CATEGORIES, "categories"),
-        event.details["cuisine"]
+        event.detailValue(ATTR_CUISINE, "cuisine")
     ).firstOrNull { !it.isNullOrBlank() }
         ?: "Add notes or switch options to give this stop more context."
 }

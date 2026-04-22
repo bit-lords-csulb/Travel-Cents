@@ -35,6 +35,7 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import com.example.travelcents.data.trip.model.ATTR_HOTEL_DETAIL_URL
+import com.example.travelcents.data.trip.model.ATTR_YELP_URL
 import com.example.travelcents.data.trip.model.EventOption
 import com.example.travelcents.data.trip.model.TravelEvent
 import com.example.travelcents.data.trip.model.YelpReview
@@ -59,8 +60,10 @@ import com.example.travelcents.ui.main.current.overlays.cards.HotelPricingCard
 import com.example.travelcents.ui.main.current.overlays.cards.HotelStayCard
 import com.example.travelcents.ui.main.current.overlays.cards.LocationMapCard
 import com.example.travelcents.ui.main.current.overlays.cards.RestaurantHoursCard
+import com.example.travelcents.ui.main.current.overlays.cards.RestaurantMenuCard
+import com.example.travelcents.ui.main.current.overlays.cards.RestaurantOverviewCard
+import com.example.travelcents.ui.main.current.overlays.cards.RestaurantReservationsCard
 import com.example.travelcents.ui.main.current.overlays.cards.RestaurantServicesCard
-import com.example.travelcents.ui.main.current.overlays.cards.RestaurantSummaryCard
 import com.example.travelcents.ui.main.current.overlays.cards.ReviewsCard
 import com.example.travelcents.ui.main.current.overlays.cards.compactHostLabel
 import com.example.travelcents.ui.main.current.overlays.cards.eventDurationSummary
@@ -80,6 +83,9 @@ import com.example.travelcents.ui.modules.heroImageModel
 @Composable
 fun CurrentTripEventDetailsDialog(
     event: TravelEvent,
+    tripDestination: String,
+    tripAdults: Int,
+    tripChildren: Int,
     currentOptions: List<EventOption>,
     yelpReviews: List<YelpReview>,
     reviewsLoading: Boolean,
@@ -214,6 +220,9 @@ fun CurrentTripEventDetailsDialog(
 
                     EventDetailCardStack(
                         event = event,
+                        tripDestination = tripDestination,
+                        tripAdults = tripAdults,
+                        tripChildren = tripChildren,
                         locationLabel = locationLabel,
                         mapsUrl = mapsUrl,
                         hotelReviewsUrl = hotelReviewsUrl,
@@ -243,6 +252,9 @@ fun CurrentTripEventDetailsDialog(
 @Composable
 private fun EventDetailCardStack(
     event: TravelEvent,
+    tripDestination: String,
+    tripAdults: Int,
+    tripChildren: Int,
     locationLabel: String,
     mapsUrl: String,
     hotelReviewsUrl: String,
@@ -283,14 +295,28 @@ private fun EventDetailCardStack(
             }
         }
         "restaurant", "dining", "food" -> {
-            RestaurantSummaryCard(event)
-            RestaurantServicesCard(event)
-            RestaurantHoursCard(event)
-            LocationMapCard(
+            val restaurantReviewsUrl = yelpReviews.firstOrNull()?.url?.takeIf { it.isNotBlank() }
+                ?: event.detailValue(ATTR_YELP_URL)?.takeIf { it.isNotBlank() }
+            RestaurantOverviewCard(
                 event = event,
-                locationLabel = locationLabel,
-                onOpenMaps = { uriHandler.openUri(mapsUrl) }
+                onOpenReviews = restaurantReviewsUrl?.let { { uriHandler.openUri(it) } }
             )
+            RestaurantHoursCard(event)
+            RestaurantMenuCard(event)
+            RestaurantReservationsCard(
+                event = event,
+                tripDestination = tripDestination,
+                tripAdults = tripAdults,
+                tripChildren = tripChildren
+            )
+            RestaurantServicesCard(event)
+            if (showLocationCard) {
+                LocationMapCard(
+                    event = event,
+                    locationLabel = locationLabel,
+                    onOpenMaps = { uriHandler.openUri(mapsUrl) }
+                )
+            }
             ReviewsCard(
                 ratingLabel = ratingLabel,
                 reviewCountLabel = reviewCountLabel,

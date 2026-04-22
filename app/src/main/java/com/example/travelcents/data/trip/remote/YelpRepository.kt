@@ -14,6 +14,7 @@ import com.example.travelcents.data.trip.model.ATTR_AVERAGE_RATING
 import com.example.travelcents.data.trip.model.ATTR_BUSINESS_ADDRESS
 import com.example.travelcents.data.trip.model.ATTR_BUSINESS_NAME
 import com.example.travelcents.data.trip.model.ATTR_CATEGORIES
+import com.example.travelcents.data.trip.model.ATTR_DIETARY_TAGS
 import com.example.travelcents.data.trip.model.ATTR_HAS_FOOD_ORDER
 import com.example.travelcents.data.trip.model.ATTR_HAS_REQUEST_A_QUOTE
 import com.example.travelcents.data.trip.model.ATTR_HAS_RESERVATIONS
@@ -27,6 +28,7 @@ import com.example.travelcents.data.trip.model.ATTR_MENU_URL
 import com.example.travelcents.data.trip.model.ATTR_PHONE
 import com.example.travelcents.data.trip.model.ATTR_PRICE_TIER
 import com.example.travelcents.data.trip.model.ATTR_PROFILE_PHOTO_URL
+import com.example.travelcents.data.trip.model.ATTR_RESERVATION_OFFER_COUNT
 import com.example.travelcents.data.trip.model.ATTR_REVIEW_COUNT
 import com.example.travelcents.data.trip.model.ATTR_STATIC_MAP_PROVIDER
 import com.example.travelcents.data.trip.model.ATTR_STATIC_MAP_URL
@@ -483,6 +485,10 @@ object YelpRepository {
             "menu_url",
             "menuUrl"
         )?.let { put(ATTR_MENU_URL, it) }
+        extractDietaryTags(attributes)
+            .takeIf { it.isNotEmpty() }
+            ?.joinToString(", ")
+            ?.let { put(ATTR_DIETARY_TAGS, it) }
 
         extractBooleanAttribute(
             attributes,
@@ -490,7 +496,13 @@ object YelpRepository {
             "restaurant_reservation"
         )?.let { put(ATTR_HAS_RESERVATIONS, it.toString()) }
         extractStringAttribute(attributes, "reservation_url")
-            ?.let { put(ATTR_HAS_RESERVATIONS, "true") }
+            ?.let { reservationUrl ->
+                put(ATTR_HAS_RESERVATIONS, "true")
+                put(ATTR_RESERVATION_OFFER_COUNT, "1")
+                put("reservation_offer_0_source", "Yelp")
+                put("reservation_offer_0_link", reservationUrl)
+                put("reservation_offer_0_deeplink_type", "yelp")
+            }
 
         extractBooleanAttribute(
             attributes,
@@ -627,6 +639,20 @@ object YelpRepository {
                 }
             }
             .firstOrNull()
+    }
+
+    private fun extractDietaryTags(attributes: Map<String, Any>): List<String> {
+        val tagMappings = listOf(
+            "vegan" to arrayOf("vegan", "vegan_menu", "vegan_options"),
+            "vegetarian" to arrayOf("vegetarian", "vegetarian_menu", "vegetarian_options"),
+            "gluten-free" to arrayOf("gluten_free", "gluten_free_menu"),
+            "halal" to arrayOf("halal", "halal_menu"),
+            "kosher" to arrayOf("kosher", "kosher_menu")
+        )
+
+        return tagMappings.mapNotNull { (label, keys) ->
+            extractBooleanAttribute(attributes, *keys)?.takeIf { it }?.let { label }
+        }
     }
 
     private fun selectedYelpId(

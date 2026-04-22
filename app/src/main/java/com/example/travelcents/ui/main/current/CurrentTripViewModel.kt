@@ -80,6 +80,8 @@ data class CurrentTripUiState(
     val destination: String = "",
     val dateFrom: String = "",
     val dateTo: String = "",
+    val adults: Int = 1,
+    val children: Int = 0,
     val events: List<TravelEvent> = emptyList(),
     val infoMessage: String? = null,
     val errorMessage: String? = null
@@ -286,6 +288,8 @@ class CurrentTripViewModel(application: Application) : AndroidViewModel(applicat
                 destination = currentTripDestination,
                 dateFrom = itinerary.dateFrom,
                 dateTo = itinerary.dateTo,
+                adults = itinerary.adults,
+                children = itinerary.children,
                 infoMessage = if (localEventsSnapshot.isEmpty()) EMPTY_PLANS_MESSAGE else null,
                 errorMessage = null
             )
