@@ -12,7 +12,9 @@ import com.example.travelcents.data.trip.model.ATTR_BOOKING_URL
 import com.example.travelcents.data.trip.model.ATTR_CHECK_IN_TIME
 import com.example.travelcents.data.trip.model.ATTR_CHECK_OUT_TIME
 import com.example.travelcents.data.trip.model.ATTR_GROUP_RATE_PER_NIGHT
+import com.example.travelcents.data.trip.model.ATTR_HOTEL_CITY
 import com.example.travelcents.data.trip.model.ATTR_HOTEL_CLASS
+import com.example.travelcents.data.trip.model.ATTR_HOTEL_DETAIL_URL
 import com.example.travelcents.data.trip.model.ATTR_HOTEL_NAME
 import com.example.travelcents.data.trip.model.ATTR_HOTEL_RATING
 import com.example.travelcents.data.trip.model.ATTR_LATITUDE
@@ -35,7 +37,7 @@ import java.util.concurrent.TimeUnit
 object SerpRepository {
 
     private const val FLIGHT_CACHE_VERSION = "v3"
-    private const val HOTEL_CACHE_VERSION = "v2"
+    private const val HOTEL_CACHE_VERSION = "v3"
     private const val MAX_FLIGHT_OPTIONS = 8
     private const val MAX_HOTEL_OPTIONS = 8
     private const val MAX_HOTEL_PHOTOS = 5
@@ -490,7 +492,13 @@ object SerpRepository {
         val eventId = UUID.randomUUID().toString()
         val selectedHotel = cappedProperties.firstOrNull()
         val eventOptions = cappedProperties.mapIndexed { idx, hotel ->
-            hotelToEventOption(hotel, eventId, isSelected = idx == 0, roomsNeeded = roomsNeeded)
+            hotelToEventOption(
+                hotel = hotel,
+                eventId = eventId,
+                isSelected = idx == 0,
+                roomsNeeded = roomsNeeded,
+                city = itinerary.destination
+            )
         }
         val selectedPhotos = selectedHotel?.let(::mapHotelPhotos).orEmpty()
 
@@ -507,6 +515,8 @@ object SerpRepository {
             details = buildMap {
                 selectedHotel?.let { hotel ->
                     put(ATTR_HOTEL_NAME, hotel.name)
+                    itinerary.destination.takeIf { it.isNotBlank() }?.let { put(ATTR_HOTEL_CITY, it) }
+                    bestHotelDetailUrlFor(hotel)?.let { put(ATTR_HOTEL_DETAIL_URL, it) }
                     put("check_in_date", request.dateFrom)
                     put("check_out_date", request.dateTo)
                     hotel.overallRating?.let { put(ATTR_HOTEL_RATING, it.toString()) }
@@ -581,7 +591,8 @@ object SerpRepository {
         hotel: SerpHotelProperty,
         eventId: String,
         isSelected: Boolean,
-        roomsNeeded: Int
+        roomsNeeded: Int,
+        city: String
     ): EventOption {
         val ratePerNight = hotel.ratePerNight?.extractedLowest ?: 0.0
         val groupRatePerNight = if (ratePerNight > 0) ratePerNight * roomsNeeded else 0.0
@@ -599,6 +610,8 @@ object SerpRepository {
             photoUrls = photos,
             details = buildMap {
                 put(ATTR_HOTEL_NAME, hotel.name)
+                city.takeIf { it.isNotBlank() }?.let { put(ATTR_HOTEL_CITY, it) }
+                bestHotelDetailUrlFor(hotel)?.let { put(ATTR_HOTEL_DETAIL_URL, it) }
                 hotel.overallRating?.let { put(ATTR_HOTEL_RATING, it.toString()) }
                 hotel.reviews?.let { put(ATTR_REVIEW_COUNT, it.toString()) }
                 hotel.hotelClass?.let { put(ATTR_HOTEL_CLASS, it) }
@@ -631,6 +644,10 @@ object SerpRepository {
         return hotel.prices
             ?.minByOrNull { it.ratePerNight?.extractedLowest ?: Double.MAX_VALUE }
             ?.link
+    }
+
+    private fun bestHotelDetailUrlFor(hotel: SerpHotelProperty): String? {
+        return hotel.link?.takeIf { it.isNotBlank() }
     }
 }
 

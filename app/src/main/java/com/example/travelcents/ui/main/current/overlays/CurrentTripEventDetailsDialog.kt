@@ -34,9 +34,11 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
+import com.example.travelcents.data.trip.model.ATTR_HOTEL_DETAIL_URL
 import com.example.travelcents.data.trip.model.EventOption
 import com.example.travelcents.data.trip.model.TravelEvent
 import com.example.travelcents.data.trip.model.YelpReview
+import com.example.travelcents.data.trip.model.detailValue
 import com.example.travelcents.ui.main.current.overlays.cards.ActivityHoursCard
 import com.example.travelcents.ui.main.current.overlays.cards.ActivitySummaryCard
 import com.example.travelcents.ui.main.current.overlays.cards.CardBackground
@@ -95,6 +97,9 @@ fun CurrentTripEventDetailsDialog(
     val officialUrl = remember(event) { eventOfficialUrl(event) }
     val mapsQuery = remember(event) { eventMapsQuery(event) }
     val mapsUrl = remember(mapsQuery) { googleMapsSearchUrl(mapsQuery) }
+    val hotelReviewsUrl = remember(event, mapsUrl) {
+        event.detailValue(ATTR_HOTEL_DETAIL_URL)?.takeIf { it.isNotBlank() } ?: mapsUrl
+    }
     val directionsUrl = remember(mapsQuery) { googleMapsDirectionsUrl(mapsQuery) }
     val locationLabel = remember(event) { eventLocationLabel(event) }
     val staticMapModel = rememberStaticMapModel(event)
@@ -215,6 +220,7 @@ fun CurrentTripEventDetailsDialog(
                         embeddedMapUrl = embeddedMapUrl,
                         locationLabel = locationLabel,
                         mapsUrl = mapsUrl,
+                        hotelReviewsUrl = hotelReviewsUrl,
                         websiteLabel = websiteLabel,
                         officialUrl = officialUrl,
                         ratingLabel = ratingLabel,
@@ -245,6 +251,7 @@ private fun EventDetailCardStack(
     embeddedMapUrl: String?,
     locationLabel: String,
     mapsUrl: String,
+    hotelReviewsUrl: String,
     websiteLabel: String,
     officialUrl: String?,
     ratingLabel: String,
@@ -268,7 +275,7 @@ private fun EventDetailCardStack(
             HotelStayCard(event)
             HotelOverviewCard(
                 event = event,
-                onOpenReviews = { uriHandler.openUri(mapsUrl) }
+                onOpenReviews = { uriHandler.openUri(hotelReviewsUrl) }
             )
             HotelPricingCard(event)
             HotelAmenitiesCard(event)

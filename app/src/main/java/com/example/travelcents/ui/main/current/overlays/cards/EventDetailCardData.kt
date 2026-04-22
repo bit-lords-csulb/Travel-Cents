@@ -9,6 +9,8 @@ import com.example.travelcents.data.trip.model.ATTR_BUSINESS_NAME
 import com.example.travelcents.data.trip.model.ATTR_CATEGORIES
 import com.example.travelcents.data.trip.model.ATTR_CHECK_IN_TIME
 import com.example.travelcents.data.trip.model.ATTR_CHECK_OUT_TIME
+import com.example.travelcents.data.trip.model.ATTR_HOTEL_CITY
+import com.example.travelcents.data.trip.model.ATTR_HOTEL_NAME
 import com.example.travelcents.data.trip.model.ATTR_HOTEL_RATING
 import com.example.travelcents.data.trip.model.ATTR_HOURS_SUMMARY
 import com.example.travelcents.data.trip.model.ATTR_IS_CLOSED
@@ -42,6 +44,15 @@ internal fun eventOfficialUrl(event: TravelEvent): String? {
 }
 
 internal fun eventMapsQuery(event: TravelEvent): String {
+    if (event.type.equals("hotel", ignoreCase = true)) {
+        val hotelName = event.detailValue(ATTR_HOTEL_NAME, "hotel_name")?.takeIf { it.isNotBlank() }
+        if (hotelName != null) {
+            val city = event.detailValue(ATTR_HOTEL_CITY)?.takeIf { it.isNotBlank() }
+                ?: event.detailValue(ATTR_BUSINESS_ADDRESS, "address")?.takeIf { it.isNotBlank() }
+                ?: event.details["location"]?.takeIf { it.isNotBlank() }
+            return if (city != null) "$hotelName, $city" else hotelName
+        }
+    }
     val latitude = event.detailValue(ATTR_LATITUDE)?.toDoubleOrNull()
     val longitude = event.detailValue(ATTR_LONGITUDE)?.toDoubleOrNull()
     if (latitude != null && longitude != null) {
@@ -51,7 +62,7 @@ internal fun eventMapsQuery(event: TravelEvent): String {
         event.detailValue(ATTR_BUSINESS_ADDRESS, "address"),
         event.details["location"],
         event.details["destination_airport"],
-        event.detailValue("attr_hotel_name", "hotel_name"),
+        event.detailValue(ATTR_HOTEL_NAME, "hotel_name"),
         event.detailValue(ATTR_BUSINESS_NAME, "restaurant_name", "activity_name"),
         event.details["title"],
         eventTitle(event)
