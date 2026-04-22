@@ -10,6 +10,7 @@ import com.example.travelcents.data.local.trip.TripLocalDataSource
 import com.example.travelcents.data.trip.FirestoreTripRepository
 import com.example.travelcents.data.trip.TripKey
 import com.example.travelcents.data.trip.TripAccessRole
+import com.example.travelcents.data.trip.TripPlanActionService
 import com.example.travelcents.data.trip.TripPerformanceLogger
 import com.example.travelcents.data.trip.TripRepository
 import com.example.travelcents.data.trip.model.DETAIL_YELP_ID
@@ -139,6 +140,7 @@ class CurrentTripViewModel(application: Application) : AndroidViewModel(applicat
     private val db = FirebaseFirestore.getInstance()
     private val auth = FirebaseAuth.getInstance()
     private val tripRepository: TripRepository = FirestoreTripRepository(db)
+    private val tripPlanActionService = TripPlanActionService()
     private val tripLocalDataSource = TripLocalDataSource(TravelCentsDatabase.getInstance(application))
     private val tripSyncRemoteDataSource = TripSyncRemoteDataSource(db)
     private val tripSyncCoordinator = TripSyncCoordinator(
@@ -1062,50 +1064,37 @@ class CurrentTripViewModel(application: Application) : AndroidViewModel(applicat
         val isYelpSelectionEvent = selectedOption.source.equals("yelp", ignoreCase = true) &&
             yelpPoolTypeForEvent(event) != null
 
-        val updatedOptions = options.map { option ->
-            option.copy(selected = option.optionId == optionId)
-                .scopedTo(
-                    ownerUid = tripKey.ownerUid,
-                    tripId = tripKey.tripId,
-                    eventId = eventId
-                )
-        }
-        val updatedEvent = mediaDetailPipeline.mergeEventWithOptions(event, updatedOptions)
-        localEventsSnapshot = sortPlanEvents(
-            localEventsSnapshot.map {
-                if (it.eventId == eventId) updatedEvent else it
-            }
-        )
-
-        val updatedOptionsByEvent = _eventOptions.value + (eventId to updatedOptions)
-        _eventOptions.value = updatedOptionsByEvent
-        _rejectedOptions.update { current ->
-            val nextRejected = current[eventId].orEmpty() - optionId
-            current + (eventId to nextRejected)
-        }
-        publishCurrentEvents(localEventsSnapshot, updatedOptionsByEvent)
-        persistLocalTripSnapshot(
-            events = localEventsSnapshot,
-            options = updatedOptionsByEvent,
-            persistOptions = !isYelpSelectionEvent
-        )
-        prefetchSharedEventMedia(listOf(updatedEvent))
-
         viewModelScope.launch {
             try {
-                if (isYelpSelectionEvent) {
-                    tripSyncRemoteDataSource.upsertEvent(
-                        tripKey = tripKey,
-                        event = updatedEvent
-                    )
-                } else {
-                    tripSyncRemoteDataSource.persistEventAndOptions(
-                        tripKey = tripKey,
-                        eventId = eventId,
-                        event = updatedEvent,
-                        options = updatedOptions
-                    )
+                val actionResult = tripPlanActionService.replaceSelectedOption(
+                    tripKey = tripKey,
+                    event = event,
+                    existingOptions = options,
+                    optionId = optionId,
+                    persistOptions = !isYelpSelectionEvent
+                )
+                val updatedEvent = actionResult.event ?: return@launch
+                val updatedOptions = actionResult.options
+
+                localEventsSnapshot = sortPlanEvents(
+                    localEventsSnapshot.map {
+                        if (it.eventId == eventId) updatedEvent else it
+                    }
+                )
+
+                val updatedOptionsByEvent = _eventOptions.value + (eventId to updatedOptions)
+                _eventOptions.value = updatedOptionsByEvent
+                _rejectedOptions.update { current ->
+                    val nextRejected = current[eventId].orEmpty() - optionId
+                    current + (eventId to nextRejected)
                 }
+                publishCurrentEvents(localEventsSnapshot, updatedOptionsByEvent)
+                persistLocalTripSnapshot(
+                    events = localEventsSnapshot,
+                    options = updatedOptionsByEvent,
+                    persistOptions = !isYelpSelectionEvent
+                )
+                prefetchSharedEventMedia(listOf(updatedEvent))
             } catch (e: Exception) {
                 Log.e("CurrentTripViewModel", "Failed to select option", e)
                 _uiState.update { it.copy(errorMessage = e.message ?: "Failed to update selection.") }
@@ -1217,7 +1206,7 @@ class CurrentTripViewModel(application: Application) : AndroidViewModel(applicat
 
         viewModelScope.launch {
             try {
-                tripSyncRemoteDataSource.upsertEvent(tripKey = tripKey, event = updatedEvent)
+                tripPlanActionService.updateEvent(tripKey = tripKey, event = updatedEvent)
                 refreshCurrentTripInBackground(tripKey)
             } catch (e: Exception) {
                 Log.e("CurrentTripViewModel", "Failed to patch event", e)
