@@ -1,7 +1,5 @@
 package com.example.travelcents.ui.main.current.overlays.cards
 
-import android.graphics.Color as AndroidColor
-import android.webkit.WebView
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -16,13 +14,18 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.Image
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.LocationOn
 import androidx.compose.material.icons.filled.Map
+import androidx.compose.material.icons.filled.Remove
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -31,18 +34,26 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.compose.ui.viewinterop.AndroidView
-import coil.compose.AsyncImagePainter
-import coil.compose.rememberAsyncImagePainter
+import coil.compose.SubcomposeAsyncImage
+import coil.compose.SubcomposeAsyncImageContent
+import com.example.travelcents.data.trip.model.TravelEvent
+import com.example.travelcents.ui.modules.DEFAULT_STATIC_MAP_ZOOM
+import com.example.travelcents.ui.modules.MAX_STATIC_MAP_ZOOM
+import com.example.travelcents.ui.modules.MIN_STATIC_MAP_ZOOM
+import com.example.travelcents.ui.modules.canAdjustStaticMapZoom
+import com.example.travelcents.ui.modules.rememberStaticMapModel
 
 @Composable
 fun StaticMapCard(
     title: String,
+    event: TravelEvent,
     locationLabel: String,
-    staticMapModel: String?,
-    embeddedMapUrl: String?,
     onOpenMaps: () -> Unit
 ) {
+    val canAdjustZoom = remember(event.eventId) { event.canAdjustStaticMapZoom() }
+    var zoomLevel by remember(event.eventId) { mutableStateOf(DEFAULT_STATIC_MAP_ZOOM) }
+    val staticMapModel = rememberStaticMapModel(event, zoomLevel)
+
     DetailCardFrame(
         modifier = Modifier.clickable(onClick = onOpenMaps),
         accent = CardSky
@@ -59,50 +70,57 @@ fun StaticMapCard(
                 .clip(RoundedCornerShape(20.dp))
                 .background(CardSurfaceHigh)
         ) {
-            when {
-                !embeddedMapUrl.isNullOrBlank() -> EmbeddedMapPreview(embeddedMapUrl)
-                !staticMapModel.isNullOrBlank() -> {
-                    val painter = rememberAsyncImagePainter(model = staticMapModel)
-                    val state = painter.state
-                    when (state) {
-                        is AsyncImagePainter.State.Loading -> {
-                            MapPreviewState("Loading map preview...")
-                        }
-                        is AsyncImagePainter.State.Error -> {
-                            if (!embeddedMapUrl.isNullOrBlank()) {
-                                EmbeddedMapPreview(embeddedMapUrl)
-                            } else {
-                                MapPreviewState("Map preview unavailable")
+            if (!staticMapModel.isNullOrBlank()) {
+                SubcomposeAsyncImage(
+                    model = staticMapModel,
+                    contentDescription = locationLabel,
+                    modifier = Modifier.fillMaxSize(),
+                    contentScale = ContentScale.Crop,
+                    loading = {
+                        MapPreviewState("Loading map preview...")
+                    },
+                    error = {
+                        MapPreviewState("Map preview unavailable")
+                    },
+                    success = success@{
+                        Box(modifier = Modifier.fillMaxSize()) {
+                            with(this@success) {
+                                SubcomposeAsyncImageContent()
                             }
-                        }
-                        else -> {
-                            Box(modifier = Modifier.fillMaxSize()) {
-                                Image(
-                                    painter = painter,
-                                    contentDescription = locationLabel,
-                                    modifier = Modifier.fillMaxSize(),
-                                    contentScale = ContentScale.Crop
-                                )
-                                Box(
-                                    modifier = Modifier
-                                        .fillMaxSize()
-                                        .background(
-                                            Brush.verticalGradient(
-                                                colors = listOf(
-                                                    androidx.compose.ui.graphics.Color.Transparent,
-                                                    CardBackground.copy(alpha = 0.18f),
-                                                    CardBackground.copy(alpha = 0.55f)
-                                                )
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxSize()
+                                    .background(
+                                        Brush.verticalGradient(
+                                            colors = listOf(
+                                                androidx.compose.ui.graphics.Color.Transparent,
+                                                CardBackground.copy(alpha = 0.18f),
+                                                CardBackground.copy(alpha = 0.55f)
                                             )
                                         )
-                                )
-                            }
+                                    )
+                            )
                         }
                     }
-                }
-                else -> {
-                    MapPreviewState("Map preview unavailable")
-                }
+                )
+            } else {
+                MapPreviewState("Map preview unavailable")
+            }
+
+            if (canAdjustZoom) {
+                ZoomControlStack(
+                    canZoomIn = zoomLevel < MAX_STATIC_MAP_ZOOM,
+                    canZoomOut = zoomLevel > MIN_STATIC_MAP_ZOOM,
+                    onZoomIn = {
+                        zoomLevel = (zoomLevel + 1).coerceAtMost(MAX_STATIC_MAP_ZOOM)
+                    },
+                    onZoomOut = {
+                        zoomLevel = (zoomLevel - 1).coerceAtLeast(MIN_STATIC_MAP_ZOOM)
+                    },
+                    modifier = Modifier
+                        .align(Alignment.TopEnd)
+                        .padding(12.dp)
+                )
             }
         }
         Spacer(modifier = Modifier.height(12.dp))
@@ -124,6 +142,58 @@ fun StaticMapCard(
                 modifier = Modifier.weight(1f)
             )
         }
+    }
+}
+
+@Composable
+private fun ZoomControlStack(
+    canZoomIn: Boolean,
+    canZoomOut: Boolean,
+    onZoomIn: () -> Unit,
+    onZoomOut: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    Column(
+        modifier = modifier,
+        verticalArrangement = Arrangement.spacedBy(6.dp),
+        horizontalAlignment = Alignment.CenterHorizontally
+    ) {
+        ZoomControlButton(
+            icon = Icons.Default.Add,
+            contentDescription = "Zoom in",
+            enabled = canZoomIn,
+            onClick = onZoomIn
+        )
+        ZoomControlButton(
+            icon = Icons.Default.Remove,
+            contentDescription = "Zoom out",
+            enabled = canZoomOut,
+            onClick = onZoomOut
+        )
+    }
+}
+
+@Composable
+private fun ZoomControlButton(
+    icon: androidx.compose.ui.graphics.vector.ImageVector,
+    contentDescription: String,
+    enabled: Boolean,
+    onClick: () -> Unit
+) {
+    Box(
+        modifier = Modifier
+            .size(34.dp)
+            .clip(RoundedCornerShape(12.dp))
+            .background(CardBackground.copy(alpha = 0.58f))
+            .clickable(enabled = enabled, onClick = onClick),
+        contentAlignment = Alignment.Center
+    ) {
+        Icon(
+            imageVector = icon,
+            contentDescription = contentDescription,
+            tint = if (enabled) CardText else CardTextMuted.copy(alpha = 0.45f),
+            modifier = Modifier.size(18.dp)
+        )
     }
 }
 
@@ -154,47 +224,6 @@ private fun MapPreviewState(message: String) {
             color = CardText,
             fontSize = 14.sp,
             fontWeight = FontWeight.SemiBold
-        )
-    }
-}
-
-@Composable
-private fun EmbeddedMapPreview(url: String) {
-    Box(modifier = Modifier.fillMaxSize()) {
-        AndroidView(
-            modifier = Modifier.fillMaxSize(),
-            factory = { context ->
-                WebView(context).apply {
-                    setBackgroundColor(AndroidColor.TRANSPARENT)
-                    isVerticalScrollBarEnabled = false
-                    isHorizontalScrollBarEnabled = false
-                    settings.javaScriptEnabled = false
-                    settings.domStorageEnabled = false
-                    settings.builtInZoomControls = false
-                    settings.displayZoomControls = false
-                    settings.loadWithOverviewMode = true
-                    settings.useWideViewPort = true
-                    loadUrl(url)
-                }
-            },
-            update = { webView ->
-                if (webView.url != url) {
-                    webView.loadUrl(url)
-                }
-            }
-        )
-        Box(
-            modifier = Modifier
-                .fillMaxSize()
-                .background(
-                    Brush.verticalGradient(
-                        colors = listOf(
-                            androidx.compose.ui.graphics.Color.Transparent,
-                            CardBackground.copy(alpha = 0.08f),
-                            CardBackground.copy(alpha = 0.28f)
-                        )
-                    )
-                )
         )
     }
 }

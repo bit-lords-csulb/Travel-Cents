@@ -32,6 +32,7 @@ LLM_BASE_URL=https://api.groq.com/openai/v1/
 LLM_MODEL=llama-3.3-70b-versatile
 SERP_API_KEY=your-key-here
 YELP_API_KEY=your-key-here
+MAPBOX_TOKEN=pk.your-mapbox-public-token
 ```
 
 All values are injected as `BuildConfig` fields at build time via `app/build.gradle.kts`.
@@ -79,7 +80,7 @@ All values are injected as `BuildConfig` fields at build time via `app/build.gra
 - `data/trip/remote/CurrencyApiService.kt` — exchange rate API
 - `data/trip/local/CurrencyRateCache.kt` — persisted currency rate cache
 - `data/media/ImageCacheManager.kt` — downloads and caches trip images (hero photos + static maps) locally
-- `data/media/StaticMapUrlFactory.kt` — builds OpenStreetMap static map tile URLs (no API key required); provider constant: `PROVIDER = "osm_staticmap"`
+- `data/media/StaticMapUrlFactory.kt` — builds static map image URLs. Prefers Mapbox Static Images API when `BuildConfig.MAPBOX_TOKEN` is set (provider `"mapbox_staticmap"`); falls back to OpenStreetMap (`"osm_staticmap"`) when no token is configured.
 - `data/trip/model/EventDetailContract.kt` — canonical `ATTR_*` string constants for all `details` map keys; extension functions `detailValue()`, `firstNonBlank()`, `displayName()` for `TravelEvent` and `EventOption`
 
 ### Current Trip / Itinerary
@@ -253,7 +254,7 @@ All typed `ATTR_*` constants live in `data/trip/model/EventDetailContract.kt`. U
 
 Title resolution: use `TravelEvent.displayName()` / `EventOption.displayName(eventType)` from `EventDetailContract.kt` rather than manual key lookups.
 
-Static map fields: `ATTR_STATIC_MAP_URL`, `ATTR_STATIC_MAP_PROVIDER` (value: `"osm_staticmap"`), `ATTR_LATITUDE`, `ATTR_LONGITUDE`. Use `rememberStaticMapModel(event)` from `TripStaticMap.kt` in Composables.
+Static map fields: `ATTR_STATIC_MAP_URL`, `ATTR_STATIC_MAP_PROVIDER` (`"mapbox_staticmap"` or `"osm_staticmap"`), `ATTR_LATITUDE`, `ATTR_LONGITUDE`. Use `rememberStaticMapModel(event)` from `TripStaticMap.kt` in Composables — the URL is (re)generated at read time from stored lat/lng so provider swaps apply to existing trips without a re-save.
 
 `TravelEvent.details` is a flat `Map<String, String>` — all type-specific fields live here. `TravelEvent.options` is a `List<EventOption>` stored in a Firestore subcollection (not in the main document).
 

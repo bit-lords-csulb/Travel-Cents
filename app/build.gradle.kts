@@ -49,6 +49,10 @@ android {
             "String", "YELP_API_KEY",
             "\"${localProperties.getProperty("YELP_API_KEY") ?: ""}\""
         )
+        buildConfigField(
+            "String", "MAPBOX_TOKEN",
+            "\"${localProperties.getProperty("MAPBOX_TOKEN") ?: ""}\""
+        )
     }
 
     buildTypes {

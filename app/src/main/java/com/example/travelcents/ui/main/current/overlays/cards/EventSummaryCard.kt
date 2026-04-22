@@ -221,15 +221,22 @@ private fun HotelSummaryCard(
                     )
                 }
 
-                if (photoCount > 1 && onOpenGallery != null) {
-                    PhotoGalleryButton(
-                        photoCount = photoCount,
-                        onClick = onOpenGallery,
-                        containerAlpha = 0.28f,
+                if (photoCount > 0) {
+                    Surface(
+                        color = CardBackground.copy(alpha = 0.62f),
+                        shape = RoundedCornerShape(999.dp),
                         modifier = Modifier
-                            .align(Alignment.TopEnd)
+                            .align(Alignment.BottomStart)
                             .padding(10.dp)
-                    )
+                    ) {
+                        Text(
+                            text = "1/$photoCount",
+                            color = CardText,
+                            fontSize = 11.sp,
+                            fontWeight = FontWeight.Bold,
+                            modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp)
+                        )
+                    }
                 }
             }
 

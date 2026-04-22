@@ -53,6 +53,7 @@ import com.example.travelcents.ui.main.current.overlays.cards.FlightPricingCard
 import com.example.travelcents.ui.main.current.overlays.cards.FlightRouteCard
 import com.example.travelcents.ui.main.current.overlays.cards.FlightTimingCard
 import com.example.travelcents.ui.main.current.overlays.cards.HotelAmenitiesCard
+import com.example.travelcents.ui.main.current.overlays.cards.HotelBookingCard
 import com.example.travelcents.ui.main.current.overlays.cards.HotelOverviewCard
 import com.example.travelcents.ui.main.current.overlays.cards.HotelPricingCard
 import com.example.travelcents.ui.main.current.overlays.cards.HotelStayCard
@@ -71,11 +72,10 @@ import com.example.travelcents.ui.main.current.overlays.cards.eventReviewCountLa
 import com.example.travelcents.ui.main.current.overlays.cards.eventTimeSummary
 import com.example.travelcents.ui.main.current.overlays.cards.googleMapsDirectionsUrl
 import com.example.travelcents.ui.main.current.overlays.cards.googleMapsSearchUrl
-import com.example.travelcents.ui.modules.embeddedMapUrl
 import com.example.travelcents.ui.modules.TripPhotoGalleryDialog
 import com.example.travelcents.ui.modules.galleryPhotoModels
+import com.example.travelcents.ui.modules.hasStaticMapSource
 import com.example.travelcents.ui.modules.heroImageModel
-import com.example.travelcents.ui.modules.rememberStaticMapModel
 
 @Composable
 fun CurrentTripEventDetailsDialog(
@@ -102,8 +102,6 @@ fun CurrentTripEventDetailsDialog(
     }
     val directionsUrl = remember(mapsQuery) { googleMapsDirectionsUrl(mapsQuery) }
     val locationLabel = remember(event) { eventLocationLabel(event) }
-    val staticMapModel = rememberStaticMapModel(event)
-    val embeddedMapUrl = remember(event) { event.embeddedMapUrl() }
     val timeSummary = remember(event) { eventTimeSummary(event) }
     val durationSummary = remember(event) { eventDurationSummary(event) }
     val ratingLabel = remember(event, yelpReviews) { eventRatingLabel(event, yelpReviews) }
@@ -216,8 +214,6 @@ fun CurrentTripEventDetailsDialog(
 
                     EventDetailCardStack(
                         event = event,
-                        staticMapModel = staticMapModel,
-                        embeddedMapUrl = embeddedMapUrl,
                         locationLabel = locationLabel,
                         mapsUrl = mapsUrl,
                         hotelReviewsUrl = hotelReviewsUrl,
@@ -247,8 +243,6 @@ fun CurrentTripEventDetailsDialog(
 @Composable
 private fun EventDetailCardStack(
     event: TravelEvent,
-    staticMapModel: String?,
-    embeddedMapUrl: String?,
     locationLabel: String,
     mapsUrl: String,
     hotelReviewsUrl: String,
@@ -261,8 +255,7 @@ private fun EventDetailCardStack(
     reviewUrl: String?
 ) {
     val uriHandler = LocalUriHandler.current
-    val showLocationCard = !staticMapModel.isNullOrBlank() ||
-        !embeddedMapUrl.isNullOrBlank() ||
+    val showLocationCard = event.hasStaticMapSource() ||
         locationLabel != "Location information unavailable"
 
     when (event.type.lowercase()) {
@@ -278,13 +271,13 @@ private fun EventDetailCardStack(
                 onOpenReviews = { uriHandler.openUri(hotelReviewsUrl) }
             )
             HotelPricingCard(event)
+            HotelBookingCard(event)
             HotelAmenitiesCard(event)
             if (showLocationCard) {
                 LocationMapCard(
                     title = "Map & Coordinates",
+                    event = event,
                     locationLabel = locationLabel,
-                    staticMapModel = staticMapModel,
-                    embeddedMapUrl = embeddedMapUrl,
                     onOpenMaps = { uriHandler.openUri(mapsUrl) }
                 )
             }
@@ -294,9 +287,8 @@ private fun EventDetailCardStack(
             RestaurantServicesCard(event)
             RestaurantHoursCard(event)
             LocationMapCard(
+                event = event,
                 locationLabel = locationLabel,
-                staticMapModel = staticMapModel,
-                embeddedMapUrl = embeddedMapUrl,
                 onOpenMaps = { uriHandler.openUri(mapsUrl) }
             )
             ReviewsCard(
@@ -318,9 +310,8 @@ private fun EventDetailCardStack(
                 )
             }
             LocationMapCard(
+                event = event,
                 locationLabel = locationLabel,
-                staticMapModel = staticMapModel,
-                embeddedMapUrl = embeddedMapUrl,
                 onOpenMaps = { uriHandler.openUri(mapsUrl) }
             )
             ReviewsCard(
