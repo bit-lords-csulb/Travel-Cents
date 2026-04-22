@@ -100,7 +100,10 @@ data class PersistedAiPlaceRecommendationRow(
     val id: String,
     val title: String,
     val subtitle: String,
-    val recommendations: List<PersistedAiPlaceRecommendation>
+    val recommendations: List<PersistedAiPlaceRecommendation>,
+    val rowType: String = AiPlaceRecommendationRowType.GENERAL.name,
+    val actionLabels: List<String> = emptyList(),
+    val actionsEnabled: Boolean = false
 )
 
 data class PersistedAiChatStoreState(
@@ -430,7 +433,10 @@ fun AiPlaceRecommendationRow.toPersisted(): PersistedAiPlaceRecommendationRow {
                 summary = recommendation.summary,
                 matchReason = recommendation.matchReason
             )
-        }
+        },
+        rowType = rowType.name,
+        actionLabels = actionLabels,
+        actionsEnabled = actionsEnabled
     )
 }
 
@@ -448,6 +454,11 @@ fun PersistedAiPlaceRecommendationRow.toModel(): AiPlaceRecommendationRow {
                 summary = recommendation.summary,
                 matchReason = recommendation.matchReason
             )
-        }
+        },
+        rowType = runCatching {
+            AiPlaceRecommendationRowType.valueOf(rowType)
+        }.getOrDefault(AiPlaceRecommendationRowType.GENERAL),
+        actionLabels = actionLabels,
+        actionsEnabled = actionsEnabled
     )
 }

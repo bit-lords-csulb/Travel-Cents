@@ -30,7 +30,9 @@ data class AiRecommendationCardModel(
     val headline: String,
     val supporting: String,
     val meta: String,
-    val kind: String
+    val kind: String,
+    val actionLabels: List<String> = emptyList(),
+    val actionsEnabled: Boolean = false
 )
 
 @Composable
@@ -152,13 +154,43 @@ private fun RecommendationCard(
                 fontFamily = TravelCentsFonts.Body
             )
 
-            Text(
-                text = "Use this",
-                color = TripWizardColors.Blue,
-                fontSize = 12.sp,
-                fontWeight = FontWeight.Bold,
-                fontFamily = TravelCentsFonts.Body
-            )
+            if (recommendation.actionLabels.isNotEmpty()) {
+                Row(
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    recommendation.actionLabels.forEach { label ->
+                        Surface(
+                            shape = RoundedCornerShape(999.dp),
+                            color = TripWizardColors.ContainerHighest.copy(alpha = 0.72f),
+                            border = BorderStroke(
+                                width = 1.dp,
+                                color = Color.White.copy(alpha = 0.08f)
+                            )
+                        ) {
+                            Text(
+                                text = label,
+                                modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
+                                color = if (recommendation.actionsEnabled) {
+                                    TripWizardColors.Blue
+                                } else {
+                                    DeepSea4
+                                },
+                                fontSize = 11.sp,
+                                fontWeight = FontWeight.SemiBold,
+                                fontFamily = TravelCentsFonts.Body
+                            )
+                        }
+                    }
+                }
+            } else {
+                Text(
+                    text = "Use this",
+                    color = TripWizardColors.Blue,
+                    fontSize = 12.sp,
+                    fontWeight = FontWeight.Bold,
+                    fontFamily = TravelCentsFonts.Body
+                )
+            }
         }
     }
 }

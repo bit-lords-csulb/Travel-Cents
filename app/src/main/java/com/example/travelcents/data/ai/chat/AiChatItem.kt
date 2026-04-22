@@ -86,9 +86,21 @@ data class AiPlaceRecommendation(
     val matchReason: String
 )
 
+enum class AiPlaceRecommendationRowType {
+    GENERAL,
+    RESTAURANTS,
+    HOTELS,
+    ACTIVITIES,
+    NEIGHBORHOODS,
+    DAY_TRIPS
+}
+
 data class AiPlaceRecommendationRow(
     val id: String = UUID.randomUUID().toString(),
     val title: String,
     val subtitle: String,
-    val recommendations: List<AiPlaceRecommendation>
+    val recommendations: List<AiPlaceRecommendation>,
+    val rowType: AiPlaceRecommendationRowType = AiPlaceRecommendationRowType.GENERAL,
+    val actionLabels: List<String> = emptyList(),
+    val actionsEnabled: Boolean = false
 )

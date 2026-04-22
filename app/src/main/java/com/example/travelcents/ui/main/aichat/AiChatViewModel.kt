@@ -8,6 +8,8 @@ import com.example.travelcents.data.ai.chat.AiChatCardCatalog
 import com.example.travelcents.data.ai.chat.AiChatCardGroup
 import com.example.travelcents.data.ai.chat.AiChatCardOption
 import com.example.travelcents.data.ai.chat.AiCuratedTripCatalog
+import com.example.travelcents.data.ai.chat.AiDestinationRecommendation
+import com.example.travelcents.data.ai.chat.AiDestinationRecommendationEngine
 import com.example.travelcents.data.ai.chat.AiCuratedTripSource
 import com.example.travelcents.data.ai.chat.AiCuratedTripStarter
 import com.example.travelcents.data.ai.chat.AiChatItem
@@ -17,6 +19,8 @@ import com.example.travelcents.data.ai.chat.AiChatSessionStore
 import com.example.travelcents.data.ai.chat.AiChatUiState
 import com.example.travelcents.data.ai.chat.AiDestinationRecommendationRow
 import com.example.travelcents.data.ai.chat.AiPlaceRecommendationRow
+import com.example.travelcents.data.ai.chat.AiPlaceRecommendationCoordinator
+import com.example.travelcents.data.ai.chat.AiRecommendationMapper
 import com.example.travelcents.data.ai.chat.AiTripIntakeDecisionType
 import com.example.travelcents.data.ai.chat.AiTripIntakeProfile
 import com.example.travelcents.data.ai.chat.AiTripIntakeOrchestrator
@@ -25,7 +29,6 @@ import com.example.travelcents.data.ai.chat.mergeIntakeProfile
 import com.example.travelcents.data.ai.chat.mergePatch
 import com.example.travelcents.data.ai.chat.toCardGroup
 import com.example.travelcents.data.ai.chat.toDestinationRecommendationRow
-import com.example.travelcents.data.ai.chat.toPlaceRecommendationRow
 import com.example.travelcents.data.ai.chat.AiTravelerProfile
 import com.example.travelcents.data.ai.chat.AiTravelerProfileReducer
 import com.example.travelcents.data.ai.chat.PersistedAiChatMessage
@@ -46,6 +49,8 @@ class AiChatViewModel(application: Application) : AndroidViewModel(application) 
     private val conversationItems = mutableListOf<AiChatItem.TextMessage>()
     private val sessionStore = AiChatSessionStore(application)
     private val curatedTripCatalog = AiCuratedTripCatalog()
+    private val destinationRecommendationEngine = AiDestinationRecommendationEngine()
+    private val placeRecommendationCoordinator = AiPlaceRecommendationCoordinator(curatedTripCatalog = curatedTripCatalog)
     private val intakeOrchestrator = AiTripIntakeOrchestrator()
     private val auth = FirebaseAuth.getInstance()
 
@@ -138,13 +143,72 @@ class AiChatViewModel(application: Application) : AndroidViewModel(application) 
         generateTitleIfNeeded()
     }
 
-    fun selectDestinationRecommendation(destination: String) {
-        val visibleMessage = "Let's go with $destination"
-        val llmUserMessage = "Destination choice: $destination sounds like the best fit for this trip."
-        submitUserTurn(
-            visibleMessage = visibleMessage,
-            llmUserMessage = llmUserMessage
+    fun selectDestinationRecommendation(recommendation: AiDestinationRecommendation) {
+        val destination = recommendation.destination.trim()
+        if (destination.isBlank()) return
+
+        val userMessage = AiChatItem.TextMessage(
+            text = "Let's plan around $destination",
+            sender = AiChatSender.USER
         )
+        conversationItems += userMessage
+
+        val llmUserMessage = buildDestinationRecommendationPrompt(recommendation)
+        val updatedIntakeProfile = sessionState.intakeProfile.mergePatch(
+            AiTripIntakeProfile(
+                destination = destination,
+                confidence = mapOf("destination" to 0.95)
+            )
+        )
+        val updatedProfile = sessionState.profile.mergeIntakeProfile(updatedIntakeProfile)
+        val assistantReply = buildDestinationRecommendationReply(recommendation)
+        conversationItems += AiChatItem.TextMessage(
+            text = assistantReply,
+            sender = AiChatSender.ASSISTANT
+        )
+
+        val followUpGroup = if (recommendation.seedId == null) {
+            buildDestinationRefinementFollowUpGroup(
+                profile = updatedProfile,
+                intakeProfile = updatedIntakeProfile,
+                destination = destination,
+                askedGroupIds = sessionState.askedFollowUpGroupIds
+            )
+        } else {
+            null
+        }
+
+        sessionState = sessionState.copy(
+            profile = updatedProfile,
+            intakeProfile = updatedIntakeProfile,
+            planningObjective = if (recommendation.seedId != null) {
+                "Pick a starter"
+            } else {
+                "Refine ${shortDestinationLabel(destination)}"
+            },
+            stage = AiTravelerProfileReducer.stageFor(updatedProfile),
+            quickReplies = AiTravelerProfileReducer.quickRepliesFor(updatedProfile),
+            llmHistory = sessionState.llmHistory +
+                LlmMessage(role = "user", content = llmUserMessage) +
+                LlmMessage(role = "assistant", content = assistantReply),
+            askedFollowUpGroupIds = recordAskedFollowUpGroupId(
+                existingIds = sessionState.askedFollowUpGroupIds,
+                group = followUpGroup
+            ),
+            activeResponseCardGroup = followUpGroup,
+            activeDestinationRecommendationRow = null,
+            activeCuratedTripRow = recommendation.seedId?.let {
+                curatedTripCatalog.recommendSeededStarterRow(updatedProfile)
+            },
+            activePlaceRecommendationRow = null,
+            draftText = "",
+            selectedDraftOptions = emptyList(),
+            anchorMessageId = userMessage.id
+        )
+
+        persistLastSession()
+        publishUiState()
+        generateTitleIfNeeded()
     }
 
     fun selectPlaceRecommendation(name: String, category: String, area: String) {
@@ -535,6 +599,96 @@ class AiChatViewModel(application: Application) : AndroidViewModel(application) 
         }.joinToString(separator = "\n").trim()
     }
 
+    private fun buildDestinationRecommendationPrompt(
+        recommendation: AiDestinationRecommendation
+    ): String {
+        return buildString {
+            append("Destination choice: use ")
+            append(recommendation.destination)
+            append(" as the planning destination.")
+            if (recommendation.matchReason.isNotBlank()) {
+                append(" Match reason: ")
+                append(recommendation.matchReason)
+                append('.')
+            }
+        }
+    }
+
+    private fun buildDestinationRecommendationReply(
+        recommendation: AiDestinationRecommendation
+    ): String {
+        val destinationLabel = shortDestinationLabel(recommendation.destination)
+        return if (recommendation.seedId != null) {
+            "I can anchor the plan on $destinationLabel. Here are curated starter ideas to shape first."
+        } else {
+            "I can anchor the trip on $destinationLabel. I just need one more refinement before building recommendations around it."
+        }
+    }
+
+    private fun buildDestinationRefinementFollowUpGroup(
+        profile: AiTravelerProfile,
+        intakeProfile: AiTripIntakeProfile,
+        destination: String,
+        askedGroupIds: List<String>
+    ): AiChatCardGroup? {
+        val lastUserInput = "Destination choice: ${shortDestinationLabel(destination)}."
+        val fallbackGroup = buildLegacyFallbackFollowUpGroup(
+            profile = profile,
+            intakeProfile = intakeProfile,
+            lastUserInput = lastUserInput,
+            askedGroupIds = askedGroupIds
+        )
+        if (fallbackGroup != null) return fallbackGroup
+        if (DESTINATION_REFINEMENT_GROUP_ID in askedGroupIds) return null
+
+        val destinationLabel = shortDestinationLabel(destination)
+        return AiChatCardGroup(
+            id = DESTINATION_REFINEMENT_GROUP_ID,
+            title = "What should $destinationLabel lean into?",
+            subtitle = "Pick one or more directions for the trip.",
+            allowMultiple = true,
+            allowOther = true,
+            otherPromptHint = "Type what you want more or less of in $destinationLabel.",
+            options = listOf(
+                AiChatCardOption(
+                    id = "${DESTINATION_REFINEMENT_GROUP_ID}_food",
+                    label = "More food",
+                    message = "Lean harder into standout food around $destinationLabel.",
+                    groupId = DESTINATION_REFINEMENT_GROUP_ID
+                ),
+                AiChatCardOption(
+                    id = "${DESTINATION_REFINEMENT_GROUP_ID}_culture",
+                    label = "More culture",
+                    message = "Make the trip more culture-forward in $destinationLabel.",
+                    groupId = DESTINATION_REFINEMENT_GROUP_ID
+                ),
+                AiChatCardOption(
+                    id = "${DESTINATION_REFINEMENT_GROUP_ID}_relaxed",
+                    label = "Relaxed pace",
+                    message = "Keep the pace more relaxed in $destinationLabel.",
+                    groupId = DESTINATION_REFINEMENT_GROUP_ID
+                ),
+                AiChatCardOption(
+                    id = "${DESTINATION_REFINEMENT_GROUP_ID}_walkable",
+                    label = "Walkable stay",
+                    message = "Focus on walkable neighborhoods in $destinationLabel.",
+                    groupId = DESTINATION_REFINEMENT_GROUP_ID
+                ),
+                AiChatCardOption(
+                    id = "${DESTINATION_REFINEMENT_GROUP_ID}_other",
+                    label = "Other",
+                    message = "I want to type my own answer.",
+                    groupId = DESTINATION_REFINEMENT_GROUP_ID,
+                    requiresText = true
+                )
+            )
+        )
+    }
+
+    private fun shortDestinationLabel(destination: String): String {
+        return destination.substringBefore(",").trim().ifBlank { destination }
+    }
+
     private fun buildCuratedTripSelectionMessage(starter: AiCuratedTripStarter): String {
         return when (starter.source) {
             AiCuratedTripSource.FIRESTORE -> "Use ${starter.title} as the starter"
@@ -697,7 +851,8 @@ class AiChatViewModel(application: Application) : AndroidViewModel(application) 
             )
             val destinationRecommendationRow = resolveDestinationRecommendationRow(
                 intakeResult = intakeResult,
-                profile = mergedProfile
+                profile = mergedProfile,
+                intakeProfile = mergedIntakeProfile
             )
             val curatedTripRow = when (intakeResult?.decision?.type) {
                 AiTripIntakeDecisionType.ASK_MORE -> null
@@ -714,7 +869,8 @@ class AiChatViewModel(application: Application) : AndroidViewModel(application) 
             }
             val placeRecommendationRow = resolvePlaceRecommendationRow(
                 intakeResult = intakeResult,
-                profile = mergedProfile
+                profile = mergedProfile,
+                intakeProfile = mergedIntakeProfile
             )
 
             sessionState = sessionState.copy(
@@ -789,22 +945,27 @@ class AiChatViewModel(application: Application) : AndroidViewModel(application) 
 
     private fun resolveDestinationRecommendationRow(
         intakeResult: AiTripIntakeTurnResult?,
-        profile: AiTravelerProfile
+        profile: AiTravelerProfile,
+        intakeProfile: AiTripIntakeProfile
     ): AiDestinationRecommendationRow? {
-        if (profile.destination.isNotBlank()) return null
+        if (profile.destination.isNotBlank() || intakeProfile.destination.isNotBlank()) return null
 
         return intakeResult?.toDestinationRecommendationRow()
-            ?: curatedTripCatalog.recommendDestinationRecommendations(profile)
+            ?: AiRecommendationMapper.destinationRowFromEngine(
+                destinationRecommendationEngine.rankDestinations(intakeProfile)
+            )
     }
 
-    private fun resolvePlaceRecommendationRow(
+    private suspend fun resolvePlaceRecommendationRow(
         intakeResult: AiTripIntakeTurnResult?,
-        profile: AiTravelerProfile
+        profile: AiTravelerProfile,
+        intakeProfile: AiTripIntakeProfile
     ): AiPlaceRecommendationRow? {
-        if (profile.destination.isBlank()) return null
-
-        return intakeResult?.toPlaceRecommendationRow()
-            ?: curatedTripCatalog.recommendPlaceRecommendations(profile)
+        return placeRecommendationCoordinator.recommendRow(
+            intakeProfile = intakeProfile,
+            profile = profile,
+            llmRecommendations = intakeResult?.placeRecommendations.orEmpty()
+        )
     }
 
     private fun buildLegacyFallbackFollowUpGroup(
@@ -842,6 +1003,7 @@ class AiChatViewModel(application: Application) : AndroidViewModel(application) 
 
     private companion object {
         private const val DESTINATION_STYLE_GROUP_ID = "destination_style"
+        private const val DESTINATION_REFINEMENT_GROUP_ID = "destination_refinement"
         private const val TAG = "AiChatViewModel"
         private const val BASE_SYSTEM_PROMPT =
             "You are TravelCents AI, a trip-planning copilot inside the TravelCents app. " +

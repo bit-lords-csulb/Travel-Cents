@@ -102,6 +102,7 @@ class AiTripIntakeSchemaTest {
         assertNotNull(row)
         assertEquals(3, row?.recommendations?.size)
         assertEquals(listOf("Tokyo", "Rome", "Bali"), row?.recommendations?.map { recommendation -> recommendation.destination })
+        assertEquals("tokyo_food_neighborhoods", row?.recommendations?.firstOrNull()?.seedId)
     }
 
     @Test

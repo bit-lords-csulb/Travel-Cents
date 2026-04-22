@@ -192,4 +192,15 @@ object AiCuratedTripSeedCatalog {
     fun findSeed(seedId: String?): AiCuratedTripSeed? {
         return seeds.firstOrNull { seed -> seed.id == seedId }
     }
+
+    fun findSeedByDestination(destination: String?): AiCuratedTripSeed? {
+        val destinationKey = destination
+            ?.substringBefore(",")
+            ?.trim()
+            ?.lowercase(Locale.US)
+            .orEmpty()
+        if (destinationKey.isBlank()) return null
+
+        return seeds.firstOrNull { seed -> seed.destinationKey == destinationKey }
+    }
 }

@@ -283,58 +283,11 @@ fun AiTripIntakeFollowUpQuestion.toCardGroup(): AiChatCardGroup? {
 }
 
 fun AiTripIntakeTurnResult.toDestinationRecommendationRow(): AiDestinationRecommendationRow? {
-    val recommendations = destinationRecommendations
-        .filter { recommendation ->
-            recommendation.destination.isNotBlank() &&
-                (recommendation.summary.isNotBlank() || recommendation.reason.isNotBlank())
-        }
-        .map { recommendation ->
-            AiDestinationRecommendation(
-                id = sanitizeFollowUpOptionId(recommendation.id, "destination"),
-                destination = recommendation.destination.trim(),
-                summary = recommendation.summary.trim(),
-                matchReason = recommendation.reason.trim()
-            )
-        }
-        .distinctBy { recommendation -> recommendation.destination.lowercase(Locale.US) }
-        .take(3)
-
-    if (recommendations.size < 2) return null
-
-    return AiDestinationRecommendationRow(
-        title = "Places worth considering",
-        subtitle = "These destinations fit what the chat knows so far.",
-        recommendations = recommendations
-    )
+    return AiRecommendationMapper.destinationRowFromIntake(destinationRecommendations)
 }
 
 fun AiTripIntakeTurnResult.toPlaceRecommendationRow(): AiPlaceRecommendationRow? {
-    val recommendations = placeRecommendations
-        .filter { recommendation ->
-            recommendation.name.isNotBlank() &&
-                recommendation.category.isNotBlank() &&
-                (recommendation.summary.isNotBlank() || recommendation.reason.isNotBlank())
-        }
-        .map { recommendation ->
-            AiPlaceRecommendation(
-                id = sanitizeFollowUpOptionId(recommendation.id, "place"),
-                name = recommendation.name.trim(),
-                category = recommendation.category.trim(),
-                area = recommendation.area.trim(),
-                summary = recommendation.summary.trim(),
-                matchReason = recommendation.reason.trim()
-            )
-        }
-        .distinctBy { recommendation -> recommendation.name.lowercase(Locale.US) }
-        .take(3)
-
-    if (recommendations.size < 2) return null
-
-    return AiPlaceRecommendationRow(
-        title = "Places to consider",
-        subtitle = "These spots match the destination and the vibe you have set.",
-        recommendations = recommendations
-    )
+    return AiRecommendationMapper.placeRowFromIntake(placeRecommendations)
 }
 
 private fun sanitizeFollowUpId(rawId: String): String {

@@ -10,27 +10,32 @@ import kotlin.math.abs
 class AiCuratedTripCatalog(
     private val tripRepository: TripRepository = FirestoreTripRepository()
 ) {
+    private val destinationRecommendationEngine = AiDestinationRecommendationEngine()
+
     fun recommendDestinationRecommendations(profile: AiTravelerProfile): AiDestinationRecommendationRow? {
         if (profile.destination.isNotBlank()) return null
 
-        val recommendations = recommendSeededTrips(profile)
-            .map { starter ->
-                AiDestinationRecommendation(
-                    destination = starter.destination,
-                    summary = starter.summary,
-                    matchReason = starter.matchReason,
-                    seedId = starter.seedId
-                )
-            }
-            .distinctBy { recommendation -> normalizeDestinationKey(recommendation.destination) }
-            .take(3)
+        return AiRecommendationMapper.destinationRowFromEngine(
+            destinationRecommendationEngine.rankDestinations(profile.intakeProfile())
+        )
+    }
 
-        if (recommendations.size < 2) return null
+    fun recommendSeededStarterRow(profile: AiTravelerProfile): AiCuratedTripRow? {
+        val seededTrips = recommendSeededTrips(profile)
+        if (seededTrips.isEmpty()) return null
 
-        return AiDestinationRecommendationRow(
-            title = "Good destination fits",
-            subtitle = "These locations match the direction you have set so far.",
-            recommendations = recommendations
+        return AiCuratedTripRow(
+            title = if (profile.destination.isNotBlank()) {
+                "Curated ${displayDestination(profile.destination)} starters"
+            } else {
+                "Curated hotspot starters"
+            },
+            subtitle = if (profile.destination.isNotBlank()) {
+                "Editable destination templates you can tune before building the trip."
+            } else {
+                "These destinations fit the vibe, pace, and budget you've described."
+            },
+            trips = seededTrips.take(3)
         )
     }
 
@@ -67,21 +72,7 @@ class AiCuratedTripCatalog(
                 )
             }
 
-            seededTrips.isNotEmpty() -> {
-                AiCuratedTripRow(
-                    title = if (profile.destination.isNotBlank()) {
-                        "Curated ${displayDestination(profile.destination)} starters"
-                    } else {
-                        "Curated hotspot starters"
-                    },
-                    subtitle = if (profile.destination.isNotBlank()) {
-                        "Editable destination templates you can tune before building the trip."
-                    } else {
-                        "These destinations fit the vibe, pace, and budget you've described."
-                    },
-                    trips = seededTrips.take(3)
-                )
-            }
+            seededTrips.isNotEmpty() -> recommendSeededStarterRow(profile)
 
             else -> {
                 buildGeneratedStarter(profile)?.let { starter ->
@@ -126,7 +117,10 @@ class AiCuratedTripCatalog(
         return AiPlaceRecommendationRow(
             title = "Places to start in ${displayDestination(seed.destination)}",
             subtitle = "Areas and spots that fit the trip direction you have described.",
-            recommendations = recommendations
+            recommendations = recommendations,
+            rowType = inferPlaceRowType(recommendations),
+            actionLabels = listOf("Add", "Save", "Swap"),
+            actionsEnabled = false
         )
     }
 
@@ -455,6 +449,18 @@ class AiCuratedTripCatalog(
         }
 
         return reasons.take(2).joinToString(" • ").ifBlank { "Fits your current trip direction." }
+    }
+
+    private fun inferPlaceRowType(
+        recommendations: List<AiPlaceRecommendation>
+    ): AiPlaceRecommendationRowType {
+        val categories = recommendations.map { recommendation -> recommendation.category.lowercase(Locale.US) }
+        return when {
+            categories.any { category -> "day trip" in category } -> AiPlaceRecommendationRowType.DAY_TRIPS
+            categories.any { category -> "neighborhood" in category || "area" in category || "historic" in category } ->
+                AiPlaceRecommendationRowType.NEIGHBORHOODS
+            else -> AiPlaceRecommendationRowType.GENERAL
+        }
     }
 
     private fun Itinerary.toStarter(matchReason: String): AiCuratedTripStarter {

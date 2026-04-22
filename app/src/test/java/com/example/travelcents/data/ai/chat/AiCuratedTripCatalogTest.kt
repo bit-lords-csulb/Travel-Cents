@@ -62,6 +62,21 @@ class AiCuratedTripCatalogTest {
     }
 
     @Test
+    fun recommendSeededStarterRow_returnsDestinationSpecificSeededStarter() {
+        val row = catalog.recommendSeededStarterRow(
+            profile = AiTravelerProfile(
+                destination = "Paris, France",
+                interests = listOf("Culture", "Food")
+            )
+        )
+
+        assertNotNull(row)
+        assertEquals("Curated Paris starters", row?.title)
+        assertEquals(1, row?.trips?.size)
+        assertEquals("paris_romance_cafes", row?.trips?.firstOrNull()?.seedId)
+    }
+
+    @Test
     fun adjustStarterDuration_updatesSeededStarterToSelectedDuration() {
         val seed = AiCuratedTripSeedCatalog.findSeed("bali_temple_beach")
         val starter = seed!!.toStarter(matchReason = "Fits your vibe", durationDays = 4)

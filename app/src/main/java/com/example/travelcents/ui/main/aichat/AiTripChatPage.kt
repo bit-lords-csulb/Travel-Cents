@@ -260,7 +260,7 @@ fun AiTripChatPage(
                                             item.row.recommendations
                                                 .firstOrNull { recommendation -> recommendation.id == recommendationId }
                                                 ?.let { recommendation ->
-                                                    viewModel.selectDestinationRecommendation(recommendation.destination)
+                                                    viewModel.selectDestinationRecommendation(recommendation)
                                                 }
                                         }
                                     )
@@ -295,7 +295,9 @@ fun AiTripChatPage(
                                                 headline = recommendation.name,
                                                 supporting = recommendation.summary.ifBlank { recommendation.area },
                                                 meta = recommendation.matchReason,
-                                                kind = recommendation.category
+                                                kind = recommendation.category,
+                                                actionLabels = item.row.actionLabels,
+                                                actionsEnabled = item.row.actionsEnabled
                                             )
                                         },
                                         onRecommendationSelected = { recommendationId ->
