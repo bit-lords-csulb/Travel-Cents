@@ -516,7 +516,9 @@ object SerpRepository {
             eventId = eventId,
             type = "hotel",
             itineraryId = itinerary.itineraryId,
-            tz = AirportTimeZones.zoneIdForIata(itinerary.destinationIata).id,
+            tz = itinerary.timeZoneId.ifBlank {
+                AirportTimeZones.zoneIdForIata(itinerary.destinationIata).id
+            },
             date = request.dateFrom,
             startTime = selectedHotel?.checkInTime ?: "15:00",
             endTime = selectedHotel?.checkOutTime ?: "11:00",
@@ -585,6 +587,7 @@ object SerpRepository {
                 eventId = UUID.randomUUID().toString(),
                 type = "hotel",
                 itineraryId = itinerary.itineraryId,
+                tz = itinerary.timeZoneId,
                 date = request.dateFrom,
                 details = mapOf(ATTR_HOTEL_NAME to "No hotels found")
             )

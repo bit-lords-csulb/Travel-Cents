@@ -36,11 +36,23 @@ fun RestaurantHoursCard(event: TravelEvent) {
     val todayIndex = now.dayOfWeek.toYelpDayIndex()
     val rows = restaurantScheduleRows(schedule, todayIndex)
     val todayHours = rows.firstOrNull { it.isToday }?.hoursLabel ?: HOURS_CLOSED_LABEL
+    val timeZoneLabel = restaurantHoursTimeZoneLabel(
+        event = event,
+        referenceDate = now.toLocalDate().toString(),
+        referenceTime = now.toLocalTime().format(hoursFormatter)
+    )
 
     DetailCardFrame(accent = CardCoral) {
         DetailCardHeader(
             eyebrow = "Hours",
             title = if (todayHours == HOURS_CLOSED_LABEL) "Closed today" else "Today · $todayHours"
+        )
+        Spacer(modifier = Modifier.height(8.dp))
+        Text(
+            text = timeZoneLabel,
+            color = CardTextMuted,
+            fontSize = 12.sp,
+            lineHeight = 16.sp
         )
         Spacer(modifier = Modifier.height(12.dp))
         DetailBadgeRow(

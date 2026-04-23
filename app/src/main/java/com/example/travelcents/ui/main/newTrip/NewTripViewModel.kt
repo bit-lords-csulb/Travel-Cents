@@ -17,6 +17,7 @@ import com.example.travelcents.data.trip.TripAccessRole
 import com.example.travelcents.data.trip.model.Itinerary
 import com.example.travelcents.data.trip.model.TravelEvent
 import com.example.travelcents.data.trip.model.TravelRequest
+import com.example.travelcents.data.trip.local.DestinationTimeZones
 import com.example.travelcents.data.trip.remote.SerpRepository
 import com.example.travelcents.data.ai.repository.TripPlannerRepository
 import com.example.travelcents.data.trip.remote.YelpRepository
@@ -543,6 +544,7 @@ class NewTripViewModel(application: Application) : AndroidViewModel(application)
             tripName = starter.title.ifBlank { starter.destination.ifBlank { "AI Trip Starter" } },
             destination = starter.destination,
             origin = intakeProfile.origin,
+            timeZoneId = DestinationTimeZones.resolveTimeZoneId(starter.destination).orEmpty(),
             dateFrom = "",
             dateTo = "",
             durationDays = starter.durationDays.coerceAtLeast(1),

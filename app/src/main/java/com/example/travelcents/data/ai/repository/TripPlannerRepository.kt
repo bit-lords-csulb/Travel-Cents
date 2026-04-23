@@ -5,6 +5,7 @@ import com.example.travelcents.data.ai.model.LlmMessage
 import com.example.travelcents.data.ai.remote.LlmClient
 import com.example.travelcents.data.trip.model.TravelRequest
 import com.example.travelcents.data.trip.model.defaultTripNameForDestination
+import com.example.travelcents.data.trip.local.DestinationTimeZones
 import com.google.gson.Gson
 import com.google.gson.JsonObject
 import java.util.UUID
@@ -63,6 +64,7 @@ Return a single JSON object with these fields only:
             ?.takeIf { !it.contains("uuid", ignoreCase = true) }
             ?: UUID.randomUUID().toString()
         val destination = json.get("destination")?.asString ?: ""
+        val destinationIata = json.get("destination_iata")?.asString?.uppercase() ?: ""
 
         return Itinerary(
             itineraryId = itineraryId,
@@ -71,7 +73,11 @@ Return a single JSON object with these fields only:
             destination = destination,
             origin = json.get("origin")?.asString ?: "",
             originIata = json.get("origin_iata")?.asString?.uppercase() ?: "",
-            destinationIata = json.get("destination_iata")?.asString?.uppercase() ?: "",
+            destinationIata = destinationIata,
+            timeZoneId = DestinationTimeZones.resolveTimeZoneId(
+                destination = destination,
+                destinationIata = destinationIata
+            ).orEmpty(),
             dateFrom = json.get("date_from")?.asString ?: "",
             dateTo = json.get("date_to")?.asString ?: "",
             durationDays = json.get("duration_days")?.asInt ?: 0,

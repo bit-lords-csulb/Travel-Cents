@@ -30,7 +30,9 @@ import com.example.travelcents.ui.modules.formatDisplayTimeRange
 import com.example.travelcents.ui.modules.formatTimeZoneLabel
 import com.example.travelcents.ui.modules.formatTripDate
 import com.example.travelcents.ui.modules.parseFlexibleTime
+import com.example.travelcents.ui.modules.todayIsoDate
 import java.time.Duration
+import java.time.ZoneId
 import java.util.Locale
 
 internal fun eventOfficialUrl(event: TravelEvent): String? {
@@ -180,17 +182,7 @@ internal data class HotelStayMoment(
 )
 
 internal fun hotelStayMoments(event: TravelEvent): List<HotelStayMoment> {
-    val zoneLabel = event.tz
-        .takeIf { it.isNotBlank() }
-        ?.let { tz ->
-            val date = event.details["check_in_date"]
-                ?: event.details["check_out_date"]
-                ?: event.date
-            val time = event.detailValue(ATTR_CHECK_IN_TIME, "check_in_time", "check_in")
-                ?: event.detailValue(ATTR_CHECK_OUT_TIME, "check_out_time", "check_out")
-                ?: event.startTime
-            if (date.isBlank() || time.isBlank()) null else formatTimeZoneLabel(tz, date, time)
-        }
+    val zoneLabel = hotelStayTimeZoneLabel(event)
 
     return listOf(
         HotelStayMoment(
@@ -212,6 +204,55 @@ internal fun hotelStayMoments(event: TravelEvent): List<HotelStayMoment> {
     ).filter { moment ->
         !moment.date.isNullOrBlank() || !moment.time.isNullOrBlank()
     }
+}
+
+private fun hotelStayTimeZoneLabel(event: TravelEvent): String? {
+    return localTimeZoneLabel(
+        context = "Hotel",
+        event = event,
+        referenceDates = listOf(
+            event.details["check_in_date"],
+            event.details["check_out_date"],
+            event.date
+        ),
+        referenceTimes = listOf(
+            event.detailValue(ATTR_CHECK_IN_TIME, "check_in_time", "check_in"),
+            event.detailValue(ATTR_CHECK_OUT_TIME, "check_out_time", "check_out"),
+            event.startTime
+        )
+    )
+}
+
+internal fun restaurantHoursTimeZoneLabel(
+    event: TravelEvent,
+    referenceDate: String? = null,
+    referenceTime: String? = null
+): String {
+    return localTimeZoneLabel(
+        context = "Restaurant",
+        event = event,
+        referenceDates = listOf(referenceDate, event.date),
+        referenceTimes = listOf(referenceTime, event.startTime)
+    )
+}
+
+private fun localTimeZoneLabel(
+    context: String,
+    event: TravelEvent,
+    referenceDates: List<String?>,
+    referenceTimes: List<String?>
+): String {
+    val unavailableLabel = "$context local time zone unavailable"
+    val timeZoneId = event.tz.takeIf { it.isNotBlank() } ?: return unavailableLabel
+    val zoneId = runCatching { ZoneId.of(timeZoneId) }.getOrNull() ?: return unavailableLabel
+    val referenceDate = referenceDates.firstNotNullOfOrNull { value ->
+        value?.takeIf { it.isNotBlank() }
+    } ?: todayIsoDate(zoneId)
+    val referenceTime = referenceTimes.firstNotNullOfOrNull { value ->
+        value?.takeIf { it.isNotBlank() }
+    } ?: "12:00 PM"
+
+    return "$context local time: ${formatTimeZoneLabel(timeZoneId, referenceDate, referenceTime)}"
 }
 
 internal fun eventExperienceText(event: TravelEvent): String {

@@ -629,6 +629,7 @@ class FirestoreTripRepository(
                 origin = document.getString("origin") ?: "",
                 originIata = document.getString("originIata") ?: "",
                 destinationIata = document.getString("destinationIata") ?: "",
+                timeZoneId = document.getString("timeZoneId") ?: "",
                 dateFrom = document.getString("dateFrom") ?: "",
                 dateTo = document.getString("dateTo") ?: "",
                 durationDays = (document.getLong("durationDays") ?: 0L).toInt(),

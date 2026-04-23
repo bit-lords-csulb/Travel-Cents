@@ -7,6 +7,7 @@ import androidx.lifecycle.viewModelScope
 import com.example.travelcents.data.media.TripMediaCacheStore
 import com.example.travelcents.data.local.trip.TravelCentsDatabase
 import com.example.travelcents.data.local.trip.TripLocalDataSource
+import com.example.travelcents.data.trip.local.DestinationTimeZones
 import com.example.travelcents.data.trip.FirestoreTripRepository
 import com.example.travelcents.data.trip.TripKey
 import com.example.travelcents.data.trip.TripAccessRole
@@ -202,6 +203,7 @@ class CurrentTripViewModel(application: Application) : AndroidViewModel(applicat
     private var currentTripKey: TripKey? = null
     private var currentTripSummary: Itinerary? = null
     private var currentTripDestination: String = ""
+    private var currentTripTimeZoneId: String = ""
     private var localEventsSnapshot: List<TravelEvent> = emptyList()
     private val sharedYelpPools = mutableMapOf<String, List<YelpOptionPoolItem>>()
     private val sharedYelpWindowBoost = mutableMapOf<String, Int>()
@@ -226,6 +228,7 @@ class CurrentTripViewModel(application: Application) : AndroidViewModel(applicat
         currentTripKey = null
         currentTripSummary = null
         currentTripDestination = ""
+        currentTripTimeZoneId = ""
         localEventsSnapshot = emptyList()
         sharedYelpPools.clear()
         sharedYelpWindowBoost.clear()
@@ -305,17 +308,27 @@ class CurrentTripViewModel(application: Application) : AndroidViewModel(applicat
         tripKey: TripKey,
         itinerary: Itinerary
     ) {
-        currentTripSummary = itinerary
-        currentTripDestination = itinerary.destination
+        val resolvedTripTimeZoneId = resolveTripTimeZoneId(itinerary)
+        val effectiveItinerary = if (
+            resolvedTripTimeZoneId.isNotBlank() &&
+            resolvedTripTimeZoneId != itinerary.timeZoneId
+        ) {
+            itinerary.copy(timeZoneId = resolvedTripTimeZoneId)
+        } else {
+            itinerary
+        }
+        currentTripSummary = effectiveItinerary
+        currentTripDestination = effectiveItinerary.destination
+        currentTripTimeZoneId = effectiveItinerary.timeZoneId
         val viewerUid = auth.currentUser?.uid
         val accessRole = when {
             viewerUid.isNullOrBlank() -> TripAccessRole.VIEWER
             viewerUid == tripKey.ownerUid -> TripAccessRole.OWNER
-            else -> TripAccessRole.fromWireValue(itinerary.roleByUid[viewerUid])
+            else -> TripAccessRole.fromWireValue(effectiveItinerary.roleByUid[viewerUid])
         }
         val canEditTrip = accessRole.canMutateEvents()
         val canManageTrip = accessRole.canManageTrip()
-        val storedTripTitle = itinerary.tripName
+        val storedTripTitle = effectiveItinerary.tripName
         val nextTripTitle = resolveTripName(storedTripTitle, currentTripDestination)
         _tripTitle.value = nextTripTitle
         _uiState.update {
@@ -329,14 +342,22 @@ class CurrentTripViewModel(application: Application) : AndroidViewModel(applicat
                 canManageTrip = canManageTrip,
                 tripTitle = nextTripTitle,
                 destination = currentTripDestination,
-                dateFrom = itinerary.dateFrom,
-                dateTo = itinerary.dateTo,
-                adults = itinerary.adults,
-                children = itinerary.children,
+                dateFrom = effectiveItinerary.dateFrom,
+                dateTo = effectiveItinerary.dateTo,
+                adults = effectiveItinerary.adults,
+                children = effectiveItinerary.children,
                 infoMessage = if (localEventsSnapshot.isEmpty()) EMPTY_PLANS_MESSAGE else null,
                 errorMessage = null
             )
         }
+
+        backfillTripTimeZoneIfNeeded(
+            viewerUid = viewerUid,
+            tripKey = tripKey,
+            originalItinerary = itinerary,
+            resolvedItinerary = effectiveItinerary,
+            canManageTrip = canManageTrip
+        )
 
         if (canManageTrip && nextTripTitle != storedTripTitle.trim()) {
             viewModelScope.launch {
@@ -364,11 +385,12 @@ class CurrentTripViewModel(application: Application) : AndroidViewModel(applicat
             sortEvents = ::sortPlanEvents
         )
         val visibleEvents = enrichedEvents.map { event ->
+            val eventWithTripTimeZone = applyTripTimeZone(event)
             val overrides = liveEventDetailOverrides[event.eventId].orEmpty()
             if (overrides.isEmpty()) {
-                event
+                eventWithTripTimeZone
             } else {
-                event.copy(details = event.details + overrides)
+                eventWithTripTimeZone.copy(details = eventWithTripTimeZone.details + overrides)
             }
         }
         _events.value = visibleEvents
@@ -386,6 +408,50 @@ class CurrentTripViewModel(application: Application) : AndroidViewModel(applicat
             )
         }
         prefetchSharedEventMedia(visibleEvents)
+    }
+
+    private fun resolveTripTimeZoneId(itinerary: Itinerary): String {
+        return itinerary.timeZoneId.takeIf { it.isNotBlank() }
+            ?: DestinationTimeZones.resolveTimeZoneId(
+                destination = itinerary.destination,
+                destinationIata = itinerary.destinationIata
+            ).orEmpty()
+    }
+
+    private fun backfillTripTimeZoneIfNeeded(
+        viewerUid: String?,
+        tripKey: TripKey,
+        originalItinerary: Itinerary,
+        resolvedItinerary: Itinerary,
+        canManageTrip: Boolean
+    ) {
+        if (viewerUid.isNullOrBlank()) return
+        if (resolvedItinerary.timeZoneId.isBlank()) return
+        if (originalItinerary.timeZoneId == resolvedItinerary.timeZoneId) return
+
+        viewModelScope.launch {
+            runCatching {
+                tripLocalDataSource.upsertTripSummary(
+                    viewerUid = viewerUid,
+                    itinerary = resolvedItinerary,
+                    isCurrentCandidate = true
+                )
+            }
+            if (canManageTrip) {
+                runCatching {
+                    tripSyncRemoteDataSource.updateTripSummaryFields(
+                        tripKey = tripKey,
+                        fields = mapOf("timeZoneId" to resolvedItinerary.timeZoneId)
+                    )
+                }
+            }
+        }
+    }
+
+    private fun applyTripTimeZone(event: TravelEvent): TravelEvent {
+        val tripTimeZoneId = currentTripTimeZoneId.takeIf { it.isNotBlank() } ?: return event
+        if (event.tz.isNotBlank()) return event
+        return event.copy(tz = tripTimeZoneId)
     }
 
     private fun replaceLiveDetailOverrides(

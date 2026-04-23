@@ -75,6 +75,7 @@ class TripSyncRemoteDataSource(
                     origin = document.getString("origin").orEmpty(),
                     originIata = document.getString("originIata").orEmpty(),
                     destinationIata = document.getString("destinationIata").orEmpty(),
+                    timeZoneId = document.getString("timeZoneId").orEmpty(),
                     dateFrom = document.getString("dateFrom").orEmpty(),
                     dateTo = document.getString("dateTo").orEmpty(),
                     durationDays = (document.getLong("durationDays") ?: 0L).toInt(),
@@ -135,6 +136,7 @@ class TripSyncRemoteDataSource(
             origin = snapshot.getString("origin").orEmpty(),
             originIata = snapshot.getString("originIata").orEmpty(),
             destinationIata = snapshot.getString("destinationIata").orEmpty(),
+            timeZoneId = snapshot.getString("timeZoneId").orEmpty(),
             dateFrom = snapshot.getString("dateFrom").orEmpty(),
             dateTo = snapshot.getString("dateTo").orEmpty(),
             durationDays = (snapshot.getLong("durationDays") ?: 0L).toInt(),
@@ -756,6 +758,7 @@ class TripSyncRemoteDataSource(
             put("origin", snapshot["origin"]?.toString().orEmpty())
             put("originIata", snapshot["originIata"]?.toString().orEmpty())
             put("destinationIata", snapshot["destinationIata"]?.toString().orEmpty())
+            put("timeZoneId", snapshot["timeZoneId"]?.toString().orEmpty())
             put("dateFrom", snapshot["dateFrom"]?.toString().orEmpty())
             put("dateTo", snapshot["dateTo"]?.toString().orEmpty())
             put("createdAt", snapshot["createdAt"]?.toString().orEmpty())
@@ -844,6 +847,7 @@ class TripSyncRemoteDataSource(
                 origin = getString("origin") ?: "",
                 originIata = getString("originIata") ?: "",
                 destinationIata = getString("destinationIata") ?: "",
+                timeZoneId = getString("timeZoneId") ?: "",
                 dateFrom = getString("dateFrom") ?: "",
                 dateTo = getString("dateTo") ?: "",
                 durationDays = (getLong("durationDays") ?: 0L).toInt(),
