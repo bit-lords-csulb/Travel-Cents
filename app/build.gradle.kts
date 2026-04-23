@@ -49,6 +49,10 @@ android {
             "String", "YELP_API_KEY",
             "\"${localProperties.getProperty("YELP_API_KEY") ?: ""}\""
         )
+        buildConfigField(
+            "String", "TICKETMASTER_API_KEY",
+            "\"${localProperties.getProperty("TICKETMASTER_API_KEY") ?: ""}\""
+        )
     }
 
     buildTypes {

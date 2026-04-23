@@ -124,6 +124,87 @@ class AiCuratedTripCatalog(
         )
     }
 
+    fun buildStarterRefinementGroup(starter: AiCuratedTripStarter): AiChatCardGroup? {
+        if (starter.source != AiCuratedTripSource.SEEDED) return null
+        val seed = AiCuratedTripSeedCatalog.findSeed(starter.seedId) ?: return null
+        val shortDestination = displayDestination(seed.destination)
+        val groupId = "starter_refinement_${seed.id}"
+        val seedTags = seed.tags.toSet()
+
+        val tagDrivenOptions = buildList {
+            if ("food" in seedTags || "food_first" in seedTags) {
+                add(refinementOption("${groupId}_food", "More food", "Lean harder into standout food in $shortDestination.", groupId))
+            }
+            if ("culture" in seedTags || "temples" in seedTags || "history" in seedTags) {
+                add(refinementOption("${groupId}_culture", "More culture", "Make the $shortDestination trip more culture-forward.", groupId))
+            }
+            if ("beach" in seedTags) {
+                add(refinementOption("${groupId}_beach", "More beach time", "Build in more beach time in $shortDestination.", groupId))
+            }
+            if ("nightlife" in seedTags) {
+                add(refinementOption("${groupId}_nightlife", "More nightlife", "Include more nightlife options in $shortDestination.", groupId))
+            }
+            if ("nature" in seedTags || "hiking" in seedTags) {
+                add(refinementOption("${groupId}_nature", "More nature", "Add more nature and scenic views in $shortDestination.", groupId))
+            }
+            if ("relaxed" in seedTags) {
+                add(refinementOption("${groupId}_slow", "Slower pace", "Keep the pace slower in $shortDestination.", groupId))
+            } else if ("walkable" in seedTags) {
+                add(refinementOption("${groupId}_walkable", "Keep it walkable", "Focus on walkable neighborhoods in $shortDestination.", groupId))
+            }
+        }
+
+        val placeOptions = seed.placeSuggestions.take(2).map { suggestion ->
+            refinementOption(
+                id = "${groupId}_place_${slugifyPlace(suggestion.name)}",
+                label = "Base in ${suggestion.name}",
+                message = "Base the $shortDestination starter around ${suggestion.name} (${suggestion.category}).",
+                groupId = groupId
+            )
+        }
+
+        val combinedOptions = (tagDrivenOptions + placeOptions)
+            .distinctBy(AiChatCardOption::id)
+            .take(5)
+        if (combinedOptions.isEmpty()) return null
+
+        return AiChatCardGroup(
+            id = groupId,
+            title = "Refine the $shortDestination starter",
+            subtitle = "Pick what to adjust before I build it out.",
+            allowMultiple = true,
+            allowOther = true,
+            otherPromptHint = "Type a refinement for the $shortDestination starter.",
+            options = combinedOptions + refinementOption(
+                id = "${groupId}_other",
+                label = "Other",
+                message = "I want to type my own refinement.",
+                groupId = groupId,
+                requiresText = true
+            )
+        )
+    }
+
+    private fun refinementOption(
+        id: String,
+        label: String,
+        message: String,
+        groupId: String,
+        requiresText: Boolean = false
+    ): AiChatCardOption {
+        return AiChatCardOption(
+            id = id,
+            label = label,
+            message = message,
+            groupId = groupId,
+            requiresText = requiresText
+        )
+    }
+
+    private fun slugifyPlace(value: String): String {
+        return value.lowercase(Locale.US).replace(Regex("[^a-z0-9]+"), "_").trim('_')
+    }
+
     fun adjustStarterDuration(
         starter: AiCuratedTripStarter,
         durationDays: Int
@@ -143,7 +224,7 @@ class AiCuratedTripCatalog(
                         matchReason = starter.matchReason,
                         durationDays = selectedDuration
                     )
-                    ?.copy(id = starter.id)
+                    ?.copy(id = starter.id, heroImageUrl = starter.heroImageUrl)
                     ?: starter.copy(durationDays = selectedDuration)
             }
 
@@ -472,7 +553,8 @@ class AiCuratedTripCatalog(
             summary = buildSummary(this),
             matchReason = matchReason,
             source = AiCuratedTripSource.FIRESTORE,
-            tripKey = TripKey(ownerUid = ownerUid, tripId = itineraryId)
+            tripKey = TripKey(ownerUid = ownerUid, tripId = itineraryId),
+            heroImageUrl = homeImageUrl.ifBlank { null }
         )
     }
 

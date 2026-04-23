@@ -35,14 +35,21 @@ import com.example.travelcents.data.ai.chat.PersistedAiChatMessage
 import com.example.travelcents.data.ai.chat.PersistedAiChatSnapshot
 import com.example.travelcents.data.ai.chat.toModel
 import com.example.travelcents.data.ai.chat.toPersisted
+import com.example.travelcents.BuildConfig
 import com.example.travelcents.data.ai.model.LlmMessage
 import com.example.travelcents.data.ai.remote.LlmClient
 import com.example.travelcents.data.trip.TripKey
+import com.example.travelcents.data.trip.remote.DestinationImageRepository
+import com.example.travelcents.data.trip.remote.WikipediaApiService
 import com.google.firebase.auth.FirebaseAuth
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
+import okhttp3.OkHttpClient
+import retrofit2.Retrofit
+import retrofit2.converter.gson.GsonConverterFactory
+import java.util.Locale
 import java.util.UUID
 
 class AiChatViewModel(application: Application) : AndroidViewModel(application) {
@@ -53,6 +60,25 @@ class AiChatViewModel(application: Application) : AndroidViewModel(application) 
     private val placeRecommendationCoordinator = AiPlaceRecommendationCoordinator(curatedTripCatalog = curatedTripCatalog)
     private val intakeOrchestrator = AiTripIntakeOrchestrator()
     private val auth = FirebaseAuth.getInstance()
+
+    private val wikipediaClient = OkHttpClient.Builder()
+        .addInterceptor { chain ->
+            val request = chain.request().newBuilder()
+                .header("User-Agent", WIKIMEDIA_USER_AGENT)
+                .header("Api-User-Agent", WIKIMEDIA_USER_AGENT)
+                .build()
+            chain.proceed(request)
+        }
+        .build()
+
+    private val wikipedia: WikipediaApiService = Retrofit.Builder()
+        .baseUrl("https://en.wikipedia.org/")
+        .client(wikipediaClient)
+        .addConverterFactory(GsonConverterFactory.create())
+        .build()
+        .create(WikipediaApiService::class.java)
+    private val destinationImages = DestinationImageRepository(wikipedia)
+    private val heroImageCache = mutableMapOf<String, String>()
 
     private var sessionState = AiChatSessionState()
     private var isLoading = false
@@ -112,12 +138,15 @@ class AiChatViewModel(application: Application) : AndroidViewModel(application) 
         )
         conversationItems += assistantMessage
 
-        val followUpGroup = buildLegacyFallbackFollowUpGroup(
-            profile = updatedProfile,
-            intakeProfile = updatedIntakeProfile,
-            lastUserInput = llmUserMessage,
-            askedGroupIds = sessionState.askedFollowUpGroupIds
-        )
+        val starterRefinementGroup = curatedTripCatalog.buildStarterRefinementGroup(starter)
+            ?.takeUnless { group -> group.id in sessionState.askedFollowUpGroupIds }
+        val followUpGroup = starterRefinementGroup
+            ?: buildLegacyFallbackFollowUpGroup(
+                profile = updatedProfile,
+                intakeProfile = updatedIntakeProfile,
+                lastUserInput = llmUserMessage,
+                askedGroupIds = sessionState.askedFollowUpGroupIds
+            )
 
         sessionState = sessionState.copy(
             profile = updatedProfile,
@@ -209,6 +238,7 @@ class AiChatViewModel(application: Application) : AndroidViewModel(application) 
         persistLastSession()
         publishUiState()
         generateTitleIfNeeded()
+        launchHeroImageEnrichment(sessionState.activeCuratedTripRow?.id)
     }
 
     fun selectPlaceRecommendation(name: String, category: String, area: String) {
@@ -277,6 +307,7 @@ class AiChatViewModel(application: Application) : AndroidViewModel(application) 
         restoreSnapshot(snapshot)
         processSnapshot = snapshot
         publishUiState()
+        launchHeroImageEnrichment(sessionState.activeCuratedTripRow?.id)
     }
 
     fun deleteSession(sessionId: String) {
@@ -396,6 +427,7 @@ class AiChatViewModel(application: Application) : AndroidViewModel(application) 
 
         restoreSnapshot(cached)
         publishUiState()
+        launchHeroImageEnrichment(sessionState.activeCuratedTripRow?.id)
     }
 
     private fun restoreSnapshot(snapshot: PersistedAiChatSnapshot) {
@@ -898,6 +930,7 @@ class AiChatViewModel(application: Application) : AndroidViewModel(application) 
             persistLastSession()
             publishUiState()
             generateTitleIfNeeded()
+            launchHeroImageEnrichment(curatedTripRow?.id)
         }
     }
 
@@ -1001,6 +1034,60 @@ class AiChatViewModel(application: Application) : AndroidViewModel(application) 
         return (existingIds + groupId).distinct()
     }
 
+    private fun launchHeroImageEnrichment(rowId: String?) {
+        val targetId = rowId ?: return
+        viewModelScope.launch {
+            val targetRow = sessionState.activeCuratedTripRow ?: return@launch
+            if (targetRow.id != targetId) return@launch
+
+            val needsLookup = targetRow.trips.filter { starter ->
+                starter.heroImageUrl.isNullOrBlank()
+            }
+            if (needsLookup.isEmpty()) return@launch
+
+            val resolved = mutableMapOf<String, String>()
+            needsLookup.map { it.destination }
+                .distinct()
+                .forEach { destination ->
+                    val key = heroImageCacheKey(destination)
+                    val cached = heroImageCache[key]
+                    if (cached != null) {
+                        resolved[destination] = cached
+                        return@forEach
+                    }
+                    val resolvedUrl = runCatching {
+                        destinationImages.resolveDestinationImage(destination).imageUrl
+                    }.onFailure { error ->
+                        Log.w(TAG, "Hero image lookup failed for '$destination': ${error.message}")
+                    }.getOrNull()
+                    if (!resolvedUrl.isNullOrBlank()) {
+                        heroImageCache[key] = resolvedUrl
+                        resolved[destination] = resolvedUrl
+                    }
+                }
+
+            if (resolved.isEmpty()) return@launch
+
+            val current = sessionState.activeCuratedTripRow ?: return@launch
+            if (current.id != targetId) return@launch
+
+            val updatedTrips = current.trips.map { starter ->
+                if (!starter.heroImageUrl.isNullOrBlank()) starter
+                else resolved[starter.destination]?.let { url -> starter.copy(heroImageUrl = url) }
+                    ?: starter
+            }
+            if (updatedTrips == current.trips) return@launch
+
+            sessionState = sessionState.copy(activeCuratedTripRow = current.copy(trips = updatedTrips))
+            persistLastSession()
+            publishUiState()
+        }
+    }
+
+    private fun heroImageCacheKey(destination: String): String {
+        return destination.substringBefore(",").trim().lowercase(Locale.US)
+    }
+
     private companion object {
         private const val DESTINATION_STYLE_GROUP_ID = "destination_style"
         private const val DESTINATION_REFINEMENT_GROUP_ID = "destination_refinement"
@@ -1010,6 +1097,9 @@ class AiChatViewModel(application: Application) : AndroidViewModel(application) 
                 "Be concise, helpful, and practical. Keep replies to short acknowledgment paragraphs. " +
                 "The app may present follow-up choices separately, so do not stack multiple questions or long questionnaires. " +
                 "Use the traveler profile context when available. Do not mention model vendors or say you are a generic AI chatbot."
+        private const val WIKIMEDIA_CONTACT_URL = "https://github.com/bit-lords-csulb/Travel-Cents"
+        private val WIKIMEDIA_USER_AGENT =
+            "TravelCents/${BuildConfig.VERSION_NAME} (Android app; $WIKIMEDIA_CONTACT_URL)"
 
         private var processSnapshot: PersistedAiChatSnapshot? = null
     }

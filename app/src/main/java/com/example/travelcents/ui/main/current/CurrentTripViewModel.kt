@@ -4,6 +4,10 @@ import android.app.Application
 import android.util.Log
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
+import com.example.travelcents.data.ai.chat.AiCuratedTripStarter
+import com.example.travelcents.data.ai.chat.AiCuratedTripToItineraryMapper
+import com.example.travelcents.data.ai.chat.AiTripIntakeProfile
+import com.example.travelcents.data.ai.chat.PREVIEW_TRIP_STATUS
 import com.example.travelcents.data.media.TripMediaCacheStore
 import com.example.travelcents.data.local.trip.TravelCentsDatabase
 import com.example.travelcents.data.local.trip.TripLocalDataSource
@@ -83,8 +87,16 @@ data class CurrentTripUiState(
     val dateTo: String = "",
     val events: List<TravelEvent> = emptyList(),
     val infoMessage: String? = null,
-    val errorMessage: String? = null
+    val errorMessage: String? = null,
+    val isPreview: Boolean = false
 )
+
+sealed class PreviewSource {
+    data class CuratedStarter(
+        val starter: AiCuratedTripStarter,
+        val intakeProfile: AiTripIntakeProfile
+    ) : PreviewSource()
+}
 
 data class ShareTarget(
     val id: String,
@@ -1421,6 +1433,54 @@ class CurrentTripViewModel(application: Application) : AndroidViewModel(applicat
                 Log.e("CurrentTripViewModel", "Failed to rename trip", e)
                 _uiState.update { it.copy(errorMessage = e.message ?: "Failed to rename trip.") }
             }
+        }
+    }
+
+    fun loadPreview(source: PreviewSource) {
+        when (source) {
+            is PreviewSource.CuratedStarter -> {
+                val viewerUid = auth.currentUser?.uid
+                val preview = AiCuratedTripToItineraryMapper.map(
+                    starter = source.starter,
+                    intakeProfile = source.intakeProfile,
+                    viewerUid = viewerUid
+                )
+                applyPreview(viewerUid = viewerUid, preview = preview)
+            }
+        }
+    }
+
+    private fun applyPreview(
+        viewerUid: String?,
+        preview: com.example.travelcents.data.ai.chat.PreviewTrip
+    ) {
+        resetTripState()
+        currentTripKey = null
+        currentTripSummary = preview.itinerary
+        currentTripDestination = preview.itinerary.destination
+        localEventsSnapshot = sortPlanEvents(preview.events)
+        _events.value = localEventsSnapshot
+        _tripTitle.value = preview.itinerary.tripName
+        _uiState.value = CurrentTripUiState(
+            isLoading = false,
+            currentTripId = preview.tripKey.tripId,
+            currentTripOwnerUid = preview.tripKey.ownerUid,
+            viewerUid = viewerUid,
+            accessRole = TripAccessRole.VIEWER,
+            canEditTrip = false,
+            canManageTrip = false,
+            tripTitle = preview.itinerary.tripName,
+            destination = preview.itinerary.destination,
+            dateFrom = preview.itinerary.dateFrom,
+            dateTo = preview.itinerary.dateTo,
+            events = localEventsSnapshot,
+            isPreview = true
+        )
+    }
+
+    fun clearPreview() {
+        if (_uiState.value.isPreview) {
+            resetTripState()
         }
     }
 

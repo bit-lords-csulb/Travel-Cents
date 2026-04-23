@@ -62,7 +62,8 @@ data class PersistedAiCuratedTripStarter(
     val tripId: String = "",
     val seedId: String? = null,
     val durationOptions: List<Int>? = null,
-    val highlights: List<String>? = null
+    val highlights: List<String>? = null,
+    val heroImageUrl: String? = null
 )
 
 data class PersistedAiCuratedTripRow(
@@ -380,7 +381,8 @@ fun AiCuratedTripRow.toPersisted(): PersistedAiCuratedTripRow {
                 tripId = starter.tripKey?.tripId.orEmpty(),
                 seedId = starter.seedId,
                 durationOptions = starter.durationOptions,
-                highlights = starter.highlights
+                highlights = starter.highlights,
+                heroImageUrl = starter.heroImageUrl
             )
         }
     )
@@ -413,7 +415,8 @@ fun PersistedAiCuratedTripRow.toModel(): AiCuratedTripRow {
                 },
                 seedId = starter.seedId,
                 durationOptions = starter.durationOptions.orEmpty(),
-                highlights = starter.highlights.orEmpty()
+                highlights = starter.highlights.orEmpty(),
+                heroImageUrl = starter.heroImageUrl
             )
         }
     )

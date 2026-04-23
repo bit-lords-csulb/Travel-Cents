@@ -21,7 +21,8 @@ data class AiCuratedTripStarter(
     val tripKey: TripKey? = null,
     val seedId: String? = null,
     val durationOptions: List<Int> = emptyList(),
-    val highlights: List<String> = emptyList()
+    val highlights: List<String> = emptyList(),
+    val heroImageUrl: String? = null
 )
 
 data class AiCuratedTripRow(

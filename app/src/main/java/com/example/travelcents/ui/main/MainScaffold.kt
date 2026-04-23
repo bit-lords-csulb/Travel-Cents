@@ -1,21 +1,43 @@
 package com.example.travelcents.ui.main
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.lifecycle.viewmodel.compose.viewModel
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.dp
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import com.example.travelcents.ui.components.MainBottomNavBar
+import com.example.travelcents.data.ai.chat.AiCuratedTripStarter
+import com.example.travelcents.data.ai.chat.AiTripIntakeProfile
 import com.example.travelcents.data.trip.TripKey
 import com.example.travelcents.ui.main.aichat.AiTripChatPage
 import com.example.travelcents.ui.main.chats.chat.ChatsScreen
@@ -23,8 +45,11 @@ import com.example.travelcents.ui.main.current.CurrentDisplayMode
 import com.example.travelcents.ui.main.current.CurrentTripScreen
 import com.example.travelcents.ui.main.current.CurrentTripRoutes
 import com.example.travelcents.ui.main.current.CurrentTripViewModel
+import com.example.travelcents.ui.main.current.PreviewSource
 import com.example.travelcents.ui.main.newTrip.NewTripLandingPage
 import com.example.travelcents.ui.main.newTrip.NewTripViewModel
+import com.example.travelcents.ui.main.newTrip.TripWizardColors
+import com.example.travelcents.ui.theme.DeepSea5
 import com.example.travelcents.ui.main.newTrip.TripGeneratingPage
 import com.example.travelcents.ui.main.newTrip.TripStep1DestinationPage
 import com.example.travelcents.ui.main.newTrip.TripStep2DatesPage
@@ -40,6 +65,7 @@ object MainRoutes {
     const val CURRENT_ITINERARY = CurrentTripRoutes.ITINERARY
     const val CURRENT_DAY = CurrentTripRoutes.DAY
     const val CURRENT_WEEK = CurrentTripRoutes.WEEK
+    const val CURRENT_TRIP_PREVIEW = "current_trip_preview"
     const val NEW_TRIP = "new_trip"
     const val NEW_TRIP_STEP_1 = "new_trip_step1"
     const val NEW_TRIP_STEP_2 = "new_trip_step2"
@@ -93,6 +119,7 @@ fun MainScaffold(modifier: Modifier = Modifier, onLogout: () -> Unit = {}) {
     val newTripViewModel: NewTripViewModel = viewModel()
     val currentTripViewModel: CurrentTripViewModel = viewModel()
     val navController = rememberNavController()
+    var pendingPreview by remember { mutableStateOf<PreviewSource.CuratedStarter?>(null) }
 
     val navBackStackEntry by navController.currentBackStackEntryAsState()
     val currentRoute = navBackStackEntry?.destination?.route ?: MainRoutes.HOME
@@ -298,19 +325,107 @@ fun MainScaffold(modifier: Modifier = Modifier, onLogout: () -> Unit = {}) {
                             }
                         },
                         onCreateDraftTrip = { starter, intakeProfile ->
-                            newTripViewModel.createDraftTripFromAiStarter(
+                            val source = PreviewSource.CuratedStarter(
                                 starter = starter,
-                                intakeProfile = intakeProfile,
-                                onTripReady = { tripKey ->
-                                    currentTripViewModel.loadTrip(tripKey)
-                                    navController.navigate(MainRoutes.CURRENT_ITINERARY) {
-                                        launchSingleTop = true
-                                    }
-                                }
+                                intakeProfile = intakeProfile
                             )
+                            pendingPreview = source
+                            currentTripViewModel.loadPreview(source)
+                            navController.navigate(MainRoutes.CURRENT_TRIP_PREVIEW) {
+                                launchSingleTop = true
+                            }
                         }
                     )
                 }
+                composable(MainRoutes.CURRENT_TRIP_PREVIEW) {
+                    val previewSource = pendingPreview
+                    DisposableEffect(Unit) {
+                        onDispose { currentTripViewModel.clearPreview() }
+                    }
+                    Box(modifier = Modifier.fillMaxSize()) {
+                        CurrentTripScreen(
+                            modifier = Modifier.fillMaxSize(),
+                            viewModel = currentTripViewModel,
+                            displayMode = CurrentDisplayMode.ITINERARY,
+                            autoLoadTrip = false,
+                            onNavigateToMode = { mode ->
+                                navController.navigate(CurrentTripRoutes.routeFor(mode)) {
+                                    launchSingleTop = true
+                                }
+                            }
+                        )
+                        if (previewSource != null) {
+                            PreviewActionBar(
+                                modifier = Modifier
+                                    .align(Alignment.BottomCenter)
+                                    .fillMaxWidth(),
+                                onDiscard = {
+                                    pendingPreview = null
+                                    navController.popBackStack()
+                                },
+                                onCommit = {
+                                    val toCommit = previewSource
+                                    pendingPreview = null
+                                    newTripViewModel.commitItinerary(
+                                        starter = toCommit.starter,
+                                        intakeProfile = toCommit.intakeProfile,
+                                        onTripReady = { tripKey ->
+                                            currentTripViewModel.loadTrip(tripKey)
+                                            navController.navigate(MainRoutes.CURRENT_ITINERARY) {
+                                                popUpTo(MainRoutes.HOME) { inclusive = false }
+                                                launchSingleTop = true
+                                            }
+                                        }
+                                    )
+                                }
+                            )
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun PreviewActionBar(
+    onDiscard: () -> Unit,
+    onCommit: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    Column(
+        modifier = modifier
+            .background(TripWizardColors.ContainerLow)
+            .navigationBarsPadding()
+            .padding(horizontal = 16.dp, vertical = 12.dp)
+    ) {
+        Text(
+            text = "Preview only — nothing is saved yet.",
+            color = DeepSea5.copy(alpha = 0.78f),
+            fontWeight = FontWeight.Medium
+        )
+        Spacer(Modifier.height(10.dp))
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            OutlinedButton(
+                onClick = onDiscard,
+                modifier = Modifier.weight(1f),
+                shape = RoundedCornerShape(14.dp)
+            ) {
+                Text(text = "Discard")
+            }
+            Button(
+                onClick = onCommit,
+                modifier = Modifier.weight(1f),
+                shape = RoundedCornerShape(14.dp),
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = TripWizardColors.Blue,
+                    contentColor = Color.White
+                )
+            ) {
+                Text(text = "Use this trip")
             }
         }
     }

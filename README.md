@@ -25,6 +25,7 @@ An AI-powered travel planning Android app built with Jetpack Compose and Kotlin.
 - An AI provider API key for any OpenAI-compatible endpoint.
 - A [SerpAPI key](https://serpapi.com/) for live flight and hotel prices.
 - A Yelp Fusion API key for activity suggestions.
+- Optional: a [Ticketmaster Discovery API key](https://developer.ticketmaster.com/) for live ticketed events.
 - A Firebase project with **Authentication** (email/password) and **Firestore** enabled.
 
 ### Setup
@@ -41,9 +42,11 @@ An AI-powered travel planning Android app built with Jetpack Compose and Kotlin.
    LLM_MODEL=llama-3.3-70b-versatile
    SERP_API_KEY=your-serpapi-key
    YELP_API_KEY=your-yelp-key
+   TICKETMASTER_API_KEY=your-ticketmaster-consumer-key
    ```
 
    `GROQ_API_KEY` is still accepted as a fallback for older local setups.
+   Ticketmaster Discovery uses the consumer key as the API key; the consumer secret is not needed for read-only event search.
 
 3. Add your Firebase config:
    - Download `google-services.json` from your Firebase console.
