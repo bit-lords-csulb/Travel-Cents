@@ -1,64 +1,43 @@
 package com.example.travelcents.ui.main
 
+import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
-import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.Button
-import androidx.compose.material3.ButtonDefaults
-import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Scaffold
-import androidx.compose.material3.Text
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.DisposableEffect
-import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.getValue
+import androidx.compose.runtime.*
 import androidx.lifecycle.viewmodel.compose.viewModel
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.unit.dp
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
-import com.example.travelcents.data.ai.chat.AiCuratedTripStarter
-import com.example.travelcents.data.ai.chat.AiTripIntakeProfile
-import com.example.travelcents.data.trip.TripKey
+import com.example.travelcents.data.social.model.DirectChatPreview
 import com.example.travelcents.ui.components.MainBottomNavBar
+import com.example.travelcents.data.trip.TripKey
+import com.example.travelcents.data.social.model.Friend
+import com.example.travelcents.data.social.model.Group
+import com.example.travelcents.data.trip.model.Event
 import com.example.travelcents.ui.main.aichat.AiTripChatPage
-import com.example.travelcents.ui.main.chats.chat.ChatsScreen
+import com.example.travelcents.ui.main.chats.chat.*
+import com.example.travelcents.ui.main.chats.friends.*
+import com.example.travelcents.ui.main.chats.groups.*
 import com.example.travelcents.ui.main.current.CurrentDisplayMode
-import com.example.travelcents.ui.main.current.CurrentTripRoutes
 import com.example.travelcents.ui.main.current.CurrentTripScreen
+import com.example.travelcents.ui.main.current.CurrentTripRoutes
 import com.example.travelcents.ui.main.current.CurrentTripViewModel
-import com.example.travelcents.ui.main.home.HomePage
-import com.example.travelcents.ui.main.home.SavedPlacesPage
-import com.example.travelcents.ui.main.current.PreviewSource
 import com.example.travelcents.ui.main.newTrip.NewTripLandingPage
 import com.example.travelcents.ui.main.newTrip.NewTripViewModel
-import com.example.travelcents.ui.main.newTrip.TripWizardColors
-import com.example.travelcents.ui.theme.DeepSea5
 import com.example.travelcents.ui.main.newTrip.TripGeneratingPage
 import com.example.travelcents.ui.main.newTrip.TripStep1DestinationPage
 import com.example.travelcents.ui.main.newTrip.TripStep2DatesPage
 import com.example.travelcents.ui.main.newTrip.TripStep3TravelersPage
+import com.example.travelcents.ui.main.home.HomePage
 import com.example.travelcents.ui.main.newTrip.TripStep4BudgetPage
-import com.example.travelcents.ui.main.newTrip.TripStep5InterestsPage
 import com.example.travelcents.ui.main.settings.SettingsPage
+import com.example.travelcents.ui.main.newTrip.TripStep5InterestsPage
 import com.example.travelcents.ui.theme.DeepSea1
 
 object MainRoutes {
@@ -66,7 +45,6 @@ object MainRoutes {
     const val CURRENT_ITINERARY = CurrentTripRoutes.ITINERARY
     const val CURRENT_DAY = CurrentTripRoutes.DAY
     const val CURRENT_WEEK = CurrentTripRoutes.WEEK
-    const val CURRENT_TRIP_PREVIEW = "current_trip_preview"
     const val NEW_TRIP = "new_trip"
     const val NEW_TRIP_STEP_1 = "new_trip_step1"
     const val NEW_TRIP_STEP_2 = "new_trip_step2"
@@ -79,7 +57,6 @@ object MainRoutes {
     const val SETTINGS = "settings"
 
     const val AI_TRIP_CHAT = "ai_trip_chat"
-    const val SAVED_PLACES = "saved_places"
 }
 
 private val bottomNavRoutes = setOf(
@@ -102,8 +79,8 @@ private val bottomNavRoutes = setOf(
 
 private fun shouldShowBottomNav(route: String): Boolean {
     return route in bottomNavRoutes ||
-        route.startsWith("${MainRoutes.CURRENT}/") ||
-        route.startsWith(MainRoutes.NEW_TRIP)
+            route.startsWith("${MainRoutes.CURRENT}/") ||
+            route.startsWith(MainRoutes.NEW_TRIP)
 }
 
 private fun selectedBottomRoute(route: String): String {
@@ -121,7 +98,19 @@ fun MainScaffold(modifier: Modifier = Modifier, onLogout: () -> Unit = {}) {
     val newTripViewModel: NewTripViewModel = viewModel()
     val currentTripViewModel: CurrentTripViewModel = viewModel()
     val navController = rememberNavController()
-    var pendingPreview by remember { mutableStateOf<PreviewSource.CuratedStarter?>(null) }
+
+    var selectedGroup   by remember { mutableStateOf<Group?>(null) }
+    var showNewTrip     by remember { mutableStateOf(false) }
+    var showFriends     by remember { mutableStateOf(false) }
+    var selectedFriend  by remember { mutableStateOf<Friend?>(null) }
+    var showAddFriend   by remember { mutableStateOf(false) }
+    var showRequests    by remember { mutableStateOf(false) }
+    var selectedDM      by remember { mutableStateOf<DirectChatPreview?>(null) }
+    var activeTab       by remember { mutableIntStateOf(0) }
+    var showEvents      by remember { mutableStateOf(false) }
+    var showCreateEvent by remember { mutableStateOf(false) }
+    var selectedEvent   by remember { mutableStateOf<Event?>(null) }
+    var showEditChat    by remember { mutableStateOf(false) }
 
     val navBackStackEntry by navController.currentBackStackEntryAsState()
     val currentRoute = navBackStackEntry?.destination?.route ?: MainRoutes.HOME
@@ -296,25 +285,89 @@ fun MainScaffold(modifier: Modifier = Modifier, onLogout: () -> Unit = {}) {
                             navController.navigate(MainRoutes.SETTINGS) {
                                 launchSingleTop = true
                             }
-                        },
-                        onSavedPlacesClick = {
-                            navController.navigate(MainRoutes.SAVED_PLACES)
                         }
                     )
-                }
-                composable(MainRoutes.SAVED_PLACES) {
-                    SavedPlacesPage(onBack = { navController.popBackStack() })
                 }
                 composable(MainRoutes.CHATS) {
-                    ChatsScreen(
-                        modifier = Modifier.fillMaxSize(),
-                        onTripCardClick = { tripId, ownerUid ->
-                            currentTripViewModel.loadTrip(TripKey(ownerUid = ownerUid, tripId = tripId))
-                            navController.navigate(MainRoutes.CURRENT_ITINERARY) {
-                                launchSingleTop = true
-                            }
+                    val onTripCardClick: (String, String) -> Unit = { tripId, ownerUid ->
+                        currentTripViewModel.loadTrip(TripKey(ownerUid = ownerUid, tripId = tripId))
+                        navController.navigate(MainRoutes.CURRENT_ITINERARY) {
+                            launchSingleTop = true
                         }
-                    )
+                    }
+
+                    when {
+                        selectedGroup != null && selectedEvent != null ->
+                            com.example.travelcents.ui.main.chats.voting.EventCommentsPage(
+                                event       = selectedEvent!!,
+                                groupId     = selectedGroup!!.id,
+                                onBackClick = { selectedEvent = null }
+                            )
+
+                        selectedGroup != null && showCreateEvent ->
+                            com.example.travelcents.ui.main.chats.voting.CreateEventPage(
+                                group          = selectedGroup!!,
+                                onBackClick    = { showCreateEvent = false },
+                                onEventCreated = { showCreateEvent = false }
+                            )
+
+                        selectedGroup != null && showEvents ->
+                            com.example.travelcents.ui.main.chats.voting.EventsPage(
+                                group        = selectedGroup!!,
+                                onBackClick  = { showEvents = false },
+                                onNewEvent   = { showCreateEvent = true },
+                                onEventClick = { event -> selectedEvent = event }
+                            )
+
+                        selectedGroup != null && showEditChat ->
+                            EditChatPage(
+                                group             = selectedGroup!!,
+                                onBackClick       = { showEditChat = false },
+                                onNavigateToChats = {
+                                    showEditChat = false
+                                    selectedGroup = null
+                                }
+                            )
+
+                        selectedGroup != null -> ChatPage(
+                            group           = selectedGroup!!,
+                            onBackClick     = { selectedGroup = null },
+                            onEventsClick   = { showEvents = true },
+                            onEditClick     = { showEditChat = true },
+                            onTripCardClick = onTripCardClick
+                        )
+
+                        selectedFriend != null -> DirectChatPage(
+                            friend      = selectedFriend!!,
+                            onBackClick = { selectedFriend = null },
+                            onTripCardClick = onTripCardClick
+                        )
+                        selectedDM != null -> DirectChatPage(
+                            friend      = Friend(uid = selectedDM!!.otherUid, displayName = selectedDM!!.otherUserName),
+                            onBackClick = { selectedDM = null; activeTab = 1 },
+                            onTripCardClick = onTripCardClick
+                        )
+                        showAddFriend -> AddFriendPage(onBackClick = { showAddFriend = false })
+                        showRequests  -> FriendRequestsPage(onBackClick = { showRequests = false })
+                        showNewTrip   -> NewTripChatPage(
+                            onBackClick   = { showNewTrip = false },
+                            onTripCreated = { newGroup -> showNewTrip = false; selectedGroup = newGroup }
+                        )
+                        showFriends -> FriendsPage(
+                            onBackClick          = { showFriends = false },
+                            onMessageFriendClick = { friend -> showFriends = false; selectedFriend = friend },
+                            onAddFriendClick     = { showAddFriend = true },
+                            onRequestsClick      = { showRequests = true }
+                        )
+                        else -> ChatsPage(
+                            modifier          = Modifier.fillMaxSize(),
+                            startTab          = activeTab,
+                            onNewChatClick    = { showNewTrip = true },
+                            onFriendsClick    = { showFriends = true },
+                            onGroupClick      = { group -> selectedGroup = group; activeTab = 0 },
+                            onDirectChatClick = { dm -> selectedDM = dm; activeTab = 1 }
+                        )
+                    }
                 }
                 composable(MainRoutes.SETTINGS) {
                     SettingsPage(
@@ -333,109 +386,20 @@ fun MainScaffold(modifier: Modifier = Modifier, onLogout: () -> Unit = {}) {
                             }
                         },
                         onCreateDraftTrip = { starter, intakeProfile ->
-                            val source = PreviewSource.CuratedStarter(
+                            newTripViewModel.createDraftTripFromAiStarter(
                                 starter = starter,
-                                intakeProfile = intakeProfile
+                                intakeProfile = intakeProfile,
+                                onTripReady = { tripKey ->
+                                    currentTripViewModel.loadTrip(tripKey)
+                                    navController.navigate(MainRoutes.CURRENT_ITINERARY) {
+                                        launchSingleTop = true
+                                    }
+                                }
                             )
-                            pendingPreview = source
-                            currentTripViewModel.loadPreview(source)
-                            navController.navigate(MainRoutes.CURRENT_TRIP_PREVIEW) {
-                                launchSingleTop = true
-                            }
                         }
                     )
                 }
-                composable(MainRoutes.CURRENT_TRIP_PREVIEW) {
-                    val previewSource = pendingPreview
-                    DisposableEffect(Unit) {
-                        onDispose { currentTripViewModel.clearPreview() }
-                    }
-                    Box(modifier = Modifier.fillMaxSize()) {
-                        CurrentTripScreen(
-                            modifier = Modifier.fillMaxSize(),
-                            viewModel = currentTripViewModel,
-                            displayMode = CurrentDisplayMode.ITINERARY,
-                            autoLoadTrip = false,
-                            onNavigateToMode = { mode ->
-                                navController.navigate(CurrentTripRoutes.routeFor(mode)) {
-                                    launchSingleTop = true
-                                }
-                            }
-                        )
-                        if (previewSource != null) {
-                            PreviewActionBar(
-                                modifier = Modifier
-                                    .align(Alignment.BottomCenter)
-                                    .fillMaxWidth(),
-                                onDiscard = {
-                                    pendingPreview = null
-                                    navController.popBackStack()
-                                },
-                                onCommit = {
-                                    val toCommit = previewSource
-                                    pendingPreview = null
-                                    newTripViewModel.commitItinerary(
-                                        starter = toCommit.starter,
-                                        intakeProfile = toCommit.intakeProfile,
-                                        onTripReady = { tripKey ->
-                                            currentTripViewModel.loadTrip(tripKey)
-                                            navController.navigate(MainRoutes.CURRENT_ITINERARY) {
-                                                popUpTo(MainRoutes.HOME) { inclusive = false }
-                                                launchSingleTop = true
-                                            }
-                                        }
-                                    )
-                                }
-                            )
-                        }
-                    }
-                }
             }
         }
     }
 }
-
-@Composable
-private fun PreviewActionBar(
-    onDiscard: () -> Unit,
-    onCommit: () -> Unit,
-    modifier: Modifier = Modifier
-) {
-    Column(
-        modifier = modifier
-            .background(TripWizardColors.ContainerLow)
-            .navigationBarsPadding()
-            .padding(horizontal = 16.dp, vertical = 12.dp)
-    ) {
-        Text(
-            text = "Preview only — nothing is saved yet.",
-            color = DeepSea5.copy(alpha = 0.78f),
-            fontWeight = FontWeight.Medium
-        )
-        Spacer(Modifier.height(10.dp))
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(12.dp)
-        ) {
-            OutlinedButton(
-                onClick = onDiscard,
-                modifier = Modifier.weight(1f),
-                shape = RoundedCornerShape(14.dp)
-            ) {
-                Text(text = "Discard")
-            }
-            Button(
-                onClick = onCommit,
-                modifier = Modifier.weight(1f),
-                shape = RoundedCornerShape(14.dp),
-                colors = ButtonDefaults.buttonColors(
-                    containerColor = TripWizardColors.Blue,
-                    contentColor = Color.White
-                )
-            ) {
-                Text(text = "Use this trip")
-            }
-        }
-    }
-}
-
