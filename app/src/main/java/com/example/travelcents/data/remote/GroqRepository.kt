@@ -29,7 +29,7 @@ object GroqRepository {
         }
         .addInterceptor(HttpLoggingInterceptor().apply {
             level = if (BuildConfig.DEBUG) HttpLoggingInterceptor.Level.BODY
-                    else HttpLoggingInterceptor.Level.NONE
+            else HttpLoggingInterceptor.Level.NONE
         })
         .connectTimeout(60, TimeUnit.SECONDS)
         .readTimeout(60, TimeUnit.SECONDS)
@@ -42,6 +42,51 @@ object GroqRepository {
         .addConverterFactory(GsonConverterFactory.create())
         .build()
         .create(GroqApiService::class.java)
+
+    // --- LOCAL EMULATOR SETUP ---
+    private val emulatorClient = OkHttpClient.Builder()
+        .addInterceptor(HttpLoggingInterceptor().apply {
+            level = if (BuildConfig.DEBUG) HttpLoggingInterceptor.Level.BODY else HttpLoggingInterceptor.Level.NONE
+        })
+        .connectTimeout(60, TimeUnit.SECONDS)
+        .readTimeout(60, TimeUnit.SECONDS)
+        .writeTimeout(60, TimeUnit.SECONDS)
+        .build()
+
+    private val emulatorApi: GroqApiService = Retrofit.Builder()
+        // 10.0.2.2 is Android's magic IP to talk to your laptop's localhost!
+        .baseUrl("http://10.0.2.2:5001/")
+        .client(emulatorClient)
+        .addConverterFactory(GsonConverterFactory.create())
+        .build()
+        .create(GroqApiService::class.java)
+
+    // NEW FUNCTION: Hit your Python Brain and map it to your UI
+    suspend fun getAIActivities(city: String, itineraryId: String, dates: List<String>): List<TravelEvent> {
+        val request = EmulatorRequest(data = mapOf("city" to city))
+        val response = emulatorApi.getLocalItinerary(request)
+
+        return response.result.itinerary.mapIndexed { index, activity ->
+            // Distribute the activities across the trip dates safely
+            val assignedDate = dates.getOrElse(index % dates.size) { "" }
+
+            TravelEvent(
+                eventId = UUID.randomUUID().toString(),
+                type = "activity",
+                itineraryId = itineraryId,
+                tz = "",
+                date = assignedDate,
+                startTime = "10:00", // Default morning start for demo
+                endTime = "13:00",
+                details = mapOf(
+                    "activity_name" to (activity.real_title ?: activity.title),
+                    "description" to activity.description,
+                    "booking_url" to (activity.booking_url ?: ""),
+                    "isNativeBookable" to activity.isNativeBookable.toString()
+                )
+            )
+        }
+    }
 
     private const val SYSTEM_PROMPT =
         "You are a travel planner. Always respond with valid JSON only. No markdown, no extra text."
