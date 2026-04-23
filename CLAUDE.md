@@ -241,16 +241,18 @@ Always check the package when importing.
 
 ## Event Cards
 
-Events are rendered by type. Color scheme in `FinalPlan.kt` / `ExpandedEventCard.kt`:
+Expanded cards are composed in `ui/main/current/overlays/CurrentTripEventDetailsDialog.kt`. Treat `docs/BP.md` §4 as the canonical type → card-stack matrix.
 
-| Type | Accent | Key `details` Fields |
-|---|---|---|
-| `flight` | Blue `#64B5F6` | airline, flight_number, origin_airport, destination_airport, departure_time, arrival_time, total_price, flight_duration_min |
- | `hotel` | Purple `#B5A0FF` | `ATTR_HOTEL_NAME`, check_in_date, check_out_date, `ATTR_RATE_PER_NIGHT`, `ATTR_AMENITIES`, `ATTR_BOOKING_URL` |
-| `restaurant` / `dining` / `food` | Red `#FF716C` | `ATTR_BUSINESS_NAME`, `ATTR_CATEGORIES`, `ATTR_AVERAGE_RATING`, `ATTR_HOURS_SUMMARY`, `ATTR_YELP_URL`, `ATTR_MENU_URL` |
-| `activity` (default) | Light blue `#D5E3FB` | `ATTR_BUSINESS_NAME`, activity_name, title, location, `ATTR_YELP_URL` |
+| Type | Accent | Current stack highlights | Key `details` fields |
+|---|---|---|---|
+| `flight` | `CardSky` `#7BC5FF` | `FlightTimingCard`, `FlightRouteCard`, `FlightPricingCard` | Flight data still comes through legacy keys like `airline`, `flight_number`, `origin_airport`, `destination_airport`, `total_price`; promote to `ATTR_*` when expanding the flight stack. |
+| `hotel` | `CardLavender` `#C8B9FF` | `HotelStayCard`, `HotelOverviewCard`, `HotelPricingCard`, `HotelBookingCard`, `HotelAmenitiesCard`, `LocationMapCard` | `ATTR_HOTEL_NAME`, `ATTR_RATE_PER_NIGHT`, `ATTR_TOTAL_STAY_RATE`, `ATTR_OFFER_COUNT`, `ATTR_AMENITIES`, `ATTR_BOOKING_URL` |
+| `restaurant` / `dining` / `food` | `CardCoral` `#FF8E7A` | `RestaurantMenuCard`, `RestaurantOverviewCard`, `RestaurantReservationsCard`, `RestaurantServicesCard`, `RestaurantHoursCard`, `TransportCard`, `LocationMapCard`, `WaitTimeCard`, `NeighborhoodCard`, `WeatherCard`, `CurrencyCostCard` | `ATTR_BUSINESS_NAME`, `ATTR_CATEGORIES`, `ATTR_AVERAGE_RATING`, `ATTR_HOURS_SUMMARY`, `ATTR_YELP_URL`, `ATTR_MENU_URL`, `ATTR_RESERVATION_OFFER_COUNT`, `ATTR_POPULAR_TIMES_JSON`, `ATTR_WEATHER_TEMP_C`, `ATTR_FX_HISTORY_30D` |
+| `activity` / generic event fallback | `CardMint` `#8CD7BE` | `ActivitySummaryCard`, `ActivityHoursCard`, `LocationMapCard`, `ReviewsCard` | `ATTR_BUSINESS_NAME`, `ATTR_CATEGORIES`, `ATTR_AVERAGE_RATING`, `ATTR_HOURS_SUMMARY`, `ATTR_YELP_URL` |
 
 All typed `ATTR_*` constants live in `data/trip/model/EventDetailContract.kt`. Use `detailValue(ATTR_FOO, "legacy_key")` (not raw string literals) for new code — it falls back through the list and returns the first non-blank value.
+
+Shared card primitives live in `ui/main/current/overlays/cards/`: `ProviderOfferRow.kt` for multi-provider CTAs and `DetailFormatters.kt` for shared USD-style price labels.
 
 Title resolution: use `TravelEvent.displayName()` / `EventOption.displayName(eventType)` from `EventDetailContract.kt` rather than manual key lookups.
 

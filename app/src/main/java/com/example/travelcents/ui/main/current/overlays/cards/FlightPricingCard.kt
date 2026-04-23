@@ -1,7 +1,6 @@
 package com.example.travelcents.ui.main.current.overlays.cards
 
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -17,7 +16,7 @@ import com.example.travelcents.data.trip.model.TravelEvent
 
 @Composable
 fun FlightPricingCard(event: TravelEvent) {
-    val totalPrice = event.details["total_price"]?.let { "$$it" } ?: "Price unavailable"
+    val totalPrice = formatPrice(event.details["total_price"]) ?: "Price unavailable"
     val carbon = event.details["carbon_diff_percent"]?.takeIf { it.isNotBlank() }?.let { "$it% vs typical" }
     DetailCardFrame(accent = CardSky) {
         DetailCardHeader(eyebrow = "Pricing", title = totalPrice)

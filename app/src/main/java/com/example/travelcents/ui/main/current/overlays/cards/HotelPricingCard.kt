@@ -30,7 +30,6 @@ import com.example.travelcents.data.trip.model.detailValue
 import java.time.LocalDate
 import java.time.format.DateTimeFormatter
 import java.time.temporal.ChronoUnit
-import java.util.Locale
 
 @Composable
 fun HotelPricingCard(event: TravelEvent) {
@@ -128,14 +127,5 @@ private fun computeNights(event: TravelEvent): Int {
         ChronoUnit.DAYS.between(start, end).toInt().coerceAtLeast(0)
     } catch (_: Exception) {
         0
-    }
-}
-
-private fun formatPrice(amount: Double): String {
-    val rounded = kotlin.math.round(amount)
-    return if (kotlin.math.abs(amount - rounded) < 0.01) {
-        "$${String.format(Locale.US, "%,d", rounded.toLong())}"
-    } else {
-        "$${String.format(Locale.US, "%,.2f", amount)}"
     }
 }
