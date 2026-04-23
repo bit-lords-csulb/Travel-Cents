@@ -164,24 +164,17 @@ class NewTripViewModel(application: Application) : AndroidViewModel(application)
                     restaurantPool, tripDates, "restaurant", itinerary.itineraryId
                 )
 
-                // Step 4: Yelp activities (1 pooled call) + Yelp events (full trip range), in parallel
+                // Step 4: AI Activities via Local Firebase Emulator (The Demo Brain)
                 _generationStep.value = GenerationStep.FINDING_ACTIVITIES
-                _uiState.value = TripUiState.Loading(YELP_ACTIVITIES_MESSAGES.random())
-                val activityPoolDeferred = async { YelpRepository.fetchActivityPool(itinerary.destination) }
-                val yelpEventsDeferred = async {
-                    YelpRepository.searchEvents(
-                        location = itinerary.destination,
-                        startDate = request.dateFrom,
-                        endDate = request.dateTo,
-                        itineraryId = itinerary.itineraryId
-                    )
-                }
-                val activityEvents = YelpRepository.distributePoolToEvents(
-                    activityPoolDeferred.await(), tripDates, "activity", itinerary.itineraryId
-                )
-                val localEvents = yelpEventsDeferred.await()
+                _uiState.value = TripUiState.Loading("Asking Local AI Brain for Activities...")
 
-                val allEvents = realFlights + realHotels + restaurantEvents + activityEvents + localEvents
+                val aiActivities = GroqRepository.getAIActivities(
+                    city = itinerary.destination,
+                    itineraryId = itinerary.itineraryId,
+                    dates = tripDates
+                )
+
+                val allEvents = realFlights + realHotels + restaurantEvents + aiActivities
                 val linkedItinerary = itinerary.copy(eventIds = allEvents.map { it.eventId })
 
                 // Step 5: Download selected hero images only — alternative images are lazy-loaded on expand
