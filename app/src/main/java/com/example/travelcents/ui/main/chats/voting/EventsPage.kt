@@ -26,8 +26,8 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import coil.compose.AsyncImage
-import com.example.travelcents.data.model.Event
-import com.example.travelcents.data.model.Group
+import com.example.travelcents.data.trip.model.Event
+import com.example.travelcents.data.social.model.Group
 import com.example.travelcents.ui.theme.*
 
 @OptIn(ExperimentalFoundationApi::class, ExperimentalMaterial3Api::class)
@@ -44,6 +44,7 @@ fun EventsPage(
 ) {
     val events by viewModel.events.collectAsState()
     val isLoading by viewModel.isLoading.collectAsState()
+    val canWriteLinkedTrip by viewModel.canWriteLinkedTrip.collectAsState()
 
     LaunchedEffect(group) {
         viewModel.updateGroup(group)
@@ -141,10 +142,7 @@ fun EventsPage(
                 Spacer(modifier = Modifier.height(32.dp))
 
                 // Add to Itinerary button
-                val isTripOwner =
-                    group.linkedTripOwnerId.isEmpty() || group.linkedTripOwnerId == viewModel.currentUid
-
-                if (selectedTab == 0 && isTripOwner) {
+                if (selectedTab == 0 && canWriteLinkedTrip) {
                     Button(
                         onClick = {
                             viewModel.markEventAsWon(event)
@@ -207,7 +205,8 @@ fun EventsPage(
                 .fillMaxWidth()
                 .clip(RoundedCornerShape(bottomStart = 24.dp, bottomEnd = 24.dp))
                 .background(DeepSea2)
-                .padding(top = 48.dp, bottom = 20.dp, start = 8.dp, end = 16.dp)
+                .statusBarsPadding()
+                .padding(top = 8.dp, bottom = 16.dp, start = 8.dp, end = 16.dp)
         ) {
             Column(
                 modifier = Modifier.fillMaxWidth(),
@@ -321,10 +320,7 @@ fun EventsPage(
                             onDownvote = { viewModel.downvote(event) },
                             onCommentClick = { onEventClick(event) },
                             onLongPress = {
-                                eventToDelete = event.takeIf {
-                                    it.createdBy == viewModel.currentUid ||
-                                            group.linkedTripOwnerId == viewModel.currentUid
-                                }
+                                eventToDelete = event.takeIf(viewModel::canDeleteEvent)
                             }
                         )
                     }
@@ -585,3 +581,4 @@ fun VotingSideBar(
         }
     }
 }
+

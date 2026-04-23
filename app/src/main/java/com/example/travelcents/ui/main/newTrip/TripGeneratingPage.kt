@@ -1,4 +1,8 @@
+<<<<<<< HEAD
 package com.example.travelcents.ui.main.newtrip
+=======
+package com.example.travelcents.ui.main.newTrip
+>>>>>>> f3ada09702446ecc92076fe613e8dffd76d7694a
 
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.expandVertically
@@ -21,10 +25,16 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.RadioButtonChecked
 import androidx.compose.material.icons.filled.RadioButtonUnchecked
+<<<<<<< HEAD
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
+=======
+import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.Icon
+import androidx.compose.material3.ProvideTextStyle
+>>>>>>> f3ada09702446ecc92076fe613e8dffd76d7694a
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
@@ -33,9 +43,18 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+<<<<<<< HEAD
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+=======
+import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import com.example.travelcents.ui.components.TcButton
+import com.example.travelcents.ui.theme.TravelCentsFonts
+>>>>>>> f3ada09702446ecc92076fe613e8dffd76d7694a
 
 private val GenBackground = Color(0xFF010E24)
 private val GenSurface = Color(0xFF0B203D)
@@ -64,6 +83,7 @@ fun TripGeneratingPage(
     val currentStep by viewModel.generationStep.collectAsState()
     val uiState by viewModel.uiState.collectAsState()
 
+<<<<<<< HEAD
     Column(
         modifier = modifier
             .fillMaxSize()
@@ -71,11 +91,26 @@ fun TripGeneratingPage(
         verticalArrangement = Arrangement.Center,
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
+=======
+    ProvideTextStyle(value = TextStyle(fontFamily = TravelCentsFonts.Body)) {
+        Column(
+            modifier = modifier
+                .fillMaxSize()
+                .background(GenBackground),
+            verticalArrangement = Arrangement.Center,
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
+>>>>>>> f3ada09702446ecc92076fe613e8dffd76d7694a
         Text(
             text = "Generating Your Trip",
             fontSize = 24.sp,
             fontWeight = FontWeight.ExtraBold,
+<<<<<<< HEAD
             color = GenOnSurface
+=======
+            color = GenOnSurface,
+            fontFamily = TravelCentsFonts.Headline
+>>>>>>> f3ada09702446ecc92076fe613e8dffd76d7694a
         )
         Text(
             text = "Sit tight while we plan your adventure",
@@ -124,13 +159,18 @@ fun TripGeneratingPage(
             enter = fadeIn(),
             exit = fadeOut()
         ) {
+<<<<<<< HEAD
             Button(
+=======
+            TcButton(
+>>>>>>> f3ada09702446ecc92076fe613e8dffd76d7694a
                 onClick = {
                     viewModel.resetState()
                     onTripReady()
                 },
                 modifier = Modifier
                     .fillMaxWidth()
+<<<<<<< HEAD
                     .height(56.dp)
                     .padding(horizontal = 24.dp),
                 shape = RoundedCornerShape(999.dp),
@@ -141,6 +181,12 @@ fun TripGeneratingPage(
             ) {
                 Text(
                     text = "View My Trip →",
+=======
+                    .padding(horizontal = 24.dp)
+            ) {
+                Text(
+                    text = "View My Trip",
+>>>>>>> f3ada09702446ecc92076fe613e8dffd76d7694a
                     fontSize = 16.sp,
                     fontWeight = FontWeight.Bold
                 )
@@ -148,6 +194,10 @@ fun TripGeneratingPage(
         }
     }
 }
+<<<<<<< HEAD
+=======
+}
+>>>>>>> f3ada09702446ecc92076fe613e8dffd76d7694a
 
 @Composable
 private fun StepCard(label: String, isDone: Boolean, isActive: Boolean) {
@@ -229,3 +279,7 @@ private fun StepCard(label: String, isDone: Boolean, isActive: Boolean) {
         }
     }
 }
+<<<<<<< HEAD
+=======
+
+>>>>>>> f3ada09702446ecc92076fe613e8dffd76d7694a

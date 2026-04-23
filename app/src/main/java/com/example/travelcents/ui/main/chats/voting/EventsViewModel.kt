@@ -3,13 +3,13 @@ package com.example.travelcents.ui.main.chats.voting
 import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
-import com.example.travelcents.data.model.Event
-import com.example.travelcents.data.model.Group
+import com.example.travelcents.data.social.model.Group
+import com.example.travelcents.data.trip.TripAccessRole
+import com.example.travelcents.data.trip.model.Event
 import com.google.firebase.Firebase
 import com.google.firebase.auth.auth
 import com.google.firebase.firestore.FieldValue
 import com.google.firebase.firestore.ListenerRegistration
-import com.google.firebase.firestore.Query
 import com.google.firebase.firestore.firestore
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -24,7 +24,12 @@ class EventsViewModel(initialGroup: Group) : ViewModel() {
     val group: Group get() = _group
 
     fun updateGroup(newGroup: Group) {
+        val linkedTripChanged = newGroup.linkedTripId != _group.linkedTripId ||
+            newGroup.linkedTripOwnerId != _group.linkedTripOwnerId
         _group = newGroup
+        if (linkedTripChanged) {
+            observeLinkedTripAccess()
+        }
     }
 
     val currentUid: String get() = auth.currentUser?.uid ?: ""
@@ -36,10 +41,17 @@ class EventsViewModel(initialGroup: Group) : ViewModel() {
     private val _isLoading = MutableStateFlow(true)
     val isLoading: StateFlow<Boolean> = _isLoading.asStateFlow()
 
+    private val _canWriteLinkedTrip = MutableStateFlow(
+        initialGroup.linkedTripId.isEmpty() || initialGroup.linkedTripOwnerId.isEmpty()
+    )
+    val canWriteLinkedTrip: StateFlow<Boolean> = _canWriteLinkedTrip.asStateFlow()
+
     private var eventsListener: ListenerRegistration? = null
+    private var linkedTripAccessListener: ListenerRegistration? = null
 
     init {
         startListening()
+        observeLinkedTripAccess()
     }
 
     private fun startListening() {
@@ -81,9 +93,54 @@ class EventsViewModel(initialGroup: Group) : ViewModel() {
                         isWon = doc.getBoolean("isWon") ?: false
                     )
                 }
-                // Sort locally by actual voting score (Upvotes - Downvotes)
                 _events.value =
                     fetchedEvents.sortedByDescending { it.upvotes.size - it.downvotes.size }
+            }
+    }
+
+    private fun observeLinkedTripAccess() {
+        linkedTripAccessListener?.remove()
+
+        if (group.linkedTripId.isEmpty() || group.linkedTripOwnerId.isEmpty()) {
+            _canWriteLinkedTrip.value = true
+            return
+        }
+
+        if (currentUid.isEmpty()) {
+            _canWriteLinkedTrip.value = false
+            return
+        }
+
+        linkedTripAccessListener = db.collection("users")
+            .document(group.linkedTripOwnerId)
+            .collection("trips")
+            .document(group.linkedTripId)
+            .addSnapshotListener { snapshot, error ->
+                if (error != null) {
+                    Log.e("EventsViewModel", "Error loading linked trip access", error)
+                    _canWriteLinkedTrip.value = currentUid == group.linkedTripOwnerId
+                    return@addSnapshotListener
+                }
+
+                if (snapshot == null || !snapshot.exists()) {
+                    _canWriteLinkedTrip.value = false
+                    return@addSnapshotListener
+                }
+
+                val roleByUid = (snapshot.get("roleByUid") as? Map<*, *>)
+                    ?.mapNotNull { entry ->
+                        val uid = entry.key as? String ?: return@mapNotNull null
+                        val role = entry.value as? String ?: return@mapNotNull null
+                        uid to role
+                    }
+                    ?.toMap()
+                    .orEmpty()
+
+                val role = when {
+                    currentUid == group.linkedTripOwnerId -> TripAccessRole.OWNER
+                    else -> TripAccessRole.fromWireValue(roleByUid[currentUid])
+                }
+                _canWriteLinkedTrip.value = role.canMutateEvents()
             }
     }
 
@@ -117,33 +174,33 @@ class EventsViewModel(initialGroup: Group) : ViewModel() {
         }
     }
 
+    fun canDeleteEvent(event: Event): Boolean {
+        val hasLinkedTripAccess =
+            group.linkedTripId.isNotEmpty() &&
+            group.linkedTripOwnerId.isNotEmpty() &&
+            _canWriteLinkedTrip.value
+
+        return currentUid == event.createdBy || hasLinkedTripAccess
+    }
+
     fun deleteEvent(event: Event, onComplete: () -> Unit = {}) {
-        // Only the creator or the trip owner can delete it
-        if (currentUid != event.createdBy && currentUid != group.linkedTripOwnerId) return
+        if (!canDeleteEvent(event)) return
 
         val groupEventRef = db.collection("groups").document(groupId)
             .collection("events").document(event.id)
 
-        // If the event hasn't won yet, or there is no linked trip, just delete it from the chat normally
         if (!event.isWon || group.linkedTripId.isEmpty() || group.linkedTripOwnerId.isEmpty()) {
             groupEventRef.delete().addOnSuccessListener { onComplete() }
             return
         }
 
-        // If it HAS won, we need to clean up the private trip database too
         val tripRef = db.collection("users").document(group.linkedTripOwnerId)
             .collection("trips").document(group.linkedTripId)
-
         val tripEventRef = tripRef.collection("events").document(event.id)
 
         db.runBatch { batch ->
-            // Delete from the Group Chat
             batch.delete(groupEventRef)
-
-            // Delete from the Trip's private "events" subcollection
             batch.delete(tripEventRef)
-
-            // Remove the ID from the main Trip document's "eventIds" array
             batch.update(tripRef, "eventIds", FieldValue.arrayRemove(event.id))
         }.addOnSuccessListener {
             onComplete()
@@ -167,32 +224,24 @@ class EventsViewModel(initialGroup: Group) : ViewModel() {
             return
         }
 
-        if (group.linkedTripOwnerId != currentUid) {
+        if (!_canWriteLinkedTrip.value) {
             Log.e(
                 "EventsViewModel",
-                "Unauthorized: User $currentUid is not the owner of trip ${group.linkedTripId}"
+                "Unauthorized: User $currentUid cannot write to trip ${group.linkedTripId}"
             )
             return
         }
 
         val groupEventRef = db.collection("groups").document(groupId)
             .collection("events").document(event.id)
-
         val tripRef = db.collection("users").document(group.linkedTripOwnerId)
             .collection("trips").document(group.linkedTripId)
-
         val tripEventRef = tripRef.collection("events").document(event.id)
-
         val wonEvent = event.copy(isWon = true)
 
         db.runBatch { batch ->
-            // Mark it as won in the Group Chat's voting tab
             batch.update(groupEventRef, "isWon", true)
-
-            // Save the UPDATED event into the user's Trip events subcollection
             batch.set(tripEventRef, wonEvent)
-
-            // Append the event ID to the main Trip document's "eventIds" array
             batch.update(tripRef, "eventIds", FieldValue.arrayUnion(event.id))
         }.addOnSuccessListener {
             onComplete()
@@ -205,6 +254,7 @@ class EventsViewModel(initialGroup: Group) : ViewModel() {
     override fun onCleared() {
         super.onCleared()
         eventsListener?.remove()
+        linkedTripAccessListener?.remove()
     }
 
     class Factory(private val group: Group) : ViewModelProvider.Factory {

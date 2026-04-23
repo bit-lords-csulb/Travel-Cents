@@ -1,4 +1,8 @@
+<<<<<<< HEAD
 package com.example.travelcents.ui.main.newtrip
+=======
+package com.example.travelcents.ui.main.newTrip
+>>>>>>> f3ada09702446ecc92076fe613e8dffd76d7694a
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -13,6 +17,10 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+<<<<<<< HEAD
+=======
+import androidx.compose.foundation.layout.statusBarsPadding
+>>>>>>> f3ada09702446ecc92076fe613e8dffd76d7694a
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -25,10 +33,16 @@ import androidx.compose.material.icons.filled.ChildCare
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Pets
 import androidx.compose.material.icons.filled.Remove
+<<<<<<< HEAD
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+=======
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.ProvideTextStyle
+>>>>>>> f3ada09702446ecc92076fe613e8dffd76d7694a
 import androidx.compose.material3.Switch
 import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
@@ -43,12 +57,23 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
+<<<<<<< HEAD
+=======
+import androidx.compose.ui.text.TextStyle
+>>>>>>> f3ada09702446ecc92076fe613e8dffd76d7694a
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+<<<<<<< HEAD
 import com.example.travelcents.ui.theme.DeepSea1
 import com.example.travelcents.ui.theme.DeepSea5
+=======
+import com.example.travelcents.ui.components.TcButton
+import com.example.travelcents.ui.theme.DeepSea1
+import com.example.travelcents.ui.theme.DeepSea5
+import com.example.travelcents.ui.theme.TravelCentsFonts
+>>>>>>> f3ada09702446ecc92076fe613e8dffd76d7694a
 
 
 @Composable
@@ -62,6 +87,7 @@ fun TripStep3TravelersPage(
     var hasChildren by remember { mutableStateOf(viewModel.children > 0) }
     var hasPets by remember { mutableStateOf(viewModel.pets > 0) }
 
+<<<<<<< HEAD
     Column(
         modifier = modifier
             .fillMaxSize()
@@ -69,6 +95,21 @@ fun TripStep3TravelersPage(
     ) {
         // Top bar
         Column(modifier = Modifier.fillMaxWidth().background(Color(0xFF010E24))) {
+=======
+    ProvideTextStyle(value = TextStyle(fontFamily = TravelCentsFonts.Body)) {
+        Column(
+            modifier = modifier
+                .fillMaxSize()
+                .background(DeepSea1)
+        ) {
+        // Top bar
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .background(Color(0xFF010E24))
+                .statusBarsPadding()
+        ) {
+>>>>>>> f3ada09702446ecc92076fe613e8dffd76d7694a
             Row(
                 modifier = Modifier.fillMaxWidth().padding(horizontal = 8.dp, vertical = 4.dp),
                 horizontalArrangement = Arrangement.SpaceBetween,
@@ -122,7 +163,12 @@ fun TripStep3TravelersPage(
                 fontWeight = FontWeight.ExtraBold,
                 color = DeepSea5,
                 textAlign = TextAlign.Center,
+<<<<<<< HEAD
                 letterSpacing = (-1).sp
+=======
+                letterSpacing = (-1).sp,
+                fontFamily = TravelCentsFonts.Headline
+>>>>>>> f3ada09702446ecc92076fe613e8dffd76d7694a
             )
             Spacer(Modifier.height(32.dp))
 
@@ -247,6 +293,7 @@ fun TripStep3TravelersPage(
                 .background(DeepSea1)
                 .padding(horizontal = 16.dp, vertical = 12.dp)
         ) {
+<<<<<<< HEAD
             Button(
                 onClick = onContinueClick,
                 modifier = Modifier.fillMaxWidth().height(56.dp),
@@ -255,6 +302,11 @@ fun TripStep3TravelersPage(
                     contentColor = Color(0xFF001627)
                 ),
                 shape = RoundedCornerShape(16.dp)
+=======
+            TcButton(
+                onClick = onContinueClick,
+                modifier = Modifier.fillMaxWidth()
+>>>>>>> f3ada09702446ecc92076fe613e8dffd76d7694a
             ) {
                 Row(
                     horizontalArrangement = Arrangement.spacedBy(8.dp),
@@ -267,6 +319,10 @@ fun TripStep3TravelersPage(
         }
     }
 }
+<<<<<<< HEAD
+=======
+}
+>>>>>>> f3ada09702446ecc92076fe613e8dffd76d7694a
 
 @Composable
 private fun S3ProgressWidget(stepsComplete: Int) {
@@ -414,3 +470,7 @@ private fun S3ToggleRow(
         )
     }
 }
+<<<<<<< HEAD
+=======
+
+>>>>>>> f3ada09702446ecc92076fe613e8dffd76d7694a

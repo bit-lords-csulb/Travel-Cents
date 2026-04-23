@@ -1,4 +1,8 @@
+<<<<<<< HEAD
 package com.example.travelcents.ui.main.newtrip
+=======
+package com.example.travelcents.ui.main.newTrip
+>>>>>>> f3ada09702446ecc92076fe613e8dffd76d7694a
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -14,6 +18,10 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+<<<<<<< HEAD
+=======
+import androidx.compose.foundation.layout.statusBarsPadding
+>>>>>>> f3ada09702446ecc92076fe613e8dffd76d7694a
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
@@ -31,10 +39,16 @@ import androidx.compose.material.icons.filled.ChevronRight
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material3.AlertDialog
+<<<<<<< HEAD
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+=======
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.ProvideTextStyle
+>>>>>>> f3ada09702446ecc92076fe613e8dffd76d7694a
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -48,12 +62,23 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+<<<<<<< HEAD
+=======
+import androidx.compose.ui.text.TextStyle
+>>>>>>> f3ada09702446ecc92076fe613e8dffd76d7694a
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+<<<<<<< HEAD
 import com.example.travelcents.ui.theme.DeepSea1
 import com.example.travelcents.ui.theme.DeepSea5
+=======
+import com.example.travelcents.ui.components.TcButton
+import com.example.travelcents.ui.theme.DeepSea1
+import com.example.travelcents.ui.theme.DeepSea5
+import com.example.travelcents.ui.theme.TravelCentsFonts
+>>>>>>> f3ada09702446ecc92076fe613e8dffd76d7694a
 import java.util.Calendar
 
 
@@ -127,6 +152,7 @@ fun TripStep2DatesPage(
         else displayMonth++
     }
 
+<<<<<<< HEAD
     Column(
         modifier = modifier
             .fillMaxSize()
@@ -134,6 +160,21 @@ fun TripStep2DatesPage(
     ) {
         // Top bar
         Column(modifier = Modifier.fillMaxWidth().background(Color(0xFF010E24))) {
+=======
+    ProvideTextStyle(value = TextStyle(fontFamily = TravelCentsFonts.Body)) {
+        Column(
+            modifier = modifier
+                .fillMaxSize()
+                .background(DeepSea1)
+        ) {
+        // Top bar
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .background(Color(0xFF010E24))
+                .statusBarsPadding()
+        ) {
+>>>>>>> f3ada09702446ecc92076fe613e8dffd76d7694a
             Row(
                 modifier = Modifier.fillMaxWidth().padding(horizontal = 8.dp, vertical = 4.dp),
                 horizontalArrangement = Arrangement.SpaceBetween,
@@ -176,7 +217,12 @@ fun TripStep2DatesPage(
                 fontSize = 30.sp,
                 fontWeight = FontWeight.ExtraBold,
                 color = DeepSea5,
+<<<<<<< HEAD
                 letterSpacing = (-1).sp
+=======
+                letterSpacing = (-1).sp,
+                fontFamily = TravelCentsFonts.Headline
+>>>>>>> f3ada09702446ecc92076fe613e8dffd76d7694a
             )
             Spacer(Modifier.height(6.dp))
             Text(
@@ -386,6 +432,7 @@ fun TripStep2DatesPage(
                 .background(DeepSea1)
                 .padding(horizontal = 16.dp, vertical = 12.dp)
         ) {
+<<<<<<< HEAD
             Button(
                 onClick = onContinueClick,
                 modifier = Modifier.fillMaxWidth().height(52.dp),
@@ -397,6 +444,12 @@ fun TripStep2DatesPage(
                     disabledContentColor = DeepSea5.copy(alpha = 0.3f)
                 ),
                 shape = RoundedCornerShape(16.dp)
+=======
+            TcButton(
+                onClick = onContinueClick,
+                modifier = Modifier.fillMaxWidth(),
+                enabled = startDate != null && endDate != null
+>>>>>>> f3ada09702446ecc92076fe613e8dffd76d7694a
             ) {
                 Row(
                     horizontalArrangement = Arrangement.spacedBy(8.dp),
@@ -409,6 +462,10 @@ fun TripStep2DatesPage(
         }
     }
 }
+<<<<<<< HEAD
+=======
+}
+>>>>>>> f3ada09702446ecc92076fe613e8dffd76d7694a
 
 @Composable
 private fun S2ProgressWidget(stepsComplete: Int) {
@@ -594,3 +651,7 @@ private fun S2MonthYearPickerDialog(
         }
     )
 }
+<<<<<<< HEAD
+=======
+
+>>>>>>> f3ada09702446ecc92076fe613e8dffd76d7694a

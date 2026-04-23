@@ -1,4 +1,8 @@
+<<<<<<< HEAD
 package com.example.travelcents.ui.main.newtrip
+=======
+package com.example.travelcents.ui.main.newTrip
+>>>>>>> f3ada09702446ecc92076fe613e8dffd76d7694a
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -12,6 +16,10 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+<<<<<<< HEAD
+=======
+import androidx.compose.foundation.layout.statusBarsPadding
+>>>>>>> f3ada09702446ecc92076fe613e8dffd76d7694a
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -22,10 +30,16 @@ import androidx.compose.material.icons.automirrored.filled.ArrowForward
 import androidx.compose.material.icons.filled.AttachMoney
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.TrendingUp
+<<<<<<< HEAD
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+=======
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.ProvideTextStyle
+>>>>>>> f3ada09702446ecc92076fe613e8dffd76d7694a
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.Slider
@@ -49,8 +63,15 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+<<<<<<< HEAD
 import com.example.travelcents.ui.theme.DeepSea1
 import com.example.travelcents.ui.theme.DeepSea5
+=======
+import com.example.travelcents.ui.components.TcButton
+import com.example.travelcents.ui.theme.DeepSea1
+import com.example.travelcents.ui.theme.DeepSea5
+import com.example.travelcents.ui.theme.TravelCentsFonts
+>>>>>>> f3ada09702446ecc92076fe613e8dffd76d7694a
 
 
 private const val S4BudgetMin = 500
@@ -84,6 +105,7 @@ fun TripStep4BudgetPage(
     viewModel.currency = "USD"
     viewModel.travelStyle = tierName.lowercase()
 
+<<<<<<< HEAD
     Column(
         modifier = modifier
             .fillMaxSize()
@@ -91,6 +113,21 @@ fun TripStep4BudgetPage(
     ) {
         // Top bar
         Column(modifier = Modifier.fillMaxWidth().background(Color(0xFF010E24))) {
+=======
+    ProvideTextStyle(value = TextStyle(fontFamily = TravelCentsFonts.Body)) {
+        Column(
+            modifier = modifier
+                .fillMaxSize()
+                .background(DeepSea1)
+        ) {
+        // Top bar
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .background(Color(0xFF010E24))
+                .statusBarsPadding()
+        ) {
+>>>>>>> f3ada09702446ecc92076fe613e8dffd76d7694a
             Row(
                 modifier = Modifier.fillMaxWidth().padding(horizontal = 8.dp, vertical = 4.dp),
                 horizontalArrangement = Arrangement.SpaceBetween,
@@ -135,7 +172,12 @@ fun TripStep4BudgetPage(
                 fontWeight = FontWeight.ExtraBold,
                 color = DeepSea5,
                 textAlign = TextAlign.Center,
+<<<<<<< HEAD
                 letterSpacing = (-1).sp
+=======
+                letterSpacing = (-1).sp,
+                fontFamily = TravelCentsFonts.Headline
+>>>>>>> f3ada09702446ecc92076fe613e8dffd76d7694a
             )
             Spacer(Modifier.height(6.dp))
             Text(
@@ -195,7 +237,12 @@ fun TripStep4BudgetPage(
                             fontWeight = FontWeight.Black,
                             color = DeepSea5,
                             letterSpacing = (-2).sp,
+<<<<<<< HEAD
                             textAlign = TextAlign.Center
+=======
+                            textAlign = TextAlign.Center,
+                            fontFamily = TravelCentsFonts.Headline
+>>>>>>> f3ada09702446ecc92076fe613e8dffd76d7694a
                         ),
                         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                         singleLine = true,
@@ -212,7 +259,12 @@ fun TripStep4BudgetPage(
                                     fontSize = 52.sp,
                                     fontWeight = FontWeight.Black,
                                     color = DeepSea5,
+<<<<<<< HEAD
                                     letterSpacing = (-2).sp
+=======
+                                    letterSpacing = (-2).sp,
+                                    fontFamily = TravelCentsFonts.Headline
+>>>>>>> f3ada09702446ecc92076fe613e8dffd76d7694a
                                 )
                                 innerTextField()
                             }
@@ -299,6 +351,7 @@ fun TripStep4BudgetPage(
                 .background(DeepSea1)
                 .padding(horizontal = 16.dp, vertical = 12.dp)
         ) {
+<<<<<<< HEAD
             Button(
                 onClick = onContinueClick,
                 modifier = Modifier.fillMaxWidth().height(52.dp),
@@ -307,6 +360,11 @@ fun TripStep4BudgetPage(
                     contentColor = Color(0xFF001627)
                 ),
                 shape = RoundedCornerShape(12.dp)
+=======
+            TcButton(
+                onClick = onContinueClick,
+                modifier = Modifier.fillMaxWidth()
+>>>>>>> f3ada09702446ecc92076fe613e8dffd76d7694a
             ) {
                 Row(
                     horizontalArrangement = Arrangement.spacedBy(8.dp),
@@ -319,6 +377,10 @@ fun TripStep4BudgetPage(
         }
     }
 }
+<<<<<<< HEAD
+=======
+}
+>>>>>>> f3ada09702446ecc92076fe613e8dffd76d7694a
 
 @Composable
 private fun S4ProgressWidget(stepsComplete: Int) {
@@ -364,3 +426,7 @@ private fun S4ProgressWidget(stepsComplete: Int) {
         }
     }
 }
+<<<<<<< HEAD
+=======
+
+>>>>>>> f3ada09702446ecc92076fe613e8dffd76d7694a
