@@ -2,6 +2,8 @@ package com.example.travelcents.data.trip.remote
 
 import android.content.Context
 import com.example.travelcents.data.trip.local.CurrencyRateCache
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import okhttp3.HttpUrl.Companion.toHttpUrl
 import okhttp3.OkHttpClient
 import okhttp3.Request
@@ -12,8 +14,6 @@ import java.time.LocalDate
 import java.util.Locale
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.TimeUnit
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.withContext
 
 class CurrencyPreviewRepository(context: Context) {
 

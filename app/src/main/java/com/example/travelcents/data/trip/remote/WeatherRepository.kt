@@ -1,5 +1,7 @@
 package com.example.travelcents.data.trip.remote
 
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import okhttp3.HttpUrl.Companion.toHttpUrl
 import okhttp3.OkHttpClient
 import okhttp3.Request
@@ -12,8 +14,6 @@ import java.util.Locale
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.TimeUnit
 import kotlin.math.abs
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.withContext
 
 object WeatherRepository {
 

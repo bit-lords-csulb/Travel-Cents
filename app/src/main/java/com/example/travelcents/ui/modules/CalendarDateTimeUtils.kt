@@ -1,8 +1,8 @@
 package com.example.travelcents.ui.modules
 
-import com.example.travelcents.data.trip.model.TravelEvent
 import com.example.travelcents.data.trip.model.ATTR_BUSINESS_NAME
 import com.example.travelcents.data.trip.model.ATTR_HOTEL_NAME
+import com.example.travelcents.data.trip.model.TravelEvent
 import com.example.travelcents.data.trip.model.firstNonBlank
 import java.time.LocalDate
 import java.time.LocalTime

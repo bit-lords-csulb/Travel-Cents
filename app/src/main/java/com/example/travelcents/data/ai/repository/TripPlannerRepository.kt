@@ -1,11 +1,11 @@
 package com.example.travelcents.data.ai.repository
 
-import com.example.travelcents.data.trip.model.Itinerary
 import com.example.travelcents.data.ai.model.LlmMessage
 import com.example.travelcents.data.ai.remote.LlmClient
+import com.example.travelcents.data.trip.local.DestinationTimeZones
+import com.example.travelcents.data.trip.model.Itinerary
 import com.example.travelcents.data.trip.model.TravelRequest
 import com.example.travelcents.data.trip.model.defaultTripNameForDestination
-import com.example.travelcents.data.trip.local.DestinationTimeZones
 import com.google.gson.Gson
 import com.google.gson.JsonObject
 import java.util.UUID

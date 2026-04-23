@@ -2,14 +2,6 @@ package com.example.travelcents.data.trip.remote
 
 import com.example.travelcents.BuildConfig
 import com.example.travelcents.data.media.StaticMapUrlFactory
-import com.example.travelcents.data.trip.model.EventOption
-import com.example.travelcents.data.trip.model.TravelEvent
-import com.example.travelcents.data.trip.model.YelpBusiness
-import com.example.travelcents.data.trip.model.YelpEvent
-import com.example.travelcents.data.trip.model.YelpOptionPoolItem
-import com.example.travelcents.data.trip.model.YelpReview
-import com.example.travelcents.data.trip.model.YELP_POOL_TYPE_ACTIVITIES
-import com.example.travelcents.data.trip.model.YELP_POOL_TYPE_RESTAURANTS
 import com.example.travelcents.data.trip.model.ATTR_AVERAGE_RATING
 import com.example.travelcents.data.trip.model.ATTR_BUSINESS_ADDRESS
 import com.example.travelcents.data.trip.model.ATTR_BUSINESS_NAME
@@ -36,15 +28,23 @@ import com.example.travelcents.data.trip.model.ATTR_STATIC_MAP_URL
 import com.example.travelcents.data.trip.model.ATTR_YELP_DETAIL_ENRICHED
 import com.example.travelcents.data.trip.model.ATTR_YELP_URL
 import com.example.travelcents.data.trip.model.DETAIL_YELP_ID
+import com.example.travelcents.data.trip.model.EventOption
+import com.example.travelcents.data.trip.model.TravelEvent
+import com.example.travelcents.data.trip.model.YELP_POOL_TYPE_ACTIVITIES
+import com.example.travelcents.data.trip.model.YELP_POOL_TYPE_RESTAURANTS
+import com.example.travelcents.data.trip.model.YelpBusiness
+import com.example.travelcents.data.trip.model.YelpEvent
+import com.example.travelcents.data.trip.model.YelpOptionPoolItem
+import com.example.travelcents.data.trip.model.YelpReview
 import com.example.travelcents.data.trip.model.detailValue
 import okhttp3.OkHttpClient
 import okhttp3.logging.HttpLoggingInterceptor
 import retrofit2.Retrofit
 import retrofit2.converter.gson.GsonConverterFactory
-import java.util.UUID
-import java.util.concurrent.TimeUnit
-import java.util.concurrent.ConcurrentHashMap
 import java.util.Locale
+import java.util.UUID
+import java.util.concurrent.ConcurrentHashMap
+import java.util.concurrent.TimeUnit
 
 object YelpRepository {
 

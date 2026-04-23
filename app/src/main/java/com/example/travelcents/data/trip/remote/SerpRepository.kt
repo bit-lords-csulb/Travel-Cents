@@ -1,12 +1,8 @@
 package com.example.travelcents.data.trip.remote
 
-import com.example.travelcents.data.trip.model.EventOption
-import com.example.travelcents.data.trip.model.Itinerary
-import com.example.travelcents.data.trip.model.SerpFlightLeg
-import com.example.travelcents.data.trip.model.SerpFlightOption
-import com.example.travelcents.data.trip.model.SerpHotelProperty
-import com.example.travelcents.data.trip.model.TravelEvent
-import com.example.travelcents.data.trip.model.TravelRequest
+import com.example.travelcents.BuildConfig
+import com.example.travelcents.data.media.StaticMapUrlFactory
+import com.example.travelcents.data.trip.local.AirportTimeZones
 import com.example.travelcents.data.trip.model.ATTR_AMENITIES
 import com.example.travelcents.data.trip.model.ATTR_BOOKING_URL
 import com.example.travelcents.data.trip.model.ATTR_CHECK_IN_TIME
@@ -28,9 +24,13 @@ import com.example.travelcents.data.trip.model.ATTR_ROOMS_NEEDED
 import com.example.travelcents.data.trip.model.ATTR_STATIC_MAP_PROVIDER
 import com.example.travelcents.data.trip.model.ATTR_STATIC_MAP_URL
 import com.example.travelcents.data.trip.model.ATTR_TOTAL_STAY_RATE
-import com.example.travelcents.data.trip.local.AirportTimeZones
-import com.example.travelcents.data.media.StaticMapUrlFactory
-import com.example.travelcents.BuildConfig
+import com.example.travelcents.data.trip.model.EventOption
+import com.example.travelcents.data.trip.model.Itinerary
+import com.example.travelcents.data.trip.model.SerpFlightLeg
+import com.example.travelcents.data.trip.model.SerpFlightOption
+import com.example.travelcents.data.trip.model.SerpHotelProperty
+import com.example.travelcents.data.trip.model.TravelEvent
+import com.example.travelcents.data.trip.model.TravelRequest
 import okhttp3.OkHttpClient
 import okhttp3.logging.HttpLoggingInterceptor
 import retrofit2.Retrofit
