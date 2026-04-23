@@ -65,6 +65,8 @@ import com.example.travelcents.ui.main.current.overlays.cards.RestaurantOverview
 import com.example.travelcents.ui.main.current.overlays.cards.RestaurantReservationsCard
 import com.example.travelcents.ui.main.current.overlays.cards.RestaurantServicesCard
 import com.example.travelcents.ui.main.current.overlays.cards.ReviewsCard
+import com.example.travelcents.ui.main.current.overlays.cards.TransportCard
+import com.example.travelcents.ui.main.current.overlays.cards.WaitTimeCard
 import com.example.travelcents.ui.main.current.overlays.cards.compactHostLabel
 import com.example.travelcents.ui.main.current.overlays.cards.eventDurationSummary
 import com.example.travelcents.ui.main.current.overlays.cards.eventLocationLabel
@@ -309,6 +311,7 @@ private fun EventDetailCardStack(
                 tripAdults = tripAdults,
                 tripChildren = tripChildren
             )
+            WaitTimeCard(event)
             RestaurantServicesCard(event)
             if (showLocationCard) {
                 LocationMapCard(
@@ -316,6 +319,7 @@ private fun EventDetailCardStack(
                     locationLabel = locationLabel,
                     onOpenMaps = { uriHandler.openUri(mapsUrl) }
                 )
+                TransportCard(event)
             }
             ReviewsCard(
                 ratingLabel = ratingLabel,

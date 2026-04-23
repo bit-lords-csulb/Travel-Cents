@@ -53,6 +53,14 @@ android {
             "String", "MAPBOX_TOKEN",
             "\"${localProperties.getProperty("MAPBOX_TOKEN") ?: ""}\""
         )
+        buildConfigField(
+            "String", "BESTTIME_API_KEY",
+            "\"${localProperties.getProperty("BESTTIME_API_KEY") ?: ""}\""
+        )
+        buildConfigField(
+            "String", "GOOGLE_DIRECTIONS_KEY",
+            "\"${localProperties.getProperty("GOOGLE_DIRECTIONS_KEY") ?: ""}\""
+        )
     }
 
     buildTypes {

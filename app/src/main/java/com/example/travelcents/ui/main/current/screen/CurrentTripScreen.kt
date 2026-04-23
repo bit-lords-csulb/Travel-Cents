@@ -117,6 +117,7 @@ fun CurrentTripScreen(
             viewModel.fetchYelpReviews(yelpId)
             viewModel.ensureYelpEventEnriched(event.eventId)
         }
+        event?.eventId?.let(viewModel::refreshRestaurantLiveContext)
         event?.eventId?.let(viewModel::ensureEventOptionsLoaded)
     }
 

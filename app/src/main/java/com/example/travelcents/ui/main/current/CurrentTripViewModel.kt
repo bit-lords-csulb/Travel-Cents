@@ -12,6 +12,19 @@ import com.example.travelcents.data.trip.TripKey
 import com.example.travelcents.data.trip.TripAccessRole
 import com.example.travelcents.data.trip.TripPerformanceLogger
 import com.example.travelcents.data.trip.TripRepository
+import com.example.travelcents.data.trip.model.ATTR_BUSINESS_ADDRESS
+import com.example.travelcents.data.trip.model.ATTR_CURRENT_BUSYNESS
+import com.example.travelcents.data.trip.model.ATTR_ESTIMATED_WAIT_MIN
+import com.example.travelcents.data.trip.model.ATTR_LATITUDE
+import com.example.travelcents.data.trip.model.ATTR_LONGITUDE
+import com.example.travelcents.data.trip.model.ATTR_LYFT_DEEPLINK
+import com.example.travelcents.data.trip.model.ATTR_POPULAR_TIMES_JSON
+import com.example.travelcents.data.trip.model.ATTR_RIDESHARE_ESTIMATE_USD
+import com.example.travelcents.data.trip.model.ATTR_RIDESHARE_MIN
+import com.example.travelcents.data.trip.model.ATTR_TRANSIT_MIN
+import com.example.travelcents.data.trip.model.ATTR_TRANSPORT_ANCHOR_LABEL
+import com.example.travelcents.data.trip.model.ATTR_UBER_DEEPLINK
+import com.example.travelcents.data.trip.model.ATTR_WALK_MIN
 import com.example.travelcents.data.trip.model.DETAIL_YELP_ID
 import com.example.travelcents.data.trip.model.EventOption
 import com.example.travelcents.data.trip.model.Itinerary
@@ -19,9 +32,12 @@ import com.example.travelcents.data.trip.model.TravelEvent
 import com.example.travelcents.data.trip.model.YelpOptionPoolItem
 import com.example.travelcents.data.trip.model.YelpReview
 import com.example.travelcents.data.trip.model.detailValue
+import com.example.travelcents.data.trip.model.displayName
 import com.example.travelcents.data.trip.model.resolveTripName
 import com.example.travelcents.data.trip.model.YELP_POOL_TYPE_ACTIVITIES
 import com.example.travelcents.data.trip.model.YELP_POOL_TYPE_RESTAURANTS
+import com.example.travelcents.data.trip.remote.PopularTimesRepository
+import com.example.travelcents.data.trip.remote.TransportRepository
 import com.example.travelcents.data.trip.remote.YelpRepository
 import com.example.travelcents.data.sync.CurrentTripSyncCoordinator
 import com.example.travelcents.data.sync.TripHydrationWorker
@@ -131,6 +147,7 @@ class CurrentTripViewModel(application: Application) : AndroidViewModel(applicat
     private val _reviewsLoading = MutableStateFlow<Set<String>>(emptySet())
     val reviewsLoading: StateFlow<Set<String>> = _reviewsLoading.asStateFlow()
     private val _yelpEnrichmentInFlight = MutableStateFlow<Set<String>>(emptySet())
+    private val _restaurantLiveContextInFlight = MutableStateFlow<Set<String>>(emptySet())
 
     private val _shareTargets = MutableStateFlow<List<ShareTarget>>(emptyList())
     val shareTargets: StateFlow<List<ShareTarget>> = _shareTargets.asStateFlow()
@@ -167,6 +184,7 @@ class CurrentTripViewModel(application: Application) : AndroidViewModel(applicat
     private val sharedYelpPools = mutableMapOf<String, List<YelpOptionPoolItem>>()
     private val sharedYelpWindowBoost = mutableMapOf<String, Int>()
     private val mediaDetailPipeline = TripMediaDetailPipeline(application)
+    private var liveEventDetailOverrides: Map<String, Map<String, String>> = emptyMap()
 
     private fun resetTripState(
         isLoading: Boolean = false,
@@ -196,8 +214,10 @@ class CurrentTripViewModel(application: Application) : AndroidViewModel(applicat
         _yelpReviews.value = emptyMap()
         _reviewsLoading.value = emptySet()
         _yelpEnrichmentInFlight.value = emptySet()
+        _restaurantLiveContextInFlight.value = emptySet()
         _shareTargets.value = emptyList()
         _tripMembers.value = emptyList()
+        liveEventDetailOverrides = emptyMap()
         _uiState.value = CurrentTripUiState(
             isLoading = isLoading,
             tripTitle = tripTitle,
@@ -320,21 +340,46 @@ class CurrentTripViewModel(application: Application) : AndroidViewModel(applicat
             optionsByEvent = alignedOptionsByEvent,
             sortEvents = ::sortPlanEvents
         )
-        _events.value = enrichedEvents
+        val visibleEvents = enrichedEvents.map { event ->
+            val overrides = liveEventDetailOverrides[event.eventId].orEmpty()
+            if (overrides.isEmpty()) {
+                event
+            } else {
+                event.copy(details = event.details + overrides)
+            }
+        }
+        _events.value = visibleEvents
         _uiState.update {
             it.copy(
-                isLoading = currentTripSummary == null && enrichedEvents.isEmpty(),
-                events = enrichedEvents,
+                isLoading = currentTripSummary == null && visibleEvents.isEmpty(),
+                events = visibleEvents,
                 infoMessage = when {
                     currentTripSummary == null -> it.infoMessage
-                    enrichedEvents.isEmpty() -> EMPTY_PLANS_MESSAGE
+                    visibleEvents.isEmpty() -> EMPTY_PLANS_MESSAGE
                     it.infoMessage == EMPTY_PLANS_MESSAGE -> null
                     else -> it.infoMessage
                 },
                 errorMessage = null
             )
         }
-        prefetchSharedEventMedia(enrichedEvents)
+        prefetchSharedEventMedia(visibleEvents)
+    }
+
+    private fun replaceLiveDetailOverrides(
+        eventId: String,
+        overrides: Map<String, String>
+    ) {
+        val current = liveEventDetailOverrides[eventId].orEmpty()
+        if (current == overrides) return
+
+        liveEventDetailOverrides = liveEventDetailOverrides.toMutableMap().apply {
+            if (overrides.isEmpty()) {
+                remove(eventId)
+            } else {
+                put(eventId, overrides)
+            }
+        }
+        publishCurrentEvents(localEventsSnapshot, _eventOptions.value)
     }
 
     private fun alignEventOptionsWithSelectedState(
@@ -633,6 +678,75 @@ class CurrentTripViewModel(application: Application) : AndroidViewModel(applicat
             persistOptions = !shouldPersistEventOnly
         )
         refreshCurrentTripInBackground(tripKey)
+    }
+
+    fun refreshRestaurantLiveContext(eventId: String) {
+        val event = _uiState.value.events.firstOrNull { it.eventId == eventId } ?: return
+        if (!isRestaurantEvent(event) || eventId in _restaurantLiveContextInFlight.value) return
+
+        val venueName = event.displayName()?.takeIf { it.isNotBlank() } ?: return
+        val venueAddress = event.detailValue(ATTR_BUSINESS_ADDRESS, "address")
+            ?.takeIf { it.isNotBlank() }
+        val transportAnchor = resolveTransportAnchor(event)
+        val transportDestination = resolveTransportDestination(event)
+
+        if (venueAddress == null && (transportAnchor == null || transportDestination == null)) return
+
+        viewModelScope.launch {
+            _restaurantLiveContextInFlight.update { it + eventId }
+            try {
+                val overrides = buildMap {
+                    if (venueAddress != null) {
+                        PopularTimesRepository.fetchSnapshot(
+                            venueName = venueName,
+                            venueAddress = venueAddress,
+                            yelpId = event.detailValue(DETAIL_YELP_ID)
+                        )?.let { snapshot ->
+                            put(ATTR_POPULAR_TIMES_JSON, snapshot.popularTimesJson)
+                            snapshot.currentBusyness?.let {
+                                put(ATTR_CURRENT_BUSYNESS, it.toString())
+                            }
+                            snapshot.estimatedWaitMin?.let {
+                                put(ATTR_ESTIMATED_WAIT_MIN, it.toString())
+                            }
+                        }
+                    }
+
+                    if (transportAnchor != null && transportDestination != null) {
+                        TransportRepository.fetchSnapshot(
+                            anchor = transportAnchor,
+                            destination = transportDestination
+                        )?.let { snapshot ->
+                            snapshot.walkMin?.let {
+                                put(ATTR_WALK_MIN, it.toString())
+                            }
+                            snapshot.transitMin?.let {
+                                put(ATTR_TRANSIT_MIN, it.toString())
+                            }
+                            snapshot.rideshareMin?.let {
+                                put(ATTR_RIDESHARE_MIN, it.toString())
+                            }
+                            snapshot.rideshareEstimateUsd?.let {
+                                put(ATTR_RIDESHARE_ESTIMATE_USD, it)
+                            }
+                            snapshot.uberDeeplink?.let {
+                                put(ATTR_UBER_DEEPLINK, it)
+                            }
+                            snapshot.lyftDeeplink?.let {
+                                put(ATTR_LYFT_DEEPLINK, it)
+                            }
+                            put(ATTR_TRANSPORT_ANCHOR_LABEL, snapshot.transportAnchorLabel)
+                        }
+                    }
+                }
+
+                replaceLiveDetailOverrides(eventId, overrides)
+            } catch (e: Exception) {
+                Log.w("CurrentTripViewModel", "Failed to refresh restaurant live context", e)
+            } finally {
+                _restaurantLiveContextInFlight.update { it - eventId }
+            }
+        }
     }
 
     fun ensureEventOptionsLoaded(eventId: String) {
@@ -1524,6 +1638,64 @@ class CurrentTripViewModel(application: Application) : AndroidViewModel(applicat
                 { normalizeTime(it.startTime) },
                 { it.eventId }
             )
+        )
+    }
+
+    private fun isRestaurantEvent(event: TravelEvent): Boolean {
+        return when (event.type.lowercase(Locale.US)) {
+            "restaurant", "dining", "food" -> true
+            else -> false
+        }
+    }
+
+    private fun resolveTransportAnchor(event: TravelEvent): TransportRepository.TransportAnchor? {
+        val targetDate = normalizeDate(event.date)
+        val tripEvents = sortPlanEvents(_uiState.value.events)
+        val dayEvents = tripEvents.filter { normalizeDate(it.date) == targetDate }
+        val targetIndex = dayEvents.indexOfFirst { it.eventId == event.eventId }
+
+        if (targetIndex > 0) {
+            dayEvents.subList(0, targetIndex)
+                .asReversed()
+                .firstNotNullOfOrNull(::transportAnchorForEvent)
+                ?.let { return it }
+        }
+
+        return tripEvents
+            .firstOrNull { it.type.equals("hotel", ignoreCase = true) }
+            ?.let(::transportAnchorForEvent)
+    }
+
+    private fun transportAnchorForEvent(event: TravelEvent): TransportRepository.TransportAnchor? {
+        val latitude = event.detailValue(ATTR_LATITUDE)?.toDoubleOrNull() ?: return null
+        val longitude = event.detailValue(ATTR_LONGITUDE)?.toDoubleOrNull() ?: return null
+        val label = listOfNotNull(
+            event.displayName()?.takeIf { it.isNotBlank() },
+            event.details["title"]?.takeIf { it.isNotBlank() },
+            event.detailValue(ATTR_BUSINESS_ADDRESS, "address")?.takeIf { it.isNotBlank() }
+        ).firstOrNull() ?: return null
+
+        return TransportRepository.TransportAnchor(
+            label = label,
+            latitude = latitude,
+            longitude = longitude
+        )
+    }
+
+    private fun resolveTransportDestination(
+        event: TravelEvent
+    ): TransportRepository.TransportDestination? {
+        val latitude = event.detailValue(ATTR_LATITUDE)?.toDoubleOrNull()
+        val longitude = event.detailValue(ATTR_LONGITUDE)?.toDoubleOrNull()
+        val address = event.detailValue(ATTR_BUSINESS_ADDRESS, "address")
+            ?.takeIf { it.isNotBlank() }
+        if ((latitude == null || longitude == null) && address == null) return null
+
+        return TransportRepository.TransportDestination(
+            label = event.displayName().orEmpty(),
+            latitude = latitude,
+            longitude = longitude,
+            address = address
         )
     }
 
