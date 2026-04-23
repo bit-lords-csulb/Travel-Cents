@@ -32,6 +32,11 @@ import com.example.travelcents.data.trip.model.firstNonBlank
 import com.example.travelcents.ui.main.current.eventSubtitle
 import com.example.travelcents.ui.main.current.eventTitle
 import com.example.travelcents.ui.modules.PhotoGalleryButton
+import com.example.travelcents.ui.modules.formatDisplayTimeRange
+import com.example.travelcents.ui.modules.formatLongDuration
+import com.example.travelcents.ui.modules.formatLongTripDateWithYear
+import com.example.travelcents.ui.modules.parseFlexibleTime
+import java.time.Duration
 import java.util.Locale
 
 @Composable
@@ -47,6 +52,19 @@ fun EventSummaryCard(
     val title = eventTitle(event)
     if (event.type.equals("hotel", ignoreCase = true)) {
         HotelSummaryCard(
+            event = event,
+            heroImage = heroImage,
+            photoCount = photoCount,
+            title = title,
+            onOpenGallery = onOpenGallery
+        )
+        return
+    }
+    if (event.type.equals("restaurant", ignoreCase = true) ||
+        event.type.equals("dining", ignoreCase = true) ||
+        event.type.equals("food", ignoreCase = true)
+    ) {
+        RestaurantSummaryVariant(
             event = event,
             heroImage = heroImage,
             photoCount = photoCount,
@@ -258,6 +276,137 @@ private fun HotelSummaryCard(
                         fontSize = 13.sp,
                         lineHeight = 18.sp
                     )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun RestaurantSummaryVariant(
+    event: TravelEvent,
+    heroImage: String?,
+    photoCount: Int,
+    title: String,
+    onOpenGallery: (() -> Unit)?
+) {
+    val dateLine = event.date.takeIf { it.isNotBlank() }
+        ?.let(::formatLongTripDateWithYear)
+    val timeRange = formatDisplayTimeRange(event.startTime, event.endTime)
+        .takeIf { it.isNotBlank() && it != "TIME TBD" }
+    val totalMinutes = run {
+        val start = parseFlexibleTime(event.startTime)
+        val end = parseFlexibleTime(event.endTime)
+        if (start != null && end != null && end.isAfter(start)) {
+            Duration.between(start, end).toMinutes()
+        } else 0L
+    }
+    val durationLabel = formatLongDuration(totalMinutes).takeIf { it.isNotBlank() }
+    val durationLine = when {
+        timeRange != null && durationLabel != null -> "$timeRange ($durationLabel)"
+        timeRange != null -> timeRange
+        durationLabel != null -> durationLabel
+        else -> null
+    }
+
+    DetailCardFrame(accent = CardCoral) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(16.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Box(
+                modifier = Modifier
+                    .weight(0.42f)
+                    .aspectRatio(0.92f)
+                    .clip(RoundedCornerShape(24.dp))
+                    .background(CardSurfaceHighest)
+                    .then(if (onOpenGallery != null) Modifier.clickable(onClick = onOpenGallery) else Modifier)
+            ) {
+                if (!heroImage.isNullOrBlank()) {
+                    AsyncImage(
+                        model = heroImage,
+                        contentDescription = title,
+                        modifier = Modifier.matchParentSize(),
+                        contentScale = ContentScale.Crop
+                    )
+                    Box(
+                        modifier = Modifier
+                            .matchParentSize()
+                            .background(
+                                Brush.verticalGradient(
+                                    colors = listOf(
+                                        androidx.compose.ui.graphics.Color.Transparent,
+                                        CardBackground.copy(alpha = 0.12f),
+                                        CardBackground.copy(alpha = 0.42f)
+                                    )
+                                )
+                            )
+                    )
+                } else {
+                    Box(
+                        modifier = Modifier
+                            .matchParentSize()
+                            .background(accentGradientForType(event.type))
+                    )
+                }
+
+                if (photoCount > 1) {
+                    Surface(
+                        color = CardBackground.copy(alpha = 0.62f),
+                        shape = RoundedCornerShape(999.dp),
+                        modifier = Modifier
+                            .align(Alignment.BottomStart)
+                            .padding(10.dp)
+                    ) {
+                        Text(
+                            text = "1/$photoCount",
+                            color = CardText,
+                            fontSize = 11.sp,
+                            fontWeight = FontWeight.Bold,
+                            modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp)
+                        )
+                    }
+                }
+            }
+
+            Column(
+                modifier = Modifier.weight(0.58f),
+                verticalArrangement = Arrangement.spacedBy(10.dp)
+            ) {
+                Text(
+                    text = title,
+                    color = CardText,
+                    fontSize = 26.sp,
+                    lineHeight = 30.sp,
+                    fontWeight = FontWeight.ExtraBold
+                )
+                dateLine?.let {
+                    Text(
+                        text = it,
+                        color = CardText,
+                        fontSize = 14.sp,
+                        fontWeight = FontWeight.SemiBold,
+                        lineHeight = 18.sp
+                    )
+                }
+                durationLine?.let {
+                    Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                        Text(
+                            text = "DURATION",
+                            color = CardTextMuted,
+                            fontSize = 10.sp,
+                            fontWeight = FontWeight.Bold,
+                            letterSpacing = 1.2.sp
+                        )
+                        Text(
+                            text = it,
+                            color = CardCoral,
+                            fontSize = 13.sp,
+                            fontWeight = FontWeight.SemiBold,
+                            lineHeight = 17.sp
+                        )
+                    }
                 }
             }
         }

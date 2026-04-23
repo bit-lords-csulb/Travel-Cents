@@ -16,6 +16,7 @@ import com.example.travelcents.data.trip.model.ATTR_BUSINESS_NAME
 import com.example.travelcents.data.trip.model.ATTR_CATEGORIES
 import com.example.travelcents.data.trip.model.ATTR_DIETARY_TAGS
 import com.example.travelcents.data.trip.model.ATTR_HAS_FOOD_ORDER
+import com.example.travelcents.data.trip.model.ATTR_HAS_OUTDOOR_SEATING
 import com.example.travelcents.data.trip.model.ATTR_HAS_REQUEST_A_QUOTE
 import com.example.travelcents.data.trip.model.ATTR_HAS_RESERVATIONS
 import com.example.travelcents.data.trip.model.ATTR_HAS_WAITLIST
@@ -489,6 +490,12 @@ object YelpRepository {
             .takeIf { it.isNotEmpty() }
             ?.joinToString(", ")
             ?.let { put(ATTR_DIETARY_TAGS, it) }
+        extractBooleanAttribute(
+            attributes,
+            "outdoor_seating",
+            "outdoorseating",
+            "outdoor_dining"
+        )?.let { put(ATTR_HAS_OUTDOOR_SEATING, it.toString()) }
 
         extractBooleanAttribute(
             attributes,

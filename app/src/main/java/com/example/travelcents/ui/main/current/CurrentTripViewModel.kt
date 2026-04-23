@@ -12,19 +12,37 @@ import com.example.travelcents.data.trip.TripKey
 import com.example.travelcents.data.trip.TripAccessRole
 import com.example.travelcents.data.trip.TripPerformanceLogger
 import com.example.travelcents.data.trip.TripRepository
+import com.example.travelcents.data.trip.model.ATTR_BIKE_SCORE
 import com.example.travelcents.data.trip.model.ATTR_BUSINESS_ADDRESS
 import com.example.travelcents.data.trip.model.ATTR_CURRENT_BUSYNESS
 import com.example.travelcents.data.trip.model.ATTR_ESTIMATED_WAIT_MIN
+import com.example.travelcents.data.trip.model.ATTR_ESTIMATED_HOME_COST
+import com.example.travelcents.data.trip.model.ATTR_ESTIMATED_LOCAL_COST
+import com.example.travelcents.data.trip.model.ATTR_FX_HISTORY_30D
+import com.example.travelcents.data.trip.model.ATTR_HAS_OUTDOOR_SEATING
+import com.example.travelcents.data.trip.model.ATTR_HOME_CURRENCY
 import com.example.travelcents.data.trip.model.ATTR_LATITUDE
 import com.example.travelcents.data.trip.model.ATTR_LONGITUDE
 import com.example.travelcents.data.trip.model.ATTR_LYFT_DEEPLINK
+import com.example.travelcents.data.trip.model.ATTR_LOCAL_CURRENCY
+import com.example.travelcents.data.trip.model.ATTR_NEAR_CATEGORIES
+import com.example.travelcents.data.trip.model.ATTR_NEIGHBORHOOD_NOTE
 import com.example.travelcents.data.trip.model.ATTR_POPULAR_TIMES_JSON
+import com.example.travelcents.data.trip.model.ATTR_PRICE_LEVEL_USD
+import com.example.travelcents.data.trip.model.ATTR_PRICE_TIER
 import com.example.travelcents.data.trip.model.ATTR_RIDESHARE_ESTIMATE_USD
 import com.example.travelcents.data.trip.model.ATTR_RIDESHARE_MIN
+import com.example.travelcents.data.trip.model.ATTR_TRANSIT_SCORE
 import com.example.travelcents.data.trip.model.ATTR_TRANSIT_MIN
 import com.example.travelcents.data.trip.model.ATTR_TRANSPORT_ANCHOR_LABEL
 import com.example.travelcents.data.trip.model.ATTR_UBER_DEEPLINK
 import com.example.travelcents.data.trip.model.ATTR_WALK_MIN
+import com.example.travelcents.data.trip.model.ATTR_WALK_SCORE
+import com.example.travelcents.data.trip.model.ATTR_WEATHER_CONDITION
+import com.example.travelcents.data.trip.model.ATTR_WEATHER_PRECIP_PCT
+import com.example.travelcents.data.trip.model.ATTR_WEATHER_SUMMARY
+import com.example.travelcents.data.trip.model.ATTR_WEATHER_TEMP_C
+import com.example.travelcents.data.trip.model.ATTR_WEATHER_WIND_KPH
 import com.example.travelcents.data.trip.model.DETAIL_YELP_ID
 import com.example.travelcents.data.trip.model.EventOption
 import com.example.travelcents.data.trip.model.Itinerary
@@ -36,8 +54,11 @@ import com.example.travelcents.data.trip.model.displayName
 import com.example.travelcents.data.trip.model.resolveTripName
 import com.example.travelcents.data.trip.model.YELP_POOL_TYPE_ACTIVITIES
 import com.example.travelcents.data.trip.model.YELP_POOL_TYPE_RESTAURANTS
+import com.example.travelcents.data.trip.remote.CurrencyPreviewRepository
 import com.example.travelcents.data.trip.remote.PopularTimesRepository
 import com.example.travelcents.data.trip.remote.TransportRepository
+import com.example.travelcents.data.trip.remote.WalkScoreRepository
+import com.example.travelcents.data.trip.remote.WeatherRepository
 import com.example.travelcents.data.trip.remote.YelpRepository
 import com.example.travelcents.data.sync.CurrentTripSyncCoordinator
 import com.example.travelcents.data.sync.TripHydrationWorker
@@ -60,6 +81,7 @@ import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.tasks.await
+import java.util.Currency
 import java.util.Locale
 import java.util.UUID
 
@@ -184,6 +206,7 @@ class CurrentTripViewModel(application: Application) : AndroidViewModel(applicat
     private val sharedYelpPools = mutableMapOf<String, List<YelpOptionPoolItem>>()
     private val sharedYelpWindowBoost = mutableMapOf<String, Int>()
     private val mediaDetailPipeline = TripMediaDetailPipeline(application)
+    private val currencyPreviewRepository = CurrencyPreviewRepository(application)
     private var liveEventDetailOverrides: Map<String, Map<String, String>> = emptyMap()
 
     private fun resetTripState(
@@ -689,8 +712,26 @@ class CurrentTripViewModel(application: Application) : AndroidViewModel(applicat
             ?.takeIf { it.isNotBlank() }
         val transportAnchor = resolveTransportAnchor(event)
         val transportDestination = resolveTransportDestination(event)
+        val latitude = event.detailValue(ATTR_LATITUDE)?.toDoubleOrNull()
+        val longitude = event.detailValue(ATTR_LONGITUDE)?.toDoubleOrNull()
+        val hasOutdoorSeating = event.detailValue(ATTR_HAS_OUTDOOR_SEATING)
+            ?.equals("true", ignoreCase = true) == true
+        val tripCurrency = currentTripSummary?.currency
+            ?.takeIf { it.isNotBlank() }
+            ?.uppercase(Locale.US)
+        val homeCurrency = resolvedHomeCurrencyCode()
+        val usdAnchorAmount = restaurantUsdAnchorAmount(event)
+        val walkScoreAddress = venueAddress
+            ?: transportDestination?.address
+            ?: event.details["location"]?.takeIf { it.isNotBlank() }
 
-        if (venueAddress == null && (transportAnchor == null || transportDestination == null)) return
+        if (
+            venueAddress == null &&
+            (transportAnchor == null || transportDestination == null) &&
+            (!hasOutdoorSeating || latitude == null || longitude == null) &&
+            (latitude == null || longitude == null || walkScoreAddress == null) &&
+            (tripCurrency == null || usdAnchorAmount == null)
+        ) return
 
         viewModelScope.launch {
             _restaurantLiveContextInFlight.update { it + eventId }
@@ -736,6 +777,75 @@ class CurrentTripViewModel(application: Application) : AndroidViewModel(applicat
                                 put(ATTR_LYFT_DEEPLINK, it)
                             }
                             put(ATTR_TRANSPORT_ANCHOR_LABEL, snapshot.transportAnchorLabel)
+                        }
+                    }
+
+                    if (hasOutdoorSeating && latitude != null && longitude != null) {
+                        WeatherRepository.fetchSnapshot(
+                            latitude = latitude,
+                            longitude = longitude,
+                            date = event.date,
+                            startTime = event.startTime,
+                            timeZoneId = event.tz
+                        )?.let { snapshot ->
+                            put(ATTR_WEATHER_TEMP_C, snapshot.temperatureC.toString())
+                            put(ATTR_WEATHER_CONDITION, snapshot.condition)
+                            snapshot.precipPct?.let {
+                                put(ATTR_WEATHER_PRECIP_PCT, it.toString())
+                            }
+                            snapshot.windKph?.let {
+                                put(ATTR_WEATHER_WIND_KPH, it.toString())
+                            }
+                            put(ATTR_WEATHER_SUMMARY, snapshot.summary)
+                        }
+                    }
+
+                    if (latitude != null && longitude != null && walkScoreAddress != null) {
+                        WalkScoreRepository.fetchSnapshot(
+                            latitude = latitude,
+                            longitude = longitude,
+                            address = walkScoreAddress
+                        )?.let { snapshot ->
+                            snapshot.walkScore?.let {
+                                put(ATTR_WALK_SCORE, it.toString())
+                            }
+                            snapshot.transitScore?.let {
+                                put(ATTR_TRANSIT_SCORE, it.toString())
+                            }
+                            snapshot.bikeScore?.let {
+                                put(ATTR_BIKE_SCORE, it.toString())
+                            }
+                            snapshot.nearCategories
+                                .takeIf { it.isNotEmpty() }
+                                ?.joinToString(", ")
+                                ?.let { categories ->
+                                    put(ATTR_NEAR_CATEGORIES, categories)
+                                }
+                            snapshot.neighborhoodNote?.let {
+                                put(ATTR_NEIGHBORHOOD_NOTE, it)
+                            }
+                        }
+                    }
+
+                    if (tripCurrency != null && usdAnchorAmount != null) {
+                        currencyPreviewRepository.buildPreview(
+                            localCurrency = tripCurrency,
+                            homeCurrency = homeCurrency,
+                            usdAnchorAmount = usdAnchorAmount
+                        )?.let { snapshot ->
+                            put(ATTR_LOCAL_CURRENCY, snapshot.localCurrency)
+                            put(ATTR_HOME_CURRENCY, snapshot.homeCurrency)
+                            put(
+                                ATTR_ESTIMATED_LOCAL_COST,
+                                String.format(Locale.US, "%.2f", snapshot.localCost)
+                            )
+                            put(
+                                ATTR_ESTIMATED_HOME_COST,
+                                String.format(Locale.US, "%.2f", snapshot.homeCost)
+                            )
+                            snapshot.fxHistory30d?.let {
+                                put(ATTR_FX_HISTORY_30D, it)
+                            }
                         }
                     }
                 }
@@ -1697,6 +1807,27 @@ class CurrentTripViewModel(application: Application) : AndroidViewModel(applicat
             longitude = longitude,
             address = address
         )
+    }
+
+    private fun restaurantUsdAnchorAmount(event: TravelEvent): Double? {
+        event.detailValue(ATTR_PRICE_LEVEL_USD)
+            ?.toDoubleOrNull()
+            ?.takeIf { it > 0.0 }
+            ?.let { return it }
+
+        return when (event.detailValue(ATTR_PRICE_TIER, "price_tier")?.trim()) {
+            "$" -> 15.0
+            "$$" -> 35.0
+            "$$$" -> 70.0
+            "$$$$" -> 120.0
+            else -> null
+        }
+    }
+
+    private fun resolvedHomeCurrencyCode(): String {
+        return runCatching {
+            Currency.getInstance(Locale.getDefault()).currencyCode
+        }.getOrDefault("USD")
     }
 
     override fun onCleared() {

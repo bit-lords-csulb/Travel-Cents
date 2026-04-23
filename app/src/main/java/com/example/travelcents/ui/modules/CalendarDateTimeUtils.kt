@@ -20,6 +20,7 @@ private val displayHourFormatter: DateTimeFormatter = DateTimeFormatter.ofPatter
 private val tripDateFormatter: DateTimeFormatter = DateTimeFormatter.ofPattern("MMM d", Locale.US)
 private val itineraryHeaderFormatter: DateTimeFormatter = DateTimeFormatter.ofPattern("EEEE, MMMM d", Locale.US)
 private val longDayFormatter: DateTimeFormatter = DateTimeFormatter.ofPattern("MMMM d", Locale.US)
+private val longDateWithYearFormatter: DateTimeFormatter = DateTimeFormatter.ofPattern("MMMM d yyyy", Locale.US)
 private val fullDayFormatter: DateTimeFormatter = DateTimeFormatter.ofPattern("EEEE", Locale.US)
 private val shortDayFormatter: DateTimeFormatter = DateTimeFormatter.ofPattern("EEE", Locale.US)
 
@@ -114,6 +115,23 @@ fun hourLabel24(hour: Int): String {
 
 fun formatTripDate(rawDate: String): String {
     return parseIsoDate(rawDate)?.format(tripDateFormatter) ?: rawDate
+}
+
+fun formatLongTripDateWithYear(rawDate: String): String {
+    return parseIsoDate(rawDate)?.format(longDateWithYearFormatter) ?: rawDate
+}
+
+fun formatLongDuration(totalMinutes: Long): String {
+    if (totalMinutes <= 0) return ""
+    val hours = totalMinutes / 60
+    val minutes = totalMinutes % 60
+    return buildString {
+        if (hours > 0) append("$hours ${if (hours == 1L) "hour" else "hours"}")
+        if (minutes > 0) {
+            if (isNotEmpty()) append(" ")
+            append("$minutes ${if (minutes == 1L) "minute" else "minutes"}")
+        }
+    }
 }
 
 fun formatItineraryHeader(rawDate: String): String {

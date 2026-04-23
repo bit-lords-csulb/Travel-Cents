@@ -61,6 +61,10 @@ android {
             "String", "GOOGLE_DIRECTIONS_KEY",
             "\"${localProperties.getProperty("GOOGLE_DIRECTIONS_KEY") ?: ""}\""
         )
+        buildConfigField(
+            "String", "WALKSCORE_API_KEY",
+            "\"${localProperties.getProperty("WALKSCORE_API_KEY") ?: ""}\""
+        )
     }
 
     buildTypes {

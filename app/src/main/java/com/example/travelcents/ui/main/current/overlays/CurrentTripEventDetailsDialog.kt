@@ -48,6 +48,7 @@ import com.example.travelcents.ui.main.current.overlays.cards.CardLavender
 import com.example.travelcents.ui.main.current.overlays.cards.CardSurface
 import com.example.travelcents.ui.main.current.overlays.cards.CardText
 import com.example.travelcents.ui.main.current.overlays.cards.CardTextMuted
+import com.example.travelcents.ui.main.current.overlays.cards.CurrencyCostCard
 import com.example.travelcents.ui.main.current.overlays.cards.DetailActionRow
 import com.example.travelcents.ui.main.current.overlays.cards.EventSummaryCard
 import com.example.travelcents.ui.main.current.overlays.cards.FlightPricingCard
@@ -59,6 +60,7 @@ import com.example.travelcents.ui.main.current.overlays.cards.HotelOverviewCard
 import com.example.travelcents.ui.main.current.overlays.cards.HotelPricingCard
 import com.example.travelcents.ui.main.current.overlays.cards.HotelStayCard
 import com.example.travelcents.ui.main.current.overlays.cards.LocationMapCard
+import com.example.travelcents.ui.main.current.overlays.cards.NeighborhoodCard
 import com.example.travelcents.ui.main.current.overlays.cards.RestaurantHoursCard
 import com.example.travelcents.ui.main.current.overlays.cards.RestaurantMenuCard
 import com.example.travelcents.ui.main.current.overlays.cards.RestaurantOverviewCard
@@ -66,7 +68,9 @@ import com.example.travelcents.ui.main.current.overlays.cards.RestaurantReservat
 import com.example.travelcents.ui.main.current.overlays.cards.RestaurantServicesCard
 import com.example.travelcents.ui.main.current.overlays.cards.ReviewsCard
 import com.example.travelcents.ui.main.current.overlays.cards.TransportCard
+
 import com.example.travelcents.ui.main.current.overlays.cards.WaitTimeCard
+import com.example.travelcents.ui.main.current.overlays.cards.WeatherCard
 import com.example.travelcents.ui.main.current.overlays.cards.compactHostLabel
 import com.example.travelcents.ui.main.current.overlays.cards.eventDurationSummary
 import com.example.travelcents.ui.main.current.overlays.cards.eventLocationLabel
@@ -299,35 +303,33 @@ private fun EventDetailCardStack(
         "restaurant", "dining", "food" -> {
             val restaurantReviewsUrl = yelpReviews.firstOrNull()?.url?.takeIf { it.isNotBlank() }
                 ?: event.detailValue(ATTR_YELP_URL)?.takeIf { it.isNotBlank() }
+            RestaurantMenuCard(event)
             RestaurantOverviewCard(
                 event = event,
                 onOpenReviews = restaurantReviewsUrl?.let { { uriHandler.openUri(it) } }
             )
-            RestaurantHoursCard(event)
-            RestaurantMenuCard(event)
             RestaurantReservationsCard(
                 event = event,
                 tripDestination = tripDestination,
                 tripAdults = tripAdults,
                 tripChildren = tripChildren
             )
-            WaitTimeCard(event)
             RestaurantServicesCard(event)
+            RestaurantHoursCard(event)
+            if (showLocationCard) {
+                TransportCard(event)
+            }
             if (showLocationCard) {
                 LocationMapCard(
                     event = event,
                     locationLabel = locationLabel,
                     onOpenMaps = { uriHandler.openUri(mapsUrl) }
                 )
-                TransportCard(event)
             }
-            ReviewsCard(
-                ratingLabel = ratingLabel,
-                reviewCountLabel = reviewCountLabel,
-                reviews = yelpReviews,
-                reviewsLoading = reviewsLoading,
-                onReadAll = reviewUrl?.let { { uriHandler.openUri(it) } }
-            )
+            WaitTimeCard(event)
+            NeighborhoodCard(event)
+            WeatherCard(event)
+            CurrencyCostCard(event)
         }
         else -> {
             ActivitySummaryCard(event)
