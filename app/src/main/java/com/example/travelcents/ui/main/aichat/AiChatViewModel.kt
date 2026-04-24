@@ -123,6 +123,7 @@ class AiChatViewModel(application: Application) : AndroidViewModel(application) 
     }
 
     fun selectCuratedTrip(starter: AiCuratedTripStarter) {
+        val isFirstTurn = conversationItems.isEmpty()
         val userMessage = AiChatItem.TextMessage(
             text = buildCuratedTripSelectionMessage(starter),
             sender = AiChatSender.USER
@@ -132,11 +133,13 @@ class AiChatViewModel(application: Application) : AndroidViewModel(application) 
 
         val updatedProfile = AiTravelerProfileReducer.merge(sessionState.profile, llmUserMessage)
         val updatedIntakeProfile = sessionState.intakeProfile.mergePatch(updatedProfile.intakeProfile())
-        val assistantMessage = AiChatItem.TextMessage(
-            text = buildCuratedTripAssistantReply(starter),
-            sender = AiChatSender.ASSISTANT
-        )
-        conversationItems += assistantMessage
+        val assistantReplyText = buildCuratedTripAssistantReply(starter)
+        if (!isFirstTurn) {
+            conversationItems += AiChatItem.TextMessage(
+                text = assistantReplyText,
+                sender = AiChatSender.ASSISTANT
+            )
+        }
 
         val starterRefinementGroup = curatedTripCatalog.buildStarterRefinementGroup(starter)
             ?.takeUnless { group -> group.id in sessionState.askedFollowUpGroupIds }
@@ -148,14 +151,20 @@ class AiChatViewModel(application: Application) : AndroidViewModel(application) 
                 askedGroupIds = sessionState.askedFollowUpGroupIds
             )
 
+        val updatedHistory = buildList {
+            addAll(sessionState.llmHistory)
+            add(LlmMessage(role = "user", content = llmUserMessage))
+            if (!isFirstTurn) {
+                add(LlmMessage(role = "assistant", content = assistantReplyText))
+            }
+        }
+
         sessionState = sessionState.copy(
             profile = updatedProfile,
             intakeProfile = updatedIntakeProfile,
             stage = AiTravelerProfileReducer.stageFor(updatedProfile),
             quickReplies = AiTravelerProfileReducer.quickRepliesFor(updatedProfile),
-            llmHistory = sessionState.llmHistory +
-                LlmMessage(role = "user", content = llmUserMessage) +
-                LlmMessage(role = "assistant", content = assistantMessage.text),
+            llmHistory = updatedHistory,
             askedFollowUpGroupIds = recordAskedFollowUpGroupId(
                 existingIds = sessionState.askedFollowUpGroupIds,
                 group = followUpGroup
@@ -176,6 +185,7 @@ class AiChatViewModel(application: Application) : AndroidViewModel(application) 
         val destination = recommendation.destination.trim()
         if (destination.isBlank()) return
 
+        val isFirstTurn = conversationItems.isEmpty()
         val userMessage = AiChatItem.TextMessage(
             text = "Let's plan around $destination",
             sender = AiChatSender.USER
@@ -191,10 +201,12 @@ class AiChatViewModel(application: Application) : AndroidViewModel(application) 
         )
         val updatedProfile = sessionState.profile.mergeIntakeProfile(updatedIntakeProfile)
         val assistantReply = buildDestinationRecommendationReply(recommendation)
-        conversationItems += AiChatItem.TextMessage(
-            text = assistantReply,
-            sender = AiChatSender.ASSISTANT
-        )
+        if (!isFirstTurn) {
+            conversationItems += AiChatItem.TextMessage(
+                text = assistantReply,
+                sender = AiChatSender.ASSISTANT
+            )
+        }
 
         val followUpGroup = if (recommendation.seedId == null) {
             buildDestinationRefinementFollowUpGroup(
@@ -217,9 +229,13 @@ class AiChatViewModel(application: Application) : AndroidViewModel(application) 
             },
             stage = AiTravelerProfileReducer.stageFor(updatedProfile),
             quickReplies = AiTravelerProfileReducer.quickRepliesFor(updatedProfile),
-            llmHistory = sessionState.llmHistory +
-                LlmMessage(role = "user", content = llmUserMessage) +
-                LlmMessage(role = "assistant", content = assistantReply),
+            llmHistory = buildList {
+                addAll(sessionState.llmHistory)
+                add(LlmMessage(role = "user", content = llmUserMessage))
+                if (!isFirstTurn) {
+                    add(LlmMessage(role = "assistant", content = assistantReply))
+                }
+            },
             askedFollowUpGroupIds = recordAskedFollowUpGroupId(
                 existingIds = sessionState.askedFollowUpGroupIds,
                 group = followUpGroup
@@ -469,6 +485,29 @@ class AiChatViewModel(application: Application) : AndroidViewModel(application) 
         )
         isLoading = false
         processSnapshot = null
+        populateQuickIdeaSurfaces()
+    }
+
+    private fun populateQuickIdeaSurfaces() {
+        val targetSessionId = sessionState.sessionId ?: return
+        viewModelScope.launch {
+            val emptyProfile = AiTravelerProfile()
+            val destinationRow = curatedTripCatalog.recommendDestinationRecommendations(emptyProfile)
+            val curatedRow = curatedTripCatalog.recommendTrips(
+                profile = emptyProfile,
+                viewerUid = currentUserId()
+            )
+            if (sessionState.sessionId != targetSessionId) return@launch
+            if (sessionState.profile.hasSignals) return@launch
+            if (conversationItems.isNotEmpty()) return@launch
+
+            sessionState = sessionState.copy(
+                activeDestinationRecommendationRow = destinationRow,
+                activeCuratedTripRow = curatedRow
+            )
+            publishUiState()
+            launchHeroImageEnrichment(curatedRow?.id)
+        }
     }
 
     private fun persistLastSession() {
@@ -886,18 +925,23 @@ class AiChatViewModel(application: Application) : AndroidViewModel(application) 
                 profile = mergedProfile,
                 intakeProfile = mergedIntakeProfile
             )
+            val isReadyForCurated = sessionState.llmHistory.size >= 4
             val curatedTripRow = when (intakeResult?.decision?.type) {
                 AiTripIntakeDecisionType.ASK_MORE -> null
-                AiTripIntakeDecisionType.BUILD_FROM_SCRATCH -> curatedTripCatalog.recommendTrips(
-                    profile = mergedProfile,
-                    viewerUid = null
-                )
+                AiTripIntakeDecisionType.BUILD_FROM_SCRATCH -> {
+                    if (isReadyForCurated) curatedTripCatalog.recommendTrips(
+                        profile = mergedProfile,
+                        viewerUid = null
+                    ) else null
+                }
 
                 AiTripIntakeDecisionType.RECOMMEND_CURATED,
-                null -> curatedTripCatalog.recommendTrips(
-                    profile = mergedProfile,
-                    viewerUid = currentUserId()
-                )
+                null -> {
+                    if (isReadyForCurated) curatedTripCatalog.recommendTrips(
+                        profile = mergedProfile,
+                        viewerUid = currentUserId()
+                    ) else null
+                }
             }
             val placeRecommendationRow = resolvePlaceRecommendationRow(
                 intakeResult = intakeResult,
@@ -930,7 +974,7 @@ class AiChatViewModel(application: Application) : AndroidViewModel(application) 
             persistLastSession()
             publishUiState()
             generateTitleIfNeeded()
-            launchHeroImageEnrichment(curatedTripRow?.id)
+            launchHeroImageEnrichment(curatedTripRow?.id, destinationRecommendationRow?.id)
         }
     }
 
@@ -1034,53 +1078,103 @@ class AiChatViewModel(application: Application) : AndroidViewModel(application) 
         return (existingIds + groupId).distinct()
     }
 
-    private fun launchHeroImageEnrichment(rowId: String?) {
-        val targetId = rowId ?: return
-        viewModelScope.launch {
-            val targetRow = sessionState.activeCuratedTripRow ?: return@launch
-            if (targetRow.id != targetId) return@launch
+    private fun launchHeroImageEnrichment(curatedRowId: String?, destinationRowId: String? = null) {
+        if (curatedRowId != null) {
+            viewModelScope.launch {
+                val targetRow = sessionState.activeCuratedTripRow ?: return@launch
+                if (targetRow.id != curatedRowId) return@launch
 
-            val needsLookup = targetRow.trips.filter { starter ->
-                starter.heroImageUrl.isNullOrBlank()
-            }
-            if (needsLookup.isEmpty()) return@launch
-
-            val resolved = mutableMapOf<String, String>()
-            needsLookup.map { it.destination }
-                .distinct()
-                .forEach { destination ->
-                    val key = heroImageCacheKey(destination)
-                    val cached = heroImageCache[key]
-                    if (cached != null) {
-                        resolved[destination] = cached
-                        return@forEach
-                    }
-                    val resolvedUrl = runCatching {
-                        destinationImages.resolveDestinationImage(destination).imageUrl
-                    }.onFailure { error ->
-                        Log.w(TAG, "Hero image lookup failed for '$destination': ${error.message}")
-                    }.getOrNull()
-                    if (!resolvedUrl.isNullOrBlank()) {
-                        heroImageCache[key] = resolvedUrl
-                        resolved[destination] = resolvedUrl
-                    }
+                val needsLookup = targetRow.trips.filter { starter ->
+                    starter.heroImageUrl.isNullOrBlank()
                 }
+                if (needsLookup.isEmpty()) return@launch
 
-            if (resolved.isEmpty()) return@launch
+                val resolved = mutableMapOf<String, String>()
+                needsLookup.map { it.destination }
+                    .distinct()
+                    .forEach { destination ->
+                        val key = heroImageCacheKey(destination)
+                        val cached = heroImageCache[key]
+                        if (cached != null) {
+                            resolved[destination] = cached
+                            return@forEach
+                        }
+                        val resolvedUrl = runCatching {
+                            destinationImages.resolveDestinationImage(destination).imageUrl
+                        }.onFailure { error ->
+                            Log.w(TAG, "Hero image lookup failed for '$destination': ${error.message}")
+                        }.getOrNull()
+                        if (!resolvedUrl.isNullOrBlank()) {
+                            heroImageCache[key] = resolvedUrl
+                            resolved[destination] = resolvedUrl
+                        }
+                    }
 
-            val current = sessionState.activeCuratedTripRow ?: return@launch
-            if (current.id != targetId) return@launch
+                if (resolved.isEmpty()) return@launch
 
-            val updatedTrips = current.trips.map { starter ->
-                if (!starter.heroImageUrl.isNullOrBlank()) starter
-                else resolved[starter.destination]?.let { url -> starter.copy(heroImageUrl = url) }
-                    ?: starter
+                val current = sessionState.activeCuratedTripRow ?: return@launch
+                if (current.id != curatedRowId) return@launch
+
+                val updatedTrips = current.trips.map { starter ->
+                    if (!starter.heroImageUrl.isNullOrBlank()) starter
+                    else resolved[starter.destination]?.let { url -> starter.copy(heroImageUrl = url) }
+                        ?: starter
+                }
+                if (updatedTrips == current.trips) return@launch
+
+                sessionState = sessionState.copy(activeCuratedTripRow = current.copy(trips = updatedTrips))
+                persistLastSession()
+                publishUiState()
             }
-            if (updatedTrips == current.trips) return@launch
+        }
 
-            sessionState = sessionState.copy(activeCuratedTripRow = current.copy(trips = updatedTrips))
-            persistLastSession()
-            publishUiState()
+        if (destinationRowId != null) {
+            viewModelScope.launch {
+                val targetRow = sessionState.activeDestinationRecommendationRow ?: return@launch
+                if (targetRow.id != destinationRowId) return@launch
+
+                val needsLookup = targetRow.recommendations.filter { rec ->
+                    rec.imageUrl.isNullOrBlank()
+                }
+                if (needsLookup.isEmpty()) return@launch
+
+                val resolved = mutableMapOf<String, String>()
+                needsLookup.map { it.destination }
+                    .distinct()
+                    .forEach { destination ->
+                        val key = heroImageCacheKey(destination)
+                        val cached = heroImageCache[key]
+                        if (cached != null) {
+                            resolved[destination] = cached
+                            return@forEach
+                        }
+                        val resolvedUrl = runCatching {
+                            destinationImages.resolveDestinationImage(destination).imageUrl
+                        }.onFailure { error ->
+                            Log.w(TAG, "Destination image lookup failed for '$destination': ${error.message}")
+                        }.getOrNull()
+                        if (!resolvedUrl.isNullOrBlank()) {
+                            heroImageCache[key] = resolvedUrl
+                            resolved[destination] = resolvedUrl
+                        }
+                    }
+
+                if (resolved.isEmpty()) return@launch
+
+                val current = sessionState.activeDestinationRecommendationRow ?: return@launch
+                if (current.id != destinationRowId) return@launch
+
+                val updatedRecs = current.recommendations.map { rec ->
+                    if (!rec.imageUrl.isNullOrBlank()) rec
+                    else resolved[rec.destination]?.let { url -> rec.copy(imageUrl = url) }
+                        ?: rec
+                }
+                if (updatedRecs == current.recommendations) return@launch
+
+                sessionState = sessionState.copy(activeDestinationRecommendationRow = current.copy(recommendations = updatedRecs))
+                persistLastSession()
+                publishUiState()
+            }
         }
     }
 

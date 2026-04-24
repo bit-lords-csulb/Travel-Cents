@@ -67,7 +67,8 @@ data class AiDestinationRecommendation(
     val destination: String,
     val summary: String,
     val matchReason: String,
-    val seedId: String? = null
+    val seedId: String? = null,
+    val imageUrl: String? = null
 )
 
 data class AiDestinationRecommendationRow(
@@ -83,7 +84,8 @@ data class AiPlaceRecommendation(
     val category: String,
     val area: String = "",
     val summary: String = "",
-    val matchReason: String
+    val matchReason: String,
+    val imageUrl: String? = null
 )
 
 enum class AiPlaceRecommendationRowType {

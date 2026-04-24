@@ -159,7 +159,8 @@ class AiPlaceRecommendationCoordinator(
                     category = "Hotel",
                     area = option.detailValue(ATTR_AMENITIES).orEmpty(),
                     summary = buildHotelSummary(option),
-                    matchReason = buildHotelMatchReason(intakeProfile, profile, option)
+                    matchReason = buildHotelMatchReason(intakeProfile, profile, option),
+                    imageUrl = option.imageUrl
                 )
             },
             rowType = AiPlaceRecommendationRowType.HOTELS,

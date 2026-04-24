@@ -78,7 +78,8 @@ data class PersistedAiDestinationRecommendation(
     val destination: String,
     val summary: String,
     val matchReason: String,
-    val seedId: String? = null
+    val seedId: String? = null,
+    val imageUrl: String? = null
 )
 
 data class PersistedAiDestinationRecommendationRow(
@@ -94,7 +95,8 @@ data class PersistedAiPlaceRecommendation(
     val category: String,
     val area: String,
     val summary: String,
-    val matchReason: String
+    val matchReason: String,
+    val imageUrl: String? = null
 )
 
 data class PersistedAiPlaceRecommendationRow(
@@ -339,7 +341,8 @@ fun AiDestinationRecommendationRow.toPersisted(): PersistedAiDestinationRecommen
                 destination = recommendation.destination,
                 summary = recommendation.summary,
                 matchReason = recommendation.matchReason,
-                seedId = recommendation.seedId
+                seedId = recommendation.seedId,
+                imageUrl = recommendation.imageUrl
             )
         }
     )
@@ -356,7 +359,8 @@ fun PersistedAiDestinationRecommendationRow.toModel(): AiDestinationRecommendati
                 destination = recommendation.destination,
                 summary = recommendation.summary,
                 matchReason = recommendation.matchReason,
-                seedId = recommendation.seedId
+                seedId = recommendation.seedId,
+                imageUrl = recommendation.imageUrl
             )
         }
     )
@@ -434,7 +438,8 @@ fun AiPlaceRecommendationRow.toPersisted(): PersistedAiPlaceRecommendationRow {
                 category = recommendation.category,
                 area = recommendation.area,
                 summary = recommendation.summary,
-                matchReason = recommendation.matchReason
+                matchReason = recommendation.matchReason,
+                imageUrl = recommendation.imageUrl
             )
         },
         rowType = rowType.name,
@@ -455,7 +460,8 @@ fun PersistedAiPlaceRecommendationRow.toModel(): AiPlaceRecommendationRow {
                 category = recommendation.category,
                 area = recommendation.area,
                 summary = recommendation.summary,
-                matchReason = recommendation.matchReason
+                matchReason = recommendation.matchReason,
+                imageUrl = recommendation.imageUrl
             )
         },
         rowType = runCatching {

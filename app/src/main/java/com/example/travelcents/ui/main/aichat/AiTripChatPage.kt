@@ -38,9 +38,11 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -83,12 +85,18 @@ fun AiTripChatPage(
     val uiState by viewModel.uiState.collectAsState()
     val listState = rememberLazyListState()
     var showHistory by remember { mutableStateOf(false) }
+    var planInDetail by rememberSaveable { mutableStateOf(false) }
     val density = LocalDensity.current
     val userMessageSettleOffset = with(density) { 92.dp.roundToPx() }
     val responseSettleOffset = with(density) { 132.dp.roundToPx() }
     val restoreSettleOffset = with(density) { 72.dp.roundToPx() }
 
-    val showStarterLanding = uiState.items.isEmpty() && !uiState.isLoading && uiState.starterCards.isNotEmpty()
+    val isFreshChat by remember(uiState.items, uiState.isLoading) {
+        derivedStateOf {
+            !uiState.isLoading && uiState.items.none { it is AiChatItem.TextMessage }
+        }
+    }
+    val showStarterLanding = isFreshChat && planInDetail && uiState.starterCards.isNotEmpty()
 
     LaunchedEffect(
         uiState.anchorMessageId,
@@ -101,6 +109,7 @@ fun AiTripChatPage(
         showStarterLanding
     ) {
         if (showStarterLanding) return@LaunchedEffect
+        if (isFreshChat) return@LaunchedEffect
 
         when {
             uiState.isLoading && uiState.anchorMessageId != null -> {
@@ -201,6 +210,7 @@ fun AiTripChatPage(
                             option.id
                         },
                         onOptionClick = viewModel::toggleStarterCard,
+                        onShowQuickIdeas = { planInDetail = false },
                         modifier = Modifier
                             .weight(1f)
                             .fillMaxWidth()
@@ -214,6 +224,13 @@ fun AiTripChatPage(
                         verticalArrangement = Arrangement.spacedBy(16.dp),
                         contentPadding = PaddingValues(horizontal = 16.dp, vertical = 20.dp)
                     ) {
+                        if (isFreshChat) {
+                            item("quick_idea_intro") {
+                                QuickIdeaIntro(
+                                    onPlanInDetail = { planInDetail = true }
+                                )
+                            }
+                        }
                         items(uiState.items, key = { it.id }) { item ->
                             when (item) {
                                 is AiChatItem.TextMessage -> {
@@ -253,7 +270,8 @@ fun AiTripChatPage(
                                                 headline = recommendation.destination,
                                                 supporting = recommendation.summary,
                                                 meta = recommendation.matchReason,
-                                                kind = "Destination"
+                                                kind = "Destination",
+                                                imageUrl = recommendation.imageUrl
                                             )
                                         },
                                         onRecommendationSelected = { recommendationId ->
@@ -297,7 +315,8 @@ fun AiTripChatPage(
                                                 meta = recommendation.matchReason,
                                                 kind = recommendation.category,
                                                 actionLabels = item.row.actionLabels,
-                                                actionsEnabled = item.row.actionsEnabled
+                                                actionsEnabled = item.row.actionsEnabled,
+                                                imageUrl = recommendation.imageUrl
                                             )
                                         },
                                         onRecommendationSelected = { recommendationId ->
@@ -403,10 +422,66 @@ private fun BoxScope.AiChatBackdrop() {
 }
 
 @Composable
+private fun QuickIdeaIntro(
+    onPlanInDetail: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    Column(
+        modifier = modifier.fillMaxWidth(),
+        verticalArrangement = Arrangement.spacedBy(10.dp)
+    ) {
+        Text(
+            text = "Quick ideas",
+            color = DeepSea5,
+            fontSize = 22.sp,
+            fontWeight = FontWeight.ExtraBold,
+            fontFamily = TravelCentsFonts.Headline
+        )
+        Text(
+            text = "Tap a destination or starter to grab a trip in seconds.",
+            color = DeepSea4,
+            fontSize = 13.sp,
+            lineHeight = 18.sp,
+            fontFamily = TravelCentsFonts.Body
+        )
+        Surface(
+            modifier = Modifier.clickable(onClick = onPlanInDetail),
+            shape = RoundedCornerShape(999.dp),
+            color = TripWizardColors.ContainerHighest,
+            border = BorderStroke(
+                width = 1.dp,
+                color = TripWizardColors.Blue.copy(alpha = 0.32f)
+            )
+        ) {
+            Row(
+                modifier = Modifier.padding(horizontal = 14.dp, vertical = 8.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                Icon(
+                    imageVector = Icons.Outlined.AutoAwesome,
+                    contentDescription = null,
+                    tint = TripWizardColors.Blue,
+                    modifier = Modifier.size(14.dp)
+                )
+                Text(
+                    text = "Plan in detail",
+                    color = DeepSea5,
+                    fontSize = 12.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    fontFamily = TravelCentsFonts.Body
+                )
+            }
+        }
+    }
+}
+
+@Composable
 private fun AiStarterLanding(
     options: List<AiChatCardOption>,
     selectedOptionIds: Set<String>,
     onOptionClick: (AiChatCardOption) -> Unit,
+    onShowQuickIdeas: () -> Unit,
     modifier: Modifier = Modifier
 ) {
     BoxWithConstraints(
@@ -427,6 +502,24 @@ private fun AiStarterLanding(
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.spacedBy(20.dp)
         ) {
+            Surface(
+                modifier = Modifier.clickable(onClick = onShowQuickIdeas),
+                shape = RoundedCornerShape(999.dp),
+                color = TripWizardColors.ContainerHighest,
+                border = BorderStroke(
+                    width = 1.dp,
+                    color = TripWizardColors.Blue.copy(alpha = 0.32f)
+                )
+            ) {
+                Text(
+                    text = "← Back to quick ideas",
+                    modifier = Modifier.padding(horizontal = 14.dp, vertical = 8.dp),
+                    color = DeepSea5,
+                    fontSize = 12.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    fontFamily = TravelCentsFonts.Body
+                )
+            }
             Surface(
                 modifier = Modifier.size(72.dp),
                 shape = CircleShape,

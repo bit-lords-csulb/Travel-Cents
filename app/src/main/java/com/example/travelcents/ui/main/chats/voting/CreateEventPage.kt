@@ -519,14 +519,20 @@ fun CreateEventPage(
                         horizontalArrangement = Arrangement.spacedBy(12.dp)
                     ) {
                         items(places) { place ->
-                            PlaceSuggestionCard(place) {
-                                viewModel.selectPlace(place)
-                                showCustomForm = true
-                                coroutineScope.launch {
-                                    delay(50)
-                                    listState.animateScrollToItem(1)
+                            com.example.travelcents.ui.components.PlaceSuggestionCard(
+                                name = place.name,
+                                photoUrl = place.photoUrl,
+                                interest = place.interest,
+                                address = place.address,
+                                onClick = {
+                                    viewModel.selectPlace(place)
+                                    showCustomForm = true
+                                    coroutineScope.launch {
+                                        delay(50)
+                                        listState.animateScrollToItem(1)
+                                    }
                                 }
-                            }
+                            )
                         }
                     }
                 }
@@ -536,51 +542,6 @@ fun CreateEventPage(
 }
 
 // Helpers
-@Composable
-fun PlaceSuggestionCard(place: PlaceSuggestion, onClick: () -> Unit) {
-    Card(
-        modifier = Modifier
-            .width(160.dp)
-            .clickable { onClick() },
-        colors = CardDefaults.cardColors(containerColor = DeepSea2),
-        shape = RoundedCornerShape(16.dp)
-    ) {
-        Column {
-            AsyncImage(
-                model = place.photoUrl,
-                contentDescription = null,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(110.dp),
-                contentScale = ContentScale.Crop
-            )
-            Column(modifier = Modifier.padding(12.dp)) {
-                Text(
-                    place.name,
-                    color = DeepSea5,
-                    fontWeight = FontWeight.Bold,
-                    fontSize = 14.sp,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis
-                )
-                Text(
-                    place.interest,
-                    color = DeepSea3,
-                    fontSize = 11.sp,
-                    fontWeight = FontWeight.Medium
-                )
-                Text(
-                    place.address,
-                    color = DeepSea5.copy(0.4f),
-                    fontSize = 10.sp,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis
-                )
-            }
-        }
-    }
-}
-
 @Composable
 fun EventTextField(
     value: String,
