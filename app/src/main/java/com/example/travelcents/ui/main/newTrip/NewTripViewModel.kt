@@ -7,6 +7,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
+import com.example.travelcents.BuildConfig
 import com.example.travelcents.data.ai.chat.AiCuratedTripStarter
 import com.example.travelcents.data.ai.chat.AiTripIntakeProfile
 import com.example.travelcents.data.ai.chat.AiTripType
@@ -20,6 +21,20 @@ import com.example.travelcents.data.trip.local.DestinationTimeZones
 import com.example.travelcents.data.trip.model.Itinerary
 import com.example.travelcents.data.trip.model.TravelEvent
 import com.example.travelcents.data.trip.model.TravelRequest
+import com.example.travelcents.data.trip.model.ATTR_BUSINESS_ADDRESS
+import com.example.travelcents.data.trip.model.ATTR_BUSINESS_NAME
+import com.example.travelcents.data.trip.model.ATTR_TICKETMASTER_EVENT_ID
+import com.example.travelcents.data.trip.model.ATTR_VENUE_NAME
+import com.example.travelcents.data.trip.model.Itinerary
+import com.example.travelcents.data.trip.model.TravelEvent
+import com.example.travelcents.data.trip.model.TravelRequest
+import com.example.travelcents.data.trip.remote.SerpRepository
+import com.example.travelcents.data.ai.repository.TripPlannerRepository
+import com.example.travelcents.data.trip.model.detailValue
+import com.example.travelcents.data.trip.remote.TicketmasterRepository
+import com.example.travelcents.data.trip.remote.YelpRepository
+import com.example.travelcents.data.sync.TripSyncRemoteDataSource
+import com.example.travelcents.data.trip.model.YelpOptionPoolItem
 import com.example.travelcents.data.trip.model.YELP_POOL_TYPE_ACTIVITIES
 import com.example.travelcents.data.trip.model.YELP_POOL_TYPE_RESTAURANTS
 import com.example.travelcents.data.trip.model.YelpOptionPoolItem
@@ -37,6 +52,7 @@ import java.time.Instant
 import java.time.LocalDate
 import java.time.LocalTime
 import java.time.format.DateTimeFormatter
+import java.util.Locale
 import java.util.UUID
 
 enum class GenerationStep {
@@ -227,6 +243,19 @@ class NewTripViewModel(application: Application) : AndroidViewModel(application)
                             itineraryId = itinerary.itineraryId
                         )
                     }
+                    val ticketmasterEventsDeferred = async {
+                        if (BuildConfig.TICKETMASTER_API_KEY.isBlank()) {
+                            emptyList()
+                        } else {
+                            TicketmasterRepository.searchEventsForTrip(
+                                location = itinerary.destination,
+                                startDate = flightArrivalDate,
+                                endDate = request.dateTo,
+                                itineraryId = itinerary.itineraryId,
+                                classification = interestsToTicketmasterClassification(request.interests)
+                            )
+                        }
+                    }
                     val activityPool = activityPoolDeferred.await()
                     if (activityPool.isNotEmpty()) {
                         yelpOptionPools[YELP_POOL_TYPE_ACTIVITIES] = activityPool
@@ -240,9 +269,13 @@ class NewTripViewModel(application: Application) : AndroidViewModel(application)
                         latestDate = request.dateTo,
                         maximumEndTime = maximumEndTime
                     )
+                    val mergedLocalEvents = mergeLocalActivityEvents(
+                        yelpEvents = yelpEventsDeferred.await(),
+                        ticketmasterEvents = ticketmasterEventsDeferred.await()
+                    )
                     localEvents = filterEventsAfterTime(
                         filterEventsBeforeTime(
-                            yelpEventsDeferred.await(),
+                            mergedLocalEvents,
                             flightArrivalDate,
                             minimumStartTime
                         ),
@@ -323,6 +356,19 @@ class NewTripViewModel(application: Application) : AndroidViewModel(application)
         intakeProfile: AiTripIntakeProfile,
         onTripReady: (TripKey) -> Unit = {}
     ) {
+        commitItinerary(
+            starter = starter,
+            intakeProfile = intakeProfile,
+            onTripReady = onTripReady
+        )
+    }
+
+    fun commitItinerary(
+        starter: AiCuratedTripStarter,
+        intakeProfile: AiTripIntakeProfile,
+        events: List<TravelEvent> = emptyList(),
+        onTripReady: (TripKey) -> Unit = {}
+    ) {
         val uid = FirebaseAuth.getInstance().currentUser?.uid
         if (uid == null) {
             _uiState.value = TripUiState.Error("You must be logged in to create a trip.")
@@ -332,10 +378,16 @@ class NewTripViewModel(application: Application) : AndroidViewModel(application)
         viewModelScope.launch {
             try {
                 val tripKey = TripKey(ownerUid = uid, tripId = UUID.randomUUID().toString())
-                val itinerary = buildDraftItinerary(
+                val baseItinerary = buildDraftItinerary(
                     tripKey = tripKey,
                     starter = starter,
                     intakeProfile = intakeProfile
+                )
+                val committedEvents = events.map { event ->
+                    event.copy(itineraryId = tripKey.tripId)
+                }
+                val itinerary = baseItinerary.copy(
+                    eventIds = committedEvents.map(TravelEvent::eventId)
                 )
 
                 _generationStep.value = GenerationStep.SAVING
@@ -344,11 +396,11 @@ class NewTripViewModel(application: Application) : AndroidViewModel(application)
                     .createTrip(
                         ownerUid = uid,
                         itinerary = itinerary,
-                        events = emptyList()
+                        events = committedEvents
                     )
 
                 _generationStep.value = GenerationStep.COMPLETE
-                _uiState.value = TripUiState.Success(itinerary, emptyList())
+                _uiState.value = TripUiState.Success(itinerary, committedEvents)
                 onTripReady(tripKey)
             } catch (e: Exception) {
                 _generationStep.value = GenerationStep.IDLE
@@ -489,6 +541,121 @@ class NewTripViewModel(application: Application) : AndroidViewModel(application)
 
     private fun sharedYelpPoolTarget(dayCount: Int): Int {
         return (dayCount + 4).coerceIn(10, 15)
+    }
+
+    private fun interestsToTicketmasterClassification(interests: List<String>): String? {
+        val mapped = interests
+            .mapNotNull(::ticketmasterClassificationForInterest)
+            .toSet()
+        return mapped.singleOrNull()
+    }
+
+    private fun ticketmasterClassificationForInterest(rawInterest: String): String? {
+        val interest = rawInterest
+            .replace('_', ' ')
+            .trim()
+            .lowercase(Locale.US)
+
+        return when {
+            interest.contains("music") ||
+                interest.contains("festival") ||
+                interest.contains("concert") ||
+                interest.contains("jazz") ||
+                interest.contains("nightlife") -> "music"
+
+            interest.contains("sport") ||
+                interest.contains("golf") ||
+                interest.contains("tennis") ||
+                interest.contains("marathon") ||
+                interest.contains("triathlon") ||
+                interest.contains("skateboarding") ||
+                interest.contains("bmx") ||
+                interest.contains("motocross") ||
+                interest.contains("go kart") ||
+                interest.contains("f1") ||
+                interest.contains("ski") -> "sports"
+
+            interest.contains("culture") ||
+                interest.contains("museum") ||
+                interest.contains("art") ||
+                interest.contains("history") ||
+                interest.contains("architecture") ||
+                interest.contains("comedy") ||
+                interest.contains("theater") ||
+                interest.contains("theatre") ||
+                interest.contains("opera") ||
+                interest.contains("ballet") ||
+                interest.contains("painting") ||
+                interest.contains("pottery") -> "arts"
+
+            interest.contains("family") ||
+                interest.contains("theme park") -> "family"
+
+            interest.contains("film") -> "film"
+
+            else -> null
+        }
+    }
+
+    private fun mergeLocalActivityEvents(
+        yelpEvents: List<TravelEvent>,
+        ticketmasterEvents: List<TravelEvent>
+    ): List<TravelEvent> {
+        if (yelpEvents.isEmpty()) return ticketmasterEvents
+        if (ticketmasterEvents.isEmpty()) return yelpEvents
+
+        return (yelpEvents + ticketmasterEvents)
+            .groupBy(::localActivityDedupKey)
+            .values
+            .map(::preferredLocalActivityEvent)
+    }
+
+    private fun preferredLocalActivityEvent(events: List<TravelEvent>): TravelEvent {
+        return events.maxWithOrNull(
+            compareBy<TravelEvent>(
+                { if (isTicketmasterBacked(it)) 1 else 0 },
+                { localActivitySignalScore(it) }
+            )
+        ) ?: events.first()
+    }
+
+    private fun localActivitySignalScore(event: TravelEvent): Int {
+        return listOf(
+            event.detailValue(ATTR_VENUE_NAME),
+            event.detailValue(ATTR_BUSINESS_ADDRESS, "address"),
+            event.detailValue("description"),
+            event.detailValue("location"),
+            event.imageUrl.takeIf { it.isNotBlank() }
+        ).count { !it.isNullOrBlank() }
+    }
+
+    private fun localActivityDedupKey(event: TravelEvent): String {
+        val date = event.date.ifBlank { "date_tbd" }
+        val startTime = event.startTime.ifBlank { "time_tbd" }
+        val venueToken = event.detailValue(
+            ATTR_VENUE_NAME,
+            ATTR_BUSINESS_ADDRESS,
+            "location",
+            "address",
+            ATTR_BUSINESS_NAME,
+            "activity_name"
+        ).normalizedDedupToken()
+        return "$date|$startTime|$venueToken"
+    }
+
+    private fun isTicketmasterBacked(event: TravelEvent): Boolean {
+        return !event.detailValue(ATTR_TICKETMASTER_EVENT_ID).isNullOrBlank()
+    }
+
+    private fun String?.normalizedDedupToken(): String {
+        return this
+            ?.lowercase(Locale.US)
+            ?.replace("&", " and ")
+            ?.replace(Regex("[^a-z0-9 ]"), " ")
+            ?.replace(Regex("\\s+"), " ")
+            ?.trim()
+            ?.ifBlank { "unknown" }
+            ?: "unknown"
     }
 
     companion object {

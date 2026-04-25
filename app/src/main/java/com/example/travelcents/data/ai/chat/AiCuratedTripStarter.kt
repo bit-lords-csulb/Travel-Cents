@@ -5,6 +5,7 @@ import java.util.UUID
 
 enum class AiCuratedTripSource {
     FIRESTORE,
+    SEEDED,
     GENERATED
 }
 
@@ -17,7 +18,11 @@ data class AiCuratedTripStarter(
     val summary: String,
     val matchReason: String,
     val source: AiCuratedTripSource,
-    val tripKey: TripKey? = null
+    val tripKey: TripKey? = null,
+    val seedId: String? = null,
+    val durationOptions: List<Int> = emptyList(),
+    val highlights: List<String> = emptyList(),
+    val heroImageUrl: String? = null
 )
 
 data class AiCuratedTripRow(

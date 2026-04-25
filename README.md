@@ -48,6 +48,12 @@ An AI-powered travel planning Android app built with Jetpack Compose and Kotlin.
    GOOGLE_DIRECTIONS_KEY=your-google-directions-key
    ```
 
+   TICKETMASTER_API_KEY=your-ticketmaster-consumer-key
+   ```
+
+   `GROQ_API_KEY` is still accepted as a fallback for older local setups.
+   Ticketmaster Discovery uses the consumer key as the API key; the consumer secret is not needed for read-only event search.
+
 3. Add your Firebase config:
    - Download `google-services.json` from your Firebase console.
    - Place it in `app/`.

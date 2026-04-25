@@ -22,9 +22,24 @@ sealed interface AiChatItem {
         val group: AiChatCardGroup
     ) : AiChatItem
 
+    data class DestinationRecommendationRow(
+        override val id: String,
+        val row: AiDestinationRecommendationRow
+    ) : AiChatItem
+
     data class CuratedTripRow(
         override val id: String,
         val row: AiCuratedTripRow
+    ) : AiChatItem
+
+    data class PlaceRecommendationRow(
+        override val id: String,
+        val row: AiPlaceRecommendationRow
+    ) : AiChatItem
+
+    data class SingleEventCard(
+        override val id: String,
+        val card: AiSingleEventSuggestion
     ) : AiChatItem
 }
 
@@ -38,7 +53,8 @@ data class AiChatCardOption(
     val id: String,
     val label: String,
     val message: String,
-    val groupId: String = ""
+    val groupId: String = "",
+    val requiresText: Boolean = false
 )
 
 data class AiChatCardGroup(
@@ -46,5 +62,52 @@ data class AiChatCardGroup(
     val title: String,
     val subtitle: String = "",
     val options: List<AiChatCardOption>,
-    val allowMultiple: Boolean = true
+    val allowMultiple: Boolean = true,
+    val allowOther: Boolean = false,
+    val otherPromptHint: String = ""
+)
+
+data class AiDestinationRecommendation(
+    val id: String = UUID.randomUUID().toString(),
+    val destination: String,
+    val summary: String,
+    val matchReason: String,
+    val seedId: String? = null,
+    val imageUrl: String? = null
+)
+
+data class AiDestinationRecommendationRow(
+    val id: String = UUID.randomUUID().toString(),
+    val title: String,
+    val subtitle: String,
+    val recommendations: List<AiDestinationRecommendation>
+)
+
+data class AiPlaceRecommendation(
+    val id: String = UUID.randomUUID().toString(),
+    val name: String,
+    val category: String,
+    val area: String = "",
+    val summary: String = "",
+    val matchReason: String,
+    val imageUrl: String? = null
+)
+
+enum class AiPlaceRecommendationRowType {
+    GENERAL,
+    RESTAURANTS,
+    HOTELS,
+    ACTIVITIES,
+    NEIGHBORHOODS,
+    DAY_TRIPS
+}
+
+data class AiPlaceRecommendationRow(
+    val id: String = UUID.randomUUID().toString(),
+    val title: String,
+    val subtitle: String,
+    val recommendations: List<AiPlaceRecommendation>,
+    val rowType: AiPlaceRecommendationRowType = AiPlaceRecommendationRowType.GENERAL,
+    val actionLabels: List<String> = emptyList(),
+    val actionsEnabled: Boolean = false
 )

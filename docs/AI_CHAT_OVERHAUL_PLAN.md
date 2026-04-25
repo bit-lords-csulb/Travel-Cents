@@ -28,12 +28,13 @@ The page should feel like a planning console:
 - [x] Linked orchestrator decisions (ask_more vs. recommend) to UI state transitions.
 
 ## Phase 1C: Curated Editable Trip Starters
-**Status: [/] In Progress**
+**Status: [x] Complete**
 - [x] Created `AiCuratedTripCatalog` to score and recommend trips from Firestore.
 - [x] Implemented `AiCuratedTripRow` and `AiCuratedTripCard` components.
 - [x] Added support for "Generated Starters" when no saved match is found.
-- [ ] Add hardcoded hotspot templates for: Bali, Tokyo, Paris, Rome, Barcelona, Honolulu, Cancun, Bangkok.
-- [ ] Implement duration adjustment and refinement flows for selected starters.
+- [x] Added hardcoded hotspot templates for Bali, Tokyo, Paris, Rome, Barcelona, Honolulu, Cancun, and Bangkok in `AiCuratedTripSeedCatalog`.
+- [x] Implemented duration adjustment (pill picker on card → `AiCuratedTripCatalog.adjustStarterDuration` → `AiChatViewModel.updateCuratedStarterDuration`).
+- [x] Implemented per-starter refinement flow: selecting a SEEDED starter now surfaces a tag- and neighborhood-aware follow-up group (`buildStarterRefinementGroup`) instead of the generic profile-gap fallback.
 
 ## Phase 3: Recommendation Cards
 **Status: [ ] Pending**

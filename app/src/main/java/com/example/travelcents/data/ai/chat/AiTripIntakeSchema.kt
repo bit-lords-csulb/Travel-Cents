@@ -2,6 +2,7 @@ package com.example.travelcents.data.ai.chat
 
 import com.google.gson.Gson
 import com.google.gson.annotations.SerializedName
+import java.util.Locale
 
 private const val INTAKE_SCHEMA_VERSION = 1
 
@@ -101,6 +102,10 @@ data class AiTripIntakeFollowUpQuestion(
     val subtitle: String = "",
     @SerializedName("allow_multiple")
     val allowMultiple: Boolean = false,
+    @SerializedName("allow_other")
+    val allowOther: Boolean = false,
+    @SerializedName("other_prompt_hint")
+    val otherPromptHint: String = "",
     @SerializedName("options")
     val options: List<AiTripIntakeAnswerOption> = emptyList()
 )
@@ -114,7 +119,37 @@ data class AiTripIntakeDecision(
     val confidence: Double? = null
 )
 
+data class AiTripIntakeDestinationRecommendation(
+    @SerializedName("id")
+    val id: String,
+    @SerializedName("destination")
+    val destination: String,
+    @SerializedName("summary")
+    val summary: String = "",
+    @SerializedName("reason")
+    val reason: String = ""
+)
+
+data class AiTripIntakePlaceRecommendation(
+    @SerializedName("id")
+    val id: String,
+    @SerializedName("name")
+    val name: String,
+    @SerializedName("category")
+    val category: String,
+    @SerializedName("area")
+    val area: String = "",
+    @SerializedName("summary")
+    val summary: String = "",
+    @SerializedName("reason")
+    val reason: String = ""
+)
+
 data class AiTripIntakeTurnResult(
+    @SerializedName("assistant_message")
+    val assistantMessage: String = "",
+    @SerializedName("planning_objective")
+    val planningObjective: String = "",
     @SerializedName("profile_patch")
     val profilePatch: AiTripIntakeProfile = AiTripIntakeProfile(),
     @SerializedName("resolved_fields")
@@ -123,6 +158,10 @@ data class AiTripIntakeTurnResult(
     val missingFields: List<String> = emptyList(),
     @SerializedName("follow_up_question")
     val followUpQuestion: AiTripIntakeFollowUpQuestion? = null,
+    @SerializedName("destination_recommendations")
+    val destinationRecommendations: List<AiTripIntakeDestinationRecommendation> = emptyList(),
+    @SerializedName("place_recommendations")
+    val placeRecommendations: List<AiTripIntakePlaceRecommendation> = emptyList(),
     @SerializedName("decision")
     val decision: AiTripIntakeDecision = AiTripIntakeDecision()
 )
@@ -187,23 +226,96 @@ fun AiTravelerProfile.mergeIntakeProfile(intakeProfile: AiTripIntakeProfile): Ai
 fun AiTripIntakeFollowUpQuestion.toCardGroup(): AiChatCardGroup? {
     if (id.isBlank() || title.isBlank() || options.isEmpty()) return null
 
+    val normalizedId = sanitizeFollowUpId(id)
+    val maxRegularOptions = if (allowOther) 5 else 6
     return AiChatCardGroup(
-        id = id,
+        id = normalizedId,
         title = title,
         subtitle = subtitle,
         allowMultiple = allowMultiple,
+        allowOther = allowOther,
+        otherPromptHint = otherPromptHint.ifBlank {
+            "Type the answer that fits best."
+        },
         options = options
             .filter { option -> option.id.isNotBlank() && option.label.isNotBlank() && option.message.isNotBlank() }
-            .take(4)
-            .map { option ->
-                AiChatCardOption(
-                    id = option.id,
-                    label = option.label,
-                    message = option.message,
-                    groupId = id
-                )
+            .take(maxRegularOptions)
+            .mapNotNull { option ->
+                val normalizedLabel = shortenOptionLabel(option.label)
+                if (normalizedLabel.isBlank()) {
+                    null
+                } else if (normalizedLabel.equals("Other", ignoreCase = true)) {
+                    AiChatCardOption(
+                        id = "${normalizedId}_other",
+                        label = "Other",
+                        message = otherPromptHint.ifBlank { "I want to type my own answer." },
+                        groupId = normalizedId,
+                        requiresText = true
+                    )
+                } else {
+                    AiChatCardOption(
+                        id = sanitizeFollowUpOptionId(option.id, normalizedId),
+                        label = normalizedLabel,
+                        message = option.message,
+                        groupId = normalizedId
+                    )
+                }
             }
-    ).takeIf { group -> group.options.isNotEmpty() }
+            .distinctBy { option -> option.id }
+            .take(maxRegularOptions)
+            .let { normalizedOptions ->
+                val otherOption = normalizedOptions.firstOrNull { option -> option.requiresText }
+                if (allowOther && otherOption == null) {
+                    normalizedOptions + AiChatCardOption(
+                        id = "${normalizedId}_other",
+                        label = "Other",
+                        message = otherPromptHint.ifBlank { "I want to type my own answer." },
+                        groupId = normalizedId,
+                        requiresText = true
+                    )
+                } else {
+                    normalizedOptions
+                }
+            }
+    ).takeIf { group ->
+        group.options.size in 2..6
+    }
+}
+
+fun AiTripIntakeTurnResult.toDestinationRecommendationRow(): AiDestinationRecommendationRow? {
+    return AiRecommendationMapper.destinationRowFromIntake(destinationRecommendations)
+}
+
+fun AiTripIntakeTurnResult.toPlaceRecommendationRow(): AiPlaceRecommendationRow? {
+    return AiRecommendationMapper.placeRowFromIntake(placeRecommendations)
+}
+
+private fun sanitizeFollowUpId(rawId: String): String {
+    return rawId
+        .trim()
+        .lowercase(Locale.US)
+        .replace(Regex("[^a-z0-9]+"), "_")
+        .trim('_')
+        .ifBlank { "follow_up" }
+}
+
+private fun sanitizeFollowUpOptionId(rawId: String, groupId: String): String {
+    val normalized = rawId
+        .trim()
+        .lowercase(Locale.US)
+        .replace(Regex("[^a-z0-9]+"), "_")
+        .trim('_')
+    return if (normalized.isBlank()) "${groupId}_option" else normalized
+}
+
+private fun shortenOptionLabel(rawLabel: String): String {
+    val trimmed = rawLabel.trim()
+    if (trimmed.isBlank()) return ""
+    return trimmed
+        .split(Regex("\\s+"))
+        .filter { token -> token.isNotBlank() }
+        .take(2)
+        .joinToString(" ")
 }
 
 private fun AiTravelerProfile.inferTripType(): AiTripType {

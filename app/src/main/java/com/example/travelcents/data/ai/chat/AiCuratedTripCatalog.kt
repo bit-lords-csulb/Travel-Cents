@@ -4,11 +4,41 @@ import com.example.travelcents.data.trip.FirestoreTripRepository
 import com.example.travelcents.data.trip.TripKey
 import com.example.travelcents.data.trip.TripRepository
 import com.example.travelcents.data.trip.model.Itinerary
+import java.util.Locale
 import kotlin.math.abs
 
 class AiCuratedTripCatalog(
     private val tripRepository: TripRepository = FirestoreTripRepository()
 ) {
+    private val destinationRecommendationEngine = AiDestinationRecommendationEngine()
+
+    fun recommendDestinationRecommendations(profile: AiTravelerProfile): AiDestinationRecommendationRow? {
+        if (profile.destination.isNotBlank()) return null
+
+        return AiRecommendationMapper.destinationRowFromEngine(
+            destinationRecommendationEngine.rankDestinations(profile.intakeProfile())
+        )
+    }
+
+    fun recommendSeededStarterRow(profile: AiTravelerProfile): AiCuratedTripRow? {
+        val seededTrips = recommendSeededTrips(profile)
+        if (seededTrips.isEmpty()) return null
+
+        return AiCuratedTripRow(
+            title = if (profile.destination.isNotBlank()) {
+                "Curated ${displayDestination(profile.destination)} starters"
+            } else {
+                "Curated hotspot starters"
+            },
+            subtitle = if (profile.destination.isNotBlank()) {
+                "Editable destination templates you can tune before building the trip."
+            } else {
+                "These destinations fit the vibe, pace, and budget you've described."
+            },
+            trips = seededTrips.take(3)
+        )
+    }
+
     suspend fun recommendTrips(
         profile: AiTravelerProfile,
         viewerUid: String?
@@ -17,21 +47,189 @@ class AiCuratedTripCatalog(
             ?.takeIf { it.isNotBlank() }
             ?.let { uid -> loadCuratedTrips(profile, uid) }
             .orEmpty()
+        val seededTrips = recommendSeededTrips(profile)
 
-        return if (curatedTrips.isNotEmpty()) {
-            AiCuratedTripRow(
-                title = "Start from a saved trip",
-                subtitle = "These curated trips match the direction you've set so far.",
-                trips = curatedTrips.take(3)
-            )
-        } else {
-            buildGeneratedStarter(profile)?.let { starter ->
+        return when {
+            curatedTrips.isNotEmpty() && seededTrips.isNotEmpty() -> {
                 AiCuratedTripRow(
-                    title = "Start from scratch",
-                    subtitle = "I couldn't find a saved match, so here's a fresh starter.",
-                    trips = listOf(starter)
+                    title = "Choose a starter",
+                    subtitle = if (profile.destination.isNotBlank()) {
+                        "Saved matches plus curated templates for ${displayDestination(profile.destination)}."
+                    } else {
+                        "Saved matches plus curated hotspot starters that fit the direction so far."
+                    },
+                    trips = (curatedTrips.take(2) + seededTrips.take(2))
+                        .distinctBy(::uniqueStarterKey)
+                        .take(4)
                 )
             }
+
+            curatedTrips.isNotEmpty() -> {
+                AiCuratedTripRow(
+                    title = "Start from a saved trip",
+                    subtitle = "These curated trips match the direction you've set so far.",
+                    trips = curatedTrips.take(3)
+                )
+            }
+
+            seededTrips.isNotEmpty() -> recommendSeededStarterRow(profile)
+
+            else -> {
+                buildGeneratedStarter(profile)?.let { starter ->
+                    AiCuratedTripRow(
+                        title = "Start from scratch",
+                        subtitle = "I couldn't find a saved or curated match, so here's a fresh starter.",
+                        trips = listOf(starter)
+                    )
+                }
+            }
+        }
+    }
+
+    fun recommendPlaceRecommendations(profile: AiTravelerProfile): AiPlaceRecommendationRow? {
+        val destinationKey = normalizeDestinationKey(profile.destination)
+        if (destinationKey.isBlank()) return null
+
+        val seed = AiCuratedTripSeedCatalog.seeds.firstOrNull { candidate ->
+            candidate.destinationKey == destinationKey
+        } ?: return null
+
+        val requestedTags = inferProfileTags(profile)
+        val recommendations = seed.placeSuggestions
+            .sortedWith(
+                compareByDescending<AiCuratedPlaceSuggestion> { suggestion ->
+                    suggestion.tags.count { tag -> tag in requestedTags }
+                }.thenBy { suggestion -> suggestion.name }
+            )
+            .take(3)
+            .map { suggestion ->
+                AiPlaceRecommendation(
+                    name = suggestion.name,
+                    category = suggestion.category,
+                    area = suggestion.area,
+                    summary = suggestion.summary,
+                    matchReason = buildPlaceMatchReason(requestedTags, suggestion)
+                )
+            }
+
+        if (recommendations.size < 2) return null
+
+        return AiPlaceRecommendationRow(
+            title = "Places to start in ${displayDestination(seed.destination)}",
+            subtitle = "Areas and spots that fit the trip direction you have described.",
+            recommendations = recommendations,
+            rowType = inferPlaceRowType(recommendations),
+            actionLabels = listOf("Add", "Save", "Swap"),
+            actionsEnabled = false
+        )
+    }
+
+    fun buildStarterRefinementGroup(starter: AiCuratedTripStarter): AiChatCardGroup? {
+        if (starter.source != AiCuratedTripSource.SEEDED) return null
+        val seed = AiCuratedTripSeedCatalog.findSeed(starter.seedId) ?: return null
+        val shortDestination = displayDestination(seed.destination)
+        val groupId = "starter_refinement_${seed.id}"
+        val seedTags = seed.tags.toSet()
+
+        val tagDrivenOptions = buildList {
+            if ("food" in seedTags || "food_first" in seedTags) {
+                add(refinementOption("${groupId}_food", "More food", "Lean harder into standout food in $shortDestination.", groupId))
+            }
+            if ("culture" in seedTags || "temples" in seedTags || "history" in seedTags) {
+                add(refinementOption("${groupId}_culture", "More culture", "Make the $shortDestination trip more culture-forward.", groupId))
+            }
+            if ("beach" in seedTags) {
+                add(refinementOption("${groupId}_beach", "More beach time", "Build in more beach time in $shortDestination.", groupId))
+            }
+            if ("nightlife" in seedTags) {
+                add(refinementOption("${groupId}_nightlife", "More nightlife", "Include more nightlife options in $shortDestination.", groupId))
+            }
+            if ("nature" in seedTags || "hiking" in seedTags) {
+                add(refinementOption("${groupId}_nature", "More nature", "Add more nature and scenic views in $shortDestination.", groupId))
+            }
+            if ("relaxed" in seedTags) {
+                add(refinementOption("${groupId}_slow", "Slower pace", "Keep the pace slower in $shortDestination.", groupId))
+            } else if ("walkable" in seedTags) {
+                add(refinementOption("${groupId}_walkable", "Keep it walkable", "Focus on walkable neighborhoods in $shortDestination.", groupId))
+            }
+        }
+
+        val placeOptions = seed.placeSuggestions.take(2).map { suggestion ->
+            refinementOption(
+                id = "${groupId}_place_${slugifyPlace(suggestion.name)}",
+                label = "Base in ${suggestion.name}",
+                message = "Base the $shortDestination starter around ${suggestion.name} (${suggestion.category}).",
+                groupId = groupId
+            )
+        }
+
+        val combinedOptions = (tagDrivenOptions + placeOptions)
+            .distinctBy(AiChatCardOption::id)
+            .take(5)
+        if (combinedOptions.isEmpty()) return null
+
+        return AiChatCardGroup(
+            id = groupId,
+            title = "Refine the $shortDestination starter",
+            subtitle = "Pick what to adjust before I build it out.",
+            allowMultiple = true,
+            allowOther = true,
+            otherPromptHint = "Type a refinement for the $shortDestination starter.",
+            options = combinedOptions + refinementOption(
+                id = "${groupId}_other",
+                label = "Other",
+                message = "I want to type my own refinement.",
+                groupId = groupId,
+                requiresText = true
+            )
+        )
+    }
+
+    private fun refinementOption(
+        id: String,
+        label: String,
+        message: String,
+        groupId: String,
+        requiresText: Boolean = false
+    ): AiChatCardOption {
+        return AiChatCardOption(
+            id = id,
+            label = label,
+            message = message,
+            groupId = groupId,
+            requiresText = requiresText
+        )
+    }
+
+    private fun slugifyPlace(value: String): String {
+        return value.lowercase(Locale.US).replace(Regex("[^a-z0-9]+"), "_").trim('_')
+    }
+
+    fun adjustStarterDuration(
+        starter: AiCuratedTripStarter,
+        durationDays: Int
+    ): AiCuratedTripStarter {
+        val availableOptions = starter.durationOptions.sorted().distinct()
+        if (availableOptions.size <= 1) return starter
+
+        val selectedDuration = availableOptions.minByOrNull { option ->
+            abs(option - durationDays)
+        } ?: starter.durationDays
+        if (selectedDuration == starter.durationDays) return starter
+
+        return when (starter.source) {
+            AiCuratedTripSource.SEEDED -> {
+                AiCuratedTripSeedCatalog.findSeed(starter.seedId)
+                    ?.toStarter(
+                        matchReason = starter.matchReason,
+                        durationDays = selectedDuration
+                    )
+                    ?.copy(id = starter.id, heroImageUrl = starter.heroImageUrl)
+                    ?: starter.copy(durationDays = selectedDuration)
+            }
+
+            AiCuratedTripSource.FIRESTORE,
+            AiCuratedTripSource.GENERATED -> starter.copy(durationDays = selectedDuration)
         }
     }
 
@@ -63,7 +261,40 @@ class AiCuratedTripCatalog(
                 .thenByDescending { scored -> scored.starter.durationDays }
                 .thenBy { scored -> scored.starter.title }
         ).map { scored -> scored.starter }
-            .distinctBy { starter -> starter.tripKey?.let { "${it.ownerUid}:${it.tripId}" } ?: starter.id }
+            .distinctBy(::uniqueStarterKey)
+    }
+
+    private fun recommendSeededTrips(profile: AiTravelerProfile): List<AiCuratedTripStarter> {
+        val destinationKey = normalizeDestinationKey(profile.destination)
+        val preferredDurationDays = inferDurationDays(profile)
+
+        val scoredSeeds = AiCuratedTripSeedCatalog.seeds.mapNotNull { seed ->
+            val score = scoreSeed(profile, seed, destinationKey)
+            if (score <= 0) return@mapNotNull null
+            ScoredSeed(
+                score = score,
+                starter = seed.toStarter(
+                    matchReason = buildSeedMatchReason(profile, seed),
+                    durationDays = preferredDurationDays
+                )
+            )
+        }.sortedWith(
+            compareByDescending<ScoredSeed> { scored -> scored.score }
+                .thenByDescending { scored -> scored.starter.durationDays }
+                .thenBy { scored -> scored.starter.title }
+        )
+
+        return when {
+            destinationKey.isNotBlank() -> scoredSeeds
+                .filter { scored -> normalizeDestinationKey(scored.starter.destination) == destinationKey }
+                .map { scored -> scored.starter }
+                .distinctBy(::uniqueStarterKey)
+
+            else -> scoredSeeds
+                .map { scored -> scored.starter }
+                .distinctBy(::uniqueStarterKey)
+                .take(3)
+        }
     }
 
     private fun scoreTrip(
@@ -109,6 +340,114 @@ class AiCuratedTripCatalog(
         return score
     }
 
+    private fun scoreSeed(
+        profile: AiTravelerProfile,
+        seed: AiCuratedTripSeed,
+        destinationKey: String
+    ): Int {
+        if (destinationKey.isNotBlank() && seed.destinationKey != destinationKey) {
+            return 0
+        }
+
+        val requestedTags = inferProfileTags(profile)
+        val overlapCount = seed.tags.count { tag -> tag in requestedTags }
+
+        var score = if (destinationKey.isNotBlank()) 120 else overlapCount * 12
+        if (score == 0) return 0
+
+        val requestedStyle = inferTravelStyle(profile)
+        if (requestedStyle.isNotBlank() && requestedStyle.equals(seed.travelStyle, ignoreCase = true)) {
+            score += 10
+        }
+
+        if ("food" in requestedTags && seed.tags.any { tag -> tag == "food" || tag == "food_first" }) {
+            score += 8
+        }
+
+        if ("romantic" in requestedTags && "romantic" in seed.tags) {
+            score += 8
+        }
+
+        if ("family" in requestedTags && "family" in seed.tags) {
+            score += 8
+        }
+
+        if ("relaxed" in requestedTags && "relaxed" in seed.tags) {
+            score += 6
+        }
+
+        if ("nightlife" in requestedTags && "nightlife" in seed.tags) {
+            score += 6
+        }
+
+        if ("beach" in requestedTags && "beach" in seed.tags) {
+            score += 6
+        }
+
+        if ("culture" in requestedTags && "culture" in seed.tags) {
+            score += 6
+        }
+
+        if ("nature" in requestedTags && "nature" in seed.tags) {
+            score += 6
+        }
+
+        if (destinationKey.isBlank() && overlapCount < 2) {
+            return 0
+        }
+
+        return score
+    }
+
+    private fun inferProfileTags(profile: AiTravelerProfile): Set<String> {
+        val normalized = buildString {
+            append(profile.destination)
+            append(' ')
+            append(profile.partySummary)
+            append(' ')
+            append(profile.travelPace)
+            append(' ')
+            append(profile.budgetSummary)
+            append(' ')
+            append(profile.interests.joinToString(" "))
+            append(' ')
+            append(profile.cuisinePreferences.joinToString(" "))
+            append(' ')
+            append(profile.notes.joinToString(" "))
+        }.lowercase(Locale.US)
+
+        return buildSet {
+            if (normalized.contains("warm")) add("warm_weather")
+            if (normalized.contains("tropical")) add("tropical")
+            if (normalized.contains("beach")) add("beach")
+            if (normalized.contains("city")) add("city")
+            if (normalized.contains("walkable")) add("walkable")
+            if (normalized.contains("food") || normalized.contains("restaurant") || normalized.contains("dining") || normalized.contains("cafe")) {
+                add("food")
+                add("food_first")
+            }
+            if (normalized.contains("culture") || normalized.contains("history") || normalized.contains("museum") || normalized.contains("art")) {
+                add("culture")
+            }
+            if (normalized.contains("temple")) add("temples")
+            if (normalized.contains("nightlife") || normalized.contains("late-night") || normalized.contains("bars") || normalized.contains("clubs")) {
+                add("nightlife")
+            }
+            if (normalized.contains("nature") || normalized.contains("scenic")) add("nature")
+            if (normalized.contains("hiking") || normalized.contains("hike")) add("hiking")
+            if (normalized.contains("romantic") || normalized.contains("couple") || normalized.contains("honeymoon") || normalized.contains("for two")) {
+                add("romantic")
+            }
+            if (normalized.contains("family") || normalized.contains("kids") || normalized.contains("children")) add("family")
+            if (normalized.contains("luxury") || normalized.contains("splurge")) add("luxury")
+            if (normalized.contains("budget") || normalized.contains("affordable")) add("budget")
+            if (normalized.contains("comfort")) add("comfort")
+            if (normalized.contains("relaxed")) add("relaxed")
+            if (normalized.contains("balanced")) add("balanced")
+            if (normalized.contains("packed")) add("packed")
+        }
+    }
+
     private fun buildMatchReason(
         profile: AiTravelerProfile,
         itinerary: Itinerary
@@ -130,6 +469,81 @@ class AiCuratedTripCatalog(
         return reasons.joinToString(" • ")
     }
 
+    private fun buildSeedMatchReason(
+        profile: AiTravelerProfile,
+        seed: AiCuratedTripSeed
+    ): String {
+        val requestedTags = inferProfileTags(profile)
+        val reasons = buildList {
+            if (profile.destination.isNotBlank()) {
+                add("Curated ${displayDestination(seed.destination)}")
+            } else {
+                add("Fits your vibe")
+            }
+
+            if ("food" in requestedTags && seed.tags.any { tag -> tag == "food" || tag == "food_first" }) {
+                add("Food-first")
+            }
+            if ("romantic" in requestedTags && "romantic" in seed.tags) {
+                add("Great for two")
+            }
+            if ("family" in requestedTags && "family" in seed.tags) {
+                add("Family-ready")
+            }
+            if ("beach" in requestedTags && "beach" in seed.tags) {
+                add("Beach fit")
+            }
+            if ("culture" in requestedTags && "culture" in seed.tags) {
+                add("Culture fit")
+            }
+            if ("nightlife" in requestedTags && "nightlife" in seed.tags) {
+                add("Nightlife fit")
+            }
+        }
+
+        return reasons.take(3).joinToString(" • ")
+    }
+
+    private fun buildPlaceMatchReason(
+        requestedTags: Set<String>,
+        suggestion: AiCuratedPlaceSuggestion
+    ): String {
+        val reasons = buildList {
+            when {
+                "food" in requestedTags && suggestion.tags.any { tag -> tag == "food" || tag == "food_first" } ->
+                    add("Great for food")
+                "romantic" in requestedTags && "romantic" in suggestion.tags ->
+                    add("Good for two")
+                "nightlife" in requestedTags && "nightlife" in suggestion.tags ->
+                    add("Good at night")
+                "culture" in requestedTags && suggestion.tags.any { tag -> tag == "culture" || tag == "history" || tag == "temples" } ->
+                    add("Strong culture fit")
+                "beach" in requestedTags && "beach" in suggestion.tags ->
+                    add("Beach fit")
+                "relaxed" in requestedTags && "relaxed" in suggestion.tags ->
+                    add("Relaxed pace")
+            }
+
+            if (suggestion.area.isNotBlank()) {
+                add(suggestion.area)
+            }
+        }
+
+        return reasons.take(2).joinToString(" • ").ifBlank { "Fits your current trip direction." }
+    }
+
+    private fun inferPlaceRowType(
+        recommendations: List<AiPlaceRecommendation>
+    ): AiPlaceRecommendationRowType {
+        val categories = recommendations.map { recommendation -> recommendation.category.lowercase(Locale.US) }
+        return when {
+            categories.any { category -> "day trip" in category } -> AiPlaceRecommendationRowType.DAY_TRIPS
+            categories.any { category -> "neighborhood" in category || "area" in category || "historic" in category } ->
+                AiPlaceRecommendationRowType.NEIGHBORHOODS
+            else -> AiPlaceRecommendationRowType.GENERAL
+        }
+    }
+
     private fun Itinerary.toStarter(matchReason: String): AiCuratedTripStarter {
         return AiCuratedTripStarter(
             title = tripName,
@@ -139,7 +553,8 @@ class AiCuratedTripCatalog(
             summary = buildSummary(this),
             matchReason = matchReason,
             source = AiCuratedTripSource.FIRESTORE,
-            tripKey = TripKey(ownerUid = ownerUid, tripId = itineraryId)
+            tripKey = TripKey(ownerUid = ownerUid, tripId = itineraryId),
+            heroImageUrl = homeImageUrl.ifBlank { null }
         )
     }
 
@@ -166,7 +581,7 @@ class AiCuratedTripCatalog(
         }
 
         return AiCuratedTripStarter(
-            title = "${durationDays}-day ${destination}",
+            title = "${durationDays}-day ${displayDestination(destination)}",
             destination = destination,
             durationDays = durationDays,
             travelStyle = style,
@@ -200,7 +615,7 @@ class AiCuratedTripCatalog(
     }
 
     private fun inferTravelStyle(profile: AiTravelerProfile): String {
-        val budget = profile.budgetSummary.lowercase()
+        val budget = profile.budgetSummary.lowercase(Locale.US)
         return when {
             "luxury" in budget -> "luxury"
             "budget" in budget -> "budget"
@@ -210,7 +625,7 @@ class AiCuratedTripCatalog(
     }
 
     private fun inferDurationDays(profile: AiTravelerProfile): Int {
-        val dateWindow = profile.dateWindow.lowercase()
+        val dateWindow = profile.dateWindow.lowercase(Locale.US)
         return when {
             "weekend" in dateWindow -> 3
             "week" in dateWindow -> 7
@@ -220,7 +635,7 @@ class AiCuratedTripCatalog(
     }
 
     private fun styleLabel(rawStyle: String): String {
-        return when (rawStyle.lowercase()) {
+        return when (rawStyle.lowercase(Locale.US)) {
             "budget" -> "Budget"
             "luxury" -> "Luxury"
             "comfort" -> "Comfort"
@@ -232,10 +647,25 @@ class AiCuratedTripCatalog(
         return destination
             .substringBefore(",")
             .trim()
-            .lowercase()
+            .lowercase(Locale.US)
+    }
+
+    private fun displayDestination(destination: String): String {
+        return destination.substringBefore(",").trim().ifBlank { destination }
+    }
+
+    private fun uniqueStarterKey(starter: AiCuratedTripStarter): String {
+        return starter.tripKey?.let { key -> "${key.ownerUid}:${key.tripId}" }
+            ?: starter.seedId?.let { seedId -> "$seedId:${starter.durationDays}" }
+            ?: starter.id
     }
 
     private data class ScoredTrip(
+        val score: Int,
+        val starter: AiCuratedTripStarter
+    )
+
+    private data class ScoredSeed(
         val score: Int,
         val starter: AiCuratedTripStarter
     )
