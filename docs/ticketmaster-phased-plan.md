@@ -20,7 +20,7 @@ This document converts [ticketmaster-api-integration.md](/C:/Users/z503/AndroidS
 
 ---
 
-## Phase 0 — Config Wiring
+## [x] Phase 0 — Config Wiring
 
 Goal: make the Discovery API key available from app code without changing behavior.
 
@@ -30,9 +30,9 @@ Files:
 - `README.md`
 
 Work:
-- Add `TICKETMASTER_API_KEY=...` to `local.properties` locally.
-- Add `buildConfigField("String", "TICKETMASTER_API_KEY", ...)` in `app/build.gradle.kts` next to the existing external API keys.
-- Add Ticketmaster setup notes to `README.md`.
+- [x] Add `TICKETMASTER_API_KEY=...` to `local.properties` locally.
+- [x] Add `buildConfigField("String", "TICKETMASTER_API_KEY", ...)` in `app/build.gradle.kts` next to the existing external API keys.
+- [x] Add Ticketmaster setup notes to `README.md`.
 
 Exit criteria:
 - `BuildConfig.TICKETMASTER_API_KEY` compiles.
@@ -41,7 +41,7 @@ Exit criteria:
 
 ---
 
-## Phase 1 — Discovery Data Layer
+## [x] Phase 1 — Discovery Data Layer
 
 Goal: create a self-contained Ticketmaster integration under `data/trip/` that can search Discovery API and map results into `TravelEvent`.
 
@@ -52,17 +52,17 @@ Files:
 - `app/src/main/java/com/example/travelcents/data/trip/model/EventDetailContract.kt`
 
 Work:
-- Add DTOs for the Discovery `/events.json` response.
-- Keep only fields the app will use:
+- [x] Add DTOs for the Discovery `/events.json` response.
+- [x] Keep only fields the app will use:
   - event `id`, `name`, `url`, `info`, `pleaseNote`
   - `dates.start.localDate`, `dates.start.localTime`, `dates.timezone`, `dates.status.code`
   - `images`
   - `classifications`
   - `priceRanges`
   - `_embedded.venues`
-- Add a Retrofit service with `@GET("discovery/v2/events.json")`.
-- Follow the existing `SerpRepository` / `WalkScoreRepository` pattern and send auth as query params, not headers.
-- Add repository methods:
+- [x] Add a Retrofit service with `@GET("discovery/v2/events.json")`.
+- [x] Follow the existing `SerpRepository` / `WalkScoreRepository` pattern and send auth as query params, not headers.
+- [x] Add repository methods:
 
 ```kotlin
 suspend fun searchEventsForTrip(
@@ -84,8 +84,8 @@ suspend fun searchEventsForChat(
 ): List<TravelEvent>
 ```
 
-- Map each Ticketmaster event into `TravelEvent(type = "activity")`.
-- Extend `EventDetailContract.kt` with Ticketmaster-specific fields:
+- [x] Map each Ticketmaster event into `TravelEvent(type = "activity")`.
+- [x] Extend `EventDetailContract.kt` with Ticketmaster-specific fields:
   - `ATTR_VENUE_NAME`
   - `ATTR_TICKET_PRICE_MIN`
   - `ATTR_TICKET_PRICE_MAX`
@@ -123,7 +123,7 @@ Exit criteria:
 
 ---
 
-## Phase 2 — Trip Generation Pipeline
+## [x] Phase 2 — Trip Generation Pipeline
 
 Goal: bring Ticketmaster events into itinerary generation alongside Yelp activities.
 
@@ -134,22 +134,22 @@ Current insertion point:
 - Step 4 already runs Yelp activity-pool fetches and `YelpRepository.searchEvents(...)` in parallel.
 
 Work:
-- Add a second async fetch in Step 4 for `TicketmasterRepository.searchEventsForTrip(...)`.
-- Use the same date window already computed for local events.
-- Add a small helper to translate trip interests into Ticketmaster classifications:
+- [x] Add a second async fetch in Step 4 for `TicketmasterRepository.searchEventsForTrip(...)`.
+- [x] Use the same date window already computed for local events.
+- [x] Add a small helper to translate trip interests into Ticketmaster classifications:
   - `music`
   - `sports`
   - `arts`
   - `family`
   - `film`
   - `null` when there is no reliable mapping
-- Merge Yelp and Ticketmaster event lists.
-- De-dupe obvious duplicates by a fuzzy key such as:
+- [x] Merge Yelp and Ticketmaster event lists.
+- [x] De-dupe obvious duplicates by a fuzzy key such as:
   - local date
   - local start time
   - normalized venue name or event name
-- Prefer the Ticketmaster copy when both sources represent the same event, because it carries booking URL and ticket pricing.
-- Run the merged list through the existing `filterEventsBeforeTime(...)` and `filterEventsAfterTime(...)` logic so flight-window trimming stays consistent.
+- [x] Prefer the Ticketmaster copy when both sources represent the same event, because it carries booking URL and ticket pricing.
+- [x] Run the merged list through the existing `filterEventsBeforeTime(...)` and `filterEventsAfterTime(...)` logic so flight-window trimming stays consistent.
 
 Exit criteria:
 - A generated trip in a major city includes at least one Ticketmaster-backed activity when available.
@@ -158,7 +158,7 @@ Exit criteria:
 
 ---
 
-## Phase 3 — Current Trip Detail Cards
+## [x] Phase 3 — Current Trip Detail Cards
 
 Goal: render the new Ticketmaster-only fields inside the existing event detail dialog without introducing a new event type.
 
@@ -168,11 +168,11 @@ Files:
 - `app/src/main/java/com/example/travelcents/ui/main/current/CurrentTripEventDetailsDialog.kt`
 
 Work:
-- Add `VenueCard` to show venue name and address.
-- Add `TicketPricingCard` to show price range and currency.
-- Append both cards in the `activity` branch of `EventDetailCardStack`.
-- Keep both cards self-hiding when the relevant fields are absent so Yelp activities remain visually unchanged.
-- Reuse the existing source/official link row for the Ticketmaster booking URL.
+- [x] Add `VenueCard` to show venue name and address.
+- [x] Add `TicketPricingCard` to show price range and currency.
+- [x] Append both cards in the `activity` branch of `EventDetailCardStack`.
+- [x] Keep both cards self-hiding when the relevant fields are absent so Yelp activities remain visually unchanged.
+- [x] Reuse the existing source/official link row for the Ticketmaster booking URL.
 
 Implementation notes:
 - Follow the current overlay-card pattern:
@@ -186,7 +186,7 @@ Exit criteria:
 
 ---
 
-## Phase 4 — AI Chat Grounding
+## [x] Phase 4 — AI Chat Grounding
 
 Goal: let AI chat answer live event questions with real Ticketmaster data instead of guessing.
 
@@ -194,10 +194,10 @@ Files:
 - `app/src/main/java/com/example/travelcents/ui/main/aichat/AiChatViewModel.kt`
 
 Work:
-- Add a light intent check for messages about concerts, shows, games, theatre, tickets, and sports.
-- When the active trip context has destination + date window, prefetch a small set of Ticketmaster results through `searchEventsForChat(...)`.
-- Inject a compact text block of real options into the prompt context.
-- Prefer a small, deterministic grounding step first. Do not introduce full tool-calling in the first pass.
+- [x] Add a light intent check for messages about concerts, shows, games, theatre, tickets, and sports.
+- [x] When the active trip context has destination + date window, prefetch a small set of Ticketmaster results through `searchEventsForChat(...)`.
+- [x] Inject a compact text block of real options into the prompt context.
+- [x] Prefer a small, deterministic grounding step first. Do not introduce full tool-calling in the first pass.
 
 Suggested first-pass behavior:
 - Fetch top 5 results
@@ -214,7 +214,7 @@ Exit criteria:
 
 ---
 
-## Phase 5 — Hardening, Caching, And Source Attribution
+## [ ] Phase 5 — Hardening, Caching, And Source Attribution
 
 Goal: make the integration production-safe and cheap enough to run regularly.
 
@@ -224,13 +224,13 @@ Files:
 - test files under `app/src/test/java/com/example/travelcents/...`
 
 Work:
-- Add a short in-memory cache for repeated Ticketmaster searches in chat.
-- Respect Discovery rate limits:
+- [ ] Add a short in-memory cache for repeated Ticketmaster searches in chat.
+- [ ] Respect Discovery rate limits:
   - 5 requests/second
   - 5,000 requests/day
   - `size * page < 1000`
-- Add source attribution when `ATTR_TICKETMASTER_EVENT_ID` is present.
-- Add tests for:
+- [ ] Add source attribution when `ATTR_TICKETMASTER_EVENT_ID` is present.
+- [ ] Add tests for:
   - DTO mapping
   - `TravelEvent` conversion
   - merge and dedupe behavior in trip generation

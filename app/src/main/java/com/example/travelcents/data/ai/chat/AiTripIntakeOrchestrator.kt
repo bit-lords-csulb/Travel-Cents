@@ -19,7 +19,7 @@ class AiTripIntakeOrchestrator {
         if (latestUserInput.isBlank()) return null
 
         val rawResponse = LlmClient.complete(
-            messages = buildMessages(
+            messages = buildIntakeMessages(
                 currentProfile = currentProfile,
                 latestUserInput = latestUserInput,
                 history = history,
@@ -28,8 +28,8 @@ class AiTripIntakeOrchestrator {
             ),
             model = LlmConfig.intakeModel,
             temperature = 0.2,
-            maxTokens = 1200,
-            responseFormat = responseFormat()
+            maxTokens = 900,
+            responseFormat = intakeResponseFormat()
         )
         if (rawResponse.isBlank()) return null
 
@@ -38,24 +38,58 @@ class AiTripIntakeOrchestrator {
         }.getOrNull() ?: return null
 
         return AiTripIntakeTurnResult(
-            assistantMessage = root.getStringOrEmpty("assistant_message"),
-            planningObjective = root.getStringOrEmpty("planning_objective"),
+            ackKey = root.enumValueOrDefault("ack_key", AiTripIntakeAckKey.GOT_IT),
             profilePatch = root.getAsJsonObjectOrNull("profile_patch")?.toIntakeProfilePatch()
                 ?: AiTripIntakeProfile(),
             resolvedFields = root.getStringList("resolved_fields"),
             missingFields = root.getStringList("missing_fields"),
-            followUpQuestion = root.getAsJsonObjectOrNull("follow_up_question")?.toFollowUpQuestion(),
-            destinationRecommendations = root.getAsJsonArrayOrNull("destination_recommendations")
-                ?.toDestinationRecommendations()
-                .orEmpty(),
-            placeRecommendations = root.getAsJsonArrayOrNull("place_recommendations")
-                ?.toPlaceRecommendations()
-                .orEmpty(),
-            decision = root.getAsJsonObjectOrNull("decision")?.toDecision() ?: AiTripIntakeDecision()
+            nextAction = root.enumValueOrDefault("next_action", AiTripIntakeNextAction.ASK_MORE),
+            nextActionReason = root.getStringOrEmpty("next_action_reason"),
+            questionKind = root.enumValueOrDefault("question_kind", AiTripIntakeQuestionKind.NONE),
+            questionId = root.getStringOrEmpty("question_id"),
+            questionTitle = root.getStringOrEmpty("question_title"),
+            questionSubtitle = root.getStringOrEmpty("question_subtitle"),
+            allowMultiple = root.getBooleanOrDefault("allow_multiple", false),
+            allowOther = root.getBooleanOrDefault("allow_other", false),
+            otherPromptHint = root.getStringOrEmpty("other_prompt_hint"),
+            textPrompt = root.getStringOrEmpty("text_prompt"),
+            options = root.getAsJsonArrayOrNull("options")
+                ?.toAnswerOptions()
+                .orEmpty()
         )
     }
 
-    private fun buildMessages(
+    suspend fun suggestDestinations(
+        currentProfile: AiTripIntakeProfile,
+        latestUserInput: String,
+        history: List<LlmMessage> = emptyList()
+    ): List<AiTripIntakeDestinationRecommendation> {
+        if (latestUserInput.isBlank()) return emptyList()
+
+        val rawResponse = LlmClient.complete(
+            messages = buildDestinationMessages(
+                currentProfile = currentProfile,
+                latestUserInput = latestUserInput,
+                history = history
+            ),
+            model = LlmConfig.intakeModel,
+            temperature = 0.2,
+            maxTokens = 600,
+            responseFormat = destinationSuggestionResponseFormat()
+        )
+        if (rawResponse.isBlank()) return emptyList()
+
+        val root = runCatching {
+            JsonParser.parseString(rawResponse).asJsonObject
+        }.getOrNull() ?: return emptyList()
+
+        return root.getAsJsonArrayOrNull("recommendations")
+            ?.toDestinationRecommendations()
+            .orEmpty()
+            .take(3)
+    }
+
+    private fun buildIntakeMessages(
         currentProfile: AiTripIntakeProfile,
         latestUserInput: String,
         history: List<LlmMessage>,
@@ -67,26 +101,26 @@ class AiTripIntakeOrchestrator {
                 role = "system",
                 content =
                     "You are the TravelCents intake orchestrator. " +
-                        "Read the user's latest turn and the current structured trip profile. " +
-                        "Aggressively infer any trip requirements stated directly or indirectly (e.g., 'me and my wife' implies party_summary of 2 and romantic trip_type). " +
+                        "Read the user's latest turn and the current structured trip profile, then update the structured trip patch. " +
+                        "Aggressively infer trip requirements stated directly or indirectly. " +
+                        "Examples: 'me and my wife', 'my husband and I', 'my partner and I', or 'for my spouse and me' imply party_summary of two adults and a romantic trip type. " +
+                        "A tropical or warm location implies a warm-weather destination style. " +
                         "Fill only fields supported by the schema. " +
                         "Treat the profile_patch as an additive patch, not a full replacement. " +
-                        "For fields you cannot newly infer from the latest turn, leave strings empty, arrays empty, numbers null, and enums as unknown. " +
-                        "Keep assistant_message EXTREMELY concise (under 5 words). It should ONLY be a brief acknowledgment like 'Got it!' or 'Sounds great!'. NEVER explain what you are updating. NEVER ask questions in assistant_message unless follow_up_question is null. " +
-                        "If important information is still missing, you have two choices for how to ask the user: " +
-                        "1) If the question can easily be answered with simple, predictable choices, provide it in the follow_up_question object to render as UI cards. The question should have 2 to 6 answer-card options with 1-2 word labels. " +
-                        "2) If the question requires an open-ended discussion, nuance, or cannot be simplified into short card options, set follow_up_question to null and ask the question directly at the end of your assistant_message instead. " +
-                        "DO NOT duplicate the follow_up_question text inside the assistant_message if you use the structured follow_up_question. " +
-                        "follow_up_question.id should be a stable snake_case id for the planning gap being asked about. " +
-                        "Set allow_other true when the preset options are only examples or the answer space is open-ended. " +
-                        "Use other_prompt_hint to tell the user what to type if they pick Other. " +
-                        "If the user has a vibe but not a destination, you may return 2 or 3 destination_recommendations. " +
-                        "If the destination is already clear and the user has enough direction, you may return 2 or 3 place_recommendations. " +
-                        "Only return recommendations that fit the known profile. " +
-                        "If enough information is present to move forward, set decision.type to recommend_curated or build_from_scratch. " +
+                        "For fields you cannot newly infer from the latest turn, leave strings empty, arrays empty, and enums as unknown. " +
+                        "ack_key must be exactly one of: got_it, sounds_good, understood, perfect. " +
+                        "Use question_kind='cards' only for simple discrete choices. " +
+                        "Use question_kind='text' only for open-ended follow-ups. " +
+                        "Use question_kind='none' when no follow-up question is needed on this turn. " +
+                        "If question_kind='none', leave question_id, question_title, question_subtitle, other_prompt_hint, and text_prompt empty, set allow_multiple and allow_other to false, and return options as an empty array. " +
+                        "If question_kind='cards', provide a stable snake_case question_id, a short question_title, 2 to 6 options, and keep text_prompt empty. " +
+                        "If question_kind='text', provide a short text_prompt, keep options empty, and do not ask the same planning gap twice. " +
+                        "Do not suggest specific destinations until you have gathered trip_type, at least 2 interests, and budget_level. Ask about missing fields first. " +
+                        "If the user has enough direction for destination suggestions but no destination yet, set next_action to suggest_destinations. " +
+                        "If the destination is already clear and the trip can move forward, set next_action to build_trip. " +
+                        "If more information is still needed before either of those, set next_action to ask_more. " +
                         "Do not ask a follow-up question for information already present in the profile. " +
                         "Do not repeat the same planning gap if it appears in asked_question_ids. " +
-                        "planning_objective should describe the next concrete planning step in a few words. " +
                         "Return JSON only."
             ),
             LlmMessage(
@@ -99,9 +133,7 @@ class AiTripIntakeOrchestrator {
                 role = "system",
                 content =
                     "Return a JSON object with these top-level keys: " +
-                        "assistant_message, planning_objective, profile_patch, resolved_fields, missing_fields, follow_up_question, destination_recommendations, place_recommendations, decision. " +
-                        "Use null for follow_up_question if no question is needed. " +
-                        "Decision types: ask_more, recommend_curated, build_from_scratch. " +
+                        "ack_key, profile_patch, resolved_fields, missing_fields, next_action, next_action_reason, question_kind, question_id, question_title, question_subtitle, allow_multiple, allow_other, other_prompt_hint, text_prompt, options. " +
                         "Never repeat a follow-up question that targets information already present in the profile."
             ),
             LlmMessage(
@@ -130,7 +162,51 @@ class AiTripIntakeOrchestrator {
         )
     }
 
-    private fun responseFormat(): Map<String, Any> {
+    private fun buildDestinationMessages(
+        currentProfile: AiTripIntakeProfile,
+        latestUserInput: String,
+        history: List<LlmMessage>
+    ): List<LlmMessage> {
+        return listOf(
+            LlmMessage(
+                role = "system",
+                content =
+                    "You are the TravelCents destination recommender. " +
+                        "Use the user's latest turn and structured trip profile to return 2 or 3 destination recommendations that tightly fit the request. " +
+                        "Do not ask questions. Do not explain your process. " +
+                        "Prefer varied but realistic fits. " +
+                        "Keep each summary and reason concise. " +
+                        "Return JSON only."
+            ),
+            LlmMessage(
+                role = "system",
+                content = "Current intake profile JSON:\n${currentProfile.toJson()}"
+            ),
+            LlmMessage(
+                role = "system",
+                content = buildString {
+                    val recentHistory = history
+                        .filter { message -> message.role == "user" || message.role == "assistant" }
+                        .takeLast(4)
+                    append("Recent chat turns:\n")
+                    if (recentHistory.isEmpty()) {
+                        append("None yet")
+                    } else {
+                        recentHistory.forEach { message ->
+                            val role = if (message.role.equals("user", ignoreCase = true)) "User" else "Assistant"
+                            appendLine("$role: ${message.content}")
+                        }
+                    }
+                }
+            ),
+            LlmMessage(
+                role = "user",
+                content = latestUserInput
+            )
+        )
+    }
+
+    private fun intakeResponseFormat(): Map<String, Any> {
         return mapOf(
             "type" to "json_schema",
             "json_schema" to mapOf(
@@ -141,31 +217,54 @@ class AiTripIntakeOrchestrator {
         )
     }
 
+    private fun destinationSuggestionResponseFormat(): Map<String, Any> {
+        return mapOf(
+            "type" to "json_schema",
+            "json_schema" to mapOf(
+                "name" to "travelcents_destination_suggestions",
+                "strict" to true,
+                "schema" to buildDestinationSuggestionSchema()
+            )
+        )
+    }
+
     private fun buildTurnSchema(): Map<String, Any> {
         return mapOf(
             "type" to "object",
             "additionalProperties" to false,
             "properties" to mapOf(
-                "assistant_message" to stringSchema(),
-                "planning_objective" to stringSchema(),
+                "ack_key" to enumSchema("got_it", "sounds_good", "understood", "perfect"),
                 "profile_patch" to buildProfilePatchSchema(),
                 "resolved_fields" to stringArraySchema(),
                 "missing_fields" to stringArraySchema(),
-                "follow_up_question" to buildFollowUpQuestionSchema(),
-                "destination_recommendations" to buildDestinationRecommendationSchema(),
-                "place_recommendations" to buildPlaceRecommendationSchema(),
-                "decision" to buildDecisionSchema()
+                "next_action" to enumSchema("ask_more", "suggest_destinations", "build_trip"),
+                "next_action_reason" to stringSchema(),
+                "question_kind" to enumSchema("none", "cards", "text"),
+                "question_id" to stringSchema(),
+                "question_title" to stringSchema(),
+                "question_subtitle" to stringSchema(),
+                "allow_multiple" to booleanSchema(),
+                "allow_other" to booleanSchema(),
+                "other_prompt_hint" to stringSchema(),
+                "text_prompt" to stringSchema(),
+                "options" to buildAnswerOptionsSchema()
             ),
             "required" to listOf(
-                "assistant_message",
-                "planning_objective",
+                "ack_key",
                 "profile_patch",
                 "resolved_fields",
                 "missing_fields",
-                "follow_up_question",
-                "destination_recommendations",
-                "place_recommendations",
-                "decision"
+                "next_action",
+                "next_action_reason",
+                "question_kind",
+                "question_id",
+                "question_title",
+                "question_subtitle",
+                "allow_multiple",
+                "allow_other",
+                "other_prompt_hint",
+                "text_prompt",
+                "options"
             )
         )
     }
@@ -181,16 +280,12 @@ class AiTripIntakeOrchestrator {
                 "destination_style" to stringArraySchema(),
                 "origin" to stringSchema(),
                 "date_window" to stringSchema(),
-                "duration_days" to nullableIntegerSchema(),
                 "budget_level" to enumSchema("unknown", "budget", "comfort", "luxury", "mixed"),
-                "budget_total" to nullableNumberSchema(),
                 "pace" to enumSchema("unknown", "relaxed", "balanced", "packed"),
                 "interests" to stringArraySchema(),
-                "cuisine_preferences" to stringArraySchema(),
                 "must_haves" to stringArraySchema(),
                 "avoid" to stringArraySchema(),
-                "notes" to stringArraySchema(),
-                "confidence" to buildConfidenceSchema()
+                "notes" to stringArraySchema()
             ),
             "required" to listOf(
                 "trip_type",
@@ -199,88 +294,40 @@ class AiTripIntakeOrchestrator {
                 "destination_style",
                 "origin",
                 "date_window",
-                "duration_days",
                 "budget_level",
-                "budget_total",
                 "pace",
                 "interests",
-                "cuisine_preferences",
                 "must_haves",
                 "avoid",
-                "notes",
-                "confidence"
+                "notes"
             )
         )
     }
 
-    private fun buildConfidenceSchema(): Map<String, Any> {
+    private fun buildAnswerOptionsSchema(): Map<String, Any> {
         return mapOf(
-            "type" to "object",
-            "additionalProperties" to false,
-            "properties" to mapOf(
-                "trip_type" to nullableNumberSchema(),
-                "destination" to nullableNumberSchema(),
-                "destination_style" to nullableNumberSchema(),
-                "origin" to nullableNumberSchema(),
-                "date_window" to nullableNumberSchema(),
-                "budget" to nullableNumberSchema(),
-                "pace" to nullableNumberSchema(),
-                "interests" to nullableNumberSchema(),
-                "cuisine_preferences" to nullableNumberSchema()
-            ),
-            "required" to listOf(
-                "trip_type",
-                "destination",
-                "destination_style",
-                "origin",
-                "date_window",
-                "budget",
-                "pace",
-                "interests",
-                "cuisine_preferences"
+            "type" to "array",
+            "items" to mapOf(
+                "type" to "object",
+                "additionalProperties" to false,
+                "properties" to mapOf(
+                    "id" to stringSchema(),
+                    "label" to stringSchema(),
+                    "message" to stringSchema()
+                ),
+                "required" to listOf("id", "label", "message")
             )
         )
     }
 
-    private fun buildFollowUpQuestionSchema(): Map<String, Any> {
-        return mapOf(
-            "type" to listOf("object", "null"),
-            "additionalProperties" to false,
-            "properties" to mapOf(
-                "id" to stringSchema(),
-                "title" to stringSchema(),
-                "subtitle" to stringSchema(),
-                "allow_multiple" to mapOf("type" to "boolean"),
-                "allow_other" to mapOf("type" to "boolean"),
-                "other_prompt_hint" to stringSchema(),
-                "options" to mapOf(
-                    "type" to "array",
-                    "items" to mapOf(
-                        "type" to "object",
-                        "additionalProperties" to false,
-                        "properties" to mapOf(
-                            "id" to stringSchema(),
-                            "label" to stringSchema(),
-                            "message" to stringSchema()
-                        ),
-                        "required" to listOf("id", "label", "message")
-                    )
-                )
-            ),
-            "required" to listOf("id", "title", "subtitle", "allow_multiple", "allow_other", "other_prompt_hint", "options")
-        )
-    }
-
-    private fun buildDecisionSchema(): Map<String, Any> {
+    private fun buildDestinationSuggestionSchema(): Map<String, Any> {
         return mapOf(
             "type" to "object",
             "additionalProperties" to false,
             "properties" to mapOf(
-                "type" to enumSchema("ask_more", "recommend_curated", "build_from_scratch"),
-                "reason" to stringSchema(),
-                "confidence" to nullableNumberSchema()
+                "recommendations" to buildDestinationRecommendationSchema()
             ),
-            "required" to listOf("type", "reason", "confidence")
+            "required" to listOf("recommendations")
         )
     }
 
@@ -301,26 +348,9 @@ class AiTripIntakeOrchestrator {
         )
     }
 
-    private fun buildPlaceRecommendationSchema(): Map<String, Any> {
-        return mapOf(
-            "type" to "array",
-            "items" to mapOf(
-                "type" to "object",
-                "additionalProperties" to false,
-                "properties" to mapOf(
-                    "id" to stringSchema(),
-                    "name" to stringSchema(),
-                    "category" to stringSchema(),
-                    "area" to stringSchema(),
-                    "summary" to stringSchema(),
-                    "reason" to stringSchema()
-                ),
-                "required" to listOf("id", "name", "category", "area", "summary", "reason")
-            )
-        )
-    }
-
     private fun stringSchema(): Map<String, Any> = mapOf("type" to "string")
+
+    private fun booleanSchema(): Map<String, Any> = mapOf("type" to "boolean")
 
     private fun stringArraySchema(): Map<String, Any> {
         return mapOf(
@@ -328,10 +358,6 @@ class AiTripIntakeOrchestrator {
             "items" to stringSchema()
         )
     }
-
-    private fun nullableIntegerSchema(): Map<String, Any> = mapOf("type" to listOf("integer", "null"))
-
-    private fun nullableNumberSchema(): Map<String, Any> = mapOf("type" to listOf("number", "null"))
 
     private fun enumSchema(vararg values: String): Map<String, Any> {
         return mapOf(
@@ -360,6 +386,25 @@ private fun JsonObject.toIntakeProfilePatch(): AiTripIntakeProfile {
         notes = getStringList("notes"),
         confidence = getDoubleMap("confidence")
     )
+}
+
+private fun JsonArray.toAnswerOptions(): List<AiTripIntakeAnswerOption> {
+    return mapNotNull { element ->
+        element.asJsonObjectOrNull()?.let { option ->
+            val optionId = option.getStringOrEmpty("id")
+            val label = option.getStringOrEmpty("label")
+            val message = option.getStringOrEmpty("message")
+            if (optionId.isBlank() || label.isBlank() || message.isBlank()) {
+                null
+            } else {
+                AiTripIntakeAnswerOption(
+                    id = optionId,
+                    label = label,
+                    message = message
+                )
+            }
+        }
+    }
 }
 
 private fun JsonObject.toFollowUpQuestion(): AiTripIntakeFollowUpQuestion? {

@@ -37,6 +37,25 @@ enum class AiTripIntakeDecisionType {
     BUILD_FROM_SCRATCH
 }
 
+enum class AiTripIntakeAckKey {
+    GOT_IT,
+    SOUNDS_GOOD,
+    UNDERSTOOD,
+    PERFECT
+}
+
+enum class AiTripIntakeNextAction {
+    ASK_MORE,
+    SUGGEST_DESTINATIONS,
+    BUILD_TRIP
+}
+
+enum class AiTripIntakeQuestionKind {
+    NONE,
+    CARDS,
+    TEXT
+}
+
 data class AiTripIntakeProfile(
     @SerializedName("schema_version")
     val schemaVersion: Int = INTAKE_SCHEMA_VERSION,
@@ -146,25 +165,94 @@ data class AiTripIntakePlaceRecommendation(
 )
 
 data class AiTripIntakeTurnResult(
-    @SerializedName("assistant_message")
-    val assistantMessage: String = "",
-    @SerializedName("planning_objective")
-    val planningObjective: String = "",
+    @SerializedName("ack_key")
+    val ackKey: AiTripIntakeAckKey = AiTripIntakeAckKey.GOT_IT,
     @SerializedName("profile_patch")
     val profilePatch: AiTripIntakeProfile = AiTripIntakeProfile(),
     @SerializedName("resolved_fields")
     val resolvedFields: List<String> = emptyList(),
     @SerializedName("missing_fields")
     val missingFields: List<String> = emptyList(),
-    @SerializedName("follow_up_question")
-    val followUpQuestion: AiTripIntakeFollowUpQuestion? = null,
+    @SerializedName("next_action")
+    val nextAction: AiTripIntakeNextAction = AiTripIntakeNextAction.ASK_MORE,
+    @SerializedName("next_action_reason")
+    val nextActionReason: String = "",
+    @SerializedName("question_kind")
+    val questionKind: AiTripIntakeQuestionKind = AiTripIntakeQuestionKind.NONE,
+    @SerializedName("question_id")
+    val questionId: String = "",
+    @SerializedName("question_title")
+    val questionTitle: String = "",
+    @SerializedName("question_subtitle")
+    val questionSubtitle: String = "",
+    @SerializedName("allow_multiple")
+    val allowMultiple: Boolean = false,
+    @SerializedName("allow_other")
+    val allowOther: Boolean = false,
+    @SerializedName("other_prompt_hint")
+    val otherPromptHint: String = "",
+    @SerializedName("text_prompt")
+    val textPrompt: String = "",
+    @SerializedName("options")
+    val options: List<AiTripIntakeAnswerOption> = emptyList(),
     @SerializedName("destination_recommendations")
     val destinationRecommendations: List<AiTripIntakeDestinationRecommendation> = emptyList(),
     @SerializedName("place_recommendations")
     val placeRecommendations: List<AiTripIntakePlaceRecommendation> = emptyList(),
     @SerializedName("decision")
-    val decision: AiTripIntakeDecision = AiTripIntakeDecision()
-)
+    val decision: AiTripIntakeDecision = when (nextAction) {
+        AiTripIntakeNextAction.BUILD_TRIP -> AiTripIntakeDecision(
+            type = AiTripIntakeDecisionType.BUILD_FROM_SCRATCH,
+            reason = nextActionReason
+        )
+
+        AiTripIntakeNextAction.ASK_MORE,
+        AiTripIntakeNextAction.SUGGEST_DESTINATIONS -> AiTripIntakeDecision(
+            type = AiTripIntakeDecisionType.ASK_MORE,
+            reason = nextActionReason
+        )
+    }
+) {
+    val assistantMessage: String
+        get() = buildList {
+            add(ackKey.displayText())
+            if (questionKind == AiTripIntakeQuestionKind.TEXT) {
+                textPrompt.ifBlank { questionTitle }
+                    .takeIf { prompt -> prompt.isNotBlank() }
+                    ?.let(::add)
+            }
+        }.joinToString(" ").trim()
+
+    val planningObjective: String
+        get() = when (nextAction) {
+            AiTripIntakeNextAction.SUGGEST_DESTINATIONS -> "Review destination ideas"
+            AiTripIntakeNextAction.BUILD_TRIP -> "Build the trip"
+            AiTripIntakeNextAction.ASK_MORE -> {
+                questionTitle.ifBlank { textPrompt }
+                    .ifBlank { nextActionReason }
+                    .ifBlank { "Refine the plan" }
+            }
+        }
+
+    val followUpQuestion: AiTripIntakeFollowUpQuestion?
+        get() {
+            if (questionKind != AiTripIntakeQuestionKind.CARDS) return null
+
+            return AiTripIntakeFollowUpQuestion(
+                id = questionId,
+                title = questionTitle,
+                subtitle = questionSubtitle,
+                allowMultiple = allowMultiple,
+                allowOther = allowOther,
+                otherPromptHint = otherPromptHint,
+                options = options
+            ).takeIf { question ->
+                question.id.isNotBlank() &&
+                    question.title.isNotBlank() &&
+                    question.options.size in 2..6
+            }
+        }
+}
 
 fun AiTravelerProfile.toIntakeProfile(): AiTripIntakeProfile {
     return AiTripIntakeProfile(
@@ -286,6 +374,12 @@ fun AiTripIntakeTurnResult.toDestinationRecommendationRow(): AiDestinationRecomm
     return AiRecommendationMapper.destinationRowFromIntake(destinationRecommendations)
 }
 
+fun AiTripIntakeTurnResult.withDestinationRecommendations(
+    recommendations: List<AiTripIntakeDestinationRecommendation>
+): AiTripIntakeTurnResult {
+    return copy(destinationRecommendations = recommendations)
+}
+
 fun AiTripIntakeTurnResult.toPlaceRecommendationRow(): AiPlaceRecommendationRow? {
     return AiRecommendationMapper.placeRowFromIntake(placeRecommendations)
 }
@@ -325,7 +419,17 @@ private fun AiTravelerProfile.inferTripType(): AiTripType {
 
     return when {
         "family" in normalized || "kids" in normalized || "children" in normalized -> AiTripType.FAMILY
-        "romantic" in normalized || "couple" in normalized || "for two" in normalized -> AiTripType.ROMANTIC
+        "romantic" in normalized ||
+            "couple" in normalized ||
+            "for two" in normalized ||
+            "wife" in normalized ||
+            "husband" in normalized ||
+            "partner" in normalized ||
+            "spouse" in normalized ||
+            "boyfriend" in normalized ||
+            "girlfriend" in normalized ||
+            "fiance" in normalized ||
+            "fiancee" in normalized -> AiTripType.ROMANTIC
         "solo" in normalized -> AiTripType.SOLO
         "friends" in normalized || "group" in normalized -> AiTripType.FRIENDS
         "business" in normalized || "work trip" in normalized || "conference" in normalized -> AiTripType.BUSINESS
@@ -432,5 +536,14 @@ private fun AiTripIntakeProfile.toPaceSummary(): String {
         AiTripPacePreference.BALANCED -> "Balanced"
         AiTripPacePreference.PACKED -> "Packed"
         AiTripPacePreference.UNKNOWN -> ""
+    }
+}
+
+private fun AiTripIntakeAckKey.displayText(): String {
+    return when (this) {
+        AiTripIntakeAckKey.GOT_IT -> "Got it!"
+        AiTripIntakeAckKey.SOUNDS_GOOD -> "Sounds good!"
+        AiTripIntakeAckKey.UNDERSTOOD -> "Understood."
+        AiTripIntakeAckKey.PERFECT -> "Perfect."
     }
 }

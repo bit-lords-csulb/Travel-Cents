@@ -223,7 +223,7 @@ private fun AiCuratedTripCard(
 private fun SourcePill(source: AiCuratedTripSource) {
     val (label, icon) = when (source) {
         AiCuratedTripSource.FIRESTORE -> "Saved trip" to Icons.Outlined.CollectionsBookmark
-        AiCuratedTripSource.SEEDED -> "Curated" to Icons.Outlined.Place
+        AiCuratedTripSource.SEEDED -> "Popular trip" to Icons.Outlined.Place
         AiCuratedTripSource.GENERATED -> "Fresh start" to Icons.Outlined.AutoAwesome
     }
 
