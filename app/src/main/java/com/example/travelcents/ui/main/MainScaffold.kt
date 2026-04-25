@@ -22,6 +22,8 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.ui.Modifier
+import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -39,12 +41,14 @@ import com.example.travelcents.ui.components.MainBottomNavBar
 import com.example.travelcents.data.ai.chat.AiCuratedTripStarter
 import com.example.travelcents.data.ai.chat.AiTripIntakeProfile
 import com.example.travelcents.data.trip.TripKey
+import com.example.travelcents.ui.components.MainBottomNavBar
 import com.example.travelcents.ui.main.aichat.AiTripChatPage
 import com.example.travelcents.ui.main.chats.chat.ChatsScreen
 import com.example.travelcents.ui.main.current.CurrentDisplayMode
-import com.example.travelcents.ui.main.current.CurrentTripScreen
 import com.example.travelcents.ui.main.current.CurrentTripRoutes
+import com.example.travelcents.ui.main.current.CurrentTripScreen
 import com.example.travelcents.ui.main.current.CurrentTripViewModel
+import com.example.travelcents.ui.main.home.HomePage
 import com.example.travelcents.ui.main.current.PreviewSource
 import com.example.travelcents.ui.main.newTrip.NewTripLandingPage
 import com.example.travelcents.ui.main.newTrip.NewTripViewModel
@@ -54,10 +58,9 @@ import com.example.travelcents.ui.main.newTrip.TripGeneratingPage
 import com.example.travelcents.ui.main.newTrip.TripStep1DestinationPage
 import com.example.travelcents.ui.main.newTrip.TripStep2DatesPage
 import com.example.travelcents.ui.main.newTrip.TripStep3TravelersPage
-import com.example.travelcents.ui.main.home.HomePage
 import com.example.travelcents.ui.main.newTrip.TripStep4BudgetPage
-import com.example.travelcents.ui.main.settings.SettingsPage
 import com.example.travelcents.ui.main.newTrip.TripStep5InterestsPage
+import com.example.travelcents.ui.main.settings.SettingsPage
 import com.example.travelcents.ui.theme.DeepSea1
 
 object MainRoutes {

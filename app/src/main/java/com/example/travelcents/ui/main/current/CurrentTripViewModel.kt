@@ -11,31 +11,70 @@ import com.example.travelcents.data.ai.chat.PREVIEW_TRIP_STATUS
 import com.example.travelcents.data.media.TripMediaCacheStore
 import com.example.travelcents.data.local.trip.TravelCentsDatabase
 import com.example.travelcents.data.local.trip.TripLocalDataSource
-import com.example.travelcents.data.trip.FirestoreTripRepository
-import com.example.travelcents.data.trip.TripKey
-import com.example.travelcents.data.trip.TripAccessRole
-import com.example.travelcents.data.trip.TripPlanActionService
-import com.example.travelcents.data.trip.TripPerformanceLogger
-import com.example.travelcents.data.trip.TripRepository
-import com.example.travelcents.data.trip.model.DETAIL_YELP_ID
-import com.example.travelcents.data.trip.model.EventOption
-import com.example.travelcents.data.trip.model.Itinerary
-import com.example.travelcents.data.trip.model.TravelEvent
-import com.example.travelcents.data.trip.model.YelpOptionPoolItem
-import com.example.travelcents.data.trip.model.YelpReview
-import com.example.travelcents.data.trip.model.detailValue
-import com.example.travelcents.data.trip.model.resolveTripName
-import com.example.travelcents.data.trip.model.YELP_POOL_TYPE_ACTIVITIES
-import com.example.travelcents.data.trip.model.YELP_POOL_TYPE_RESTAURANTS
-import com.example.travelcents.data.trip.remote.YelpRepository
+import com.example.travelcents.data.media.TripMediaCacheStore
 import com.example.travelcents.data.sync.CurrentTripSyncCoordinator
 import com.example.travelcents.data.sync.TripHydrationWorker
 import com.example.travelcents.data.sync.TripSyncCoordinator
 import com.example.travelcents.data.sync.TripSyncRemoteDataSource
+import com.example.travelcents.data.trip.FirestoreTripRepository
+import com.example.travelcents.data.trip.TripAccessRole
+import com.example.travelcents.data.trip.TripKey
+import com.example.travelcents.data.trip.TripPlanActionService
+import com.example.travelcents.data.trip.TripPerformanceLogger
+import com.example.travelcents.data.trip.TripRepository
+import com.example.travelcents.data.trip.local.DestinationTimeZones
+import com.example.travelcents.data.trip.model.ATTR_BIKE_SCORE
+import com.example.travelcents.data.trip.model.ATTR_BUSINESS_ADDRESS
+import com.example.travelcents.data.trip.model.ATTR_CURRENT_BUSYNESS
+import com.example.travelcents.data.trip.model.ATTR_ESTIMATED_HOME_COST
+import com.example.travelcents.data.trip.model.ATTR_ESTIMATED_LOCAL_COST
+import com.example.travelcents.data.trip.model.ATTR_ESTIMATED_WAIT_MIN
+import com.example.travelcents.data.trip.model.ATTR_FX_HISTORY_30D
+import com.example.travelcents.data.trip.model.ATTR_HAS_OUTDOOR_SEATING
+import com.example.travelcents.data.trip.model.ATTR_HOME_CURRENCY
+import com.example.travelcents.data.trip.model.ATTR_LATITUDE
+import com.example.travelcents.data.trip.model.ATTR_LOCAL_CURRENCY
+import com.example.travelcents.data.trip.model.ATTR_LONGITUDE
+import com.example.travelcents.data.trip.model.ATTR_LYFT_DEEPLINK
+import com.example.travelcents.data.trip.model.ATTR_NEAR_CATEGORIES
+import com.example.travelcents.data.trip.model.ATTR_NEIGHBORHOOD_NOTE
+import com.example.travelcents.data.trip.model.ATTR_POPULAR_TIMES_JSON
+import com.example.travelcents.data.trip.model.ATTR_PRICE_LEVEL_USD
+import com.example.travelcents.data.trip.model.ATTR_PRICE_TIER
+import com.example.travelcents.data.trip.model.ATTR_RIDESHARE_ESTIMATE_USD
+import com.example.travelcents.data.trip.model.ATTR_RIDESHARE_MIN
+import com.example.travelcents.data.trip.model.ATTR_TRANSIT_MIN
+import com.example.travelcents.data.trip.model.ATTR_TRANSIT_SCORE
+import com.example.travelcents.data.trip.model.ATTR_TRANSPORT_ANCHOR_LABEL
+import com.example.travelcents.data.trip.model.ATTR_UBER_DEEPLINK
+import com.example.travelcents.data.trip.model.ATTR_WALK_MIN
+import com.example.travelcents.data.trip.model.ATTR_WALK_SCORE
+import com.example.travelcents.data.trip.model.ATTR_WEATHER_CONDITION
+import com.example.travelcents.data.trip.model.ATTR_WEATHER_PRECIP_PCT
+import com.example.travelcents.data.trip.model.ATTR_WEATHER_SUMMARY
+import com.example.travelcents.data.trip.model.ATTR_WEATHER_TEMP_C
+import com.example.travelcents.data.trip.model.ATTR_WEATHER_WIND_KPH
+import com.example.travelcents.data.trip.model.DETAIL_YELP_ID
+import com.example.travelcents.data.trip.model.EventOption
+import com.example.travelcents.data.trip.model.Itinerary
+import com.example.travelcents.data.trip.model.TravelEvent
+import com.example.travelcents.data.trip.model.YELP_POOL_TYPE_ACTIVITIES
+import com.example.travelcents.data.trip.model.YELP_POOL_TYPE_RESTAURANTS
+import com.example.travelcents.data.trip.model.YelpOptionPoolItem
+import com.example.travelcents.data.trip.model.YelpReview
+import com.example.travelcents.data.trip.model.detailValue
+import com.example.travelcents.data.trip.model.displayName
+import com.example.travelcents.data.trip.model.resolveTripName
+import com.example.travelcents.data.trip.remote.CurrencyPreviewRepository
+import com.example.travelcents.data.trip.remote.PopularTimesRepository
+import com.example.travelcents.data.trip.remote.TransportRepository
+import com.example.travelcents.data.trip.remote.WalkScoreRepository
+import com.example.travelcents.data.trip.remote.WeatherRepository
+import com.example.travelcents.data.trip.remote.YelpRepository
+import com.example.travelcents.ui.main.shared.TripMediaDetailPipeline
 import com.example.travelcents.ui.modules.defaultPlanTimeZoneId
 import com.example.travelcents.ui.modules.normalizeDate
 import com.example.travelcents.ui.modules.normalizeTime
-import com.example.travelcents.ui.main.shared.TripMediaDetailPipeline
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FieldPath
 import com.google.firebase.firestore.FieldValue
@@ -45,10 +84,10 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
-import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.tasks.await
+import java.util.Currency
 import java.util.Locale
 import java.util.UUID
 
@@ -85,6 +124,8 @@ data class CurrentTripUiState(
     val destination: String = "",
     val dateFrom: String = "",
     val dateTo: String = "",
+    val adults: Int = 1,
+    val children: Int = 0,
     val events: List<TravelEvent> = emptyList(),
     val infoMessage: String? = null,
     val errorMessage: String? = null,
@@ -142,6 +183,7 @@ class CurrentTripViewModel(application: Application) : AndroidViewModel(applicat
     private val _reviewsLoading = MutableStateFlow<Set<String>>(emptySet())
     val reviewsLoading: StateFlow<Set<String>> = _reviewsLoading.asStateFlow()
     private val _yelpEnrichmentInFlight = MutableStateFlow<Set<String>>(emptySet())
+    private val _restaurantLiveContextInFlight = MutableStateFlow<Set<String>>(emptySet())
 
     private val _shareTargets = MutableStateFlow<List<ShareTarget>>(emptyList())
     val shareTargets: StateFlow<List<ShareTarget>> = _shareTargets.asStateFlow()
@@ -175,10 +217,13 @@ class CurrentTripViewModel(application: Application) : AndroidViewModel(applicat
     private var currentTripKey: TripKey? = null
     private var currentTripSummary: Itinerary? = null
     private var currentTripDestination: String = ""
+    private var currentTripTimeZoneId: String = ""
     private var localEventsSnapshot: List<TravelEvent> = emptyList()
     private val sharedYelpPools = mutableMapOf<String, List<YelpOptionPoolItem>>()
     private val sharedYelpWindowBoost = mutableMapOf<String, Int>()
     private val mediaDetailPipeline = TripMediaDetailPipeline(application)
+    private val currencyPreviewRepository = CurrencyPreviewRepository(application)
+    private var liveEventDetailOverrides: Map<String, Map<String, String>> = emptyMap()
 
     private fun resetTripState(
         isLoading: Boolean = false,
@@ -197,6 +242,7 @@ class CurrentTripViewModel(application: Application) : AndroidViewModel(applicat
         currentTripKey = null
         currentTripSummary = null
         currentTripDestination = ""
+        currentTripTimeZoneId = ""
         localEventsSnapshot = emptyList()
         sharedYelpPools.clear()
         sharedYelpWindowBoost.clear()
@@ -208,8 +254,10 @@ class CurrentTripViewModel(application: Application) : AndroidViewModel(applicat
         _yelpReviews.value = emptyMap()
         _reviewsLoading.value = emptySet()
         _yelpEnrichmentInFlight.value = emptySet()
+        _restaurantLiveContextInFlight.value = emptySet()
         _shareTargets.value = emptyList()
         _tripMembers.value = emptyList()
+        liveEventDetailOverrides = emptyMap()
         _uiState.value = CurrentTripUiState(
             isLoading = isLoading,
             tripTitle = tripTitle,
@@ -274,17 +322,27 @@ class CurrentTripViewModel(application: Application) : AndroidViewModel(applicat
         tripKey: TripKey,
         itinerary: Itinerary
     ) {
-        currentTripSummary = itinerary
-        currentTripDestination = itinerary.destination
+        val resolvedTripTimeZoneId = resolveTripTimeZoneId(itinerary)
+        val effectiveItinerary = if (
+            resolvedTripTimeZoneId.isNotBlank() &&
+            resolvedTripTimeZoneId != itinerary.timeZoneId
+        ) {
+            itinerary.copy(timeZoneId = resolvedTripTimeZoneId)
+        } else {
+            itinerary
+        }
+        currentTripSummary = effectiveItinerary
+        currentTripDestination = effectiveItinerary.destination
+        currentTripTimeZoneId = effectiveItinerary.timeZoneId
         val viewerUid = auth.currentUser?.uid
         val accessRole = when {
             viewerUid.isNullOrBlank() -> TripAccessRole.VIEWER
             viewerUid == tripKey.ownerUid -> TripAccessRole.OWNER
-            else -> TripAccessRole.fromWireValue(itinerary.roleByUid[viewerUid])
+            else -> TripAccessRole.fromWireValue(effectiveItinerary.roleByUid[viewerUid])
         }
         val canEditTrip = accessRole.canMutateEvents()
         val canManageTrip = accessRole.canManageTrip()
-        val storedTripTitle = itinerary.tripName
+        val storedTripTitle = effectiveItinerary.tripName
         val nextTripTitle = resolveTripName(storedTripTitle, currentTripDestination)
         _tripTitle.value = nextTripTitle
         _uiState.update {
@@ -298,12 +356,22 @@ class CurrentTripViewModel(application: Application) : AndroidViewModel(applicat
                 canManageTrip = canManageTrip,
                 tripTitle = nextTripTitle,
                 destination = currentTripDestination,
-                dateFrom = itinerary.dateFrom,
-                dateTo = itinerary.dateTo,
+                dateFrom = effectiveItinerary.dateFrom,
+                dateTo = effectiveItinerary.dateTo,
+                adults = effectiveItinerary.adults,
+                children = effectiveItinerary.children,
                 infoMessage = if (localEventsSnapshot.isEmpty()) EMPTY_PLANS_MESSAGE else null,
                 errorMessage = null
             )
         }
+
+        backfillTripTimeZoneIfNeeded(
+            viewerUid = viewerUid,
+            tripKey = tripKey,
+            originalItinerary = itinerary,
+            resolvedItinerary = effectiveItinerary,
+            canManageTrip = canManageTrip
+        )
 
         if (canManageTrip && nextTripTitle != storedTripTitle.trim()) {
             viewModelScope.launch {
@@ -330,21 +398,91 @@ class CurrentTripViewModel(application: Application) : AndroidViewModel(applicat
             optionsByEvent = alignedOptionsByEvent,
             sortEvents = ::sortPlanEvents
         )
-        _events.value = enrichedEvents
+        val visibleEvents = enrichedEvents.map { event ->
+            val eventWithTripTimeZone = applyTripTimeZone(event)
+            val overrides = liveEventDetailOverrides[event.eventId].orEmpty()
+            if (overrides.isEmpty()) {
+                eventWithTripTimeZone
+            } else {
+                eventWithTripTimeZone.copy(details = eventWithTripTimeZone.details + overrides)
+            }
+        }
+        _events.value = visibleEvents
         _uiState.update {
             it.copy(
-                isLoading = currentTripSummary == null && enrichedEvents.isEmpty(),
-                events = enrichedEvents,
+                isLoading = currentTripSummary == null && visibleEvents.isEmpty(),
+                events = visibleEvents,
                 infoMessage = when {
                     currentTripSummary == null -> it.infoMessage
-                    enrichedEvents.isEmpty() -> EMPTY_PLANS_MESSAGE
+                    visibleEvents.isEmpty() -> EMPTY_PLANS_MESSAGE
                     it.infoMessage == EMPTY_PLANS_MESSAGE -> null
                     else -> it.infoMessage
                 },
                 errorMessage = null
             )
         }
-        prefetchSharedEventMedia(enrichedEvents)
+        prefetchSharedEventMedia(visibleEvents)
+    }
+
+    private fun resolveTripTimeZoneId(itinerary: Itinerary): String {
+        return itinerary.timeZoneId.takeIf { it.isNotBlank() }
+            ?: DestinationTimeZones.resolveTimeZoneId(
+                destination = itinerary.destination,
+                destinationIata = itinerary.destinationIata
+            ).orEmpty()
+    }
+
+    private fun backfillTripTimeZoneIfNeeded(
+        viewerUid: String?,
+        tripKey: TripKey,
+        originalItinerary: Itinerary,
+        resolvedItinerary: Itinerary,
+        canManageTrip: Boolean
+    ) {
+        if (viewerUid.isNullOrBlank()) return
+        if (resolvedItinerary.timeZoneId.isBlank()) return
+        if (originalItinerary.timeZoneId == resolvedItinerary.timeZoneId) return
+
+        viewModelScope.launch {
+            runCatching {
+                tripLocalDataSource.upsertTripSummary(
+                    viewerUid = viewerUid,
+                    itinerary = resolvedItinerary,
+                    isCurrentCandidate = true
+                )
+            }
+            if (canManageTrip) {
+                runCatching {
+                    tripSyncRemoteDataSource.updateTripSummaryFields(
+                        tripKey = tripKey,
+                        fields = mapOf("timeZoneId" to resolvedItinerary.timeZoneId)
+                    )
+                }
+            }
+        }
+    }
+
+    private fun applyTripTimeZone(event: TravelEvent): TravelEvent {
+        val tripTimeZoneId = currentTripTimeZoneId.takeIf { it.isNotBlank() } ?: return event
+        if (event.tz.isNotBlank()) return event
+        return event.copy(tz = tripTimeZoneId)
+    }
+
+    private fun replaceLiveDetailOverrides(
+        eventId: String,
+        overrides: Map<String, String>
+    ) {
+        val current = liveEventDetailOverrides[eventId].orEmpty()
+        if (current == overrides) return
+
+        liveEventDetailOverrides = liveEventDetailOverrides.toMutableMap().apply {
+            if (overrides.isEmpty()) {
+                remove(eventId)
+            } else {
+                put(eventId, overrides)
+            }
+        }
+        publishCurrentEvents(localEventsSnapshot, _eventOptions.value)
     }
 
     private fun alignEventOptionsWithSelectedState(
@@ -643,6 +781,162 @@ class CurrentTripViewModel(application: Application) : AndroidViewModel(applicat
             persistOptions = !shouldPersistEventOnly
         )
         refreshCurrentTripInBackground(tripKey)
+    }
+
+    fun refreshRestaurantLiveContext(eventId: String) {
+        val event = _uiState.value.events.firstOrNull { it.eventId == eventId } ?: return
+        if (!isRestaurantEvent(event) || eventId in _restaurantLiveContextInFlight.value) return
+
+        val venueName = event.displayName()?.takeIf { it.isNotBlank() } ?: return
+        val venueAddress = event.detailValue(ATTR_BUSINESS_ADDRESS, "address")
+            ?.takeIf { it.isNotBlank() }
+        val transportAnchor = resolveTransportAnchor(event)
+        val transportDestination = resolveTransportDestination(event)
+        val latitude = event.detailValue(ATTR_LATITUDE)?.toDoubleOrNull()
+        val longitude = event.detailValue(ATTR_LONGITUDE)?.toDoubleOrNull()
+        val hasOutdoorSeating = event.detailValue(ATTR_HAS_OUTDOOR_SEATING)
+            ?.equals("true", ignoreCase = true) == true
+        val tripCurrency = currentTripSummary?.currency
+            ?.takeIf { it.isNotBlank() }
+            ?.uppercase(Locale.US)
+        val homeCurrency = resolvedHomeCurrencyCode()
+        val usdAnchorAmount = restaurantUsdAnchorAmount(event)
+        val walkScoreAddress = venueAddress
+            ?: transportDestination?.address
+            ?: event.details["location"]?.takeIf { it.isNotBlank() }
+
+        if (
+            venueAddress == null &&
+            (transportAnchor == null || transportDestination == null) &&
+            (!hasOutdoorSeating || latitude == null || longitude == null) &&
+            (latitude == null || longitude == null || walkScoreAddress == null) &&
+            (tripCurrency == null || usdAnchorAmount == null)
+        ) return
+
+        viewModelScope.launch {
+            _restaurantLiveContextInFlight.update { it + eventId }
+            try {
+                val overrides = buildMap {
+                    if (venueAddress != null) {
+                        PopularTimesRepository.fetchSnapshot(
+                            venueName = venueName,
+                            venueAddress = venueAddress,
+                            yelpId = event.detailValue(DETAIL_YELP_ID)
+                        )?.let { snapshot ->
+                            put(ATTR_POPULAR_TIMES_JSON, snapshot.popularTimesJson)
+                            snapshot.currentBusyness?.let {
+                                put(ATTR_CURRENT_BUSYNESS, it.toString())
+                            }
+                            snapshot.estimatedWaitMin?.let {
+                                put(ATTR_ESTIMATED_WAIT_MIN, it.toString())
+                            }
+                        }
+                    }
+
+                    if (transportAnchor != null && transportDestination != null) {
+                        TransportRepository.fetchSnapshot(
+                            anchor = transportAnchor,
+                            destination = transportDestination
+                        )?.let { snapshot ->
+                            snapshot.walkMin?.let {
+                                put(ATTR_WALK_MIN, it.toString())
+                            }
+                            snapshot.transitMin?.let {
+                                put(ATTR_TRANSIT_MIN, it.toString())
+                            }
+                            snapshot.rideshareMin?.let {
+                                put(ATTR_RIDESHARE_MIN, it.toString())
+                            }
+                            snapshot.rideshareEstimateUsd?.let {
+                                put(ATTR_RIDESHARE_ESTIMATE_USD, it)
+                            }
+                            snapshot.uberDeeplink?.let {
+                                put(ATTR_UBER_DEEPLINK, it)
+                            }
+                            snapshot.lyftDeeplink?.let {
+                                put(ATTR_LYFT_DEEPLINK, it)
+                            }
+                            put(ATTR_TRANSPORT_ANCHOR_LABEL, snapshot.transportAnchorLabel)
+                        }
+                    }
+
+                    if (hasOutdoorSeating && latitude != null && longitude != null) {
+                        WeatherRepository.fetchSnapshot(
+                            latitude = latitude,
+                            longitude = longitude,
+                            date = event.date,
+                            startTime = event.startTime,
+                            timeZoneId = event.tz
+                        )?.let { snapshot ->
+                            put(ATTR_WEATHER_TEMP_C, snapshot.temperatureC.toString())
+                            put(ATTR_WEATHER_CONDITION, snapshot.condition)
+                            snapshot.precipPct?.let {
+                                put(ATTR_WEATHER_PRECIP_PCT, it.toString())
+                            }
+                            snapshot.windKph?.let {
+                                put(ATTR_WEATHER_WIND_KPH, it.toString())
+                            }
+                            put(ATTR_WEATHER_SUMMARY, snapshot.summary)
+                        }
+                    }
+
+                    if (latitude != null && longitude != null && walkScoreAddress != null) {
+                        WalkScoreRepository.fetchSnapshot(
+                            latitude = latitude,
+                            longitude = longitude,
+                            address = walkScoreAddress
+                        )?.let { snapshot ->
+                            snapshot.walkScore?.let {
+                                put(ATTR_WALK_SCORE, it.toString())
+                            }
+                            snapshot.transitScore?.let {
+                                put(ATTR_TRANSIT_SCORE, it.toString())
+                            }
+                            snapshot.bikeScore?.let {
+                                put(ATTR_BIKE_SCORE, it.toString())
+                            }
+                            snapshot.nearCategories
+                                .takeIf { it.isNotEmpty() }
+                                ?.joinToString(", ")
+                                ?.let { categories ->
+                                    put(ATTR_NEAR_CATEGORIES, categories)
+                                }
+                            snapshot.neighborhoodNote?.let {
+                                put(ATTR_NEIGHBORHOOD_NOTE, it)
+                            }
+                        }
+                    }
+
+                    if (tripCurrency != null && usdAnchorAmount != null) {
+                        currencyPreviewRepository.buildPreview(
+                            localCurrency = tripCurrency,
+                            homeCurrency = homeCurrency,
+                            usdAnchorAmount = usdAnchorAmount
+                        )?.let { snapshot ->
+                            put(ATTR_LOCAL_CURRENCY, snapshot.localCurrency)
+                            put(ATTR_HOME_CURRENCY, snapshot.homeCurrency)
+                            put(
+                                ATTR_ESTIMATED_LOCAL_COST,
+                                String.format(Locale.US, "%.2f", snapshot.localCost)
+                            )
+                            put(
+                                ATTR_ESTIMATED_HOME_COST,
+                                String.format(Locale.US, "%.2f", snapshot.homeCost)
+                            )
+                            snapshot.fxHistory30d?.let {
+                                put(ATTR_FX_HISTORY_30D, it)
+                            }
+                        }
+                    }
+                }
+
+                replaceLiveDetailOverrides(eventId, overrides)
+            } catch (e: Exception) {
+                Log.w("CurrentTripViewModel", "Failed to refresh restaurant live context", e)
+            } finally {
+                _restaurantLiveContextInFlight.update { it - eventId }
+            }
+        }
     }
 
     fun ensureEventOptionsLoaded(eventId: String) {
@@ -1570,6 +1864,85 @@ class CurrentTripViewModel(application: Application) : AndroidViewModel(applicat
                 { it.eventId }
             )
         )
+    }
+
+    private fun isRestaurantEvent(event: TravelEvent): Boolean {
+        return when (event.type.lowercase(Locale.US)) {
+            "restaurant", "dining", "food" -> true
+            else -> false
+        }
+    }
+
+    private fun resolveTransportAnchor(event: TravelEvent): TransportRepository.TransportAnchor? {
+        val targetDate = normalizeDate(event.date)
+        val tripEvents = sortPlanEvents(_uiState.value.events)
+        val dayEvents = tripEvents.filter { normalizeDate(it.date) == targetDate }
+        val targetIndex = dayEvents.indexOfFirst { it.eventId == event.eventId }
+
+        if (targetIndex > 0) {
+            dayEvents.subList(0, targetIndex)
+                .asReversed()
+                .firstNotNullOfOrNull(::transportAnchorForEvent)
+                ?.let { return it }
+        }
+
+        return tripEvents
+            .firstOrNull { it.type.equals("hotel", ignoreCase = true) }
+            ?.let(::transportAnchorForEvent)
+    }
+
+    private fun transportAnchorForEvent(event: TravelEvent): TransportRepository.TransportAnchor? {
+        val latitude = event.detailValue(ATTR_LATITUDE)?.toDoubleOrNull() ?: return null
+        val longitude = event.detailValue(ATTR_LONGITUDE)?.toDoubleOrNull() ?: return null
+        val label = listOfNotNull(
+            event.displayName()?.takeIf { it.isNotBlank() },
+            event.details["title"]?.takeIf { it.isNotBlank() },
+            event.detailValue(ATTR_BUSINESS_ADDRESS, "address")?.takeIf { it.isNotBlank() }
+        ).firstOrNull() ?: return null
+
+        return TransportRepository.TransportAnchor(
+            label = label,
+            latitude = latitude,
+            longitude = longitude
+        )
+    }
+
+    private fun resolveTransportDestination(
+        event: TravelEvent
+    ): TransportRepository.TransportDestination? {
+        val latitude = event.detailValue(ATTR_LATITUDE)?.toDoubleOrNull()
+        val longitude = event.detailValue(ATTR_LONGITUDE)?.toDoubleOrNull()
+        val address = event.detailValue(ATTR_BUSINESS_ADDRESS, "address")
+            ?.takeIf { it.isNotBlank() }
+        if ((latitude == null || longitude == null) && address == null) return null
+
+        return TransportRepository.TransportDestination(
+            label = event.displayName().orEmpty(),
+            latitude = latitude,
+            longitude = longitude,
+            address = address
+        )
+    }
+
+    private fun restaurantUsdAnchorAmount(event: TravelEvent): Double? {
+        event.detailValue(ATTR_PRICE_LEVEL_USD)
+            ?.toDoubleOrNull()
+            ?.takeIf { it > 0.0 }
+            ?.let { return it }
+
+        return when (event.detailValue(ATTR_PRICE_TIER, "price_tier")?.trim()) {
+            "$" -> 15.0
+            "$$" -> 35.0
+            "$$$" -> 70.0
+            "$$$$" -> 120.0
+            else -> null
+        }
+    }
+
+    private fun resolvedHomeCurrencyCode(): String {
+        return runCatching {
+            Currency.getInstance(Locale.getDefault()).currencyCode
+        }.getOrDefault("USD")
     }
 
     override fun onCleared() {

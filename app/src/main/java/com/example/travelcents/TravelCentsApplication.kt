@@ -9,8 +9,8 @@ import coil.memory.MemoryCache
 import com.example.travelcents.data.firebase.FirestoreStartupConfig
 import com.example.travelcents.data.trip.TripPerformanceLogger
 import com.google.firebase.firestore.FirebaseFirestore
-import java.util.concurrent.TimeUnit
 import okhttp3.OkHttpClient
+import java.util.concurrent.TimeUnit
 
 class TravelCentsApplication : Application(), ImageLoaderFactory {
     override fun onCreate() {

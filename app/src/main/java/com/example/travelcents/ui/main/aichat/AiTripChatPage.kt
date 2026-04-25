@@ -1,7 +1,7 @@
 package com.example.travelcents.ui.main.aichat
 
-import androidx.compose.foundation.background
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -19,11 +19,11 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.widthIn
-import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Add
@@ -47,6 +47,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.platform.LocalContext
@@ -62,7 +63,6 @@ import com.example.travelcents.data.trip.TripKey
 import com.example.travelcents.ui.main.aichat.components.AddToTripBottomSheet
 import com.example.travelcents.ui.main.aichat.components.AiChatBubble
 import com.example.travelcents.ui.main.aichat.components.AiChatComposer
-import com.example.travelcents.ui.main.aichat.components.AiCuratedTripRow as AiCuratedTripRowSection
 import com.example.travelcents.ui.main.aichat.components.AiChatHistoryScreen
 import com.example.travelcents.ui.main.aichat.components.AiPromptCardGrid
 import com.example.travelcents.ui.main.aichat.components.AiRecommendationRow
@@ -74,6 +74,7 @@ import com.example.travelcents.ui.theme.DeepSea4
 import com.example.travelcents.ui.theme.DeepSea5
 import com.example.travelcents.ui.theme.TravelCentsFonts
 import kotlinx.coroutines.delay
+import com.example.travelcents.ui.main.aichat.components.AiCuratedTripRow as AiCuratedTripRowSection
 
 @Composable
 fun AiTripChatPage(
