@@ -50,6 +50,20 @@ android {
             "\"${localProperties.getProperty("YELP_API_KEY") ?: ""}\""
         )
         buildConfigField(
+            "String", "MAPBOX_TOKEN",
+            "\"${localProperties.getProperty("MAPBOX_TOKEN") ?: ""}\""
+        )
+        buildConfigField(
+            "String", "BESTTIME_API_KEY",
+            "\"${localProperties.getProperty("BESTTIME_API_KEY") ?: ""}\""
+        )
+        buildConfigField(
+            "String", "GOOGLE_DIRECTIONS_KEY",
+            "\"${localProperties.getProperty("GOOGLE_DIRECTIONS_KEY") ?: ""}\""
+        )
+        buildConfigField(
+            "String", "WALKSCORE_API_KEY",
+            "\"${localProperties.getProperty("WALKSCORE_API_KEY") ?: ""}\""
             "String", "TICKETMASTER_API_KEY",
             "\"${localProperties.getProperty("TICKETMASTER_API_KEY") ?: ""}\""
         )

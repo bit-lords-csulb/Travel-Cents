@@ -17,6 +17,11 @@ import com.example.travelcents.data.ai.chat.AiChatSender
 import com.example.travelcents.data.ai.chat.AiChatSessionState
 import com.example.travelcents.data.ai.chat.AiChatSessionStore
 import com.example.travelcents.data.ai.chat.AiChatUiState
+import com.example.travelcents.data.ai.chat.AiCuratedTripCatalog
+import com.example.travelcents.data.ai.chat.AiCuratedTripSource
+import com.example.travelcents.data.ai.chat.AiCuratedTripStarter
+import com.example.travelcents.data.ai.chat.AiTravelerProfile
+import com.example.travelcents.data.ai.chat.AiTravelerProfileReducer
 import com.example.travelcents.data.ai.chat.AiDestinationRecommendationRow
 import com.example.travelcents.data.ai.chat.AiChatTripOption
 import com.example.travelcents.data.ai.chat.AiPlaceRecommendationRow
@@ -25,9 +30,11 @@ import com.example.travelcents.data.ai.chat.AiRecommendationMapper
 import com.example.travelcents.data.ai.chat.AiSingleEventCoordinator
 import com.example.travelcents.data.ai.chat.AiSingleEventSuggestion
 import com.example.travelcents.data.ai.chat.AiTripIntakeDecisionType
-import com.example.travelcents.data.ai.chat.AiTripIntakeProfile
 import com.example.travelcents.data.ai.chat.AiTripIntakeOrchestrator
+import com.example.travelcents.data.ai.chat.AiTripIntakeProfile
 import com.example.travelcents.data.ai.chat.AiTripIntakeTurnResult
+import com.example.travelcents.data.ai.chat.PersistedAiChatMessage
+import com.example.travelcents.data.ai.chat.PersistedAiChatSnapshot
 import com.example.travelcents.data.ai.chat.mergeIntakeProfile
 import com.example.travelcents.data.ai.chat.mergePatch
 import com.example.travelcents.data.ai.chat.toCardGroup

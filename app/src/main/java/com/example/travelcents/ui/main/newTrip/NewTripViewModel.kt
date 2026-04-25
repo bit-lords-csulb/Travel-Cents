@@ -11,10 +11,16 @@ import com.example.travelcents.BuildConfig
 import com.example.travelcents.data.ai.chat.AiCuratedTripStarter
 import com.example.travelcents.data.ai.chat.AiTripIntakeProfile
 import com.example.travelcents.data.ai.chat.AiTripType
-import com.example.travelcents.data.media.remoteMediaUrls
+import com.example.travelcents.data.ai.repository.TripPlannerRepository
 import com.example.travelcents.data.media.TripMediaCacheStore
-import com.example.travelcents.data.trip.TripKey
+import com.example.travelcents.data.media.remoteMediaUrls
+import com.example.travelcents.data.sync.TripSyncRemoteDataSource
 import com.example.travelcents.data.trip.TripAccessRole
+import com.example.travelcents.data.trip.TripKey
+import com.example.travelcents.data.trip.local.DestinationTimeZones
+import com.example.travelcents.data.trip.model.Itinerary
+import com.example.travelcents.data.trip.model.TravelEvent
+import com.example.travelcents.data.trip.model.TravelRequest
 import com.example.travelcents.data.trip.model.ATTR_BUSINESS_ADDRESS
 import com.example.travelcents.data.trip.model.ATTR_BUSINESS_NAME
 import com.example.travelcents.data.trip.model.ATTR_TICKETMASTER_EVENT_ID
@@ -31,6 +37,9 @@ import com.example.travelcents.data.sync.TripSyncRemoteDataSource
 import com.example.travelcents.data.trip.model.YelpOptionPoolItem
 import com.example.travelcents.data.trip.model.YELP_POOL_TYPE_ACTIVITIES
 import com.example.travelcents.data.trip.model.YELP_POOL_TYPE_RESTAURANTS
+import com.example.travelcents.data.trip.model.YelpOptionPoolItem
+import com.example.travelcents.data.trip.remote.SerpRepository
+import com.example.travelcents.data.trip.remote.YelpRepository
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FirebaseFirestore
 import kotlinx.coroutines.async
@@ -38,9 +47,8 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.tasks.await
-import java.time.Instant
 import java.time.Duration
+import java.time.Instant
 import java.time.LocalDate
 import java.time.LocalTime
 import java.time.format.DateTimeFormatter
@@ -702,6 +710,7 @@ class NewTripViewModel(application: Application) : AndroidViewModel(application)
             tripName = starter.title.ifBlank { starter.destination.ifBlank { "AI Trip Starter" } },
             destination = starter.destination,
             origin = intakeProfile.origin,
+            timeZoneId = DestinationTimeZones.resolveTimeZoneId(starter.destination).orEmpty(),
             dateFrom = "",
             dateTo = "",
             durationDays = starter.durationDays.coerceAtLeast(1),

@@ -1,6 +1,5 @@
 package com.example.travelcents.data.sync
 
-import com.example.travelcents.data.local.trip.TripLocalDataSource
 import com.example.travelcents.data.trip.TripKey
 import com.example.travelcents.data.trip.TripRepository
 import com.example.travelcents.data.trip.model.Itinerary
