@@ -36,6 +36,11 @@ sealed interface AiChatItem {
         override val id: String,
         val row: AiPlaceRecommendationRow
     ) : AiChatItem
+
+    data class SingleEventCard(
+        override val id: String,
+        val card: AiSingleEventSuggestion
+    ) : AiChatItem
 }
 
 enum class AiChatSender {

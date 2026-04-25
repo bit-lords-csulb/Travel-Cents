@@ -51,6 +51,7 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -60,6 +61,7 @@ import com.example.travelcents.data.ai.chat.AiChatItem
 import com.example.travelcents.data.ai.chat.AiCuratedTripStarter
 import com.example.travelcents.data.ai.chat.AiTripIntakeProfile
 import com.example.travelcents.data.trip.TripKey
+import com.example.travelcents.ui.main.aichat.components.AddToTripBottomSheet
 import com.example.travelcents.ui.main.aichat.components.AiChatBubble
 import com.example.travelcents.ui.main.aichat.components.AiChatComposer
 import com.example.travelcents.ui.main.aichat.components.AiCuratedTripRow as AiCuratedTripRowSection
@@ -67,6 +69,7 @@ import com.example.travelcents.ui.main.aichat.components.AiChatHistoryScreen
 import com.example.travelcents.ui.main.aichat.components.AiPromptCardGrid
 import com.example.travelcents.ui.main.aichat.components.AiRecommendationRow
 import com.example.travelcents.ui.main.aichat.components.AiResponseCardGroup
+import com.example.travelcents.ui.main.aichat.components.AiSingleEventCard
 import com.example.travelcents.ui.main.newTrip.TripWizardColors
 import com.example.travelcents.ui.theme.DeepSea1
 import com.example.travelcents.ui.theme.DeepSea4
@@ -87,6 +90,7 @@ fun AiTripChatPage(
     var showHistory by remember { mutableStateOf(false) }
     var planInDetail by rememberSaveable { mutableStateOf(false) }
     val density = LocalDensity.current
+    val context = LocalContext.current
     val userMessageSettleOffset = with(density) { 92.dp.roundToPx() }
     val responseSettleOffset = with(density) { 132.dp.roundToPx() }
     val restoreSettleOffset = with(density) { 72.dp.roundToPx() }
@@ -104,6 +108,7 @@ fun AiTripChatPage(
         uiState.activeDestinationRecommendationRowId,
         uiState.activeCuratedTripRowId,
         uiState.activePlaceRecommendationRowId,
+        uiState.activeSingleEventCardId,
         uiState.isLoading,
         uiState.items.size,
         showStarterLanding
@@ -146,6 +151,19 @@ fun AiTripChatPage(
                     delay(140)
                     listState.animateScrollToItem(
                         index = destinationRowIndex,
+                        scrollOffset = -responseSettleOffset
+                    )
+                }
+            }
+
+            !uiState.isLoading && uiState.activeSingleEventCardId != null -> {
+                val eventIndex = uiState.items.indexOfFirst { item ->
+                    item.id == uiState.activeSingleEventCardId
+                }
+                if (eventIndex >= 0) {
+                    delay(140)
+                    listState.animateScrollToItem(
+                        index = eventIndex,
                         scrollOffset = -responseSettleOffset
                     )
                 }
@@ -303,6 +321,24 @@ fun AiTripChatPage(
                                     )
                                 }
 
+                                is AiChatItem.SingleEventCard -> {
+                                    val card = item.card
+                                    AiSingleEventCard(
+                                        suggestion = card,
+                                        onAddToTrip = { viewModel.requestAddSingleEventToTrip(card) },
+                                        onOpenTickets = {
+                                            card.bookingUrl?.let { url ->
+                                                val intent = android.content.Intent(
+                                                    android.content.Intent.ACTION_VIEW,
+                                                    android.net.Uri.parse(url)
+                                                )
+                                                runCatching { context.startActivity(intent) }
+                                            }
+                                        },
+                                        onDismiss = { viewModel.dismissSingleEventCard(card.id) }
+                                    )
+                                }
+
                                 is AiChatItem.PlaceRecommendationRow -> {
                                     AiRecommendationRow(
                                         title = item.row.title,
@@ -367,6 +403,15 @@ fun AiTripChatPage(
                         onRemoveDraftOption = viewModel::removeDraftOption
                     )
                 }
+            }
+
+            uiState.pendingAddToTripEvent?.let { pendingEvent ->
+                AddToTripBottomSheet(
+                    suggestion = pendingEvent,
+                    trips = uiState.availableTrips,
+                    onTripSelected = { trip -> viewModel.confirmAddSingleEventToTrip(trip) },
+                    onDismiss = { viewModel.dismissAddToTripSheet() }
+                )
             }
 
             if (showHistory) {

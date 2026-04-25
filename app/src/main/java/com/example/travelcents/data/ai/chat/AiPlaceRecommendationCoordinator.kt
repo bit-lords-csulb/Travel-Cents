@@ -101,7 +101,8 @@ class AiPlaceRecommendationCoordinator(
                     area = business.location?.displayAddress?.firstOrNull()
                         ?: business.location?.city.orEmpty(),
                     summary = buildRestaurantSummary(business),
-                    matchReason = buildRestaurantMatchReason(intakeProfile, profile, business)
+                    matchReason = buildRestaurantMatchReason(intakeProfile, profile, business),
+                    imageUrl = business.imageUrl.takeIf { url -> url.isNotBlank() }
                 )
             },
             rowType = AiPlaceRecommendationRowType.RESTAURANTS,
@@ -130,7 +131,8 @@ class AiPlaceRecommendationCoordinator(
                     area = business.location?.displayAddress?.firstOrNull()
                         ?: business.location?.city.orEmpty(),
                     summary = buildActivitySummary(business),
-                    matchReason = buildActivityMatchReason(intakeProfile, profile, business)
+                    matchReason = buildActivityMatchReason(intakeProfile, profile, business),
+                    imageUrl = business.imageUrl.takeIf { url -> url.isNotBlank() }
                 )
             },
             rowType = AiPlaceRecommendationRowType.ACTIVITIES,

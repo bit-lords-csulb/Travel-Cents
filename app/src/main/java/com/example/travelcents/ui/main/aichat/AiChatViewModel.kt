@@ -18,9 +18,12 @@ import com.example.travelcents.data.ai.chat.AiChatSessionState
 import com.example.travelcents.data.ai.chat.AiChatSessionStore
 import com.example.travelcents.data.ai.chat.AiChatUiState
 import com.example.travelcents.data.ai.chat.AiDestinationRecommendationRow
+import com.example.travelcents.data.ai.chat.AiChatTripOption
 import com.example.travelcents.data.ai.chat.AiPlaceRecommendationRow
 import com.example.travelcents.data.ai.chat.AiPlaceRecommendationCoordinator
 import com.example.travelcents.data.ai.chat.AiRecommendationMapper
+import com.example.travelcents.data.ai.chat.AiSingleEventCoordinator
+import com.example.travelcents.data.ai.chat.AiSingleEventSuggestion
 import com.example.travelcents.data.ai.chat.AiTripIntakeDecisionType
 import com.example.travelcents.data.ai.chat.AiTripIntakeProfile
 import com.example.travelcents.data.ai.chat.AiTripIntakeOrchestrator
@@ -38,10 +41,12 @@ import com.example.travelcents.data.ai.chat.toPersisted
 import com.example.travelcents.BuildConfig
 import com.example.travelcents.data.ai.model.LlmMessage
 import com.example.travelcents.data.ai.remote.LlmClient
+import com.example.travelcents.data.sync.TripSyncRemoteDataSource
 import com.example.travelcents.data.trip.TripKey
 import com.example.travelcents.data.trip.remote.DestinationImageRepository
 import com.example.travelcents.data.trip.remote.WikipediaApiService
 import com.google.firebase.auth.FirebaseAuth
+import com.google.firebase.firestore.FirebaseFirestore
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -58,8 +63,13 @@ class AiChatViewModel(application: Application) : AndroidViewModel(application) 
     private val curatedTripCatalog = AiCuratedTripCatalog()
     private val destinationRecommendationEngine = AiDestinationRecommendationEngine()
     private val placeRecommendationCoordinator = AiPlaceRecommendationCoordinator(curatedTripCatalog = curatedTripCatalog)
+    private val singleEventCoordinator = AiSingleEventCoordinator()
     private val intakeOrchestrator = AiTripIntakeOrchestrator()
     private val auth = FirebaseAuth.getInstance()
+    private val tripSyncRemoteDataSource = TripSyncRemoteDataSource(FirebaseFirestore.getInstance())
+
+    private var pendingAddToTripEvent: AiSingleEventSuggestion? = null
+    private var availableTripsForAdd: List<AiChatTripOption> = emptyList()
 
     private val wikipediaClient = OkHttpClient.Builder()
         .addInterceptor { chain ->
@@ -173,6 +183,7 @@ class AiChatViewModel(application: Application) : AndroidViewModel(application) 
             activeDestinationRecommendationRow = null,
             activeCuratedTripRow = null,
             activePlaceRecommendationRow = null,
+            activeSingleEventCard = null,
             anchorMessageId = userMessage.id
         )
 
@@ -246,6 +257,7 @@ class AiChatViewModel(application: Application) : AndroidViewModel(application) 
                 curatedTripCatalog.recommendSeededStarterRow(updatedProfile)
             },
             activePlaceRecommendationRow = null,
+            activeSingleEventCard = null,
             draftText = "",
             selectedDraftOptions = emptyList(),
             anchorMessageId = userMessage.id
@@ -340,6 +352,92 @@ class AiChatViewModel(application: Application) : AndroidViewModel(application) 
         publishUiState()
     }
 
+    fun requestAddSingleEventToTrip(suggestion: AiSingleEventSuggestion) {
+        val viewerUid = currentUserId().orEmpty()
+        if (viewerUid.isBlank()) {
+            conversationItems += AiChatItem.TextMessage(
+                text = "Sign in to add events to a trip.",
+                sender = AiChatSender.SYSTEM
+            )
+            publishUiState()
+            return
+        }
+        pendingAddToTripEvent = suggestion
+        publishUiState()
+
+        viewModelScope.launch {
+            val trips = runCatching {
+                tripSyncRemoteDataSource.fetchTripRefs(viewerUid)
+            }.onFailure { error ->
+                Log.w(TAG, "Failed to load trips for add-to-trip sheet: ${error.message}")
+            }.getOrDefault(emptyList())
+
+            availableTripsForAdd = trips
+                .sortedByDescending { it.dateFrom }
+                .map { itinerary ->
+                    AiChatTripOption(
+                        tripId = itinerary.itineraryId,
+                        ownerUid = itinerary.ownerUid.ifBlank { viewerUid },
+                        title = itinerary.tripName.ifBlank { itinerary.destination },
+                        destination = itinerary.destination,
+                        dateWindow = listOf(itinerary.dateFrom, itinerary.dateTo)
+                            .filter { it.isNotBlank() }
+                            .joinToString(" – "),
+                        imageUrl = itinerary.homeImageUrl.takeIf { it.isNotBlank() }
+                    )
+                }
+            publishUiState()
+        }
+    }
+
+    fun dismissAddToTripSheet() {
+        if (pendingAddToTripEvent == null) return
+        pendingAddToTripEvent = null
+        availableTripsForAdd = emptyList()
+        publishUiState()
+    }
+
+    fun confirmAddSingleEventToTrip(tripOption: AiChatTripOption) {
+        val suggestion = pendingAddToTripEvent ?: return
+        val tripKey = TripKey(ownerUid = tripOption.ownerUid, tripId = tripOption.tripId)
+        val eventToPersist = suggestion.event.copy(itineraryId = tripOption.tripId)
+
+        pendingAddToTripEvent = null
+        availableTripsForAdd = emptyList()
+        publishUiState()
+
+        viewModelScope.launch {
+            val result = runCatching {
+                tripSyncRemoteDataSource.upsertEvent(tripKey, eventToPersist)
+            }
+            val confirmationText = result.fold(
+                onSuccess = {
+                    "Added \"${suggestion.headline}\" to ${tripOption.title}."
+                },
+                onFailure = { error ->
+                    Log.w(TAG, "upsertEvent failed: ${error.message}")
+                    "I could not save that event to ${tripOption.title}. Try again in a moment."
+                }
+            )
+            conversationItems += AiChatItem.TextMessage(
+                text = confirmationText,
+                sender = AiChatSender.ASSISTANT
+            )
+            if (result.isSuccess && sessionState.activeSingleEventCard?.id == suggestion.id) {
+                sessionState = sessionState.copy(activeSingleEventCard = null)
+            }
+            persistLastSession()
+            publishUiState()
+        }
+    }
+
+    fun dismissSingleEventCard(id: String) {
+        if (sessionState.activeSingleEventCard?.id != id) return
+        sessionState = sessionState.copy(activeSingleEventCard = null)
+        persistLastSession()
+        publishUiState()
+    }
+
     private fun toggleDraftOption(
         option: AiChatCardOption,
         allowMultiple: Boolean
@@ -387,6 +485,9 @@ class AiChatViewModel(application: Application) : AndroidViewModel(application) 
             activeDestinationRecommendationRowId = sessionState.activeDestinationRecommendationRow?.id,
             activeCuratedTripRowId = sessionState.activeCuratedTripRow?.id,
             activePlaceRecommendationRowId = sessionState.activePlaceRecommendationRow?.id,
+            activeSingleEventCardId = sessionState.activeSingleEventCard?.id,
+            pendingAddToTripEvent = pendingAddToTripEvent,
+            availableTrips = availableTripsForAdd,
             isLoading = isLoading
         )
     }
@@ -423,6 +524,14 @@ class AiChatViewModel(application: Application) : AndroidViewModel(application) 
                     AiChatItem.PlaceRecommendationRow(
                         id = row.id,
                         row = row
+                    )
+                )
+            }
+            sessionState.activeSingleEventCard?.let { card ->
+                add(
+                    AiChatItem.SingleEventCard(
+                        id = card.id,
+                        card = card
                     )
                 )
             }
@@ -811,7 +920,8 @@ class AiChatViewModel(application: Application) : AndroidViewModel(application) 
         profile: AiTravelerProfile,
         intakeProfile: AiTripIntakeProfile,
         history: List<LlmMessage>,
-        planningObjective: String
+        planningObjective: String,
+        groundingContext: String? = null
     ): List<LlmMessage> {
         return buildList {
             add(LlmMessage(role = "system", content = BASE_SYSTEM_PROMPT))
@@ -819,6 +929,9 @@ class AiChatViewModel(application: Application) : AndroidViewModel(application) 
             add(LlmMessage(role = "system", content = "Structured intake profile JSON:\n${intakeProfile.toJson()}"))
             if (planningObjective.isNotBlank()) {
                 add(LlmMessage(role = "system", content = "Current planning objective: $planningObjective"))
+            }
+            groundingContext?.takeIf { context -> context.isNotBlank() }?.let { context ->
+                add(LlmMessage(role = "system", content = context))
             }
             addAll(history)
         }
@@ -828,7 +941,8 @@ class AiChatViewModel(application: Application) : AndroidViewModel(application) 
         profile: AiTravelerProfile,
         intakeProfile: AiTripIntakeProfile,
         history: List<LlmMessage>,
-        planningObjective: String
+        planningObjective: String,
+        groundingContext: String? = null
     ): String {
         return runCatching {
             LlmClient.complete(
@@ -836,7 +950,8 @@ class AiChatViewModel(application: Application) : AndroidViewModel(application) 
                     profile = profile,
                     intakeProfile = intakeProfile,
                     history = history,
-                    planningObjective = planningObjective
+                    planningObjective = planningObjective,
+                    groundingContext = groundingContext
                 )
             )
         }.getOrElse { error ->
@@ -876,6 +991,7 @@ class AiChatViewModel(application: Application) : AndroidViewModel(application) 
             activeDestinationRecommendationRow = null,
             activeCuratedTripRow = null,
             activePlaceRecommendationRow = null,
+            activeSingleEventCard = null,
             anchorMessageId = submittedMessage.id
         )
         isLoading = true
@@ -897,16 +1013,37 @@ class AiChatViewModel(application: Application) : AndroidViewModel(application) 
 
             val mergedIntakeProfile = sessionState.intakeProfile.mergePatch(intakeResult?.profilePatch)
             val mergedProfile = sessionState.profile.mergeIntakeProfile(mergedIntakeProfile)
+            val assistantPlanningObjective = (intakeResult?.planningObjective ?: "")
+                .ifBlank { sessionState.planningObjective }
+            val singleEventResolution = runCatching {
+                singleEventCoordinator.resolve(
+                    userMessage = trimmedLlmUserMessage,
+                    intakeProfile = mergedIntakeProfile,
+                    profile = mergedProfile
+                )
+            }.onFailure { error ->
+                Log.w(TAG, "Ticketmaster grounding failed. Continuing without live event context.", error)
+            }.getOrNull()
+            val ticketmasterGrounding = singleEventResolution?.groundingContext
 
-            val assistantResponse = intakeResult?.assistantMessage
-                ?.takeIf { message -> message.isNotBlank() }
-                ?: fallbackAssistantMessage(
+            val assistantResponse = if (!ticketmasterGrounding.isNullOrBlank()) {
+                fallbackAssistantMessage(
                     profile = mergedProfile,
                     intakeProfile = mergedIntakeProfile,
                     history = sessionState.llmHistory,
-                    planningObjective = (intakeResult?.planningObjective ?: "")
-                        .ifBlank { sessionState.planningObjective }
+                    planningObjective = assistantPlanningObjective,
+                    groundingContext = ticketmasterGrounding
                 )
+            } else {
+                intakeResult?.assistantMessage
+                    ?.takeIf { message -> message.isNotBlank() }
+                    ?: fallbackAssistantMessage(
+                        profile = mergedProfile,
+                        intakeProfile = mergedIntakeProfile,
+                        history = sessionState.llmHistory,
+                        planningObjective = assistantPlanningObjective
+                    )
+            }
 
             conversationItems += AiChatItem.TextMessage(
                 text = assistantResponse,
@@ -948,13 +1085,12 @@ class AiChatViewModel(application: Application) : AndroidViewModel(application) 
                 profile = mergedProfile,
                 intakeProfile = mergedIntakeProfile
             )
+            val singleEventCard = singleEventResolution?.suggestion
 
             sessionState = sessionState.copy(
                 profile = mergedProfile,
                 intakeProfile = mergedIntakeProfile,
-                planningObjective = intakeResult?.planningObjective
-                    ?.ifBlank { sessionState.planningObjective }
-                    ?: sessionState.planningObjective,
+                planningObjective = assistantPlanningObjective,
                 stage = AiTravelerProfileReducer.stageFor(mergedProfile),
                 quickReplies = AiTravelerProfileReducer.quickRepliesFor(mergedProfile),
                 llmHistory = sessionState.llmHistory + LlmMessage(
@@ -968,7 +1104,8 @@ class AiChatViewModel(application: Application) : AndroidViewModel(application) 
                 activeResponseCardGroup = followUpGroup,
                 activeDestinationRecommendationRow = destinationRecommendationRow,
                 activeCuratedTripRow = curatedTripRow,
-                activePlaceRecommendationRow = placeRecommendationRow
+                activePlaceRecommendationRow = placeRecommendationRow,
+                activeSingleEventCard = singleEventCard
             )
             isLoading = false
             persistLastSession()
