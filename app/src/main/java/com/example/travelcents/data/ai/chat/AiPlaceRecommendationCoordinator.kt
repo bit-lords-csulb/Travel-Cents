@@ -25,6 +25,39 @@ class AiPlaceRecommendationCoordinator(
     private val activityProvider: suspend (String, Int) -> List<YelpBusiness> = YelpRepository::fetchActivityPool,
     private val hotelProvider: suspend (TravelRequest, Itinerary) -> List<TravelEvent> = SerpRepository::searchHotels
 ) {
+    suspend fun recommendRowForToolCall(
+        toolCall: AiToolCall,
+        intakeProfile: AiTripIntakeProfile,
+        profile: AiTravelerProfile
+    ): AiPlaceRecommendationRow? {
+        return when (toolCall) {
+            is AiToolCall.SearchRestaurants -> buildRestaurantRow(
+                intakeProfile = intakeProfile,
+                profile = profile,
+                destination = toolCall.city,
+                cuisines = toolCall.cuisines
+            )
+
+            is AiToolCall.SearchActivities -> buildActivityRow(
+                intakeProfile = intakeProfile,
+                profile = profile,
+                destination = toolCall.city,
+                categories = toolCall.categories
+            )
+
+            is AiToolCall.SearchHotels -> buildHotelRow(
+                intakeProfile = intakeProfile,
+                profile = profile,
+                destination = toolCall.city,
+                checkIn = toolCall.checkIn,
+                checkOut = toolCall.checkOut,
+                requireExplicitDates = true
+            )
+
+            is AiToolCall.SearchEvents -> null
+        }
+    }
+
     suspend fun recommendRow(
         intakeProfile: AiTripIntakeProfile,
         profile: AiTravelerProfile,
@@ -84,16 +117,21 @@ class AiPlaceRecommendationCoordinator(
     private suspend fun buildRestaurantRow(
         intakeProfile: AiTripIntakeProfile,
         profile: AiTravelerProfile,
-        destination: String
+        destination: String,
+        cuisines: List<String> = emptyList()
     ): AiPlaceRecommendationRow? {
         val businesses = restaurantProvider(destination, PROVIDER_RESULT_LIMIT)
+            .let { candidates -> rankBusinessesByTerms(candidates, cuisines) }
             .distinctBy(YelpBusiness::id)
             .take(PROVIDER_RESULT_LIMIT)
         if (businesses.size < 2) return null
 
         return AiPlaceRecommendationRow(
             title = "Food spots in ${shortDestination(destination)}",
-            subtitle = "Restaurant ideas pulled from live local results.",
+            subtitle = cuisines.takeIf(List<String>::isNotEmpty)
+                ?.joinToString(separator = ", ")
+                ?.let { requested -> "Restaurant ideas pulled from live local results for $requested." }
+                ?: "Restaurant ideas pulled from live local results.",
             recommendations = businesses.map { business ->
                 AiPlaceRecommendation(
                     name = business.name,
@@ -114,16 +152,21 @@ class AiPlaceRecommendationCoordinator(
     private suspend fun buildActivityRow(
         intakeProfile: AiTripIntakeProfile,
         profile: AiTravelerProfile,
-        destination: String
+        destination: String,
+        categories: List<String> = emptyList()
     ): AiPlaceRecommendationRow? {
         val businesses = activityProvider(destination, PROVIDER_RESULT_LIMIT)
+            .let { candidates -> rankBusinessesByTerms(candidates, categories) }
             .distinctBy(YelpBusiness::id)
             .take(PROVIDER_RESULT_LIMIT)
         if (businesses.size < 2) return null
 
         return AiPlaceRecommendationRow(
             title = "Activity ideas in ${shortDestination(destination)}",
-            subtitle = "Live activity picks that match the current trip direction.",
+            subtitle = categories.takeIf(List<String>::isNotEmpty)
+                ?.joinToString(separator = ", ")
+                ?.let { requested -> "Live activity picks for $requested." }
+                ?: "Live activity picks that match the current trip direction.",
             recommendations = businesses.map { business ->
                 AiPlaceRecommendation(
                     name = business.name,
@@ -144,9 +187,19 @@ class AiPlaceRecommendationCoordinator(
     private suspend fun buildHotelRow(
         intakeProfile: AiTripIntakeProfile,
         profile: AiTravelerProfile,
-        destination: String
+        destination: String,
+        checkIn: String? = null,
+        checkOut: String? = null,
+        requireExplicitDates: Boolean = false
     ): AiPlaceRecommendationRow? {
-        val request = buildTravelRequest(intakeProfile, profile, destination)
+        val request = buildTravelRequest(
+            intakeProfile = intakeProfile,
+            profile = profile,
+            destination = destination,
+            explicitDateFrom = checkIn,
+            explicitDateTo = checkOut,
+            requireExplicitDates = requireExplicitDates
+        ) ?: return null
         val itinerary = buildSearchItinerary(request)
         val hotelEvent = hotelProvider(request, itinerary).firstOrNull() ?: return null
         val selectedAndOptions = buildHotelCandidates(hotelEvent)
@@ -310,6 +363,30 @@ class AiPlaceRecommendationCoordinator(
         return primary.copy(recommendations = mergedRecommendations)
     }
 
+    private fun rankBusinessesByTerms(
+        businesses: List<YelpBusiness>,
+        terms: List<String>
+    ): List<YelpBusiness> {
+        val normalizedTerms = terms
+            .map(String::trim)
+            .filter(String::isNotBlank)
+            .map { term -> term.lowercase(Locale.US) }
+        if (normalizedTerms.isEmpty()) return businesses
+
+        return businesses.sortedWith(
+            compareByDescending<YelpBusiness> { business ->
+                val categoryText = business.categories.joinToString(" ") { category ->
+                    category.title
+                }.lowercase(Locale.US)
+                normalizedTerms.count { term -> term in categoryText }
+            }.thenByDescending { business ->
+                business.rating
+            }.thenBy { business ->
+                business.name
+            }
+        )
+    }
+
     private fun inferCuratedRowType(row: AiPlaceRecommendationRow): AiPlaceRecommendationRowType {
         val categories = row.recommendations.map { recommendation -> recommendation.category.lowercase(Locale.US) }
         return when {
@@ -373,9 +450,18 @@ class AiPlaceRecommendationCoordinator(
     private fun buildTravelRequest(
         intakeProfile: AiTripIntakeProfile,
         profile: AiTravelerProfile,
-        destination: String
-    ): TravelRequest {
-        val (dateFrom, dateTo) = buildDateWindow(intakeProfile.durationDays)
+        destination: String,
+        explicitDateFrom: String? = null,
+        explicitDateTo: String? = null,
+        requireExplicitDates: Boolean = false
+    ): TravelRequest? {
+        val dateWindow = resolveSearchDateWindow(
+            explicitDateFrom = explicitDateFrom,
+            explicitDateTo = explicitDateTo,
+            durationDays = intakeProfile.durationDays,
+            requireExplicitDates = requireExplicitDates
+        ) ?: return null
+        val (dateFrom, dateTo) = dateWindow
         return TravelRequest(
             userId = "",
             origin = intakeProfile.origin.ifBlank { profile.origin },
@@ -392,6 +478,24 @@ class AiPlaceRecommendationCoordinator(
                 .distinct()
                 .joinToString(". ")
         )
+    }
+
+    private fun resolveSearchDateWindow(
+        explicitDateFrom: String?,
+        explicitDateTo: String?,
+        durationDays: Int?,
+        requireExplicitDates: Boolean
+    ): Pair<String, String>? {
+        val normalizedDateFrom = explicitDateFrom?.trim().orEmpty()
+        val normalizedDateTo = explicitDateTo?.trim().orEmpty()
+        if (normalizedDateFrom.isNotBlank() || normalizedDateTo.isNotBlank()) {
+            val start = parseIsoDate(normalizedDateFrom) ?: return null
+            val end = parseIsoDate(normalizedDateTo) ?: return null
+            if (end.isBefore(start)) return null
+            return start.format(DateTimeFormatter.ISO_LOCAL_DATE) to end.format(DateTimeFormatter.ISO_LOCAL_DATE)
+        }
+        if (requireExplicitDates) return null
+        return buildDateWindow(durationDays)
     }
 
     private fun buildSearchItinerary(request: TravelRequest): Itinerary {
@@ -419,6 +523,10 @@ class AiPlaceRecommendationCoordinator(
         val start = LocalDate.now().plusDays(DEFAULT_SEARCH_START_OFFSET_DAYS)
         val end = start.plusDays((durationDays ?: DEFAULT_DURATION_DAYS).coerceAtLeast(2).toLong())
         return start.format(DateTimeFormatter.ISO_LOCAL_DATE) to end.format(DateTimeFormatter.ISO_LOCAL_DATE)
+    }
+
+    private fun parseIsoDate(value: String): LocalDate? {
+        return runCatching { LocalDate.parse(value, DateTimeFormatter.ISO_LOCAL_DATE) }.getOrNull()
     }
 
     private fun inferAdults(

@@ -38,7 +38,6 @@ import com.example.travelcents.data.trip.model.ATTR_HOTEL_DETAIL_URL
 import com.example.travelcents.data.trip.model.ATTR_YELP_URL
 import com.example.travelcents.data.trip.model.EventOption
 import com.example.travelcents.data.trip.model.ATTR_TICKETMASTER_EVENT_ID
-import com.example.travelcents.data.trip.model.ATTR_YELP_URL
 import com.example.travelcents.data.trip.model.TravelEvent
 import com.example.travelcents.data.trip.model.YelpReview
 import com.example.travelcents.data.trip.model.detailValue
@@ -356,9 +355,8 @@ private fun EventDetailCardStack(
             }
             if (showLocationCard) {
                 LocationMapCard(
+                    event = event,
                     locationLabel = locationLabel,
-                    staticMapModel = staticMapModel,
-                    embeddedMapUrl = embeddedMapUrl,
                     onOpenMaps = { uriHandler.openUri(mapsUrl) }
                 )
             }

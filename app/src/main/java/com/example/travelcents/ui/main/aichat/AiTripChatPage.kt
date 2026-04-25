@@ -48,10 +48,10 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
@@ -232,8 +232,8 @@ fun AiTripChatPage(
                         item("starter_welcome") {
                             AiStarterLanding(
                                 options = uiState.starterCards,
-                                selectedOptionIds = emptySet(),
-                                onOptionClick = viewModel::submitStarterCard
+                                selectedOptionIds = selectedDraftOptionIds,
+                                onOptionClick = viewModel::toggleStarterCard
                             )
                         }
                     }
@@ -483,20 +483,24 @@ private fun AiStarterLanding(
                 verticalArrangement = Arrangement.spacedBy(16.dp)
             ) {
                 Column(
-                    verticalArrangement = Arrangement.spacedBy(6.dp)
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalArrangement = Arrangement.spacedBy(6.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally
                 ) {
                     Text(
                         text = "Where to next?",
                         color = DeepSea5,
-                        fontSize = 24.sp,
+                        fontSize = 28.sp,
+                        textAlign = TextAlign.Center,
                         fontWeight = FontWeight.ExtraBold,
                         fontFamily = TravelCentsFonts.Headline
                     )
                     Text(
-                        text = "Start with a trip idea, or type your own plan below.",
+                        text = "Pick one or more trip directions, then add your own words below.",
                         color = DeepSea4,
                         fontSize = 13.sp,
                         lineHeight = 19.sp,
+                        textAlign = TextAlign.Center,
                         fontFamily = TravelCentsFonts.Body
                     )
                 }

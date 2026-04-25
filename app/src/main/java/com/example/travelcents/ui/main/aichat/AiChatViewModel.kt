@@ -17,22 +17,23 @@ import com.example.travelcents.data.ai.chat.AiChatSender
 import com.example.travelcents.data.ai.chat.AiChatSessionState
 import com.example.travelcents.data.ai.chat.AiChatSessionStore
 import com.example.travelcents.data.ai.chat.AiChatUiState
-import com.example.travelcents.data.ai.chat.AiCuratedTripCatalog
-import com.example.travelcents.data.ai.chat.AiCuratedTripSource
-import com.example.travelcents.data.ai.chat.AiCuratedTripStarter
 import com.example.travelcents.data.ai.chat.AiTravelerProfile
 import com.example.travelcents.data.ai.chat.AiTravelerProfileReducer
 import com.example.travelcents.data.ai.chat.AiDestinationRecommendationRow
 import com.example.travelcents.data.ai.chat.AiChatTripOption
 import com.example.travelcents.data.ai.chat.AiPlaceRecommendationRow
+import com.example.travelcents.data.ai.chat.AiPlaceRecommendationRowType
 import com.example.travelcents.data.ai.chat.AiPlaceRecommendationCoordinator
 import com.example.travelcents.data.ai.chat.AiRecommendationMapper
 import com.example.travelcents.data.ai.chat.AiSingleEventCoordinator
+import com.example.travelcents.data.ai.chat.AiSingleEventResolution
 import com.example.travelcents.data.ai.chat.AiSingleEventSuggestion
+import com.example.travelcents.data.ai.chat.AiToolCall
+import com.example.travelcents.data.ai.chat.AiToolRouterOrchestrator
+import com.example.travelcents.data.ai.chat.AiToolRouterResult
 import com.example.travelcents.data.ai.chat.AiTripIntakeNextAction
 import com.example.travelcents.data.ai.chat.AiTripIntakeProfile
 import com.example.travelcents.data.ai.chat.AiTripIntakeOrchestrator
-import com.example.travelcents.data.ai.chat.AiTripIntakeProfile
 import com.example.travelcents.data.ai.chat.AiTripIntakeTurnResult
 import com.example.travelcents.data.ai.chat.PersistedAiChatMessage
 import com.example.travelcents.data.ai.chat.PersistedAiChatSnapshot
@@ -41,10 +42,6 @@ import com.example.travelcents.data.ai.chat.mergePatch
 import com.example.travelcents.data.ai.chat.toCardGroup
 import com.example.travelcents.data.ai.chat.toDestinationRecommendationRow
 import com.example.travelcents.data.ai.chat.withDestinationRecommendations
-import com.example.travelcents.data.ai.chat.AiTravelerProfile
-import com.example.travelcents.data.ai.chat.AiTravelerProfileReducer
-import com.example.travelcents.data.ai.chat.PersistedAiChatMessage
-import com.example.travelcents.data.ai.chat.PersistedAiChatSnapshot
 import com.example.travelcents.data.ai.chat.toModel
 import com.example.travelcents.data.ai.chat.toPersisted
 import com.example.travelcents.BuildConfig
@@ -74,6 +71,7 @@ class AiChatViewModel(application: Application) : AndroidViewModel(application) 
     private val placeRecommendationCoordinator = AiPlaceRecommendationCoordinator(curatedTripCatalog = curatedTripCatalog)
     private val singleEventCoordinator = AiSingleEventCoordinator()
     private val intakeOrchestrator = AiTripIntakeOrchestrator()
+    private val toolRouter = AiToolRouterOrchestrator()
     private val auth = FirebaseAuth.getInstance()
     private val tripSyncRemoteDataSource = TripSyncRemoteDataSource(FirebaseFirestore.getInstance())
 
@@ -114,12 +112,9 @@ class AiChatViewModel(application: Application) : AndroidViewModel(application) 
         publishUiState()
     }
 
-    fun submitStarterCard(option: AiChatCardOption) {
+    fun toggleStarterCard(option: AiChatCardOption) {
         if (isLoading) return
-        submitUserTurn(
-            visibleMessage = option.message,
-            llmUserMessage = option.message
-        )
+        toggleDraftOption(option, allowMultiple = true)
     }
 
     fun toggleResponseCard(option: AiChatCardOption, group: AiChatCardGroup) {
@@ -539,7 +534,8 @@ class AiChatViewModel(application: Application) : AndroidViewModel(application) 
         conversationItems += snapshot.messages.map { message ->
             AiChatItem.TextMessage(
                 text = message.text,
-                sender = message.sender
+                sender = message.sender,
+                tags = message.tags
             )
         }
         sessionState = AiChatSessionState(
@@ -578,17 +574,15 @@ class AiChatViewModel(application: Application) : AndroidViewModel(application) 
         viewModelScope.launch {
             val emptyProfile = AiTravelerProfile()
             val destinationRow = curatedTripCatalog.recommendDestinationRecommendations(emptyProfile)
-            val curatedRow = curatedTripCatalog.recommendFreshLandingStarterRow()
             if (sessionState.sessionId != targetSessionId) return@launch
             if (sessionState.profile.hasSignals) return@launch
             if (conversationItems.isNotEmpty()) return@launch
 
             sessionState = sessionState.copy(
                 activeDestinationRecommendationRow = destinationRow,
-                activeCuratedTripRow = curatedRow
+                activeCuratedTripRow = null
             )
             publishUiState()
-            launchHeroImageEnrichment(curatedRow?.id)
         }
     }
 
@@ -605,7 +599,8 @@ class AiChatViewModel(application: Application) : AndroidViewModel(application) 
             messages = conversationItems.map { message ->
                 PersistedAiChatMessage(
                     text = message.text,
-                    sender = message.sender
+                    sender = message.sender,
+                    tags = message.tags
                 )
             },
             profile = sessionState.profile,
@@ -719,11 +714,21 @@ class AiChatViewModel(application: Application) : AndroidViewModel(application) 
         selectedOptions: List<AiChatCardOption>,
         typedText: String
     ): String {
+        if (selectedOptions.isNotEmpty() && selectedOptions.all { option -> option.groupId == STARTER_CARD_GROUP_ID }) {
+            val selectionLine = selectedOptions.joinToString(separator = " & ") { option ->
+                "(${option.label})"
+            }
+            return listOf(selectionLine, typedText)
+                .filter { value -> value.isNotBlank() }
+                .joinToString(separator = "\n")
+                .trim()
+        }
+
         val selectionLine = selectedOptions
             .filterNot { option -> option.requiresText && typedText.isNotBlank() }
             .joinToString(separator = "  •  ") { option ->
-            option.label
-        }
+                option.label
+            }
 
         return listOf(selectionLine, typedText)
             .filter { value -> value.isNotBlank() }
@@ -735,6 +740,10 @@ class AiChatViewModel(application: Application) : AndroidViewModel(application) 
         selectedOptions: List<AiChatCardOption>,
         typedText: String
     ): String {
+        if (selectedOptions.isNotEmpty() && selectedOptions.all { option -> option.groupId == STARTER_CARD_GROUP_ID }) {
+            return buildVisibleUserMessage(selectedOptions, typedText)
+        }
+
         val standardOptions = selectedOptions.filterNot { option -> option.requiresText }
         val hasTypedOther = selectedOptions.any { option -> option.requiresText } && typedText.isNotBlank()
 
@@ -952,30 +961,36 @@ class AiChatViewModel(application: Application) : AndroidViewModel(application) 
             val mergedProfile = sessionState.profile.mergeIntakeProfile(mergedIntakeProfile)
             val assistantPlanningObjective = (enrichedIntakeResult?.planningObjective ?: "")
                 .ifBlank { sessionState.planningObjective }
-            val singleEventResolution = runCatching {
-                singleEventCoordinator.resolve(
+            val toolRouterResult = runCatching {
+                toolRouter.routeTools(
+                    currentProfile = mergedIntakeProfile,
+                    latestUserInput = trimmedLlmUserMessage,
+                    history = sessionState.llmHistory.dropLast(1),
+                    planningObjective = assistantPlanningObjective
+                )
+            }.onFailure { error ->
+                Log.w(TAG, "Tool routing failed. Continuing without routed tool calls.", error)
+            }.getOrNull()
+            val toolDispatch = runCatching {
+                dispatchToolCalls(
+                    toolRouterResult = toolRouterResult,
                     userMessage = trimmedLlmUserMessage,
                     intakeProfile = mergedIntakeProfile,
                     profile = mergedProfile
                 )
             }.onFailure { error ->
-                Log.w(TAG, "Ticketmaster grounding failed. Continuing without live event context.", error)
-            }.getOrNull()
-            val ticketmasterGrounding = singleEventResolution?.groundingContext
-
-            val assistantResponse = if (!ticketmasterGrounding.isNullOrBlank()) {
-                fallbackAssistantMessage(
-                    profile = mergedProfile,
-                    intakeProfile = mergedIntakeProfile,
-                    history = sessionState.llmHistory,
-                    planningObjective = assistantPlanningObjective,
-                    groundingContext = ticketmasterGrounding
-                )
-            } else {
-                enrichedIntakeResult?.assistantMessage
-                    ?.takeIf { message -> message.isNotBlank() }
-                    ?: defaultAssistantAcknowledgement()
-            }
+                Log.w(TAG, "Tool dispatch failed. Continuing without live tool results.", error)
+            }.getOrDefault(AiToolDispatchResult())
+            val assistantResponse = buildAssistantResponse(
+                intakeResult = enrichedIntakeResult,
+                profile = mergedProfile,
+                intakeProfile = mergedIntakeProfile,
+                planningObjective = assistantPlanningObjective,
+                history = sessionState.llmHistory,
+                ticketmasterGrounding = toolDispatch.singleEventResolution?.groundingContext,
+                viabilityWarning = toolDispatch.viabilityWarning,
+                placeRecommendationRow = toolDispatch.placeRecommendationRow
+            )
 
             conversationItems += AiChatItem.TextMessage(
                 text = assistantResponse,
@@ -1006,12 +1021,8 @@ class AiChatViewModel(application: Application) : AndroidViewModel(application) 
                     null
                 }
             }
-            val placeRecommendationRow = resolvePlaceRecommendationRow(
-                intakeResult = enrichedIntakeResult,
-                profile = mergedProfile,
-                intakeProfile = mergedIntakeProfile
-            )
-            val singleEventCard = singleEventResolution?.suggestion
+            val placeRecommendationRow = toolDispatch.placeRecommendationRow
+            val singleEventCard = toolDispatch.singleEventResolution?.suggestion
 
             sessionState = sessionState.copy(
                 profile = mergedProfile,
@@ -1037,6 +1048,89 @@ class AiChatViewModel(application: Application) : AndroidViewModel(application) 
             publishUiState()
             generateTitleIfNeeded()
             launchHeroImageEnrichment(curatedTripRow?.id, destinationRecommendationRow?.id)
+        }
+    }
+
+    private suspend fun buildAssistantResponse(
+        intakeResult: AiTripIntakeTurnResult?,
+        profile: AiTravelerProfile,
+        intakeProfile: AiTripIntakeProfile,
+        planningObjective: String,
+        history: List<LlmMessage>,
+        ticketmasterGrounding: String?,
+        viabilityWarning: String,
+        placeRecommendationRow: AiPlaceRecommendationRow?
+    ): String {
+        val baseResponse = if (!ticketmasterGrounding.isNullOrBlank()) {
+            fallbackAssistantMessage(
+                profile = profile,
+                intakeProfile = intakeProfile,
+                history = history,
+                planningObjective = planningObjective,
+                groundingContext = ticketmasterGrounding
+            )
+        } else {
+            intakeResult?.assistantMessage
+                ?.takeIf { message -> message.isNotBlank() }
+                ?: defaultAssistantAcknowledgement()
+        }
+
+        return listOfNotNull(
+            viabilityWarning.takeIf { warning -> warning.isNotBlank() },
+            baseResponse.takeIf { response -> response.isNotBlank() },
+            routedPlaceSummary(placeRecommendationRow)
+                ?.takeUnless { summary -> ticketmasterGrounding.isNullOrBlank().not() }
+        ).joinToString(separator = "\n\n")
+    }
+
+    private suspend fun dispatchToolCalls(
+        toolRouterResult: AiToolRouterResult?,
+        userMessage: String,
+        intakeProfile: AiTripIntakeProfile,
+        profile: AiTravelerProfile
+    ): AiToolDispatchResult {
+        if (toolRouterResult == null) return AiToolDispatchResult()
+
+        val eventCall = toolRouterResult.toolCalls
+            .filterIsInstance<AiToolCall.SearchEvents>()
+            .firstOrNull()
+        val placeCall = toolRouterResult.toolCalls.firstOrNull { toolCall ->
+            toolCall is AiToolCall.SearchRestaurants ||
+                toolCall is AiToolCall.SearchActivities ||
+                toolCall is AiToolCall.SearchHotels
+        }
+
+        val singleEventResolution = eventCall?.let { toolCall ->
+            singleEventCoordinator.resolve(
+                toolCall = toolCall,
+                userMessage = userMessage,
+                intakeProfile = intakeProfile,
+                profile = profile
+            )
+        }
+        val placeRecommendationRow = placeCall?.let { toolCall ->
+            placeRecommendationCoordinator.recommendRowForToolCall(
+                toolCall = toolCall,
+                intakeProfile = intakeProfile,
+                profile = profile
+            )
+        }
+
+        return AiToolDispatchResult(
+            placeRecommendationRow = placeRecommendationRow,
+            singleEventResolution = singleEventResolution,
+            viabilityWarning = toolRouterResult.viabilityWarning
+        )
+    }
+
+    private fun routedPlaceSummary(
+        placeRecommendationRow: AiPlaceRecommendationRow?
+    ): String? {
+        return when (placeRecommendationRow?.rowType) {
+            AiPlaceRecommendationRowType.RESTAURANTS -> "I pulled a few live restaurant options below."
+            AiPlaceRecommendationRowType.ACTIVITIES -> "I pulled a few live activity options below."
+            AiPlaceRecommendationRowType.HOTELS -> "I pulled a few live hotel options below."
+            else -> null
         }
     }
 
@@ -1081,18 +1175,6 @@ class AiChatViewModel(application: Application) : AndroidViewModel(application) 
             AiTripIntakeNextAction.ASK_MORE,
             AiTripIntakeNextAction.BUILD_TRIP -> null
         }
-    }
-
-    private suspend fun resolvePlaceRecommendationRow(
-        intakeResult: AiTripIntakeTurnResult?,
-        profile: AiTravelerProfile,
-        intakeProfile: AiTripIntakeProfile
-    ): AiPlaceRecommendationRow? {
-        return placeRecommendationCoordinator.recommendRow(
-            intakeProfile = intakeProfile,
-            profile = profile,
-            llmRecommendations = intakeResult?.placeRecommendations.orEmpty()
-        )
     }
 
     private fun recordAskedFollowUpGroupId(
@@ -1208,6 +1290,7 @@ class AiChatViewModel(application: Application) : AndroidViewModel(application) 
     }
 
     private companion object {
+        private const val STARTER_CARD_GROUP_ID = "starter_grid"
         private const val TAG = "AiChatViewModel"
         private const val BASE_SYSTEM_PROMPT =
             "You are TravelCents AI, a trip-planning copilot inside the TravelCents app. " +
@@ -1221,3 +1304,9 @@ class AiChatViewModel(application: Application) : AndroidViewModel(application) 
         private var processSnapshot: PersistedAiChatSnapshot? = null
     }
 }
+
+private data class AiToolDispatchResult(
+    val placeRecommendationRow: AiPlaceRecommendationRow? = null,
+    val singleEventResolution: AiSingleEventResolution? = null,
+    val viabilityWarning: String = ""
+)
