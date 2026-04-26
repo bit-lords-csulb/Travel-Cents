@@ -242,7 +242,8 @@ fun AiTripChatPage(
                             is AiChatItem.TextMessage -> {
                                 AiChatBubble(
                                     text = item.text,
-                                    sender = item.sender
+                                    sender = item.sender,
+                                    tags = item.tags
                                 )
                             }
 

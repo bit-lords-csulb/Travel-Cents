@@ -126,7 +126,7 @@ class AiTripIntakeOrchestrator {
             LlmMessage(
                 role = "system",
                 content =
-                    "Current intake profile JSON:\n${currentProfile.toJson()}\n\n" +
+                    "Current intake profile JSON:\n${currentProfile.toPromptJson()}\n\n" +
                         "Fields still missing:\n${currentProfile.missingFields().joinToString()}"
             ),
             LlmMessage(
@@ -180,7 +180,7 @@ class AiTripIntakeOrchestrator {
             ),
             LlmMessage(
                 role = "system",
-                content = "Current intake profile JSON:\n${currentProfile.toJson()}"
+                content = "Current intake profile JSON:\n${currentProfile.toPromptJson()}"
             ),
             LlmMessage(
                 role = "system",

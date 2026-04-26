@@ -1,6 +1,8 @@
 package com.example.travelcents.data.ai.chat
 
+import com.google.gson.JsonParser
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
@@ -123,6 +125,48 @@ class AiTripIntakeSchemaTest {
             listOf("Ari", "Old Town", "Sukhumvit"),
             row?.recommendations?.map { recommendation -> recommendation.name }
         )
+    }
+
+    @Test
+    fun assistantMessage_includesCardQuestionTitle() {
+        val result = AiTripIntakeTurnResult(
+            ackKey = AiTripIntakeAckKey.UNDERSTOOD,
+            questionKind = AiTripIntakeQuestionKind.CARDS,
+            questionTitle = "What type of trip are you planning?"
+        )
+
+        assertEquals("Understood. What type of trip are you planning?", result.assistantMessage)
+    }
+
+    @Test
+    fun toPromptJson_usesSchemaFriendlyValuesOnly() {
+        val profile = AiTripIntakeProfile(
+            tripType = AiTripType.ROMANTIC,
+            partySummary = "Two adults",
+            destinationStyle = listOf("Beach", "Warm_Weather"),
+            budgetLevel = AiBudgetLevel.LUXURY,
+            pace = AiTripPacePreference.RELAXED,
+            interests = listOf("Beach"),
+            mustHaves = listOf("Ocean view"),
+            avoid = listOf("Crowds"),
+            notes = listOf("Shoulder season"),
+            durationDays = 5,
+            budgetTotal = 2500.0,
+            cuisinePreferences = listOf("Seafood"),
+            confidence = mapOf("pace" to 0.8)
+        )
+
+        val root = JsonParser.parseString(profile.toPromptJson()).asJsonObject
+
+        assertEquals("romantic", root.get("trip_type").asString)
+        assertEquals("luxury", root.get("budget_level").asString)
+        assertEquals("relaxed", root.get("pace").asString)
+        assertEquals("beach", root.getAsJsonArray("destination_style")[0].asString)
+        assertEquals("warm_weather", root.getAsJsonArray("destination_style")[1].asString)
+        assertFalse(root.has("duration_days"))
+        assertFalse(root.has("budget_total"))
+        assertFalse(root.has("cuisine_preferences"))
+        assertFalse(root.has("confidence"))
     }
 
     private fun option(id: String, label: String): AiTripIntakeAnswerOption {

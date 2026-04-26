@@ -38,6 +38,7 @@ data class AiChatUiState(
     val activeSingleEventCardId: String? = null,
     val pendingAddToTripEvent: AiSingleEventSuggestion? = null,
     val availableTrips: List<AiChatTripOption> = emptyList(),
+    val bookmarkedPlaceIds: Set<String> = emptySet(),
     val isLoading: Boolean = false
 )
 

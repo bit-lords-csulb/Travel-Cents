@@ -16,6 +16,8 @@ import com.example.travelcents.data.trip.TripPerformanceLogger
 import com.example.travelcents.data.trip.model.Itinerary
 import com.example.travelcents.data.trip.remote.DestinationImageRepository
 import com.example.travelcents.data.trip.remote.WikipediaApiService
+import com.example.travelcents.data.social.model.BookmarkedPlace
+import com.example.travelcents.data.social.repository.BookmarksRepository
 import com.example.travelcents.data.user.UserProfileRepository
 import com.example.travelcents.data.user.model.CurrentUserProfile
 import com.google.firebase.auth.FirebaseAuth
@@ -37,6 +39,7 @@ data class HomeUiState(
     // itinerary id -> home card image URL
     val tripImages: Map<String, String> = emptyMap(),
     val profile: CurrentUserProfile = CurrentUserProfile(),
+    val bookmarks: List<BookmarkedPlace> = emptyList(),
     val errorMessage: String? = null
 )
 
@@ -45,6 +48,7 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
     private val db = FirebaseFirestore.getInstance()
     private val auth = FirebaseAuth.getInstance()
     private val userProfileRepository = UserProfileRepository(auth = auth, db = db)
+    private val bookmarksRepository = BookmarksRepository(db)
     private val localDataSource = TripLocalDataSource(TravelCentsDatabase.getInstance(application))
     private val remoteRepository = FirestoreTripRepository(db)
     private val tripRepository = LocalFirstTripRepository(
@@ -83,7 +87,24 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
     init {
         observeProfile()
         observeHomeTrips()
+        observeBookmarks()
         loadAllTrips()
+    }
+
+    private fun observeBookmarks() {
+        val uid = auth.currentUser?.uid ?: return
+        viewModelScope.launch {
+            bookmarksRepository.observeBookmarks(uid).collect { places ->
+                _uiState.update { it.copy(bookmarks = places) }
+            }
+        }
+    }
+
+    fun removeBookmark(placeId: String) {
+        val uid = auth.currentUser?.uid ?: return
+        viewModelScope.launch {
+            runCatching { bookmarksRepository.removeBookmark(uid, placeId) }
+        }
     }
 
     private fun observeProfile() {

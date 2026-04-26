@@ -101,6 +101,25 @@ data class AiTripIntakeProfile(
     }
 
     fun toJson(gson: Gson = Gson()): String = gson.toJson(this)
+
+    fun toPromptJson(gson: Gson = Gson()): String {
+        return gson.toJson(
+            linkedMapOf(
+                "trip_type" to tripType.promptValue(),
+                "party_summary" to partySummary,
+                "destination" to destination,
+                "destination_style" to destinationStyle.map { style -> style.lowercase(Locale.US) },
+                "origin" to origin,
+                "date_window" to dateWindow,
+                "budget_level" to budgetLevel.promptValue(),
+                "pace" to pace.promptValue(),
+                "interests" to interests,
+                "must_haves" to mustHaves,
+                "avoid" to avoid,
+                "notes" to notes
+            )
+        )
+    }
 }
 
 data class AiTripIntakeAnswerOption(
@@ -216,10 +235,22 @@ data class AiTripIntakeTurnResult(
     val assistantMessage: String
         get() = buildList {
             add(ackKey.displayText())
-            if (questionKind == AiTripIntakeQuestionKind.TEXT) {
-                textPrompt.ifBlank { questionTitle }
-                    .takeIf { prompt -> prompt.isNotBlank() }
-                    ?.let(::add)
+            when (questionKind) {
+                AiTripIntakeQuestionKind.CARDS -> {
+                    listOf(questionTitle, questionSubtitle)
+                        .filter { value -> value.isNotBlank() }
+                        .joinToString(" ")
+                        .takeIf { prompt -> prompt.isNotBlank() }
+                        ?.let(::add)
+                }
+
+                AiTripIntakeQuestionKind.TEXT -> {
+                    textPrompt.ifBlank { questionTitle }
+                        .takeIf { prompt -> prompt.isNotBlank() }
+                        ?.let(::add)
+                }
+
+                AiTripIntakeQuestionKind.NONE -> Unit
             }
         }.joinToString(" ").trim()
 
@@ -547,3 +578,9 @@ private fun AiTripIntakeAckKey.displayText(): String {
         AiTripIntakeAckKey.PERFECT -> "Perfect."
     }
 }
+
+private fun AiTripType.promptValue(): String = name.lowercase(Locale.US)
+
+private fun AiBudgetLevel.promptValue(): String = name.lowercase(Locale.US)
+
+private fun AiTripPacePreference.promptValue(): String = name.lowercase(Locale.US)

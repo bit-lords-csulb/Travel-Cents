@@ -29,6 +29,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.OpenInNew
 import androidx.compose.material.icons.filled.Bookmark
+import androidx.compose.material.icons.filled.BookmarkBorder
 import androidx.compose.material.icons.filled.ChevronRight
 import androidx.compose.material.icons.filled.Description
 import androidx.compose.material.icons.filled.Flight
@@ -62,6 +63,7 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import coil.compose.AsyncImage
 import coil.request.ImageRequest
 import com.example.travelcents.BuildConfig
+import com.example.travelcents.data.social.model.BookmarkedPlace
 import com.example.travelcents.data.trip.TripKey
 import com.example.travelcents.data.trip.TripPerformanceLogger
 import com.example.travelcents.data.trip.model.Itinerary
@@ -88,6 +90,7 @@ fun HomePage(
     modifier: Modifier = Modifier,
     onTripClick: (TripKey) -> Unit = {},
     onProfileClick: () -> Unit = {},
+    onSavedPlacesClick: () -> Unit = {},
     homeViewModel: HomeViewModel = viewModel(),
     currencyViewModel: CurrencyViewModel = viewModel()
 ) {
@@ -131,7 +134,11 @@ fun HomePage(
             verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
             Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                SavedPlacesWidget(modifier = Modifier.weight(1f).aspectRatio(1f))
+                SavedPlacesWidget(
+                    bookmarks = homeUiState.bookmarks,
+                    onSavedPlacesClick = onSavedPlacesClick,
+                    modifier = Modifier.weight(1f).aspectRatio(1f)
+                )
                 CurrencyConverterCard(
                     modifier = Modifier.weight(1f).aspectRatio(1f),
                     viewModel = currencyViewModel
@@ -463,9 +470,13 @@ private fun TripCard(
 // ─────────────────────────────────────────────────────────────
 
 @Composable
-private fun SavedPlacesWidget(modifier: Modifier = Modifier) {
+private fun SavedPlacesWidget(
+    bookmarks: List<BookmarkedPlace>,
+    onSavedPlacesClick: () -> Unit,
+    modifier: Modifier = Modifier
+) {
     Card(
-        modifier = modifier,
+        modifier = modifier.clickable(onClick = onSavedPlacesClick),
         shape = RoundedCornerShape(24.dp),
         colors = CardDefaults.cardColors(containerColor = DeepSea2)
     ) {
@@ -493,70 +504,114 @@ private fun SavedPlacesWidget(modifier: Modifier = Modifier) {
                 )
             }
             Spacer(modifier = Modifier.height(10.dp))
-            // 2 × 2 photo grid
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .weight(1f),
-                horizontalArrangement = Arrangement.spacedBy(6.dp)
-            ) {
-                Column(
+
+            if (bookmarks.isEmpty()) {
+                Box(
                     modifier = Modifier
-                        .weight(1f)
-                        .fillMaxHeight(),
-                    verticalArrangement = Arrangement.spacedBy(6.dp)
+                        .fillMaxWidth()
+                        .weight(1f),
+                    contentAlignment = Alignment.Center
                 ) {
-                    AsyncImage(
-                        model = "https://picsum.photos/seed/paris/100/100",
-                        contentDescription = "Paris",
-                        contentScale = ContentScale.Crop,
-                        modifier = Modifier
-                            .weight(1f)
-                            .fillMaxWidth()
-                            .clip(RoundedCornerShape(10.dp))
-                    )
-                    AsyncImage(
-                        model = "https://picsum.photos/seed/cairo/100/100",
-                        contentDescription = "Cairo",
-                        contentScale = ContentScale.Crop,
-                        modifier = Modifier
-                            .weight(1f)
-                            .fillMaxWidth()
-                            .clip(RoundedCornerShape(10.dp))
-                    )
-                }
-                Column(
-                    modifier = Modifier
-                        .weight(1f)
-                        .fillMaxHeight(),
-                    verticalArrangement = Arrangement.spacedBy(6.dp)
-                ) {
-                    AsyncImage(
-                        model = "https://picsum.photos/seed/agra/100/100",
-                        contentDescription = "Agra",
-                        contentScale = ContentScale.Crop,
-                        modifier = Modifier
-                            .weight(1f)
-                            .fillMaxWidth()
-                            .clip(RoundedCornerShape(10.dp))
-                    )
-                    Box(
-                        modifier = Modifier
-                            .weight(1f)
-                            .fillMaxWidth()
-                            .background(SurfaceBright, RoundedCornerShape(10.dp)),
-                        contentAlignment = Alignment.Center
+                    Column(
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        verticalArrangement = Arrangement.spacedBy(6.dp)
                     ) {
-                        Text(
-                            text = "+12",
-                            color = Primary,
-                            fontSize = 13.sp,
-                            fontWeight = FontWeight.Bold
+                        Icon(
+                            imageVector = Icons.Default.BookmarkBorder,
+                            contentDescription = null,
+                            tint = DeepSea3,
+                            modifier = Modifier.size(24.dp)
                         )
+                        Text(
+                            text = "Nothing to\nsee here",
+                            color = DeepSea4,
+                            fontSize = 11.sp,
+                            fontWeight = FontWeight.Medium,
+                            textAlign = androidx.compose.ui.text.style.TextAlign.Center
+                        )
+                    }
+                }
+            } else {
+                val extraCount = bookmarks.size - 3
+                // 2 × 2 photo grid
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .weight(1f),
+                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                ) {
+                    Column(
+                        modifier = Modifier
+                            .weight(1f)
+                            .fillMaxHeight(),
+                        verticalArrangement = Arrangement.spacedBy(6.dp)
+                    ) {
+                        BookmarkPhotoCell(
+                            bookmark = bookmarks.getOrNull(0),
+                            modifier = Modifier
+                                .weight(1f)
+                                .fillMaxWidth()
+                        )
+                        BookmarkPhotoCell(
+                            bookmark = bookmarks.getOrNull(1),
+                            modifier = Modifier
+                                .weight(1f)
+                                .fillMaxWidth()
+                        )
+                    }
+                    Column(
+                        modifier = Modifier
+                            .weight(1f)
+                            .fillMaxHeight(),
+                        verticalArrangement = Arrangement.spacedBy(6.dp)
+                    ) {
+                        BookmarkPhotoCell(
+                            bookmark = bookmarks.getOrNull(2),
+                            modifier = Modifier
+                                .weight(1f)
+                                .fillMaxWidth()
+                        )
+                        if (extraCount > 0) {
+                            Box(
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .fillMaxWidth()
+                                    .background(SurfaceBright, RoundedCornerShape(10.dp)),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Text(
+                                    text = "+$extraCount",
+                                    color = Primary,
+                                    fontSize = 13.sp,
+                                    fontWeight = FontWeight.Bold
+                                )
+                            }
+                        } else {
+                            Spacer(modifier = Modifier.weight(1f))
+                        }
                     }
                 }
             }
         }
+    }
+}
+
+@Composable
+private fun BookmarkPhotoCell(
+    bookmark: BookmarkedPlace?,
+    modifier: Modifier = Modifier
+) {
+    if (bookmark?.imageUrl != null) {
+        AsyncImage(
+            model = bookmark.imageUrl,
+            contentDescription = bookmark.name,
+            contentScale = ContentScale.Crop,
+            modifier = modifier.clip(RoundedCornerShape(10.dp))
+        )
+    } else {
+        Box(
+            modifier = modifier.background(SurfaceBright, RoundedCornerShape(10.dp))
+        )
     }
 }
 

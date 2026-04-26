@@ -80,7 +80,7 @@ class AiToolRouterOrchestrator {
             LlmMessage(
                 role = "system",
                 content =
-                    "Current intake profile JSON:\n${currentProfile.toJson()}\n\n" +
+                    "Current intake profile JSON:\n${currentProfile.toPromptJson()}\n\n" +
                         "Current planning objective: ${planningObjective.ifBlank { "Not set yet" }}"
             ),
             LlmMessage(

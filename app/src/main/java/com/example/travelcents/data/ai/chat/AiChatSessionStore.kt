@@ -27,7 +27,8 @@ data class PersistedAiChatSnapshot(
 
 data class PersistedAiChatMessage(
     val text: String,
-    val sender: AiChatSender
+    val sender: AiChatSender,
+    val tags: List<String>? = null
 )
 
 data class PersistedAiChatCardOption(
@@ -244,7 +245,7 @@ class AiChatSessionStore(context: Context) {
 
         val firstUserMessage = snapshot.messages.firstOrNull { message ->
             message.sender == AiChatSender.USER
-        }?.text.orEmpty().trim()
+        }?.renderMessageText().orEmpty().trim()
         if (firstUserMessage.isBlank()) return ""
 
         return firstUserMessage
@@ -263,8 +264,8 @@ class AiChatSessionStore(context: Context) {
     private fun deriveSnippet(snapshot: PersistedAiChatSnapshot): String {
         return snapshot.messages.lastOrNull { message ->
             message.sender == AiChatSender.ASSISTANT
-        }?.text?.trim().orEmpty().ifBlank {
-            snapshot.messages.lastOrNull()?.text?.trim().orEmpty()
+        }?.renderMessageText()?.trim().orEmpty().ifBlank {
+            snapshot.messages.lastOrNull()?.renderMessageText()?.trim().orEmpty()
         }.lineSequence()
             .firstOrNull()
             .orEmpty()
@@ -287,6 +288,16 @@ class AiChatSessionStore(context: Context) {
         private const val STORE_KEY_PREFIX = "ai_chat_store"
         private const val LEGACY_KEY_PREFIX = "last_ai_chat"
     }
+}
+
+private fun PersistedAiChatMessage.renderMessageText(): String {
+    val tagLine = tags.orEmpty().takeIf(List<String>::isNotEmpty)
+        ?.joinToString(separator = " & ") { tag -> "($tag)" }
+        .orEmpty()
+    return listOf(tagLine, text.trim())
+        .filter { value -> value.isNotBlank() }
+        .joinToString(separator = "\n")
+        .trim()
 }
 
 fun AiChatCardGroup.toPersisted(): PersistedAiChatCardGroup {

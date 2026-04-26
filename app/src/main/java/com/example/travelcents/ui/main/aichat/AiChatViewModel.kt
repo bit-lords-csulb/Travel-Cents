@@ -47,6 +47,7 @@ import com.example.travelcents.data.ai.chat.toPersisted
 import com.example.travelcents.BuildConfig
 import com.example.travelcents.data.ai.model.LlmMessage
 import com.example.travelcents.data.ai.remote.LlmClient
+import com.example.travelcents.data.social.repository.BookmarksRepository
 import com.example.travelcents.data.sync.TripSyncRemoteDataSource
 import com.example.travelcents.data.trip.TripKey
 import com.example.travelcents.data.trip.remote.DestinationImageRepository
@@ -74,6 +75,9 @@ class AiChatViewModel(application: Application) : AndroidViewModel(application) 
     private val toolRouter = AiToolRouterOrchestrator()
     private val auth = FirebaseAuth.getInstance()
     private val tripSyncRemoteDataSource = TripSyncRemoteDataSource(FirebaseFirestore.getInstance())
+    private val bookmarksRepository = BookmarksRepository()
+
+    private val _bookmarkedPlaceIds = MutableStateFlow<Set<String>>(emptySet())
 
     private var pendingAddToTripEvent: AiSingleEventSuggestion? = null
     private var availableTripsForAdd: List<AiChatTripOption> = emptyList()
@@ -105,6 +109,7 @@ class AiChatViewModel(application: Application) : AndroidViewModel(application) 
 
     init {
         restoreLastSessionOrStartFresh()
+        observeBookmarks()
     }
 
     fun updateDraftText(text: String) {
@@ -292,7 +297,8 @@ class AiChatViewModel(application: Application) : AndroidViewModel(application) 
 
         submitUserTurn(
             visibleMessage = buildVisibleUserMessage(selectedOptions, trimmedText),
-            llmUserMessage = buildLlmUserMessage(selectedOptions, trimmedText)
+            llmUserMessage = buildLlmUserMessage(selectedOptions, trimmedText),
+            visibleTags = buildVisibleUserTags(selectedOptions)
         )
     }
 
@@ -434,6 +440,16 @@ class AiChatViewModel(application: Application) : AndroidViewModel(application) 
         publishUiState()
     }
 
+    private fun observeBookmarks() {
+        val uid = currentUserId() ?: return
+        viewModelScope.launch {
+            bookmarksRepository.observeBookmarks(uid).collect { bookmarks ->
+                _bookmarkedPlaceIds.value = bookmarks.map { it.id }.toSet()
+                publishUiState()
+            }
+        }
+    }
+
     private fun publishUiState() {
         val selectedOtherOption = sessionState.selectedDraftOptions.lastOrNull { option -> option.requiresText }
         val composerHint = if (selectedOtherOption != null) {
@@ -462,6 +478,7 @@ class AiChatViewModel(application: Application) : AndroidViewModel(application) 
             activeSingleEventCardId = sessionState.activeSingleEventCard?.id,
             pendingAddToTripEvent = pendingAddToTripEvent,
             availableTrips = availableTripsForAdd,
+            bookmarkedPlaceIds = _bookmarkedPlaceIds.value,
             isLoading = isLoading
         )
     }
@@ -494,12 +511,13 @@ class AiChatViewModel(application: Application) : AndroidViewModel(application) 
                 )
             }
             sessionState.activePlaceRecommendationRow?.let { row ->
-                add(
-                    AiChatItem.PlaceRecommendationRow(
-                        id = row.id,
-                        row = row
-                    )
+                val bookmarkedIds = _bookmarkedPlaceIds.value
+                val enrichedRow = row.copy(
+                    recommendations = row.recommendations.map { rec ->
+                        rec.copy(isBookmarked = rec.id in bookmarkedIds)
+                    }
                 )
+                add(AiChatItem.PlaceRecommendationRow(id = enrichedRow.id, row = enrichedRow))
             }
             sessionState.activeSingleEventCard?.let { card ->
                 add(
@@ -535,7 +553,7 @@ class AiChatViewModel(application: Application) : AndroidViewModel(application) 
             AiChatItem.TextMessage(
                 text = message.text,
                 sender = message.sender,
-                tags = message.tags
+                tags = message.tags.orEmpty()
             )
         }
         sessionState = AiChatSessionState(
@@ -674,7 +692,7 @@ class AiChatViewModel(application: Application) : AndroidViewModel(application) 
             .takeLast(6)
             .joinToString(separator = "\n") { item ->
                 val role = if (item.sender == AiChatSender.USER) "User" else "Assistant"
-                "$role: ${item.text}"
+                "$role: ${item.renderMessageText()}"
             }
 
         return "Conversation:\n$userTurns"
@@ -699,7 +717,7 @@ class AiChatViewModel(application: Application) : AndroidViewModel(application) 
     private fun fallbackSessionTitle(): String {
         return conversationItems.firstOrNull { item ->
             item.sender == AiChatSender.USER
-        }?.text
+        }?.renderMessageText()
             ?.lineSequence()
             ?.firstOrNull()
             .orEmpty()
@@ -710,18 +728,22 @@ class AiChatViewModel(application: Application) : AndroidViewModel(application) 
             .trim()
     }
 
+    private fun AiChatItem.TextMessage.renderMessageText(): String {
+        val tagLine = tags.takeIf(List<String>::isNotEmpty)
+            ?.joinToString(separator = " & ") { tag -> "($tag)" }
+            .orEmpty()
+        return listOf(tagLine, text.trim())
+            .filter { value -> value.isNotBlank() }
+            .joinToString(separator = "\n")
+            .trim()
+    }
+
     private fun buildVisibleUserMessage(
         selectedOptions: List<AiChatCardOption>,
         typedText: String
     ): String {
         if (selectedOptions.isNotEmpty() && selectedOptions.all { option -> option.groupId == STARTER_CARD_GROUP_ID }) {
-            val selectionLine = selectedOptions.joinToString(separator = " & ") { option ->
-                "(${option.label})"
-            }
-            return listOf(selectionLine, typedText)
-                .filter { value -> value.isNotBlank() }
-                .joinToString(separator = "\n")
-                .trim()
+            return typedText
         }
 
         val selectionLine = selectedOptions
@@ -736,12 +758,30 @@ class AiChatViewModel(application: Application) : AndroidViewModel(application) 
             .trim()
     }
 
+    private fun buildVisibleUserTags(
+        selectedOptions: List<AiChatCardOption>
+    ): List<String> {
+        return selectedOptions
+            .takeIf { options -> options.isNotEmpty() && options.all { option -> option.groupId == STARTER_CARD_GROUP_ID } }
+            ?.map(AiChatCardOption::label)
+            .orEmpty()
+    }
+
     private fun buildLlmUserMessage(
         selectedOptions: List<AiChatCardOption>,
         typedText: String
     ): String {
         if (selectedOptions.isNotEmpty() && selectedOptions.all { option -> option.groupId == STARTER_CARD_GROUP_ID }) {
-            return buildVisibleUserMessage(selectedOptions, typedText)
+            return buildList {
+                addAll(
+                    selectedOptions.mapNotNull { option ->
+                        option.message.trim().ifBlank { option.label.trim() }.ifBlank { null }
+                    }
+                )
+                typedText.takeIf { text -> text.isNotBlank() }?.let { text ->
+                    add("Extra context: $text")
+                }
+            }.joinToString(separator = "\n").trim()
         }
 
         val standardOptions = selectedOptions.filterNot { option -> option.requiresText }
@@ -847,7 +887,7 @@ class AiChatViewModel(application: Application) : AndroidViewModel(application) 
         return buildList {
             add(LlmMessage(role = "system", content = BASE_SYSTEM_PROMPT))
             add(LlmMessage(role = "system", content = profile.promptSummary()))
-            add(LlmMessage(role = "system", content = "Structured intake profile JSON:\n${intakeProfile.toJson()}"))
+            add(LlmMessage(role = "system", content = "Structured intake profile JSON:\n${intakeProfile.toPromptJson()}"))
             if (planningObjective.isNotBlank()) {
                 add(LlmMessage(role = "system", content = "Current planning objective: $planningObjective"))
             }
@@ -884,19 +924,19 @@ class AiChatViewModel(application: Application) : AndroidViewModel(application) 
         }
     }
 
-    private fun defaultAssistantAcknowledgement(): String = "Got it!"
-
     private fun submitUserTurn(
         visibleMessage: String,
-        llmUserMessage: String
+        llmUserMessage: String,
+        visibleTags: List<String> = emptyList()
     ) {
         val trimmedVisibleMessage = visibleMessage.trim()
         val trimmedLlmUserMessage = llmUserMessage.trim()
-        if (trimmedVisibleMessage.isBlank() || trimmedLlmUserMessage.isBlank()) return
+        if ((trimmedVisibleMessage.isBlank() && visibleTags.isEmpty()) || trimmedLlmUserMessage.isBlank()) return
 
         val submittedMessage = AiChatItem.TextMessage(
             text = trimmedVisibleMessage,
-            sender = AiChatSender.USER
+            sender = AiChatSender.USER,
+            tags = visibleTags
         )
         conversationItems += submittedMessage
 
@@ -1061,6 +1101,8 @@ class AiChatViewModel(application: Application) : AndroidViewModel(application) 
         viabilityWarning: String,
         placeRecommendationRow: AiPlaceRecommendationRow?
     ): String {
+        val structuredResponse = intakeResult?.assistantMessage
+            ?.takeIf { message -> message.isNotBlank() }
         val baseResponse = if (!ticketmasterGrounding.isNullOrBlank()) {
             fallbackAssistantMessage(
                 profile = profile,
@@ -1069,10 +1111,15 @@ class AiChatViewModel(application: Application) : AndroidViewModel(application) 
                 planningObjective = planningObjective,
                 groundingContext = ticketmasterGrounding
             )
+        } else if (structuredResponse != null) {
+            structuredResponse
         } else {
-            intakeResult?.assistantMessage
-                ?.takeIf { message -> message.isNotBlank() }
-                ?: defaultAssistantAcknowledgement()
+            fallbackAssistantMessage(
+                profile = profile,
+                intakeProfile = intakeProfile,
+                history = history,
+                planningObjective = planningObjective
+            )
         }
 
         return listOfNotNull(
