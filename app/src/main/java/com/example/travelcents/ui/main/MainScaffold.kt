@@ -198,6 +198,9 @@ fun MainScaffold(modifier: Modifier = Modifier, onLogout: () -> Unit = {}) {
                     )
                 }
                 composable(MainRoutes.NEW_TRIP_STEP_1) {
+                    LaunchedEffect(Unit) {
+                        newTripViewModel.resetState()
+                    }
                     TripStep1DestinationPage(
                         modifier = Modifier.fillMaxSize(),
                         viewModel = newTripViewModel,
@@ -248,8 +251,8 @@ fun MainScaffold(modifier: Modifier = Modifier, onLogout: () -> Unit = {}) {
                     TripGeneratingPage(
                         modifier = Modifier.fillMaxSize(),
                         viewModel = newTripViewModel,
-                        onTripReady = {
-                            currentTripViewModel.loadTrip()
+                        onTripReady = { tripKey ->
+                            currentTripViewModel.loadTrip(tripKey)
                             navController.navigate(MainRoutes.CURRENT_ITINERARY) {
                                 popUpTo(MainRoutes.HOME) { inclusive = false }
                             }
