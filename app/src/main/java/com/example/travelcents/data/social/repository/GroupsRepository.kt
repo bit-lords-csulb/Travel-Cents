@@ -36,6 +36,19 @@ class GroupsRepository(
             }
     }
 
+    fun observeGroup(groupId: String): Flow<Group?> = callbackFlow {
+        val listenerRegistration = db.collection("groups").document(groupId)
+            .addSnapshotListener { snapshot, error ->
+                if (error != null) {
+                    close(error)
+                    return@addSnapshotListener
+                }
+                val group = snapshot?.toObject(Group::class.java)
+                trySend(group)
+            }
+        awaitClose { listenerRegistration.remove() }
+    }
+
     fun observeGroups(): Flow<List<Group>> = callbackFlow {
         val listenerRegistration = db.collection("groups")
             .addSnapshotListener { snapshot, error ->

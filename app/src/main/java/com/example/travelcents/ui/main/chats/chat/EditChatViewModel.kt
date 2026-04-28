@@ -8,6 +8,7 @@ import com.example.travelcents.data.social.model.Friend
 import com.example.travelcents.data.social.model.Group
 import com.example.travelcents.data.social.repository.GroupsRepository
 import com.example.travelcents.data.social.repository.SocialUserRepository
+import com.example.travelcents.data.social.repository.FriendsRepository
 import com.google.firebase.Firebase
 import com.google.firebase.auth.auth
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -23,7 +24,8 @@ data class TripPreview(val id: String, val name: String, val ownerId: String)
 class EditChatViewModel(
     private val initialGroup: Group,
     private val repository: GroupsRepository = GroupsRepository(),
-    private val userRepository: SocialUserRepository = SocialUserRepository()
+    private val userRepository: SocialUserRepository = SocialUserRepository(),
+    private val friendRepository: FriendsRepository = FriendsRepository()
 ) : ViewModel() {
 
     private val currentUid = Firebase.auth.currentUser?.uid ?: ""
@@ -75,6 +77,13 @@ class EditChatViewModel(
         }
         fetchAvailableTrips()
         fetchMemberNames()
+        fetchAllFriends()
+    }
+
+    private fun fetchAllFriends() {
+        friendRepository.fetchFriends(currentUid) { friends ->
+            _allFriends.value = friends
+        }
     }
 
     private fun fetchAvailableTrips() {
@@ -97,16 +106,25 @@ class EditChatViewModel(
 
     val filteredFriends: StateFlow<List<Friend>> = combine(
         _allFriends,
-        _searchQuery
-    ) { friends, query ->
-        if (query.isBlank()) emptyList()
-        else friends.filter {
-            it.displayName.contains(query, ignoreCase = true) &&
-                    it.uid !in initialGroup.members
+        _searchQuery,
+        _stagedFriends,
+        _members
+    ) { friends, query, staged, currentMembers ->
+        if (query.isBlank()) {
+            emptyList()
+        } else {
+            val stagedIds = staged.map { it.uid }
+            friends.filter { friend ->
+                val matchesQuery = friend.displayName.contains(query, ignoreCase = true)
+                // Ensure they aren't already in the group OR already selected (staged)
+                val isNotAlreadyInChat = friend.uid !in currentMembers
+                val isNotStaged = friend.uid !in stagedIds
+
+                matchesQuery && isNotAlreadyInChat && isNotStaged
+            }
         }
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
-    // Add the missing functions the UI calls:
     fun onSearchQueryChange(query: String) { _searchQuery.value = query }
 
     fun selectFriend(friend: Friend) {
@@ -147,11 +165,16 @@ class EditChatViewModel(
     }
 
     private fun updateFirestoreDocument(imageUrl: String, onComplete: () -> Unit) {
+        // 1. Get the current member UIDs
+        // 2. Map the staged friends to just their UIDs
+        // 3. Combine them into one final list
+        val finalMembersList = _members.value + _stagedFriends.value.map { it.uid }
+
         val updates = mapOf(
             "name" to _chatName.value.trim(),
             "destination" to _destination.value.trim(),
             "description" to _description.value.trim(),
-            "members" to _members.value,
+            "members" to finalMembersList, // Use the combined list here!
             "linkedTripId" to (_selectedTrip.value?.id ?: ""),
             "linkedTripOwnerId" to (_selectedTrip.value?.ownerId ?: ""),
             "groupImageUrl" to imageUrl
@@ -161,6 +184,11 @@ class EditChatViewModel(
             groupId = initialGroup.id,
             updates = updates,
             onSuccess = {
+                // 1. Update the local members list so the UI shows the new people
+                _members.value = finalMembersList
+                // 2. Clear the "staged" chips so they disappear
+                _stagedFriends.value = emptyList()
+
                 _isLoading.value = false
                 onComplete()
             },
