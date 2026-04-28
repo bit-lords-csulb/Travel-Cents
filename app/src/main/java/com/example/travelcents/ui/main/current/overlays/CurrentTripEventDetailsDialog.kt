@@ -69,8 +69,8 @@ import com.example.travelcents.ui.main.current.overlays.cards.eventReviewCountLa
 import com.example.travelcents.ui.main.current.overlays.cards.eventTimeSummary
 import com.example.travelcents.ui.main.current.overlays.cards.googleMapsDirectionsUrl
 import com.example.travelcents.ui.main.current.overlays.cards.googleMapsSearchUrl
-import com.example.travelcents.ui.modules.embeddedMapUrl
 import com.example.travelcents.ui.modules.TripPhotoGalleryDialog
+import com.example.travelcents.ui.modules.embeddedMapUrl
 import com.example.travelcents.ui.modules.galleryPhotoModels
 import com.example.travelcents.ui.modules.heroImageModel
 import com.example.travelcents.ui.modules.rememberStaticMapModel
@@ -264,6 +264,7 @@ private fun EventDetailCardStack(
             FlightRouteCard(event)
             FlightPricingCard(event)
         }
+
         "hotel" -> {
             HotelStayCard(event)
             HotelOverviewCard(
@@ -282,6 +283,7 @@ private fun EventDetailCardStack(
                 )
             }
         }
+
         "restaurant", "dining", "food" -> {
             RestaurantSummaryCard(event)
             RestaurantServicesCard(event)
@@ -300,14 +302,18 @@ private fun EventDetailCardStack(
                 onReadAll = reviewUrl?.let { { uriHandler.openUri(it) } }
             )
         }
+
         else -> {
             ActivitySummaryCard(event)
             ActivityHoursCard(event)
-            if (officialUrl != null) {
+            val isBookable = event.isNativeBookable?.toString() == "true"
+            val bookingUrl = event.bookingUrl
+            if (isBookable && !bookingUrl.isNullOrBlank()) {
                 com.example.travelcents.ui.main.current.overlays.cards.DetailLinkRow(
-                    label = "Source",
-                    value = websiteLabel,
-                    onClick = { uriHandler.openUri(officialUrl) }
+                    label = "★ INSTANT BOOKING",
+                    value = "Book on Viator",
+                    accent = com.example.travelcents.ui.main.current.overlays.cards.CardMint,
+                    onClick = { uriHandler.openUri(bookingUrl) }
                 )
             }
             LocationMapCard(
