@@ -81,6 +81,17 @@ const val ATTR_TICKETMASTER_EVENT_ID = "attr_ticketmaster_event_id"
 const val ATTR_YELP_DETAIL_ENRICHED = "attr_yelp_detail_enriched"
 const val DETAIL_YELP_ID = "yelp_id"
 
+// ── Flight ────────────────────────────────────────────────────────────────────
+const val ATTR_HERO_IMAGE_URL = "attr_hero_image_url"
+const val ATTR_HERO_IMAGE_ATTRIBUTION = "attr_hero_image_attribution"
+const val ATTR_AIRLINE_LOGO_URL = "attr_airline_logo_url"
+const val ATTR_ORIGIN_TZ = "attr_origin_tz"
+const val ATTR_DESTINATION_TZ = "attr_destination_tz"
+const val ATTR_ARRIVAL_DAY_OFFSET = "attr_arrival_day_offset"
+const val ATTR_ORIGIN_CITY = "attr_origin_city"
+const val ATTR_DESTINATION_CITY = "attr_destination_city"
+const val ATTR_STOP_AIRPORTS = "attr_stop_airports"
+
 fun Map<String, String>.firstNonBlank(vararg keys: String): String? {
     return keys.asSequence()
         .mapNotNull { key -> this[key]?.takeIf { it.isNotBlank() } }

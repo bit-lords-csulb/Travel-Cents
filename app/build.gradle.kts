@@ -64,6 +64,8 @@ android {
         buildConfigField(
             "String", "WALKSCORE_API_KEY",
             "\"${localProperties.getProperty("WALKSCORE_API_KEY") ?: ""}\""
+        )
+        buildConfigField(
             "String", "TICKETMASTER_API_KEY",
             "\"${localProperties.getProperty("TICKETMASTER_API_KEY") ?: ""}\""
         )

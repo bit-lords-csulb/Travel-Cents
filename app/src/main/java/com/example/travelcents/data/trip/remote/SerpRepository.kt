@@ -3,8 +3,15 @@ package com.example.travelcents.data.trip.remote
 import com.example.travelcents.BuildConfig
 import com.example.travelcents.data.media.StaticMapUrlFactory
 import com.example.travelcents.data.trip.local.AirportTimeZones
+import com.example.travelcents.data.trip.model.ATTR_AIRLINE_LOGO_URL
 import com.example.travelcents.data.trip.model.ATTR_AMENITIES
+import com.example.travelcents.data.trip.model.ATTR_ARRIVAL_DAY_OFFSET
 import com.example.travelcents.data.trip.model.ATTR_BOOKING_URL
+import com.example.travelcents.data.trip.model.ATTR_DESTINATION_CITY
+import com.example.travelcents.data.trip.model.ATTR_DESTINATION_TZ
+import com.example.travelcents.data.trip.model.ATTR_ORIGIN_CITY
+import com.example.travelcents.data.trip.model.ATTR_ORIGIN_TZ
+import com.example.travelcents.data.trip.model.ATTR_STOP_AIRPORTS
 import com.example.travelcents.data.trip.model.ATTR_CHECK_IN_TIME
 import com.example.travelcents.data.trip.model.ATTR_CHECK_OUT_TIME
 import com.example.travelcents.data.trip.model.ATTR_DEAL_DESCRIPTION
@@ -381,6 +388,47 @@ object SerpRepository {
                 selectedOption.carbonEmissions?.differencePercent?.let {
                     put("carbon_diff_percent", it.toString())
                 }
+                // Hero / branding
+                selectedOption.airlineLogo?.takeIf { it.isNotBlank() }?.let {
+                    put(ATTR_AIRLINE_LOGO_URL, it)
+                }
+                // Time-zone context for per-cell display
+                val destTz = segment.timeZoneId(itinerary)
+                put(ATTR_DESTINATION_TZ, destTz)
+                val originIataCode = when (segment) {
+                    FlightSegment.OUTBOUND -> itinerary.originIata
+                    FlightSegment.RETURN -> itinerary.destinationIata
+                }
+                put(ATTR_ORIGIN_TZ, AirportTimeZones.zoneIdForIata(originIataCode).id)
+                // City names for display and future destination-aware cards
+                put(ATTR_ORIGIN_CITY, when (segment) {
+                    FlightSegment.OUTBOUND -> itinerary.origin
+                    FlightSegment.RETURN -> itinerary.destination
+                })
+                put(ATTR_DESTINATION_CITY, when (segment) {
+                    FlightSegment.OUTBOUND -> itinerary.destination
+                    FlightSegment.RETURN -> itinerary.origin
+                })
+                // Intermediate stop airports (CSV of IATA codes)
+                selectedOption.flights
+                    .dropLast(1)
+                    .map { it.arrivalAirport.id }
+                    .filter { it.isNotBlank() }
+                    .takeIf { it.isNotEmpty() }
+                    ?.let { put(ATTR_STOP_AIRPORTS, it.joinToString(",")) }
+                // Day offset: +1 = next day arrival, -1 = previous day (rare), 0 = same day
+                val depDateStr = departureTimestamp.datePart(defaultDate)
+                val arrDateStr = arrivalTimestamp.datePart(defaultDate)
+                if (depDateStr.isNotBlank() && arrDateStr.isNotBlank()) {
+                    try {
+                        val fmt = DateTimeFormatter.ISO_LOCAL_DATE
+                        val offset = ChronoUnit.DAYS.between(
+                            LocalDate.parse(depDateStr, fmt),
+                            LocalDate.parse(arrDateStr, fmt)
+                        )
+                        put(ATTR_ARRIVAL_DAY_OFFSET, offset.toString())
+                    } catch (_: Exception) { }
+                }
             },
             options = eventOptions
         )
@@ -465,6 +513,15 @@ object SerpRepository {
                     put("carbon_diff_percent", it.toString())
                 }
                 option.type?.let { put("trip_type", it) }
+                option.airlineLogo?.takeIf { it.isNotBlank() }?.let {
+                    put(ATTR_AIRLINE_LOGO_URL, it)
+                }
+                option.flights
+                    .dropLast(1)
+                    .map { it.arrivalAirport.id }
+                    .filter { it.isNotBlank() }
+                    .takeIf { it.isNotEmpty() }
+                    ?.let { put(ATTR_STOP_AIRPORTS, it.joinToString(",")) }
                 // Per-leg breakdown stored with leg_N_ prefix for detailed display
                 option.flights.forEachIndexed { i, leg ->
                     put("leg_${i}_airline", leg.airline)
