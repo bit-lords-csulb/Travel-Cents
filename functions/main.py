@@ -2,6 +2,7 @@ from firebase_functions import https_fn
 from firebase_admin import initialize_app
 import os
 import requests
+import json
 from groq import Groq
 from pinecone import Pinecone
 from dotenv import load_dotenv
@@ -10,53 +11,86 @@ from dotenv import load_dotenv
 initialize_app()
 load_dotenv()
 
-
 @https_fn.on_call()
 def generate_itinerary(req: https_fn.CallableRequest):
-    # 1. Grab the city from the Android App request
-    target_city = req.data.get("city", "London")
+    # 1. Extract all the travel details sent from the Android app's TravelRequest model
+    req_data = req.data or {}
+    destination = req_data.get("destination", "London")
+    target_city = destination.split(',')[0].strip()
 
-    # 2. Get API Keys from .env
+    date_from = req_data.get("dateFrom", "Unknown")
+    date_to = req_data.get("dateTo", "Unknown")
+    adults = req_data.get("adults", 1)
+    children = req_data.get("children", 0)
+    travel_style = req_data.get("travelStyle", "comfort")
+    budget = req_data.get("budgetTotal", "Flexible")
+    interests = req_data.get("interests", [])
+    special_requests = req_data.get("specialRequests", "None")
+
+    # 2. Get API Keys
     groq_key = os.getenv("GROQ_API_KEY")
     hf_token = os.getenv("HF_TOKEN")
     pinecone_key = os.getenv("PINECONE_API_KEY")
 
-    # 3. Setup Groq (The Brain)
     client = Groq(api_key=groq_key)
 
+    # Format the interests list into a readable string
+    interests_str = ", ".join(interests) if interests else "general exploring"
+
+    # 3. Dynamic Prompting: Feed the user's exact parameters to Groq
     prompt = f"""
-    Create a 3-day travel itinerary for {target_city}. 
+    Design a highly personalized, magical travel itinerary for {target_city}.
+
+    Traveler Profile & Constraints:
+    - Travel Dates: {date_from} to {date_to}
+    - Party Size: {adults} adults, {children} children
+    - Travel Style: {travel_style}
+    - Estimated Budget: {budget}
+    - Core Interests: {interests_str}
+    - Special Requests: {special_requests}
+
+    Skip the generic tourist traps. Based strictly on the traveler profile above, focus on hidden gems, enchanting local experiences, and highly creative activities that fit their specific vibe, budget, and age group.
+
+    Create a comprehensive list of activities to fill their specific travel dates.
+
     Return ONLY a JSON object with this exact structure:
     {{
       "itinerary": [
-        {{ "title": "Activity Name", "description": "Short description" }}
+        {{ "title": "Activity Name", "description": "A short, captivating description that highlights why this experience is magical and why it perfectly fits their specific interests." }}
       ]
     }}
-    Include 3 activities total.
     """
 
     chat_completion = client.chat.completions.create(
         messages=[{"role": "user", "content": prompt}],
         model="llama-3.1-8b-instant",
-        response_format={"type": "json_object"}
+        response_format={"type": "json_object"},
+        temperature=0.85, # Pushed higher for a more imaginative, creative response
+        top_p=0.9         # Wide enough to allow unique vocabulary, but grounded enough to stay coherent
     )
 
-    import json
     raw_itinerary = json.loads(chat_completion.choices[0].message.content)
 
-    # 4. Setup Pinecone & Matchmaking
+    # 4. Setup Pinecone
     pc = Pinecone(api_key=pinecone_key)
     index = pc.Index("travel-cents-inventory")
 
     final_itinerary = []
 
-    for activity in raw_itinerary["itinerary"]:
-        # Hugging Face Setup (The Vectorizer)
+    print(f"--- 🚀 STARTING MATCHMAKING FOR {target_city} ---", flush=True)
+
+    for activity in raw_itinerary.get("itinerary", []):
+        activity_title = activity.get('title') or activity.get('Activity Name') or "Unknown"
+        activity_desc = activity.get('description', '')
+
+        print(f"🔍 Analyzing: {activity_title}...", flush=True)
+
+        # Hybrid search query
+        search_query = f"{activity_title}: {activity_desc}"
+
         hf_api_url = "https://router.huggingface.co/hf-inference/models/BAAI/bge-base-en-v1.5/pipeline/feature-extraction"
         headers = {"Authorization": f"Bearer {hf_token}"}
-
-        # Wrap description in "inputs" as required by HF Inference API
-        hf_payload = {"inputs": activity["description"]}
+        hf_payload = {"inputs": search_query}
 
         try:
             hf_response = requests.post(hf_api_url, headers=headers, json=hf_payload)
@@ -64,7 +98,7 @@ def generate_itinerary(req: https_fn.CallableRequest):
             if hf_response.status_code == 200:
                 vector = hf_response.json()
 
-                # Query Pinecone for the closest matching REAL activity in our DB
+                # Query Pinecone with the cleaned target_city
                 search_result = index.query(
                     vector=vector,
                     top_k=1,
@@ -73,20 +107,31 @@ def generate_itinerary(req: https_fn.CallableRequest):
                 )
 
                 if search_result['matches']:
-                    best_match = search_result['matches'][0]['metadata']
-                    activity['booking_url'] = best_match.get('booking_url', "")
-                    activity['real_title'] = best_match.get('title', "")
-                    activity['isNativeBookable'] = True
+                    match = search_result['matches'][0]
+                    score = match['score']
+                    best_match_meta = match['metadata']
+
+                    print(f"   ✅ Best Match: {best_match_meta.get('title')} (Score: {score:.4f})", flush=True)
+
+                    if score > 0.5:
+                        activity['booking_url'] = best_match_meta.get('booking_url', "")
+                        activity['real_title'] = best_match_meta.get('title', "")
+                        activity['isNativeBookable'] = "true"
+                    else:
+                        print(f"   ⚠️ Score too low ({score:.4f}).", flush=True)
+                        activity['isNativeBookable'] = "false"
                 else:
-                    activity['isNativeBookable'] = False
+                    print(f"   ❌ No database matches for '{activity_title}' in {target_city}.", flush=True)
+                    activity['isNativeBookable'] = "false"
             else:
-                print(f"HF Error: {hf_response.status_code} - {hf_response.text}")
-                activity['isNativeBookable'] = False
+                print(f"   ❌ HF Error: {hf_response.status_code}", flush=True)
+                activity['isNativeBookable'] = "false"
 
         except Exception as e:
-            print(f"Matchmaking Exception: {e}")
-            activity['isNativeBookable'] = False
+            print(f"   🔥 Error: {e}", flush=True)
+            activity['isNativeBookable'] = "false"
 
         final_itinerary.append(activity)
 
+    print("--- ✅ MATCHMAKING COMPLETE ---", flush=True)
     return {"itinerary": final_itinerary}
