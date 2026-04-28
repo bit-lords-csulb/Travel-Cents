@@ -1,4 +1,8 @@
+<<<<<<< HEAD
+package com.example.travelcents.ui.main.newtrip
+=======
 package com.example.travelcents.ui.main.newTrip
+>>>>>>> f3ada09702446ecc92076fe613e8dffd76d7694a
 
 import android.Manifest
 import android.annotation.SuppressLint
@@ -23,7 +27,10 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+<<<<<<< HEAD
+=======
 import androidx.compose.foundation.layout.statusBarsPadding
+>>>>>>> f3ada09702446ecc92076fe613e8dffd76d7694a
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.GridItemSpan
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
@@ -36,12 +43,20 @@ import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.LocationOn
 import androidx.compose.material.icons.filled.MyLocation
 import androidx.compose.material.icons.filled.Search
+<<<<<<< HEAD
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
+=======
+>>>>>>> f3ada09702446ecc92076fe613e8dffd76d7694a
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MenuDefaults
+<<<<<<< HEAD
+=======
 import androidx.compose.material3.ProvideTextStyle
+>>>>>>> f3ada09702446ecc92076fe613e8dffd76d7694a
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextField
 import androidx.compose.material3.TextFieldDefaults
@@ -59,7 +74,10 @@ import androidx.compose.foundation.Image
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
+<<<<<<< HEAD
+=======
 import androidx.compose.ui.text.TextStyle
+>>>>>>> f3ada09702446ecc92076fe613e8dffd76d7694a
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
@@ -67,10 +85,15 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.PopupProperties
 import androidx.core.content.ContextCompat
 import com.example.travelcents.R
+<<<<<<< HEAD
+import com.example.travelcents.ui.theme.DeepSea1
+import com.example.travelcents.ui.theme.DeepSea5
+=======
 import com.example.travelcents.ui.components.TcButton
 import com.example.travelcents.ui.theme.DeepSea1
 import com.example.travelcents.ui.theme.DeepSea5
 import com.example.travelcents.ui.theme.TravelCentsFonts
+>>>>>>> f3ada09702446ecc92076fe613e8dffd76d7694a
 import com.google.android.gms.location.LocationServices
 import com.google.android.gms.location.Priority
 import com.google.android.gms.tasks.CancellationTokenSource
@@ -112,18 +135,29 @@ fun TripStep1DestinationPage(
         }
     }
 
+<<<<<<< HEAD
+    Column(
+        modifier = modifier
+            .fillMaxSize()
+            .background(DeepSea1)
+    ) {
+=======
     ProvideTextStyle(value = TextStyle(fontFamily = TravelCentsFonts.Body)) {
         Column(
             modifier = modifier
                 .fillMaxSize()
                 .background(DeepSea1)
         ) {
+>>>>>>> f3ada09702446ecc92076fe613e8dffd76d7694a
         // Top bar + progress strip
         Column(
             modifier = Modifier
                 .fillMaxWidth()
                 .background(Color(0xFF010E24))
+<<<<<<< HEAD
+=======
                 .statusBarsPadding()
+>>>>>>> f3ada09702446ecc92076fe613e8dffd76d7694a
         ) {
             Row(
                 modifier = Modifier
@@ -187,8 +221,12 @@ fun TripStep1DestinationPage(
                         fontSize = 40.sp,
                         fontWeight = FontWeight.ExtraBold,
                         color = DeepSea5,
+<<<<<<< HEAD
+                        letterSpacing = (-1.5).sp
+=======
                         letterSpacing = (-1.5).sp,
                         fontFamily = TravelCentsFonts.Headline
+>>>>>>> f3ada09702446ecc92076fe613e8dffd76d7694a
                     )
                     Spacer(modifier = Modifier.height(6.dp))
                     Text(
@@ -387,17 +425,36 @@ fun TripStep1DestinationPage(
                 .background(DeepSea1)
                 .padding(horizontal = 16.dp, vertical = 12.dp)
         ) {
+<<<<<<< HEAD
+            Button(
+                onClick = onContinueClick,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(52.dp),
+                enabled = viewModel.destination.isNotBlank() && viewModel.origin.isNotBlank(),
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = TripWizardColors.Blue,
+                    contentColor = Color(0xFF001627),
+                    disabledContainerColor = TripWizardColors.Blue.copy(alpha = 0.25f),
+                    disabledContentColor = DeepSea5.copy(alpha = 0.3f)
+                ),
+                shape = RoundedCornerShape(16.dp)
+=======
             TcButton(
                 onClick = onContinueClick,
                 modifier = Modifier.fillMaxWidth(),
                 enabled = viewModel.destination.isNotBlank() && viewModel.origin.isNotBlank()
+>>>>>>> f3ada09702446ecc92076fe613e8dffd76d7694a
             ) {
                 Text(text = "Continue", fontSize = 16.sp, fontWeight = FontWeight.Bold)
             }
         }
     }
 }
+<<<<<<< HEAD
+=======
 }
+>>>>>>> f3ada09702446ecc92076fe613e8dffd76d7694a
 
 private fun hasLocationPermission(context: Context): Boolean {
     val hasFineLocation = ContextCompat.checkSelfPermission(
@@ -627,4 +684,7 @@ private fun DestinationCard(
         }
     }
 }
+<<<<<<< HEAD
+=======
 
+>>>>>>> f3ada09702446ecc92076fe613e8dffd76d7694a

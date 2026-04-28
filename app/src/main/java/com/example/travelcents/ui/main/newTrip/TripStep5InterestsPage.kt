@@ -1,4 +1,8 @@
+<<<<<<< HEAD
+package com.example.travelcents.ui.main.newtrip
+=======
 package com.example.travelcents.ui.main.newTrip
+>>>>>>> f3ada09702446ecc92076fe613e8dffd76d7694a
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -16,7 +20,10 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+<<<<<<< HEAD
+=======
 import androidx.compose.foundation.layout.statusBarsPadding
+>>>>>>> f3ada09702446ecc92076fe613e8dffd76d7694a
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.GridItemSpan
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
@@ -30,9 +37,16 @@ import androidx.compose.material.icons.automirrored.filled.ArrowForward
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Search
+<<<<<<< HEAD
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
+=======
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.ProvideTextStyle
+>>>>>>> f3ada09702446ecc92076fe613e8dffd76d7694a
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextField
 import androidx.compose.material3.TextFieldDefaults
@@ -50,15 +64,23 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.foundation.Image
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.painterResource
+<<<<<<< HEAD
+=======
 import androidx.compose.ui.text.TextStyle
+>>>>>>> f3ada09702446ecc92076fe613e8dffd76d7694a
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.travelcents.R
+<<<<<<< HEAD
+import com.example.travelcents.ui.theme.DeepSea1
+import com.example.travelcents.ui.theme.DeepSea5
+=======
 import com.example.travelcents.ui.components.TcButton
 import com.example.travelcents.ui.theme.DeepSea1
 import com.example.travelcents.ui.theme.DeepSea5
 import com.example.travelcents.ui.theme.TravelCentsFonts
+>>>>>>> f3ada09702446ecc92076fe613e8dffd76d7694a
 
 private data class InterestItem(val key: String, val label: String, val imageRes: Int)
 
@@ -117,6 +139,15 @@ fun TripStep5InterestsPage(
     var searchQuery by remember { mutableStateOf("") }
     var customInterests by remember { mutableStateOf(listOf<String>()) }
 
+<<<<<<< HEAD
+    Column(
+        modifier = modifier
+            .fillMaxSize()
+            .background(DeepSea1)
+    ) {
+        // Top bar
+        Column(modifier = Modifier.fillMaxWidth().background(Color(0xFF010E24))) {
+=======
     ProvideTextStyle(value = TextStyle(fontFamily = TravelCentsFonts.Body)) {
         Column(
             modifier = modifier
@@ -130,6 +161,7 @@ fun TripStep5InterestsPage(
                 .background(Color(0xFF010E24))
                 .statusBarsPadding()
         ) {
+>>>>>>> f3ada09702446ecc92076fe613e8dffd76d7694a
             Row(
                 modifier = Modifier.fillMaxWidth().padding(horizontal = 8.dp, vertical = 4.dp),
                 horizontalArrangement = Arrangement.SpaceBetween,
@@ -187,8 +219,12 @@ fun TripStep5InterestsPage(
                         fontSize = 28.sp,
                         fontWeight = FontWeight.ExtraBold,
                         color = DeepSea5,
+<<<<<<< HEAD
+                        letterSpacing = (-1).sp
+=======
                         letterSpacing = (-1).sp,
                         fontFamily = TravelCentsFonts.Headline
+>>>>>>> f3ada09702446ecc92076fe613e8dffd76d7694a
                     )
                     Spacer(Modifier.height(4.dp))
                     Row(
@@ -333,14 +369,30 @@ fun TripStep5InterestsPage(
                 .background(DeepSea1)
                 .padding(horizontal = 16.dp, vertical = 12.dp)
         ) {
+<<<<<<< HEAD
+            Button(
+=======
             TcButton(
+>>>>>>> f3ada09702446ecc92076fe613e8dffd76d7694a
                 onClick = {
                     if (viewModel.origin.isBlank()) viewModel.origin = "Not specified"
                     viewModel.generateTrip()
                     onTripGenerated()
                 },
+<<<<<<< HEAD
+                modifier = Modifier.fillMaxWidth().height(56.dp),
+                enabled = viewModel.interests.isNotEmpty(),
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = TripWizardColors.Blue,
+                    contentColor = Color(0xFF001627),
+                    disabledContainerColor = TripWizardColors.Blue.copy(alpha = 0.25f),
+                    disabledContentColor = DeepSea5.copy(alpha = 0.3f)
+                ),
+                shape = RoundedCornerShape(999.dp)
+=======
                 modifier = Modifier.fillMaxWidth(),
                 enabled = viewModel.interests.isNotEmpty()
+>>>>>>> f3ada09702446ecc92076fe613e8dffd76d7694a
             ) {
                 Row(
                     horizontalArrangement = Arrangement.spacedBy(8.dp),
@@ -353,7 +405,10 @@ fun TripStep5InterestsPage(
         }
     }
 }
+<<<<<<< HEAD
+=======
 }
+>>>>>>> f3ada09702446ecc92076fe613e8dffd76d7694a
 
 @Composable
 private fun S5ProgressWidget() {
@@ -466,4 +521,7 @@ private fun S5InterestCard(
         }
     }
 }
+<<<<<<< HEAD
+=======
 
+>>>>>>> f3ada09702446ecc92076fe613e8dffd76d7694a
