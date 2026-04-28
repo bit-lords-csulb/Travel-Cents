@@ -92,6 +92,16 @@ const val ATTR_ORIGIN_CITY = "attr_origin_city"
 const val ATTR_DESTINATION_CITY = "attr_destination_city"
 const val ATTR_STOP_AIRPORTS = "attr_stop_airports"
 
+// ── Flight live status (OpenSky-backed) ──────────────────────────────────────
+const val ATTR_FLIGHT_STATUS = "attr_flight_status"
+const val ATTR_DELAY_MIN = "attr_delay_min"
+const val ATTR_LIVE_STATUS_UPDATED_AT = "attr_live_status_updated_at"
+const val ATTR_FLIGHT_LATITUDE = "attr_flight_latitude"
+const val ATTR_FLIGHT_LONGITUDE = "attr_flight_longitude"
+const val ATTR_FLIGHT_ON_GROUND = "attr_flight_on_ground"
+const val ATTR_FLIGHT_CALLSIGN = "attr_flight_callsign"
+const val ATTR_FLIGHT_ICAO24 = "attr_flight_icao24"
+
 fun Map<String, String>.firstNonBlank(vararg keys: String): String? {
     return keys.asSequence()
         .mapNotNull { key -> this[key]?.takeIf { it.isNotBlank() } }

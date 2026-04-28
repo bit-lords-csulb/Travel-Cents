@@ -23,6 +23,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImage
+import com.example.travelcents.data.trip.model.ATTR_AIRLINE_LOGO_URL
 import com.example.travelcents.data.trip.model.ATTR_BUSINESS_ADDRESS
 import com.example.travelcents.data.trip.model.TravelEvent
 import com.example.travelcents.data.trip.model.firstNonBlank
@@ -66,6 +67,18 @@ fun EventSummaryCard(
             heroImage = heroImage,
             photoCount = photoCount,
             title = title,
+            onOpenGallery = onOpenGallery
+        )
+        return
+    }
+    if (event.type.equals("flight", ignoreCase = true)) {
+        FlightSummaryVariant(
+            event = event,
+            heroImage = heroImage,
+            photoCount = photoCount,
+            title = title,
+            timeSummary = timeSummary,
+            durationSummary = durationSummary,
             onOpenGallery = onOpenGallery
         )
         return
@@ -405,6 +418,128 @@ private fun RestaurantSummaryVariant(
                         )
                     }
                 }
+            }
+        }
+    }
+}
+
+@Composable
+private fun FlightSummaryVariant(
+    event: TravelEvent,
+    heroImage: String?,
+    photoCount: Int,
+    title: String,
+    timeSummary: String,
+    durationSummary: String,
+    onOpenGallery: (() -> Unit)?
+) {
+    val airlineLogo = event.details.firstNonBlank(ATTR_AIRLINE_LOGO_URL, "airline_logo")
+        ?.takeIf { it.isNotBlank() }
+
+    DetailCardFrame(accent = CardSky) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(16.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Box(
+                modifier = Modifier
+                    .weight(0.42f)
+                    .aspectRatio(0.92f)
+                    .clip(RoundedCornerShape(24.dp))
+                    .background(CardSurfaceHighest)
+                    .then(if (onOpenGallery != null) Modifier.clickable(onClick = onOpenGallery) else Modifier)
+            ) {
+                if (!heroImage.isNullOrBlank()) {
+                    AsyncImage(
+                        model = heroImage,
+                        contentDescription = title,
+                        modifier = Modifier.matchParentSize(),
+                        contentScale = ContentScale.Crop
+                    )
+                    Box(
+                        modifier = Modifier
+                            .matchParentSize()
+                            .background(
+                                Brush.verticalGradient(
+                                    colors = listOf(
+                                        androidx.compose.ui.graphics.Color.Transparent,
+                                        CardBackground.copy(alpha = 0.18f),
+                                        CardBackground.copy(alpha = 0.72f)
+                                    )
+                                )
+                            )
+                    )
+                } else {
+                    Box(
+                        modifier = Modifier
+                            .matchParentSize()
+                            .background(accentGradientForType(event.type))
+                    )
+                }
+
+                if (photoCount > 1 && onOpenGallery != null) {
+                    PhotoGalleryButton(
+                        photoCount = photoCount,
+                        onClick = onOpenGallery,
+                        modifier = Modifier
+                            .align(Alignment.TopEnd)
+                            .padding(10.dp)
+                    )
+                }
+
+                if (airlineLogo != null) {
+                    Surface(
+                        color = androidx.compose.ui.graphics.Color.White,
+                        shape = RoundedCornerShape(999.dp),
+                        modifier = Modifier
+                            .align(Alignment.BottomStart)
+                            .padding(10.dp)
+                            .size(36.dp)
+                    ) {
+                        AsyncImage(
+                            model = airlineLogo,
+                            contentDescription = null,
+                            modifier = Modifier
+                                .padding(6.dp),
+                            contentScale = ContentScale.Fit
+                        )
+                    }
+                } else {
+                    Surface(
+                        color = CardBackground.copy(alpha = 0.62f),
+                        shape = RoundedCornerShape(999.dp),
+                        modifier = Modifier
+                            .align(Alignment.BottomStart)
+                            .padding(10.dp)
+                    ) {
+                        Text(
+                            text = event.type.uppercase(Locale.US),
+                            color = CardSky,
+                            fontSize = 9.sp,
+                            fontWeight = FontWeight.Bold,
+                            letterSpacing = 1.3.sp,
+                            modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp)
+                        )
+                    }
+                }
+            }
+
+            Column(
+                modifier = Modifier.weight(0.58f),
+                verticalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                Text(
+                    text = title,
+                    color = CardText,
+                    fontSize = 24.sp,
+                    lineHeight = 28.sp,
+                    fontWeight = FontWeight.ExtraBold
+                )
+                DetailBadgeRow(
+                    badges = listOf(timeSummary, durationSummary),
+                    accent = CardSky
+                )
             }
         }
     }

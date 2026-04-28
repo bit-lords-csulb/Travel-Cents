@@ -365,7 +365,7 @@ object SerpRepository {
             date = departureTimestamp.datePart(defaultDate),
             startTime = departureTimestamp.timePart(),
             endTime = arrivalTimestamp.timePart(),
-            imageUrl = selectedOption.airlineLogo ?: "",
+            imageUrl = "",
             details = buildMap {
                 put("trip_segment", segment.key)
                 put("title", buildFlightTitle(segment, destinationAirport, itinerary))
@@ -429,6 +429,20 @@ object SerpRepository {
                         put(ATTR_ARRIVAL_DAY_OFFSET, offset.toString())
                     } catch (_: Exception) { }
                 }
+                // Per-leg breakdown so FlightLegsCard can render multi-stop itineraries
+                // straight off the event without joining to the option subcollection.
+                selectedOption.flights.forEachIndexed { i, leg ->
+                    put("leg_${i}_airline", leg.airline)
+                    put("leg_${i}_flight_number", leg.flightNumber)
+                    put("leg_${i}_from", leg.departureAirport.id)
+                    put("leg_${i}_to", leg.arrivalAirport.id)
+                    put("leg_${i}_departure", leg.departureTimestamp())
+                    put("leg_${i}_arrival", leg.arrivalTimestamp())
+                    put("leg_${i}_duration_min", leg.duration.toString())
+                    leg.legroom?.let { lr -> put("leg_${i}_legroom", lr) }
+                    if (leg.oftenDelayed) put("leg_${i}_often_delayed", "true")
+                    if (leg.overnight) put("leg_${i}_overnight", "true")
+                }
             },
             options = eventOptions
         )
@@ -480,7 +494,7 @@ object SerpRepository {
             eventId = eventId,
             source = "serp",
             selected = isSelected,
-            imageUrl = option.airlineLogo ?: "",
+            imageUrl = "",
             details = buildMap {
                 val departureTimestamp = firstLeg?.departureTimestamp().orEmpty()
                 val arrivalTimestamp = lastLeg?.arrivalTimestamp().orEmpty()
