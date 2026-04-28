@@ -23,3 +23,4 @@ plan.md
 analytics.settings
 __pycache__/
 .codex_tmp_signin_assets.zip
+/credentials.json

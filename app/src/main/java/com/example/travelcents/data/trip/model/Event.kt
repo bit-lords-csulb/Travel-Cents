@@ -18,7 +18,14 @@ data class Event(
     val upvotes: List<String> = emptyList(),
     val downvotes: List<String> = emptyList(),
     val commentCount: Int = 0,
-    val isWon: Boolean = false
+    val isWon: Boolean = false,
+    val yelpId: String = "",
+    val yelpUrl: String = "",
+    val yelpCategory: String = "",
+    val yelpCategories: List<String> = emptyList(),
+    val yelpRating: Double? = null,
+    val yelpReviewCount: Int = 0,
+    val yelpImageUrl: String = ""
 )
 
 data class EventComment(
@@ -28,4 +35,3 @@ data class EventComment(
     val senderName: String = "",
     val timestamp: Timestamp? = null
 )
-
