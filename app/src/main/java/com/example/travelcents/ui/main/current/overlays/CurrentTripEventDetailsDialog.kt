@@ -52,8 +52,10 @@ import com.example.travelcents.ui.main.current.overlays.cards.CardTextMuted
 import com.example.travelcents.ui.main.current.overlays.cards.CurrencyCostCard
 import com.example.travelcents.ui.main.current.overlays.cards.DetailActionRow
 import com.example.travelcents.ui.main.current.overlays.cards.EventSummaryCard
+import com.example.travelcents.ui.main.current.overlays.cards.FlightLegsCard
 import com.example.travelcents.ui.main.current.overlays.cards.FlightPricingCard
 import com.example.travelcents.ui.main.current.overlays.cards.FlightRouteCard
+import com.example.travelcents.ui.main.current.overlays.cards.FlightStatusCard
 import com.example.travelcents.ui.main.current.overlays.cards.FlightTimingCard
 import com.example.travelcents.ui.main.current.overlays.cards.HotelAmenitiesCard
 import com.example.travelcents.ui.main.current.overlays.cards.HotelBookingCard
@@ -290,6 +292,8 @@ private fun EventDetailCardStack(
         "flight" -> {
             FlightTimingCard(event)
             FlightRouteCard(event)
+            FlightStatusCard(event)
+            FlightLegsCard(event)
             FlightPricingCard(event)
         }
         "hotel" -> {

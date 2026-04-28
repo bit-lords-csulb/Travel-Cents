@@ -27,16 +27,23 @@ import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import coil.compose.AsyncImage
 import com.example.travelcents.data.media.ImageCacheManager
+import com.example.travelcents.data.trip.model.ATTR_HERO_IMAGE_URL
 import com.example.travelcents.data.trip.model.EventOption
 import com.example.travelcents.data.trip.model.TravelEvent
 
+private fun TravelEvent.resolvedRemoteHero(): String {
+    val attrHero = details[ATTR_HERO_IMAGE_URL]?.takeIf { it.isNotBlank() }
+    if (attrHero != null) return attrHero
+    return imageUrl.ifBlank { details["imageUrl"] ?: details["image_url"] ?: "" }
+}
+
 fun TravelEvent.heroImageModel(context: Context): String {
-    val remoteHero = imageUrl.ifBlank { details["imageUrl"] ?: details["image_url"] ?: "" }
+    val remoteHero = resolvedRemoteHero()
     return localImagePath.ifBlank { cachedOrRemoteModelFor(context, itineraryId, remoteHero).orEmpty() }
 }
 
 fun TravelEvent.galleryPhotoModels(context: Context): List<String> {
-    val remoteHero = imageUrl.ifBlank { details["imageUrl"] ?: details["image_url"] ?: "" }
+    val remoteHero = resolvedRemoteHero()
     val preferredHero = localImagePath.ifBlank {
         cachedOrRemoteModelFor(context, itineraryId, remoteHero).orEmpty()
     }

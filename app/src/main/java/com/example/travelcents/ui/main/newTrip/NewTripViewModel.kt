@@ -23,9 +23,16 @@ import com.example.travelcents.data.trip.model.TravelEvent
 import com.example.travelcents.data.trip.model.TravelRequest
 import com.example.travelcents.data.trip.model.ATTR_BUSINESS_ADDRESS
 import com.example.travelcents.data.trip.model.ATTR_BUSINESS_NAME
+import com.example.travelcents.data.trip.model.ATTR_DESTINATION_CITY
+import com.example.travelcents.data.trip.model.ATTR_HERO_IMAGE_ATTRIBUTION
+import com.example.travelcents.data.trip.model.ATTR_HERO_IMAGE_URL
 import com.example.travelcents.data.trip.model.ATTR_TICKETMASTER_EVENT_ID
 import com.example.travelcents.data.trip.model.ATTR_VENUE_NAME
 import com.example.travelcents.data.trip.model.YelpOptionPoolItem
+import com.example.travelcents.data.trip.remote.FlightHeroImageRepository
+import com.example.travelcents.data.trip.model.Itinerary
+import com.example.travelcents.data.trip.model.TravelEvent
+import com.example.travelcents.data.trip.model.TravelRequest
 import com.example.travelcents.data.trip.remote.SerpRepository
 import com.example.travelcents.data.trip.model.detailValue
 import com.example.travelcents.data.trip.remote.TicketmasterRepository
@@ -124,6 +131,22 @@ class NewTripViewModel(application: Application) : AndroidViewModel(application)
     private val _generationStep = MutableStateFlow(GenerationStep.IDLE)
     val generationStep: StateFlow<GenerationStep> = _generationStep.asStateFlow()
 
+    private val flightHeroImages: FlightHeroImageRepository by lazy {
+        val wikipediaClient = okhttp3.OkHttpClient.Builder()
+            .connectTimeout(20, java.util.concurrent.TimeUnit.SECONDS)
+            .readTimeout(20, java.util.concurrent.TimeUnit.SECONDS)
+            .build()
+        val wikipedia = retrofit2.Retrofit.Builder()
+            .baseUrl("https://en.wikipedia.org/")
+            .client(wikipediaClient)
+            .addConverterFactory(retrofit2.converter.gson.GsonConverterFactory.create())
+            .build()
+            .create(com.example.travelcents.data.trip.remote.WikipediaApiService::class.java)
+        FlightHeroImageRepository(
+            destinationImages = com.example.travelcents.data.trip.remote.DestinationImageRepository(wikipedia)
+        )
+    }
+
     fun generateTrip() {
         val uid = FirebaseAuth.getInstance().currentUser?.uid
         if (uid == null) {
@@ -165,7 +188,7 @@ class NewTripViewModel(application: Application) : AndroidViewModel(application)
                 _generationStep.value = GenerationStep.FINDING_HOTELS
                 _uiState.value = TripUiState.Loading(SERP_HOTELS_MESSAGES.random())
                 val hotelsDeferred = async { SerpRepository.searchHotels(request, itinerary) }
-                val realFlights = flightsDeferred.await()
+                val realFlights = enrichFlightsWithHeroImages(flightsDeferred.await())
                 val realHotels = hotelsDeferred.await()
 
                 // Remaining budget for activity guidance
@@ -717,6 +740,26 @@ class NewTripViewModel(application: Application) : AndroidViewModel(application)
             memberUids = listOf(tripKey.ownerUid),
             roleByUid = mapOf(tripKey.ownerUid to TripAccessRole.OWNER.wireValue)
         )
+    }
+
+    private suspend fun enrichFlightsWithHeroImages(flights: List<TravelEvent>): List<TravelEvent> {
+        if (flights.isEmpty()) return flights
+        return flights.map { event ->
+            if (!event.type.equals("flight", ignoreCase = true)) return@map event
+            val destinationCity = event.details[ATTR_DESTINATION_CITY]
+                ?.takeIf { it.isNotBlank() }
+                .orEmpty()
+            val airlineIata = FlightHeroImageRepository.extractAirlineIata(event.details["flight_number"])
+            val resolved = flightHeroImages.resolveFlightHero(destinationCity, airlineIata)
+                ?: return@map event
+            event.copy(
+                imageUrl = resolved.imageUrl,
+                details = event.details + buildMap {
+                    put(ATTR_HERO_IMAGE_URL, resolved.imageUrl)
+                    resolved.attribution?.let { put(ATTR_HERO_IMAGE_ATTRIBUTION, it) }
+                }
+            )
+        }
     }
 
     private fun inferTravelerCounts(intakeProfile: AiTripIntakeProfile): Pair<Int, Int> {
