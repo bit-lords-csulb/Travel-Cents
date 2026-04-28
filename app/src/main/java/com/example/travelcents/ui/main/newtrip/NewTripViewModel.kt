@@ -1,4 +1,4 @@
-package com.example.travelcents.ui.main.newtrip
+package com.example.travelcents.ui.main.newTrip
 
 import android.app.Application
 import androidx.compose.runtime.getValue
@@ -7,13 +7,19 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
-import com.example.travelcents.data.ImageCacheManager
-import com.example.travelcents.data.model.Itinerary
-import com.example.travelcents.data.model.TravelEvent
-import com.example.travelcents.data.model.TravelRequest
-import com.example.travelcents.data.remote.GroqRepository
-import com.example.travelcents.data.remote.SerpRepository
-import com.example.travelcents.data.remote.YelpRepository
+import com.example.travelcents.data.ai.chat.AiCuratedTripStarter
+import com.example.travelcents.data.ai.chat.AiTripIntakeProfile
+import com.example.travelcents.data.ai.chat.AiTripType
+import com.example.travelcents.data.ai.repository.TripPlannerRepository
+import com.example.travelcents.data.media.ImageCacheManager
+import com.example.travelcents.data.sync.TripSyncRemoteDataSource
+import com.example.travelcents.data.trip.TripAccessRole
+import com.example.travelcents.data.trip.TripKey
+import com.example.travelcents.data.trip.model.Itinerary
+import com.example.travelcents.data.trip.model.TravelEvent
+import com.example.travelcents.data.trip.model.TravelRequest
+import com.example.travelcents.data.trip.remote.SerpRepository
+import com.example.travelcents.data.trip.remote.YelpRepository
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FirebaseFirestore
 import kotlinx.coroutines.async
@@ -22,6 +28,9 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.tasks.await
+import java.time.Instant
+import java.time.LocalDate
+import java.util.UUID
 
 enum class GenerationStep {
     IDLE,
@@ -37,7 +46,6 @@ enum class GenerationStep {
 
 class NewTripViewModel(application: Application) : AndroidViewModel(application) {
 
-    // Form fields
     var origin by mutableStateOf("")
     var destination by mutableStateOf("")
     var dateFrom by mutableStateOf("")
@@ -51,7 +59,6 @@ class NewTripViewModel(application: Application) : AndroidViewModel(application)
     var interests by mutableStateOf(emptyList<String>())
     var specialRequests by mutableStateOf("")
 
-    // Autocomplete
     private val allDestinations = listOf(
         "Paris, France", "Tokyo, Japan", "Bali, Indonesia", "New York, USA", "London, UK", "Dubai, UAE",
         "Rome, Italy", "Barcelona, Spain", "Amsterdam, Netherlands", "Singapore", "Bangkok, Thailand",
@@ -86,6 +93,14 @@ class NewTripViewModel(application: Application) : AndroidViewModel(application)
     var filteredDestinations by mutableStateOf(emptyList<String>())
         private set
 
+    private val _uiState = MutableStateFlow<TripUiState>(TripUiState.Idle)
+    val uiState: StateFlow<TripUiState> = _uiState.asStateFlow()
+
+    private val _generationStep = MutableStateFlow(GenerationStep.IDLE)
+    val generationStep: StateFlow<GenerationStep> = _generationStep.asStateFlow()
+
+    private var draftTripId: String = newTripId()
+
     fun updateDestination(input: String) {
         destination = input
         filteredDestinations = if (input.length >= 2) {
@@ -94,11 +109,6 @@ class NewTripViewModel(application: Application) : AndroidViewModel(application)
             emptyList()
         }
     }
-
-    private val _uiState = MutableStateFlow<TripUiState>(TripUiState.Idle)
-    val uiState: StateFlow<TripUiState> = _uiState.asStateFlow()
-    private val _generationStep = MutableStateFlow(GenerationStep.IDLE)
-    val generationStep: StateFlow<GenerationStep> = _generationStep.asStateFlow()
 
     fun generateTrip() {
         val uid = FirebaseAuth.getInstance().currentUser?.uid
@@ -111,7 +121,6 @@ class NewTripViewModel(application: Application) : AndroidViewModel(application)
             return
         }
 
-        val budget = budgetTotal.toDoubleOrNull() ?: 0.0
         val request = TravelRequest(
             userId = uid,
             origin = origin,
@@ -122,85 +131,90 @@ class NewTripViewModel(application: Application) : AndroidViewModel(application)
             children = children,
             travelStyle = travelStyle,
             currency = currency,
-            budgetTotal = budget,
+            budgetTotal = budgetTotal.toDoubleOrNull() ?: 0.0,
             interests = interests,
             specialRequests = specialRequests
         )
 
         viewModelScope.launch {
             try {
-                // Step 1: Groq generates itinerary metadata + IATA codes
                 _generationStep.value = GenerationStep.CRAFTING_ITINERARY
-                _uiState.value = TripUiState.Loading(GROQ_ITINERARY_MESSAGES.random())
-                val itinerary = GroqRepository.generateItinerary(request)
+                _uiState.value = TripUiState.Loading(ITINERARY_MESSAGES.random())
+                val generatedItinerary = TripPlannerRepository.generateItinerary(request)
+                val itinerary = generatedItinerary.copy(
+                    itineraryId = generateFreshTripId(),
+                    userId = uid,
+                    ownerUid = uid,
+                    memberUids = listOf(uid),
+                    roleByUid = mapOf(uid to TripAccessRole.OWNER.wireValue)
+                )
 
-                // Step 2: Flights + hotels in parallel
                 _generationStep.value = GenerationStep.SEARCHING_FLIGHTS
-                _uiState.value = TripUiState.Loading(SERP_FLIGHTS_MESSAGES.random())
+                _uiState.value = TripUiState.Loading(FLIGHT_MESSAGES.random())
                 val flightsDeferred = async { SerpRepository.searchFlights(request, itinerary) }
+
                 _generationStep.value = GenerationStep.FINDING_HOTELS
-                _uiState.value = TripUiState.Loading(SERP_HOTELS_MESSAGES.random())
+                _uiState.value = TripUiState.Loading(HOTEL_MESSAGES.random())
                 val hotelsDeferred = async { SerpRepository.searchHotels(request, itinerary) }
+
                 val realFlights = flightsDeferred.await()
                 val realHotels = hotelsDeferred.await()
-
-                // Remaining budget for activity guidance
-                val flightPrice = realFlights.firstOrNull()?.details?.get("total_price")?.toDoubleOrNull() ?: 0.0
-                val hotelPerNight = realHotels.firstOrNull()?.details?.get("rate_per_night")?.toDoubleOrNull() ?: 0.0
-                val hotelTotal = hotelPerNight * itinerary.durationDays
-                val remainingBudget = if (budget > 0) maxOf(0.0, budget - flightPrice - hotelTotal) else 0.0
-
                 val tripDates = generateTripDates(request.dateFrom, itinerary.durationDays)
+                val firstFlightArrival = realFlights
+                    .firstOrNull { it.date == tripDates.firstOrNull() }
+                    ?.endTime
+                    ?: "Unknown"
 
-                // Step 3: Yelp restaurants ΓÇö 1 pooled call, distributed round-robin across days
                 _generationStep.value = GenerationStep.FINDING_RESTAURANTS
-                _uiState.value = TripUiState.Loading(YELP_RESTAURANTS_MESSAGES.random())
+                _uiState.value = TripUiState.Loading(RESTAURANT_MESSAGES.random())
                 val restaurantPoolTarget = tripDates.size * 5
                 val restaurantPool = YelpRepository.fetchRestaurantPool(
                     location = itinerary.destination,
                     targetCount = restaurantPoolTarget
                 )
-                val restaurantEvents = YelpRepository.distributePoolToEvents(
-                    restaurantPool, tripDates, "restaurant", itinerary.itineraryId
+                val restaurantEvents = YelpRepository.distributePoolToSelectedEvents(
+                    pool = YelpRepository.mapBusinessesToPoolItems(restaurantPool),
+                    dates = tripDates,
+                    type = "restaurant",
+                    itineraryId = itinerary.itineraryId
                 )
 
-                // Step 4: AI Activities via Local Firebase Emulator (The Demo Brain)
                 _generationStep.value = GenerationStep.FINDING_ACTIVITIES
-                _uiState.value = TripUiState.Loading("Asking Local AI Brain for Activities...")
-
-                val aiActivities = GroqRepository.getAIActivities(
-                    city = itinerary.destination,
+                _uiState.value = TripUiState.Loading(ACTIVITY_MESSAGES.random())
+                val aiActivities = TripPlannerRepository.getAIActivities(
+                    request = request,
                     itineraryId = itinerary.itineraryId,
-                    dates = tripDates
+                    dates = tripDates,
+                    flightArrival = firstFlightArrival
                 )
 
                 val allEvents = realFlights + realHotels + restaurantEvents + aiActivities
                 val linkedItinerary = itinerary.copy(eventIds = allEvents.map { it.eventId })
 
-                // Step 5: Download selected hero images only ΓÇö alternative images are lazy-loaded on expand
                 _generationStep.value = GenerationStep.DOWNLOADING_IMAGES
-                _uiState.value = TripUiState.Loading(DOWNLOADING_MESSAGES.random())
+                _uiState.value = TripUiState.Loading(DOWNLOAD_MESSAGES.random())
                 val heroImageUrls = allEvents.map { it.imageUrl }.filter { it.isNotBlank() }
                 val localPaths = ImageCacheManager.downloadTripImages(
-                    getApplication(),
-                    itinerary.itineraryId,
-                    heroImageUrls
+                    context = getApplication(),
+                    tripId = linkedItinerary.itineraryId,
+                    urls = heroImageUrls
                 )
 
-                // Patch localImagePath into event hero image where cached; alternatives remain remote URLs
                 val patchedEvents = allEvents.map { event ->
                     val localEventImg = localPaths[event.imageUrl]
-                    if (localEventImg != null) event.copy(imageUrl = localEventImg) else event
+                    if (localEventImg != null) {
+                        event.copy(imageUrl = localEventImg, localImagePath = localEventImg)
+                    } else {
+                        event
+                    }
                 }
 
-                // Step 6: Save to Firestore (events + options subcollection)
                 _generationStep.value = GenerationStep.SAVING
-                _uiState.value = TripUiState.Loading(FIRESTORE_MESSAGES.random())
+                _uiState.value = TripUiState.Loading(SAVE_MESSAGES.random())
                 saveToFirestore(uid, linkedItinerary, patchedEvents)
 
                 _generationStep.value = GenerationStep.COMPLETE
                 _uiState.value = TripUiState.Success(linkedItinerary, patchedEvents)
-
             } catch (e: Exception) {
                 _generationStep.value = GenerationStep.IDLE
                 _uiState.value = TripUiState.Error(e.message ?: "Failed to generate trip.")
@@ -222,7 +236,6 @@ class NewTripViewModel(application: Application) : AndroidViewModel(application)
         for (event in events) {
             val eventRef = tripRef.collection("events").document(event.eventId)
             eventRef.set(event.toFirestoreMap()).await()
-            // Options stored as subcollection: events/{eventId}/options/{optionId}
             for (option in event.options) {
                 eventRef.collection("options")
                     .document(option.optionId)
@@ -233,71 +246,207 @@ class NewTripViewModel(application: Application) : AndroidViewModel(application)
     }
 
     fun resetState() {
+        origin = ""
+        destination = ""
+        dateFrom = ""
+        dateTo = ""
+        adults = 1
+        children = 0
+        pets = 0
+        travelStyle = "comfort"
+        currency = "USD"
+        budgetTotal = ""
+        interests = emptyList()
+        specialRequests = ""
+        filteredDestinations = emptyList()
+        generateFreshTripId()
         _uiState.value = TripUiState.Idle
         _generationStep.value = GenerationStep.IDLE
+    }
+
+    fun createDraftTripFromAiStarter(
+        starter: AiCuratedTripStarter,
+        intakeProfile: AiTripIntakeProfile,
+        onTripReady: (TripKey) -> Unit = {}
+    ) {
+        val uid = FirebaseAuth.getInstance().currentUser?.uid
+        if (uid == null) {
+            _uiState.value = TripUiState.Error("You must be logged in to create a trip.")
+            return
+        }
+
+        applyAiStarterToState(starter, intakeProfile)
+
+        viewModelScope.launch {
+            try {
+                val tripKey = TripKey(ownerUid = uid, tripId = generateFreshTripId())
+                val itinerary = buildDraftItinerary(
+                    tripKey = tripKey,
+                    starter = starter,
+                    intakeProfile = intakeProfile
+                )
+
+                _generationStep.value = GenerationStep.SAVING
+                _uiState.value = TripUiState.Loading("Creating your AI trip starter...")
+
+                TripSyncRemoteDataSource(FirebaseFirestore.getInstance())
+                    .createTrip(
+                        ownerUid = uid,
+                        itinerary = itinerary,
+                        events = emptyList()
+                    )
+
+                _generationStep.value = GenerationStep.COMPLETE
+                _uiState.value = TripUiState.Success(itinerary, emptyList())
+                onTripReady(tripKey)
+            } catch (e: Exception) {
+                _generationStep.value = GenerationStep.IDLE
+                _uiState.value = TripUiState.Error(e.message ?: "Failed to create AI trip starter.")
+            }
+        }
     }
 
     fun toggleInterest(item: String) {
         interests = if (item in interests) interests - item else interests + item
     }
 
-    // Generates a list of YYYY-MM-DD strings for each day of the trip
+    private fun applyAiStarterToState(
+        starter: AiCuratedTripStarter,
+        intakeProfile: AiTripIntakeProfile
+    ) {
+        val (draftAdults, draftChildren) = inferTravelerCounts(intakeProfile)
+        destination = starter.destination
+        origin = intakeProfile.origin.ifBlank { origin }
+        travelStyle = starter.travelStyle.ifBlank { travelStyle }
+        adults = draftAdults
+        children = draftChildren
+        interests = (intakeProfile.interests + intakeProfile.destinationStyle)
+            .filter { it.isNotBlank() }
+            .distinct()
+        budgetTotal = intakeProfile.budgetTotal?.let(::formatBudgetTotal).orEmpty()
+        specialRequests = intakeProfile.notes
+            .ifEmpty { starter.summary.takeIf { it.isNotBlank() }?.let(::listOf).orEmpty() }
+            .joinToString(separator = "; ")
+        filteredDestinations = emptyList()
+    }
+
     private fun generateTripDates(dateFrom: String, durationDays: Int): List<String> {
         return try {
-            val parts = dateFrom.split("-")
-            val year = parts[0].toInt()
-            val month = parts[1].toInt() - 1 // Calendar months are 0-based
-            val day = parts[2].toInt()
-            val cal = java.util.Calendar.getInstance()
-            cal.set(year, month, day)
-            (0 until durationDays).map {
-                val y = cal.get(java.util.Calendar.YEAR)
-                val m = cal.get(java.util.Calendar.MONTH) + 1
-                val d = cal.get(java.util.Calendar.DAY_OF_MONTH)
-                cal.add(java.util.Calendar.DAY_OF_MONTH, 1)
-                "%04d-%02d-%02d".format(y, m, d)
+            val startDate = LocalDate.parse(dateFrom)
+            val safeDuration = durationDays.coerceAtLeast(1)
+            (0 until safeDuration).map { offset ->
+                startDate.plusDays(offset.toLong()).toString()
             }
         } catch (_: Exception) {
             emptyList()
         }
     }
 
-    companion object {
-        private val GROQ_ITINERARY_MESSAGES = listOf(
-            "Asking Groq to plan your trip...",
-            "Groq is crafting your itinerary...",
-            "Generating trip structure with Groq...",
-            "Consulting Groq for travel ideas..."
+    private fun buildDraftItinerary(
+        tripKey: TripKey,
+        starter: AiCuratedTripStarter,
+        intakeProfile: AiTripIntakeProfile
+    ): Itinerary {
+        val (draftAdults, draftChildren) = inferTravelerCounts(intakeProfile)
+        val draftDuration = intakeProfile.durationDays ?: starter.durationDays.coerceAtLeast(1)
+
+        return Itinerary(
+            itineraryId = tripKey.tripId,
+            userId = tripKey.ownerUid,
+            tripName = starter.title.ifBlank { starter.destination.ifBlank { "AI Trip Starter" } },
+            destination = starter.destination,
+            origin = intakeProfile.origin,
+            dateFrom = "",
+            dateTo = "",
+            durationDays = draftDuration.coerceAtLeast(1),
+            currency = currency.ifBlank { "USD" },
+            travelStyle = starter.travelStyle.ifBlank { "comfort" },
+            adults = draftAdults,
+            children = draftChildren,
+            createdAt = Instant.now().toString(),
+            status = "draft",
+            eventIds = emptyList(),
+            ownerUid = tripKey.ownerUid,
+            memberUids = listOf(tripKey.ownerUid),
+            roleByUid = mapOf(tripKey.ownerUid to TripAccessRole.OWNER.wireValue)
         )
-        private val SERP_FLIGHTS_MESSAGES = listOf(
+    }
+
+    private fun inferTravelerCounts(intakeProfile: AiTripIntakeProfile): Pair<Int, Int> {
+        val normalizedParty = intakeProfile.partySummary.lowercase()
+
+        return when {
+            intakeProfile.tripType == AiTripType.SOLO || "solo" in normalizedParty -> 1 to 0
+            intakeProfile.tripType == AiTripType.ROMANTIC ||
+                "two adults" in normalizedParty ||
+                "for two" in normalizedParty -> 2 to 0
+            intakeProfile.tripType == AiTripType.FAMILY ||
+                "family" in normalizedParty ||
+                "kids" in normalizedParty ||
+                "children" in normalizedParty -> 2 to 2
+            intakeProfile.tripType == AiTripType.FRIENDS ||
+                "friends" in normalizedParty ||
+                "group" in normalizedParty -> 4 to 0
+            else -> 2 to 0
+        }
+    }
+
+    private fun formatBudgetTotal(value: Double): String {
+        return if (value % 1.0 == 0.0) {
+            value.toLong().toString()
+        } else {
+            value.toString()
+        }
+    }
+
+    private fun generateFreshTripId(): String {
+        draftTripId = newTripId()
+        return draftTripId
+    }
+
+    private fun newTripId(): String = UUID.randomUUID().toString()
+
+    companion object {
+        private val ITINERARY_MESSAGES = listOf(
+            "Crafting your itinerary...",
+            "Generating trip structure...",
+            "Planning the base trip..."
+        )
+
+        private val FLIGHT_MESSAGES = listOf(
             "Checking flight availability...",
             "Searching for the best flights...",
             "Scanning flight options for your dates..."
         )
-        private val SERP_HOTELS_MESSAGES = listOf(
+
+        private val HOTEL_MESSAGES = listOf(
             "Looking for top-rated hotels...",
             "Searching for accommodations...",
             "Browsing hotel options at your destination..."
         )
-        private val YELP_RESTAURANTS_MESSAGES = listOf(
+
+        private val RESTAURANT_MESSAGES = listOf(
             "Finding the best restaurants for each day...",
             "Searching local dining options via Yelp...",
             "Curating restaurant picks for your trip..."
         )
-        private val YELP_ACTIVITIES_MESSAGES = listOf(
-            "Discovering activities and attractions...",
-            "Finding things to do via Yelp...",
-            "Searching local events and experiences..."
+
+        private val ACTIVITY_MESSAGES = listOf(
+            "Asking the local AI service for activities...",
+            "Pulling emulator-backed activity recommendations...",
+            "Generating activity ideas from the local microservice..."
         )
-        private val DOWNLOADING_MESSAGES = listOf(
+
+        private val DOWNLOAD_MESSAGES = listOf(
             "Saving photos for offline use...",
             "Downloading images for your trip...",
-            "Almost there ΓÇö caching your trip photos..."
+            "Caching your trip photos..."
         )
-        private val FIRESTORE_MESSAGES = listOf(
+
+        private val SAVE_MESSAGES = listOf(
             "Saving your trip...",
             "Storing your itinerary...",
-            "Almost done ΓÇö saving to the clouds..."
+            "Writing everything to Firestore..."
         )
     }
 }
