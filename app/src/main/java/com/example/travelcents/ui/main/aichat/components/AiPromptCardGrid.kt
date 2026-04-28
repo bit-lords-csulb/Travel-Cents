@@ -19,12 +19,7 @@ import androidx.compose.material.icons.outlined.FamilyRestroom
 import androidx.compose.material.icons.outlined.FavoriteBorder
 import androidx.compose.material.icons.outlined.FlightTakeoff
 import androidx.compose.material.icons.outlined.Forest
-import androidx.compose.material.icons.outlined.Luggage
-import androidx.compose.material.icons.outlined.Map
-import androidx.compose.material.icons.outlined.MonetizationOn
-import androidx.compose.material.icons.outlined.Nightlife
 import androidx.compose.material.icons.outlined.Restaurant
-import androidx.compose.material.icons.outlined.WbSunny
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -188,17 +183,12 @@ private data class StarterCardMeta(
 
 private fun starterCardMeta(option: AiChatCardOption): StarterCardMeta {
     return when {
-        option.id.contains("plan_trip") -> StarterCardMeta(Icons.Outlined.Map, TripWizardColors.Blue)
-        option.id.contains("warm_places") -> StarterCardMeta(Icons.Outlined.WbSunny, Color(0xFFFFB875))
+        option.id.contains("beach_getaway") -> StarterCardMeta(Icons.Outlined.BeachAccess, Color(0xFF7DE1FF))
+        option.id.contains("nature_escape") -> StarterCardMeta(Icons.Outlined.Forest, Color(0xFF85D59F))
         option.id.contains("city_break") -> StarterCardMeta(Icons.Outlined.FlightTakeoff, Color(0xFFB6C6ED))
-        option.id.contains("foodie_spots") -> StarterCardMeta(Icons.Outlined.Restaurant, Color(0xFF00B0D6))
-        option.id.contains("beach_escape") -> StarterCardMeta(Icons.Outlined.BeachAccess, Color(0xFF7DE1FF))
-        option.id.contains("weekend_getaway") -> StarterCardMeta(Icons.Outlined.Luggage, Color(0xFF9FC3FF))
+        option.id.contains("food_trip") -> StarterCardMeta(Icons.Outlined.Restaurant, Color(0xFF00B0D6))
         option.id.contains("romantic_trip") -> StarterCardMeta(Icons.Outlined.FavoriteBorder, Color(0xFFFFA0B8))
         option.id.contains("family_trip") -> StarterCardMeta(Icons.Outlined.FamilyRestroom, Color(0xFF9EDB9A))
-        option.id.contains("nature_hiking") -> StarterCardMeta(Icons.Outlined.Forest, Color(0xFF85D59F))
-        option.id.contains("nightlife") -> StarterCardMeta(Icons.Outlined.Nightlife, Color(0xFF8EA7FF))
-        option.id.contains("budget_friendly") -> StarterCardMeta(Icons.Outlined.MonetizationOn, Color(0xFFA7E09C))
         else -> StarterCardMeta(Icons.Outlined.AutoAwesome, TripWizardColors.Blue)
     }
 }

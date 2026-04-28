@@ -3,35 +3,6 @@ package com.example.travelcents.data.ai.chat
 import java.util.Locale
 
 object AiRecommendationMapper {
-    fun destinationRowFromEngine(
-        recommendations: List<AiDestinationRecommendationMatch>
-    ): AiDestinationRecommendationRow? {
-        val mapped = recommendations
-            .filter { recommendation ->
-                recommendation.destination.isNotBlank() &&
-                    (recommendation.summary.isNotBlank() || recommendation.matchReason.isNotBlank())
-            }
-            .map { recommendation ->
-                AiDestinationRecommendation(
-                    id = sanitizeRecommendationId(recommendation.seedId ?: recommendation.destination, "destination"),
-                    destination = recommendation.destination.trim(),
-                    summary = recommendation.summary.trim(),
-                    matchReason = recommendation.matchReason.trim(),
-                    seedId = recommendation.seedId
-                )
-            }
-            .distinctBy { recommendation -> normalizeDestinationKey(recommendation.destination) }
-            .take(3)
-
-        if (mapped.size < 2) return null
-
-        return AiDestinationRecommendationRow(
-            title = "Good destination fits",
-            subtitle = "These locations match the direction you have set so far.",
-            recommendations = mapped
-        )
-    }
-
     fun destinationRowFromIntake(
         recommendations: List<AiTripIntakeDestinationRecommendation>
     ): AiDestinationRecommendationRow? {

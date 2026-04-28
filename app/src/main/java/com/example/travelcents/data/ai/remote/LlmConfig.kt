@@ -5,7 +5,7 @@ import com.example.travelcents.BuildConfig
 object LlmConfig {
     private const val DEFAULT_BASE_URL = "https://api.groq.com/openai/v1/"
     private const val DEFAULT_CHAT_MODEL = "llama-3.3-70b-versatile"
-    private const val DEFAULT_INTAKE_MODEL = "openai/gpt-oss-20b"
+    private const val DEFAULT_INTAKE_MODEL = "llama-3.3-70b-versatile"
 
     val apiKey: String
         get() = BuildConfig.LLM_API_KEY

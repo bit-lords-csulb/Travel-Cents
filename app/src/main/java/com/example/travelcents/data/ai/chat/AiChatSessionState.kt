@@ -9,7 +9,6 @@ data class AiChatSessionState(
     val intakeProfile: AiTripIntakeProfile = AiTravelerProfile().intakeProfile(),
     val planningObjective: String = "",
     val stage: AiChatStage = AiChatStage.ONBOARDING,
-    val quickReplies: List<AiChatQuickReply> = emptyList(),
     val llmHistory: List<LlmMessage> = emptyList(),
     val starterCards: List<AiChatCardOption> = emptyList(),
     val draftText: String = "",
@@ -25,7 +24,6 @@ data class AiChatSessionState(
 
 data class AiChatUiState(
     val items: List<AiChatItem> = emptyList(),
-    val quickReplies: List<AiChatQuickReply> = emptyList(),
     val starterCards: List<AiChatCardOption> = emptyList(),
     val draftText: String = "",
     val selectedDraftOptions: List<AiChatCardOption> = emptyList(),
@@ -40,6 +38,7 @@ data class AiChatUiState(
     val activeSingleEventCardId: String? = null,
     val pendingAddToTripEvent: AiSingleEventSuggestion? = null,
     val availableTrips: List<AiChatTripOption> = emptyList(),
+    val bookmarkedPlaceIds: Set<String> = emptySet(),
     val isLoading: Boolean = false
 )
 

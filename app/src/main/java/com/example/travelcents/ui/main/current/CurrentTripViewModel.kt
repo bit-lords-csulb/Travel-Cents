@@ -11,7 +11,6 @@ import com.example.travelcents.data.ai.chat.PREVIEW_TRIP_STATUS
 import com.example.travelcents.data.media.TripMediaCacheStore
 import com.example.travelcents.data.local.trip.TravelCentsDatabase
 import com.example.travelcents.data.local.trip.TripLocalDataSource
-import com.example.travelcents.data.media.TripMediaCacheStore
 import com.example.travelcents.data.sync.CurrentTripSyncCoordinator
 import com.example.travelcents.data.sync.TripHydrationWorker
 import com.example.travelcents.data.sync.TripSyncCoordinator

@@ -38,11 +38,17 @@ class AiSingleEventCoordinator(
 ) {
 
     suspend fun resolve(
+        toolCall: AiToolCall.SearchEvents,
         userMessage: String,
         intakeProfile: AiTripIntakeProfile,
         profile: AiTravelerProfile
     ): AiSingleEventResolution? {
-        val searchContext = resolveSearchContext(userMessage, intakeProfile, profile) ?: return null
+        val searchContext = resolveSearchContext(
+            toolCall = toolCall,
+            userMessage = userMessage,
+            intakeProfile = intakeProfile,
+            profile = profile
+        ) ?: return null
         return AiSingleEventResolution(
             groundingContext = searchContext.toGroundingContext(),
             suggestion = searchContext.events.firstOrNull()?.toSuggestion()
@@ -50,30 +56,38 @@ class AiSingleEventCoordinator(
     }
 
     suspend fun suggest(
+        toolCall: AiToolCall.SearchEvents,
         userMessage: String,
         intakeProfile: AiTripIntakeProfile,
         profile: AiTravelerProfile
     ): AiSingleEventSuggestion? {
-        return resolve(userMessage, intakeProfile, profile)?.suggestion
+        return resolve(toolCall, userMessage, intakeProfile, profile)?.suggestion
     }
 
     suspend fun buildGroundingContext(
+        toolCall: AiToolCall.SearchEvents,
         userMessage: String,
         intakeProfile: AiTripIntakeProfile,
         profile: AiTravelerProfile
     ): String? {
-        return resolve(userMessage, intakeProfile, profile)?.groundingContext
+        return resolve(toolCall, userMessage, intakeProfile, profile)?.groundingContext
     }
 
     private suspend fun resolveSearchContext(
+        toolCall: AiToolCall.SearchEvents,
         userMessage: String,
         intakeProfile: AiTripIntakeProfile,
         profile: AiTravelerProfile
     ): EventSearchContext? {
         if (!isSearchAvailable()) return null
-        val signal = detectSingleEventSignal(userMessage) ?: return null
-        val destination = intakeProfile.destination.ifBlank { profile.destination }.trim()
+        val destination = toolCall.city.trim()
+            .ifBlank { intakeProfile.destination.ifBlank { profile.destination }.trim() }
         if (destination.isBlank()) return null
+        val signal = SingleEventSignal(
+            classification = toolCall.classification?.trim()?.ifBlank { null },
+            keyword = toolCall.keyword?.trim()?.ifBlank { null },
+            timeHint = resolveTimeHint(userMessage)
+        )
 
         val searchWindow = resolveWindow(
             timeHint = signal.timeHint,
@@ -429,31 +443,15 @@ class AiSingleEventCoordinator(
         return MONTH_MAP[rawMonth.lowercase(Locale.US)]
     }
 
-    private fun detectSingleEventSignal(userMessage: String): SingleEventSignal? {
+    private fun resolveTimeHint(userMessage: String): TimeHint {
         val normalized = userMessage.lowercase(Locale.US)
-        val classification = CLASSIFICATION_KEYWORDS.firstOrNull { (tokens, _) ->
-            tokens.any { token -> token in normalized }
-        }?.second
-        val keyword = ARTIST_HINT_REGEX.find(userMessage)?.groupValues?.getOrNull(1)?.trim()
-
-        val timeHint = when {
+        return when {
             "tonight" in normalized -> TimeHint.TONIGHT
             "today" in normalized -> TimeHint.TODAY
             "tomorrow" in normalized -> TimeHint.TOMORROW
             "this weekend" in normalized || "weekend" in normalized -> TimeHint.THIS_WEEKEND
             else -> TimeHint.NONE
         }
-
-        val hasEventIntent = classification != null ||
-            keyword != null ||
-            EVENT_INTENT_KEYWORDS.any { token -> token in normalized }
-
-        if (!hasEventIntent) return null
-        return SingleEventSignal(
-            classification = classification,
-            keyword = keyword,
-            timeHint = timeHint
-        )
     }
 
     private data class EventSearchContext(
@@ -526,26 +524,6 @@ class AiSingleEventCoordinator(
             """\b($MONTH_PATTERN)\b""",
             RegexOption.IGNORE_CASE
         )
-
-        private val CLASSIFICATION_KEYWORDS: List<Pair<List<String>, String>> = listOf(
-            listOf("concert", "gig", "live music", "show tonight", "dj set", "festival") to "Music",
-            listOf("game", "match", "sports", "sport", "nba", "nfl", "mlb", "nhl", "soccer") to "Sports",
-            listOf("theatre", "theater", "musical", "broadway", "play tonight", "shows", "live show") to "Arts & Theatre",
-            listOf("comedy", "stand-up", "standup", "stand up") to "Arts & Theatre"
-        )
-
-        private val EVENT_INTENT_KEYWORDS: List<String> = listOf(
-            "event tonight",
-            "something to do tonight",
-            "tickets",
-            "ticket",
-            "one-off",
-            "one off",
-            "live event",
-            "live events"
-        )
-
-        private val ARTIST_HINT_REGEX = Regex("""(?:see|watch|tickets for)\s+([A-Z][A-Za-z0-9& ]{1,40})""")
     }
 }
 

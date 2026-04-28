@@ -8,7 +8,8 @@ sealed interface AiChatItem {
     data class TextMessage(
         override val id: String = UUID.randomUUID().toString(),
         val text: String,
-        val sender: AiChatSender
+        val sender: AiChatSender,
+        val tags: List<String> = emptyList()
     ) : AiChatItem
 
     data class SystemStatus(
@@ -90,7 +91,8 @@ data class AiPlaceRecommendation(
     val area: String = "",
     val summary: String = "",
     val matchReason: String,
-    val imageUrl: String? = null
+    val imageUrl: String? = null,
+    val isBookmarked: Boolean = false
 )
 
 enum class AiPlaceRecommendationRowType {

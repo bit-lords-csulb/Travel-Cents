@@ -8,6 +8,44 @@ import com.google.gson.JsonElement
 import com.google.gson.JsonObject
 import com.google.gson.JsonParser
 
+private const val MAX_INTAKE_RESPONSE_TOKENS = 500
+
+private val SUPPORTED_INTAKE_PROFILE_PATCH_FIELDS = listOf(
+    "trip_type",
+    "party_summary",
+    "destination",
+    "destination_style",
+    "origin",
+    "date_window",
+    "duration_days",
+    "budget_level",
+    "budget_total",
+    "pace",
+    "interests",
+    "cuisine_preferences",
+    "must_haves",
+    "avoid",
+    "notes"
+)
+
+private val MINIMAL_INTAKE_RESPONSE_EXAMPLE = """
+{
+  "ack_key": "got_it",
+  "profile_patch": {
+    "trip_type": "romantic",
+    "destination_style": ["beach"]
+  },
+  "next_action": "ask_more",
+  "question_id": "destination_type",
+  "question_title": "What kind of destination?",
+  "options": [
+    { "id": "tropical", "label": "Tropical", "message": "Tropical." },
+    { "id": "coastal_town", "label": "Coastal town", "message": "A coastal town." },
+    { "id": "beach_resort", "label": "Beach resort", "message": "A beach resort." }
+  ]
+}
+""".trimIndent()
+
 class AiTripIntakeOrchestrator {
     suspend fun analyzeTurn(
         currentProfile: AiTripIntakeProfile,
@@ -19,7 +57,7 @@ class AiTripIntakeOrchestrator {
         if (latestUserInput.isBlank()) return null
 
         val rawResponse = LlmClient.complete(
-            messages = buildMessages(
+            messages = buildIntakeMessages(
                 currentProfile = currentProfile,
                 latestUserInput = latestUserInput,
                 history = history,
@@ -28,8 +66,8 @@ class AiTripIntakeOrchestrator {
             ),
             model = LlmConfig.intakeModel,
             temperature = 0.2,
-            maxTokens = 1200,
-            responseFormat = responseFormat()
+            maxTokens = MAX_INTAKE_RESPONSE_TOKENS,
+            responseFormat = intakeResponseFormat()
         )
         if (rawResponse.isBlank()) return null
 
@@ -37,25 +75,40 @@ class AiTripIntakeOrchestrator {
             JsonParser.parseString(rawResponse).asJsonObject
         }.getOrNull() ?: return null
 
-        return AiTripIntakeTurnResult(
-            assistantMessage = root.getStringOrEmpty("assistant_message"),
-            planningObjective = root.getStringOrEmpty("planning_objective"),
-            profilePatch = root.getAsJsonObjectOrNull("profile_patch")?.toIntakeProfilePatch()
-                ?: AiTripIntakeProfile(),
-            resolvedFields = root.getStringList("resolved_fields"),
-            missingFields = root.getStringList("missing_fields"),
-            followUpQuestion = root.getAsJsonObjectOrNull("follow_up_question")?.toFollowUpQuestion(),
-            destinationRecommendations = root.getAsJsonArrayOrNull("destination_recommendations")
-                ?.toDestinationRecommendations()
-                .orEmpty(),
-            placeRecommendations = root.getAsJsonArrayOrNull("place_recommendations")
-                ?.toPlaceRecommendations()
-                .orEmpty(),
-            decision = root.getAsJsonObjectOrNull("decision")?.toDecision() ?: AiTripIntakeDecision()
-        )
+        return root.toMinimalTurnResult()
     }
 
-    private fun buildMessages(
+    suspend fun suggestDestinations(
+        currentProfile: AiTripIntakeProfile,
+        latestUserInput: String,
+        history: List<LlmMessage> = emptyList()
+    ): List<AiTripIntakeDestinationRecommendation> {
+        if (latestUserInput.isBlank()) return emptyList()
+
+        val rawResponse = LlmClient.complete(
+            messages = buildDestinationMessages(
+                currentProfile = currentProfile,
+                latestUserInput = latestUserInput,
+                history = history
+            ),
+            model = LlmConfig.intakeModel,
+            temperature = 0.2,
+            maxTokens = 600,
+            responseFormat = destinationSuggestionResponseFormat()
+        )
+        if (rawResponse.isBlank()) return emptyList()
+
+        val root = runCatching {
+            JsonParser.parseString(rawResponse).asJsonObject
+        }.getOrNull() ?: return emptyList()
+
+        return root.getAsJsonArrayOrNull("recommendations")
+            ?.toDestinationRecommendations()
+            .orEmpty()
+            .take(3)
+    }
+
+    private fun buildIntakeMessages(
         currentProfile: AiTripIntakeProfile,
         latestUserInput: String,
         history: List<LlmMessage>,
@@ -65,44 +118,49 @@ class AiTripIntakeOrchestrator {
         return listOf(
             LlmMessage(
                 role = "system",
-                content =
-                    "You are the TravelCents intake orchestrator. " +
-                        "Read the user's latest turn and the current structured trip profile. " +
-                        "Aggressively infer any trip requirements stated directly or indirectly (e.g., 'me and my wife' implies party_summary of 2 and romantic trip_type). " +
-                        "Fill only fields supported by the schema. " +
-                        "Treat the profile_patch as an additive patch, not a full replacement. " +
-                        "For fields you cannot newly infer from the latest turn, leave strings empty, arrays empty, numbers null, and enums as unknown. " +
-                        "Keep assistant_message EXTREMELY concise (under 5 words). It should ONLY be a brief acknowledgment like 'Got it!' or 'Sounds great!'. NEVER explain what you are updating. NEVER ask questions in assistant_message unless follow_up_question is null. " +
-                        "If important information is still missing, you have two choices for how to ask the user: " +
-                        "1) If the question can easily be answered with simple, predictable choices, provide it in the follow_up_question object to render as UI cards. The question should have 2 to 6 answer-card options with 1-2 word labels. " +
-                        "2) If the question requires an open-ended discussion, nuance, or cannot be simplified into short card options, set follow_up_question to null and ask the question directly at the end of your assistant_message instead. " +
-                        "DO NOT duplicate the follow_up_question text inside the assistant_message if you use the structured follow_up_question. " +
-                        "follow_up_question.id should be a stable snake_case id for the planning gap being asked about. " +
-                        "Set allow_other true when the preset options are only examples or the answer space is open-ended. " +
-                        "Use other_prompt_hint to tell the user what to type if they pick Other. " +
-                        "If the user has a vibe but not a destination, you may return 2 or 3 destination_recommendations. " +
-                        "If the destination is already clear and the user has enough direction, you may return 2 or 3 place_recommendations. " +
-                        "Only return recommendations that fit the known profile. " +
-                        "If enough information is present to move forward, set decision.type to recommend_curated or build_from_scratch. " +
-                        "Do not ask a follow-up question for information already present in the profile. " +
-                        "Do not repeat the same planning gap if it appears in asked_question_ids. " +
-                        "planning_objective should describe the next concrete planning step in a few words. " +
-                        "Return JSON only."
+                content = buildString {
+                    append("You are the TravelCents intake orchestrator. ")
+                    append("Read the user's latest turn and the current structured trip profile, then return a small JSON object for the next intake step. ")
+                    append("Aggressively infer trip requirements stated directly or indirectly. ")
+                    append("Examples: 'me and my wife', 'my husband and I', 'my partner and I', or 'for my spouse and me' imply party_summary='Two adults' and trip_type='romantic'. ")
+                    append("A tropical or warm location implies a warm-weather destination style. ")
+                    append("profile_patch is an additive partial patch, not a full replacement. ")
+                    append("Only include profile_patch keys you can newly infer from the latest turn. Omit keys you cannot newly infer. ")
+                    append("Supported profile_patch keys: ${SUPPORTED_INTAKE_PROFILE_PATCH_FIELDS.joinToString(", ")}. ")
+                    append("ack_key must be exactly one of: got_it, sounds_good, understood, perfect. ")
+                    append("next_action must be exactly one of: ask_more, suggest_destinations, build_trip. ")
+                    append("Do not ask a follow-up question for information already present in the profile. ")
+                    append("Do not repeat the same planning gap if it appears in asked_question_ids. ")
+                    append("Do not suggest specific destinations until you have gathered trip_type, at least 2 interests, and budget_level. Ask about missing fields first. ")
+                    append("If the user has enough direction for destination suggestions but no destination yet, set next_action to suggest_destinations. ")
+                    append("If the destination is already clear and the trip can move forward, set next_action to build_trip. ")
+                    append("If more information is still needed before either of those, set next_action to ask_more. ")
+                    append("When next_action is ask_more, ask exactly one short cards-friendly follow-up with 2 to 6 options. ")
+                    append("Use a stable snake_case question_id, a short question_title, and short option labels. Users can still type free text instead of tapping a card. ")
+                    append("When next_action is suggest_destinations or build_trip, set question_id and question_title to empty strings and set options to an empty array. ")
+                    append("Return JSON only.")
+                }
             ),
             LlmMessage(
                 role = "system",
                 content =
-                    "Current intake profile JSON:\n${currentProfile.toJson()}\n\n" +
-                        "Fields still missing:\n${currentProfile.missingFields().joinToString()}"
+                    "Current intake profile JSON:\n${currentProfile.toPromptJson()}\n\n" +
+                        "Fields still missing:\n${currentProfile.missingFields().joinToString().ifBlank { "None" }}"
             ),
             LlmMessage(
                 role = "system",
-                content =
-                    "Return a JSON object with these top-level keys: " +
-                        "assistant_message, planning_objective, profile_patch, resolved_fields, missing_fields, follow_up_question, destination_recommendations, place_recommendations, decision. " +
-                        "Use null for follow_up_question if no question is needed. " +
-                        "Decision types: ask_more, recommend_curated, build_from_scratch. " +
-                        "Never repeat a follow-up question that targets information already present in the profile."
+                content = buildString {
+                    appendLine("Return exactly one JSON object with these top-level keys and no others:")
+                    appendLine("ack_key, profile_patch, next_action, question_id, question_title, options")
+                    appendLine()
+                    appendLine("Do not return resolved_fields, missing_fields, next_action_reason, question_kind, question_subtitle, allow_multiple, allow_other, other_prompt_hint, text_prompt, destination_recommendations, place_recommendations, or decision.")
+                    appendLine("If next_action='ask_more', question_id must be snake_case, question_title must be concise, and options must contain 2 to 6 objects with id, label, and message.")
+                    appendLine("If next_action is not 'ask_more', set question_id and question_title to empty strings and set options to [].")
+                    appendLine("profile_patch may be {} when the latest turn adds no new structured facts.")
+                    appendLine()
+                    appendLine("Example:")
+                    append(MINIMAL_INTAKE_RESPONSE_EXAMPLE)
+                }
             ),
             LlmMessage(
                 role = "system",
@@ -130,215 +188,82 @@ class AiTripIntakeOrchestrator {
         )
     }
 
-    private fun responseFormat(): Map<String, Any> {
-        return mapOf(
-            "type" to "json_schema",
-            "json_schema" to mapOf(
-                "name" to "travelcents_intake_turn",
-                "strict" to true,
-                "schema" to buildTurnSchema()
-            )
-        )
-    }
-
-    private fun buildTurnSchema(): Map<String, Any> {
-        return mapOf(
-            "type" to "object",
-            "additionalProperties" to false,
-            "properties" to mapOf(
-                "assistant_message" to stringSchema(),
-                "planning_objective" to stringSchema(),
-                "profile_patch" to buildProfilePatchSchema(),
-                "resolved_fields" to stringArraySchema(),
-                "missing_fields" to stringArraySchema(),
-                "follow_up_question" to buildFollowUpQuestionSchema(),
-                "destination_recommendations" to buildDestinationRecommendationSchema(),
-                "place_recommendations" to buildPlaceRecommendationSchema(),
-                "decision" to buildDecisionSchema()
+    private fun buildDestinationMessages(
+        currentProfile: AiTripIntakeProfile,
+        latestUserInput: String,
+        history: List<LlmMessage>
+    ): List<LlmMessage> {
+        return listOf(
+            LlmMessage(
+                role = "system",
+                content =
+                    "You are the TravelCents destination recommender. " +
+                        "Use the user's latest turn and structured trip profile to return 2 or 3 destination recommendations that tightly fit the request. " +
+                        "Do not ask questions. Do not explain your process. " +
+                        "Prefer varied but realistic fits. " +
+                        "Keep each summary and reason concise. " +
+                        "Return JSON only."
             ),
-            "required" to listOf(
-                "assistant_message",
-                "planning_objective",
-                "profile_patch",
-                "resolved_fields",
-                "missing_fields",
-                "follow_up_question",
-                "destination_recommendations",
-                "place_recommendations",
-                "decision"
-            )
-        )
-    }
-
-    private fun buildProfilePatchSchema(): Map<String, Any> {
-        return mapOf(
-            "type" to "object",
-            "additionalProperties" to false,
-            "properties" to mapOf(
-                "trip_type" to enumSchema("unknown", "solo", "romantic", "family", "friends", "business", "mixed"),
-                "party_summary" to stringSchema(),
-                "destination" to stringSchema(),
-                "destination_style" to stringArraySchema(),
-                "origin" to stringSchema(),
-                "date_window" to stringSchema(),
-                "duration_days" to nullableIntegerSchema(),
-                "budget_level" to enumSchema("unknown", "budget", "comfort", "luxury", "mixed"),
-                "budget_total" to nullableNumberSchema(),
-                "pace" to enumSchema("unknown", "relaxed", "balanced", "packed"),
-                "interests" to stringArraySchema(),
-                "cuisine_preferences" to stringArraySchema(),
-                "must_haves" to stringArraySchema(),
-                "avoid" to stringArraySchema(),
-                "notes" to stringArraySchema(),
-                "confidence" to buildConfidenceSchema()
+            LlmMessage(
+                role = "system",
+                content = "Current intake profile JSON:\n${currentProfile.toPromptJson()}"
             ),
-            "required" to listOf(
-                "trip_type",
-                "party_summary",
-                "destination",
-                "destination_style",
-                "origin",
-                "date_window",
-                "duration_days",
-                "budget_level",
-                "budget_total",
-                "pace",
-                "interests",
-                "cuisine_preferences",
-                "must_haves",
-                "avoid",
-                "notes",
-                "confidence"
-            )
-        )
-    }
-
-    private fun buildConfidenceSchema(): Map<String, Any> {
-        return mapOf(
-            "type" to "object",
-            "additionalProperties" to false,
-            "properties" to mapOf(
-                "trip_type" to nullableNumberSchema(),
-                "destination" to nullableNumberSchema(),
-                "destination_style" to nullableNumberSchema(),
-                "origin" to nullableNumberSchema(),
-                "date_window" to nullableNumberSchema(),
-                "budget" to nullableNumberSchema(),
-                "pace" to nullableNumberSchema(),
-                "interests" to nullableNumberSchema(),
-                "cuisine_preferences" to nullableNumberSchema()
+            LlmMessage(
+                role = "system",
+                content = buildString {
+                    val recentHistory = history
+                        .filter { message -> message.role == "user" || message.role == "assistant" }
+                        .takeLast(4)
+                    append("Recent chat turns:\n")
+                    if (recentHistory.isEmpty()) {
+                        append("None yet")
+                    } else {
+                        recentHistory.forEach { message ->
+                            val role = if (message.role.equals("user", ignoreCase = true)) "User" else "Assistant"
+                            appendLine("$role: ${message.content}")
+                        }
+                    }
+                }
             ),
-            "required" to listOf(
-                "trip_type",
-                "destination",
-                "destination_style",
-                "origin",
-                "date_window",
-                "budget",
-                "pace",
-                "interests",
-                "cuisine_preferences"
+            LlmMessage(
+                role = "user",
+                content = latestUserInput
             )
         )
     }
 
-    private fun buildFollowUpQuestionSchema(): Map<String, Any> {
-        return mapOf(
-            "type" to listOf("object", "null"),
-            "additionalProperties" to false,
-            "properties" to mapOf(
-                "id" to stringSchema(),
-                "title" to stringSchema(),
-                "subtitle" to stringSchema(),
-                "allow_multiple" to mapOf("type" to "boolean"),
-                "allow_other" to mapOf("type" to "boolean"),
-                "other_prompt_hint" to stringSchema(),
-                "options" to mapOf(
-                    "type" to "array",
-                    "items" to mapOf(
-                        "type" to "object",
-                        "additionalProperties" to false,
-                        "properties" to mapOf(
-                            "id" to stringSchema(),
-                            "label" to stringSchema(),
-                            "message" to stringSchema()
-                        ),
-                        "required" to listOf("id", "label", "message")
-                    )
-                )
-            ),
-            "required" to listOf("id", "title", "subtitle", "allow_multiple", "allow_other", "other_prompt_hint", "options")
-        )
+    private fun intakeResponseFormat(): Map<String, Any> {
+        return mapOf("type" to "json_object")
     }
 
-    private fun buildDecisionSchema(): Map<String, Any> {
-        return mapOf(
-            "type" to "object",
-            "additionalProperties" to false,
-            "properties" to mapOf(
-                "type" to enumSchema("ask_more", "recommend_curated", "build_from_scratch"),
-                "reason" to stringSchema(),
-                "confidence" to nullableNumberSchema()
-            ),
-            "required" to listOf("type", "reason", "confidence")
-        )
+    private fun destinationSuggestionResponseFormat(): Map<String, Any> {
+        return mapOf("type" to "json_object")
     }
+}
 
-    private fun buildDestinationRecommendationSchema(): Map<String, Any> {
-        return mapOf(
-            "type" to "array",
-            "items" to mapOf(
-                "type" to "object",
-                "additionalProperties" to false,
-                "properties" to mapOf(
-                    "id" to stringSchema(),
-                    "destination" to stringSchema(),
-                    "summary" to stringSchema(),
-                    "reason" to stringSchema()
-                ),
-                "required" to listOf("id", "destination", "summary", "reason")
-            )
-        )
-    }
+private fun JsonObject.toMinimalTurnResult(): AiTripIntakeTurnResult {
+    val nextAction = enumValueOrDefault("next_action", AiTripIntakeNextAction.ASK_MORE)
+    val questionId = getStringOrEmpty("question_id")
+    val questionTitle = getStringOrEmpty("question_title")
+    val options = getAsJsonArrayOrNull("options")
+        ?.toAnswerOptions()
+        .orEmpty()
+        .take(6)
+    val hasCardFollowUp = nextAction == AiTripIntakeNextAction.ASK_MORE &&
+        questionId.isNotBlank() &&
+        questionTitle.isNotBlank() &&
+        options.size in 2..6
 
-    private fun buildPlaceRecommendationSchema(): Map<String, Any> {
-        return mapOf(
-            "type" to "array",
-            "items" to mapOf(
-                "type" to "object",
-                "additionalProperties" to false,
-                "properties" to mapOf(
-                    "id" to stringSchema(),
-                    "name" to stringSchema(),
-                    "category" to stringSchema(),
-                    "area" to stringSchema(),
-                    "summary" to stringSchema(),
-                    "reason" to stringSchema()
-                ),
-                "required" to listOf("id", "name", "category", "area", "summary", "reason")
-            )
-        )
-    }
-
-    private fun stringSchema(): Map<String, Any> = mapOf("type" to "string")
-
-    private fun stringArraySchema(): Map<String, Any> {
-        return mapOf(
-            "type" to "array",
-            "items" to stringSchema()
-        )
-    }
-
-    private fun nullableIntegerSchema(): Map<String, Any> = mapOf("type" to listOf("integer", "null"))
-
-    private fun nullableNumberSchema(): Map<String, Any> = mapOf("type" to listOf("number", "null"))
-
-    private fun enumSchema(vararg values: String): Map<String, Any> {
-        return mapOf(
-            "type" to "string",
-            "enum" to values.toList()
-        )
-    }
+    return AiTripIntakeTurnResult(
+        ackKey = enumValueOrDefault("ack_key", AiTripIntakeAckKey.GOT_IT),
+        profilePatch = getAsJsonObjectOrNull("profile_patch")?.toIntakeProfilePatch()
+            ?: AiTripIntakeProfile(),
+        nextAction = nextAction,
+        questionKind = if (hasCardFollowUp) AiTripIntakeQuestionKind.CARDS else AiTripIntakeQuestionKind.NONE,
+        questionId = questionId.takeIf { hasCardFollowUp }.orEmpty(),
+        questionTitle = questionTitle.takeIf { hasCardFollowUp }.orEmpty(),
+        options = options.takeIf { hasCardFollowUp }.orEmpty()
+    )
 }
 
 private fun JsonObject.toIntakeProfilePatch(): AiTripIntakeProfile {
@@ -360,6 +285,25 @@ private fun JsonObject.toIntakeProfilePatch(): AiTripIntakeProfile {
         notes = getStringList("notes"),
         confidence = getDoubleMap("confidence")
     )
+}
+
+private fun JsonArray.toAnswerOptions(): List<AiTripIntakeAnswerOption> {
+    return mapNotNull { element ->
+        element.asJsonObjectOrNull()?.let { option ->
+            val optionId = option.getStringOrEmpty("id")
+            val label = option.getStringOrEmpty("label")
+            val message = option.getStringOrEmpty("message")
+            if (optionId.isBlank() || label.isBlank() || message.isBlank()) {
+                null
+            } else {
+                AiTripIntakeAnswerOption(
+                    id = optionId,
+                    label = label,
+                    message = message
+                )
+            }
+        }
+    }
 }
 
 private fun JsonObject.toFollowUpQuestion(): AiTripIntakeFollowUpQuestion? {

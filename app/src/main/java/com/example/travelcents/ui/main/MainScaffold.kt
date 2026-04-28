@@ -46,6 +46,7 @@ import com.example.travelcents.ui.main.current.CurrentTripRoutes
 import com.example.travelcents.ui.main.current.CurrentTripScreen
 import com.example.travelcents.ui.main.current.CurrentTripViewModel
 import com.example.travelcents.ui.main.home.HomePage
+import com.example.travelcents.ui.main.home.SavedPlacesPage
 import com.example.travelcents.ui.main.current.PreviewSource
 import com.example.travelcents.ui.main.newTrip.NewTripLandingPage
 import com.example.travelcents.ui.main.newTrip.NewTripViewModel
@@ -78,6 +79,7 @@ object MainRoutes {
     const val SETTINGS = "settings"
 
     const val AI_TRIP_CHAT = "ai_trip_chat"
+    const val SAVED_PLACES = "saved_places"
 }
 
 private val bottomNavRoutes = setOf(
@@ -294,8 +296,14 @@ fun MainScaffold(modifier: Modifier = Modifier, onLogout: () -> Unit = {}) {
                             navController.navigate(MainRoutes.SETTINGS) {
                                 launchSingleTop = true
                             }
+                        },
+                        onSavedPlacesClick = {
+                            navController.navigate(MainRoutes.SAVED_PLACES)
                         }
                     )
+                }
+                composable(MainRoutes.SAVED_PLACES) {
+                    SavedPlacesPage(onBack = { navController.popBackStack() })
                 }
                 composable(MainRoutes.CHATS) {
                     ChatsScreen(

@@ -27,7 +27,6 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Add
-import androidx.compose.material.icons.outlined.AutoAwesome
 import androidx.compose.material.icons.outlined.History
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
@@ -42,7 +41,6 @@ import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -50,10 +48,10 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
@@ -89,19 +87,20 @@ fun AiTripChatPage(
     val uiState by viewModel.uiState.collectAsState()
     val listState = rememberLazyListState()
     var showHistory by remember { mutableStateOf(false) }
-    var planInDetail by rememberSaveable { mutableStateOf(false) }
     val density = LocalDensity.current
     val context = LocalContext.current
     val userMessageSettleOffset = with(density) { 92.dp.roundToPx() }
     val responseSettleOffset = with(density) { 132.dp.roundToPx() }
     val restoreSettleOffset = with(density) { 72.dp.roundToPx() }
+    val selectedDraftOptionIds = uiState.selectedDraftOptions.mapTo(mutableSetOf()) { option ->
+        option.id
+    }
 
     val isFreshChat by remember(uiState.items, uiState.isLoading) {
         derivedStateOf {
             !uiState.isLoading && uiState.items.none { it is AiChatItem.TextMessage }
         }
     }
-    val showStarterLanding = isFreshChat && planInDetail && uiState.starterCards.isNotEmpty()
 
     LaunchedEffect(
         uiState.anchorMessageId,
@@ -112,9 +111,8 @@ fun AiTripChatPage(
         uiState.activeSingleEventCardId,
         uiState.isLoading,
         uiState.items.size,
-        showStarterLanding
+        isFreshChat
     ) {
-        if (showStarterLanding) return@LaunchedEffect
         if (isFreshChat) return@LaunchedEffect
 
         when {
@@ -222,165 +220,152 @@ fun AiTripChatPage(
                     onNewChatClick = { viewModel.startNewChat() }
                 )
 
-                if (showStarterLanding) {
-                    AiStarterLanding(
-                        options = uiState.starterCards.take(4),
-                        selectedOptionIds = uiState.selectedDraftOptions.mapTo(mutableSetOf()) { option ->
-                            option.id
-                        },
-                        onOptionClick = viewModel::toggleStarterCard,
-                        onShowQuickIdeas = { planInDetail = false },
-                        modifier = Modifier
-                            .weight(1f)
-                            .fillMaxWidth()
-                    )
-                } else {
-                    LazyColumn(
-                        state = listState,
-                        modifier = Modifier
-                            .weight(1f)
-                            .fillMaxWidth(),
-                        verticalArrangement = Arrangement.spacedBy(16.dp),
-                        contentPadding = PaddingValues(horizontal = 16.dp, vertical = 20.dp)
-                    ) {
-                        if (isFreshChat) {
-                            item("quick_idea_intro") {
-                                QuickIdeaIntro(
-                                    onPlanInDetail = { planInDetail = true }
+                LazyColumn(
+                    state = listState,
+                    modifier = Modifier
+                        .weight(1f)
+                        .fillMaxWidth(),
+                    verticalArrangement = Arrangement.spacedBy(16.dp),
+                    contentPadding = PaddingValues(horizontal = 16.dp, vertical = 20.dp)
+                ) {
+                    if (isFreshChat && uiState.starterCards.isNotEmpty()) {
+                        item("starter_welcome") {
+                            AiStarterLanding(
+                                options = uiState.starterCards,
+                                selectedOptionIds = selectedDraftOptionIds,
+                                onOptionClick = viewModel::toggleStarterCard
+                            )
+                        }
+                    }
+                    items(uiState.items, key = { it.id }) { item ->
+                        when (item) {
+                            is AiChatItem.TextMessage -> {
+                                AiChatBubble(
+                                    text = item.text,
+                                    sender = item.sender,
+                                    tags = item.tags
+                                )
+                            }
+
+                            is AiChatItem.SystemStatus -> {
+                                AiSystemStatusCard(
+                                    title = item.title,
+                                    detail = item.detail
+                                )
+                            }
+
+                            is AiChatItem.ResponseCardGroup -> {
+                                AiResponseCardGroup(
+                                    group = item.group,
+                                    selectedOptionIds = selectedDraftOptionIds,
+                                    enabled = uiState.activeResponseCardGroupId == item.group.id && !uiState.isLoading,
+                                    onOptionClick = { option ->
+                                        viewModel.toggleResponseCard(option, item.group)
+                                    }
+                                )
+                            }
+
+                            is AiChatItem.DestinationRecommendationRow -> {
+                                AiRecommendationRow(
+                                    title = item.row.title,
+                                    subtitle = item.row.subtitle,
+                                    recommendations = item.row.recommendations.map { recommendation ->
+                                        com.example.travelcents.ui.main.aichat.components.AiRecommendationCardModel(
+                                            id = recommendation.id,
+                                            headline = recommendation.destination,
+                                            supporting = recommendation.summary,
+                                            meta = recommendation.matchReason,
+                                            kind = "Destination",
+                                            imageUrl = recommendation.imageUrl
+                                        )
+                                    },
+                                    onRecommendationSelected = { recommendationId ->
+                                        item.row.recommendations
+                                            .firstOrNull { recommendation -> recommendation.id == recommendationId }
+                                            ?.let { recommendation ->
+                                                viewModel.selectDestinationRecommendation(recommendation)
+                                            }
+                                    }
+                                )
+                            }
+
+                            is AiChatItem.CuratedTripRow -> {
+                                AiCuratedTripRowSection(
+                                    row = item.row,
+                                    onDurationSelected = { starter, durationDays ->
+                                        viewModel.updateCuratedStarterDuration(
+                                            starterId = starter.id,
+                                            durationDays = durationDays
+                                        )
+                                    },
+                                    onTripSelected = { starter ->
+                                        viewModel.handleRecommendedStarterSelection(
+                                            starter = starter,
+                                            onOpenTrip = onOpenTrip,
+                                            onCreateDraftTrip = onCreateDraftTrip
+                                        )
+                                    }
+                                )
+                            }
+
+                            is AiChatItem.SingleEventCard -> {
+                                val card = item.card
+                                AiSingleEventCard(
+                                    suggestion = card,
+                                    onAddToTrip = { viewModel.requestAddSingleEventToTrip(card) },
+                                    onOpenTickets = {
+                                        card.bookingUrl?.let { url ->
+                                            val intent = android.content.Intent(
+                                                android.content.Intent.ACTION_VIEW,
+                                                android.net.Uri.parse(url)
+                                            )
+                                            runCatching { context.startActivity(intent) }
+                                        }
+                                    },
+                                    onDismiss = { viewModel.dismissSingleEventCard(card.id) }
+                                )
+                            }
+
+                            is AiChatItem.PlaceRecommendationRow -> {
+                                AiRecommendationRow(
+                                    title = item.row.title,
+                                    subtitle = item.row.subtitle,
+                                    recommendations = item.row.recommendations.map { recommendation ->
+                                        com.example.travelcents.ui.main.aichat.components.AiRecommendationCardModel(
+                                            id = recommendation.id,
+                                            headline = recommendation.name,
+                                            supporting = recommendation.summary.ifBlank { recommendation.area },
+                                            meta = recommendation.matchReason,
+                                            kind = recommendation.category,
+                                            actionLabels = item.row.actionLabels,
+                                            actionsEnabled = item.row.actionsEnabled,
+                                            imageUrl = recommendation.imageUrl
+                                        )
+                                    },
+                                    onRecommendationSelected = { recommendationId ->
+                                        item.row.recommendations
+                                            .firstOrNull { recommendation -> recommendation.id == recommendationId }
+                                            ?.let { recommendation ->
+                                                viewModel.selectPlaceRecommendation(
+                                                    name = recommendation.name,
+                                                    category = recommendation.category,
+                                                    area = recommendation.area
+                                                )
+                                            }
+                                    }
                                 )
                             }
                         }
-                        items(uiState.items, key = { it.id }) { item ->
-                            when (item) {
-                                is AiChatItem.TextMessage -> {
-                                    AiChatBubble(
-                                        text = item.text,
-                                        sender = item.sender
-                                    )
-                                }
+                    }
 
-                                is AiChatItem.SystemStatus -> {
-                                    AiSystemStatusCard(
-                                        title = item.title,
-                                        detail = item.detail
-                                    )
-                                }
-
-                                is AiChatItem.ResponseCardGroup -> {
-                                    AiResponseCardGroup(
-                                        group = item.group,
-                                        selectedOptionIds = uiState.selectedDraftOptions.mapTo(mutableSetOf()) { option ->
-                                            option.id
-                                        },
-                                        enabled = uiState.activeResponseCardGroupId == item.group.id && !uiState.isLoading,
-                                        onOptionClick = { option ->
-                                            viewModel.toggleResponseCard(option, item.group)
-                                        }
-                                    )
-                                }
-
-                                is AiChatItem.DestinationRecommendationRow -> {
-                                    AiRecommendationRow(
-                                        title = item.row.title,
-                                        subtitle = item.row.subtitle,
-                                        recommendations = item.row.recommendations.map { recommendation ->
-                                            com.example.travelcents.ui.main.aichat.components.AiRecommendationCardModel(
-                                                id = recommendation.id,
-                                                headline = recommendation.destination,
-                                                supporting = recommendation.summary,
-                                                meta = recommendation.matchReason,
-                                                kind = "Destination",
-                                                imageUrl = recommendation.imageUrl
-                                            )
-                                        },
-                                        onRecommendationSelected = { recommendationId ->
-                                            item.row.recommendations
-                                                .firstOrNull { recommendation -> recommendation.id == recommendationId }
-                                                ?.let { recommendation ->
-                                                    viewModel.selectDestinationRecommendation(recommendation)
-                                                }
-                                        }
-                                    )
-                                }
-
-                                is AiChatItem.CuratedTripRow -> {
-                                    AiCuratedTripRowSection(
-                                        row = item.row,
-                                        onDurationSelected = { starter, durationDays ->
-                                            viewModel.updateCuratedStarterDuration(
-                                                starterId = starter.id,
-                                                durationDays = durationDays
-                                            )
-                                        },
-                                        onTripSelected = { starter ->
-                                            viewModel.handleRecommendedStarterSelection(
-                                                starter = starter,
-                                                onOpenTrip = onOpenTrip,
-                                                onCreateDraftTrip = onCreateDraftTrip
-                                            )
-                                        }
-                                    )
-                                }
-
-                                is AiChatItem.SingleEventCard -> {
-                                    val card = item.card
-                                    AiSingleEventCard(
-                                        suggestion = card,
-                                        onAddToTrip = { viewModel.requestAddSingleEventToTrip(card) },
-                                        onOpenTickets = {
-                                            card.bookingUrl?.let { url ->
-                                                val intent = android.content.Intent(
-                                                    android.content.Intent.ACTION_VIEW,
-                                                    android.net.Uri.parse(url)
-                                                )
-                                                runCatching { context.startActivity(intent) }
-                                            }
-                                        },
-                                        onDismiss = { viewModel.dismissSingleEventCard(card.id) }
-                                    )
-                                }
-
-                                is AiChatItem.PlaceRecommendationRow -> {
-                                    AiRecommendationRow(
-                                        title = item.row.title,
-                                        subtitle = item.row.subtitle,
-                                        recommendations = item.row.recommendations.map { recommendation ->
-                                            com.example.travelcents.ui.main.aichat.components.AiRecommendationCardModel(
-                                                id = recommendation.id,
-                                                headline = recommendation.name,
-                                                supporting = recommendation.summary.ifBlank { recommendation.area },
-                                                meta = recommendation.matchReason,
-                                                kind = recommendation.category,
-                                                actionLabels = item.row.actionLabels,
-                                                actionsEnabled = item.row.actionsEnabled,
-                                                imageUrl = recommendation.imageUrl
-                                            )
-                                        },
-                                        onRecommendationSelected = { recommendationId ->
-                                            item.row.recommendations
-                                                .firstOrNull { recommendation -> recommendation.id == recommendationId }
-                                                ?.let { recommendation ->
-                                                    viewModel.selectPlaceRecommendation(
-                                                        name = recommendation.name,
-                                                        category = recommendation.category,
-                                                        area = recommendation.area
-                                                    )
-                                                }
-                                        }
-                                    )
-                                }
-                            }
+                    if (uiState.isLoading) {
+                        item("loading") {
+                            AiLoadingCard()
                         }
+                    }
 
-                        if (uiState.isLoading) {
-                            item("loading") {
-                                AiLoadingCard()
-                            }
-                        }
-
-                        item("bottom_anchor_spacer") {
-                            Spacer(modifier = Modifier.fillParentMaxHeight(0.9f))
-                        }
+                    item("bottom_anchor_spacer") {
+                        Spacer(modifier = Modifier.fillParentMaxHeight(0.9f))
                     }
                 }
 
@@ -468,72 +453,14 @@ private fun BoxScope.AiChatBackdrop() {
 }
 
 @Composable
-private fun QuickIdeaIntro(
-    onPlanInDetail: () -> Unit,
-    modifier: Modifier = Modifier
-) {
-    Column(
-        modifier = modifier.fillMaxWidth(),
-        verticalArrangement = Arrangement.spacedBy(10.dp)
-    ) {
-        Text(
-            text = "Quick ideas",
-            color = DeepSea5,
-            fontSize = 22.sp,
-            fontWeight = FontWeight.ExtraBold,
-            fontFamily = TravelCentsFonts.Headline
-        )
-        Text(
-            text = "Tap a destination or starter to grab a trip in seconds.",
-            color = DeepSea4,
-            fontSize = 13.sp,
-            lineHeight = 18.sp,
-            fontFamily = TravelCentsFonts.Body
-        )
-        Surface(
-            modifier = Modifier.clickable(onClick = onPlanInDetail),
-            shape = RoundedCornerShape(999.dp),
-            color = TripWizardColors.ContainerHighest,
-            border = BorderStroke(
-                width = 1.dp,
-                color = TripWizardColors.Blue.copy(alpha = 0.32f)
-            )
-        ) {
-            Row(
-                modifier = Modifier.padding(horizontal = 14.dp, vertical = 8.dp),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                Icon(
-                    imageVector = Icons.Outlined.AutoAwesome,
-                    contentDescription = null,
-                    tint = TripWizardColors.Blue,
-                    modifier = Modifier.size(14.dp)
-                )
-                Text(
-                    text = "Plan in detail",
-                    color = DeepSea5,
-                    fontSize = 12.sp,
-                    fontWeight = FontWeight.SemiBold,
-                    fontFamily = TravelCentsFonts.Body
-                )
-            }
-        }
-    }
-}
-
-@Composable
 private fun AiStarterLanding(
     options: List<AiChatCardOption>,
     selectedOptionIds: Set<String>,
     onOptionClick: (AiChatCardOption) -> Unit,
-    onShowQuickIdeas: () -> Unit,
     modifier: Modifier = Modifier
 ) {
     BoxWithConstraints(
-        modifier = modifier
-            .fillMaxWidth()
-            .padding(horizontal = 16.dp)
+        modifier = modifier.fillMaxWidth()
     ) {
         val panelModifier = if (maxWidth < 420.dp) {
             Modifier.fillMaxWidth()
@@ -541,98 +468,50 @@ private fun AiStarterLanding(
             Modifier.widthIn(max = 420.dp)
         }
 
-        Column(
+        Surface(
             modifier = panelModifier
                 .align(Alignment.Center)
                 .fillMaxWidth(),
-            horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.spacedBy(20.dp)
+            color = Color(0xE610223C),
+            shape = RoundedCornerShape(28.dp),
+            border = BorderStroke(
+                width = 1.dp,
+                color = Color.White.copy(alpha = 0.06f)
+            )
         ) {
-            Surface(
-                modifier = Modifier.clickable(onClick = onShowQuickIdeas),
-                shape = RoundedCornerShape(999.dp),
-                color = TripWizardColors.ContainerHighest,
-                border = BorderStroke(
-                    width = 1.dp,
-                    color = TripWizardColors.Blue.copy(alpha = 0.32f)
-                )
+            Column(
+                modifier = Modifier.padding(20.dp),
+                verticalArrangement = Arrangement.spacedBy(16.dp)
             ) {
-                Text(
-                    text = "← Back to quick ideas",
-                    modifier = Modifier.padding(horizontal = 14.dp, vertical = 8.dp),
-                    color = DeepSea5,
-                    fontSize = 12.sp,
-                    fontWeight = FontWeight.SemiBold,
-                    fontFamily = TravelCentsFonts.Body
-                )
-            }
-            Surface(
-                modifier = Modifier.size(72.dp),
-                shape = CircleShape,
-                color = TripWizardColors.ContainerHighest.copy(alpha = 0.92f),
-                border = BorderStroke(
-                    width = 1.dp,
-                    color = TripWizardColors.Blue.copy(alpha = 0.28f)
-                )
-            ) {
-                Box(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .background(
-                            Brush.radialGradient(
-                                colors = listOf(
-                                    TripWizardColors.Blue.copy(alpha = 0.22f),
-                                    Color.Transparent
-                                )
-                            )
-                        ),
-                    contentAlignment = Alignment.Center
+                Column(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalArrangement = Arrangement.spacedBy(6.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally
                 ) {
-                    Icon(
-                        imageVector = Icons.Outlined.AutoAwesome,
-                        contentDescription = null,
-                        tint = TripWizardColors.Blue,
-                        modifier = Modifier.size(30.dp)
+                    Text(
+                        text = "Where to next?",
+                        color = DeepSea5,
+                        fontSize = 28.sp,
+                        textAlign = TextAlign.Center,
+                        fontWeight = FontWeight.ExtraBold,
+                        fontFamily = TravelCentsFonts.Headline
+                    )
+                    Text(
+                        text = "Pick one or more trip directions, then add your own words below.",
+                        color = DeepSea4,
+                        fontSize = 13.sp,
+                        lineHeight = 19.sp,
+                        textAlign = TextAlign.Center,
+                        fontFamily = TravelCentsFonts.Body
                     )
                 }
-            }
 
-            Column(
-                horizontalAlignment = Alignment.CenterHorizontally,
-                verticalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                Text(
-                    text = "Where to next?",
-                    color = DeepSea5,
-                    fontSize = 28.sp,
-                    fontWeight = FontWeight.ExtraBold,
-                    fontFamily = TravelCentsFonts.Headline
-                )
-                Text(
-                    text = "Pick a direction to start, or type your own trip idea below.",
-                    color = DeepSea4,
-                    fontSize = 14.sp,
-                    lineHeight = 20.sp,
-                    fontFamily = TravelCentsFonts.Body
-                )
-            }
-
-            Surface(
-                modifier = Modifier.fillMaxWidth(),
-                color = Color(0xE610223C),
-                shape = RoundedCornerShape(28.dp),
-                border = BorderStroke(
-                    width = 1.dp,
-                    color = Color.White.copy(alpha = 0.06f)
-                )
-            ) {
                 AiPromptCardGrid(
                     title = "",
                     subtitle = "",
                     options = options,
                     selectedOptionIds = selectedOptionIds,
-                    onOptionClick = onOptionClick,
-                    modifier = Modifier.padding(18.dp)
+                    onOptionClick = onOptionClick
                 )
             }
         }

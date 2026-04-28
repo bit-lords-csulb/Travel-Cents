@@ -1,6 +1,8 @@
 package com.example.travelcents.data.ai.chat
 
+import com.google.gson.JsonParser
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
@@ -37,7 +39,7 @@ class AiTripIntakeSchemaTest {
     }
 
     @Test
-    fun toCardGroup_shortensLabelsToTwoWords() {
+    fun toCardGroup_keepsLabelsWithinFourWords() {
         val question = AiTripIntakeFollowUpQuestion(
             id = "party_shape",
             title = "Who is going?",
@@ -50,7 +52,7 @@ class AiTripIntakeSchemaTest {
         val group = question.toCardGroup()
 
         assertNotNull(group)
-        assertEquals(listOf("Family with", "Group of"), group?.options?.map { option -> option.label })
+        assertEquals(listOf("Family with kids", "Group of friends"), group?.options?.map { option -> option.label })
     }
 
     @Test
@@ -123,6 +125,74 @@ class AiTripIntakeSchemaTest {
             listOf("Ari", "Old Town", "Sukhumvit"),
             row?.recommendations?.map { recommendation -> recommendation.name }
         )
+    }
+
+    @Test
+    fun assistantMessage_includesCardQuestionTitleFromMinimalPayload() {
+        val result = AiTripIntakeTurnResult(
+            ackKey = AiTripIntakeAckKey.UNDERSTOOD,
+            nextAction = AiTripIntakeNextAction.ASK_MORE,
+            questionId = "trip_type",
+            questionTitle = "What type of trip are you planning?",
+            options = listOf(
+                option("romantic", "Romantic"),
+                option("family", "Family")
+            )
+        )
+
+        assertEquals("Understood. What type of trip are you planning?", result.assistantMessage)
+    }
+
+    @Test
+    fun followUpQuestion_isDerivedFromMinimalAskMorePayload() {
+        val result = AiTripIntakeTurnResult(
+            nextAction = AiTripIntakeNextAction.ASK_MORE,
+            questionId = "destination_type",
+            questionTitle = "What kind of destination?",
+            options = listOf(
+                option("tropical", "Tropical"),
+                option("coastal_town", "Coastal town"),
+                option("beach_resort", "Beach resort")
+            )
+        )
+
+        val followUpQuestion = result.followUpQuestion
+
+        assertNotNull(followUpQuestion)
+        assertEquals("destination_type", followUpQuestion?.id)
+        assertEquals("What kind of destination?", followUpQuestion?.title)
+        assertEquals(3, followUpQuestion?.options?.size)
+    }
+
+    @Test
+    fun toPromptJson_usesSchemaFriendlyValuesOnly() {
+        val profile = AiTripIntakeProfile(
+            tripType = AiTripType.ROMANTIC,
+            partySummary = "Two adults",
+            destinationStyle = listOf("Beach", "Warm_Weather"),
+            budgetLevel = AiBudgetLevel.LUXURY,
+            pace = AiTripPacePreference.RELAXED,
+            interests = listOf("Beach"),
+            mustHaves = listOf("Ocean view"),
+            avoid = listOf("Crowds"),
+            notes = listOf("Shoulder season"),
+            durationDays = 5,
+            budgetTotal = 2500.0,
+            cuisinePreferences = listOf("Seafood"),
+            confidence = mapOf("pace" to 0.8)
+        )
+
+        val root = JsonParser.parseString(profile.toPromptJson()).asJsonObject
+
+        assertEquals("romantic", root.get("trip_type").asString)
+        assertEquals("luxury", root.get("budget_level").asString)
+        assertEquals("relaxed", root.get("pace").asString)
+        assertEquals("beach", root.getAsJsonArray("destination_style")[0].asString)
+        assertEquals("warm_weather", root.getAsJsonArray("destination_style")[1].asString)
+        assertFalse(root.has("duration_days"))
+        assertFalse(root.has("budget_total"))
+        assertFalse(root.has("cuisine_preferences"))
+        assertFalse(root.has("confidence"))
     }
 
     private fun option(id: String, label: String): AiTripIntakeAnswerOption {

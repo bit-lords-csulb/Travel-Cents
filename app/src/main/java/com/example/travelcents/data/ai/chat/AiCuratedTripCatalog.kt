@@ -10,13 +10,18 @@ import kotlin.math.abs
 class AiCuratedTripCatalog(
     private val tripRepository: TripRepository = FirestoreTripRepository()
 ) {
-    private val destinationRecommendationEngine = AiDestinationRecommendationEngine()
+    fun recommendFreshLandingStarterRow(): AiCuratedTripRow? {
+        val popularTrips = AiCuratedTripSeedCatalog.seeds
+            .take(3)
+            .map { seed ->
+                seed.toStarter(matchReason = "Popular trip")
+            }
+        if (popularTrips.isEmpty()) return null
 
-    fun recommendDestinationRecommendations(profile: AiTravelerProfile): AiDestinationRecommendationRow? {
-        if (profile.destination.isNotBlank()) return null
-
-        return AiRecommendationMapper.destinationRowFromEngine(
-            destinationRecommendationEngine.rankDestinations(profile.intakeProfile())
+        return AiCuratedTripRow(
+            title = "Popular trips",
+            subtitle = "Editable starter templates to spark ideas before you start planning.",
+            trips = popularTrips
         )
     }
 
@@ -26,14 +31,14 @@ class AiCuratedTripCatalog(
 
         return AiCuratedTripRow(
             title = if (profile.destination.isNotBlank()) {
-                "Curated ${displayDestination(profile.destination)} starters"
+                "Popular trips in ${displayDestination(profile.destination)}"
             } else {
-                "Curated hotspot starters"
+                "Popular trips"
             },
             subtitle = if (profile.destination.isNotBlank()) {
-                "Editable destination templates you can tune before building the trip."
+                "Editable starter templates for this destination."
             } else {
-                "These destinations fit the vibe, pace, and budget you've described."
+                "Editable starter templates to spark ideas before you start planning."
             },
             trips = seededTrips.take(3)
         )
@@ -43,47 +48,19 @@ class AiCuratedTripCatalog(
         profile: AiTravelerProfile,
         viewerUid: String?
     ): AiCuratedTripRow? {
-        val curatedTrips = viewerUid
+        val savedTrips = viewerUid
             ?.takeIf { it.isNotBlank() }
             ?.let { uid -> loadCuratedTrips(profile, uid) }
             .orEmpty()
-        val seededTrips = recommendSeededTrips(profile)
 
-        return when {
-            curatedTrips.isNotEmpty() && seededTrips.isNotEmpty() -> {
-                AiCuratedTripRow(
-                    title = "Choose a starter",
-                    subtitle = if (profile.destination.isNotBlank()) {
-                        "Saved matches plus curated templates for ${displayDestination(profile.destination)}."
-                    } else {
-                        "Saved matches plus curated hotspot starters that fit the direction so far."
-                    },
-                    trips = (curatedTrips.take(2) + seededTrips.take(2))
-                        .distinctBy(::uniqueStarterKey)
-                        .take(4)
-                )
-            }
+        if (savedTrips.isEmpty()) return null
 
-            curatedTrips.isNotEmpty() -> {
-                AiCuratedTripRow(
-                    title = "Start from a saved trip",
-                    subtitle = "These curated trips match the direction you've set so far.",
-                    trips = curatedTrips.take(3)
-                )
-            }
-
-            seededTrips.isNotEmpty() -> recommendSeededStarterRow(profile)
-
-            else -> {
-                buildGeneratedStarter(profile)?.let { starter ->
-                    AiCuratedTripRow(
-                        title = "Start from scratch",
-                        subtitle = "I couldn't find a saved or curated match, so here's a fresh starter.",
-                        trips = listOf(starter)
-                    )
-                }
-            }
-        }
+        return AiCuratedTripRow(
+            title = "Start from a saved trip",
+            subtitle = "Saved trips that match the direction you've set so far.",
+            trips = savedTrips.take(3)
+                .distinctBy(::uniqueStarterKey)
+        )
     }
 
     fun recommendPlaceRecommendations(profile: AiTravelerProfile): AiPlaceRecommendationRow? {
@@ -555,39 +532,6 @@ class AiCuratedTripCatalog(
             source = AiCuratedTripSource.FIRESTORE,
             tripKey = TripKey(ownerUid = ownerUid, tripId = itineraryId),
             heroImageUrl = homeImageUrl.ifBlank { null }
-        )
-    }
-
-    private fun buildGeneratedStarter(profile: AiTravelerProfile): AiCuratedTripStarter? {
-        val destination = profile.destination.ifBlank { return null }
-        val style = inferTravelStyle(profile).ifBlank { "comfort" }
-        val durationDays = inferDurationDays(profile).coerceAtLeast(4)
-        val summary = buildString {
-            append("${durationDays}-day ")
-            append(destination)
-            append(" starter")
-            profile.travelPace.takeIf { it.isNotBlank() }?.let { pace ->
-                append(" with a ")
-                append(pace.lowercase())
-                append(" pace")
-            }
-            val highlights = (profile.interests + profile.cuisinePreferences)
-                .distinct()
-                .take(2)
-            if (highlights.isNotEmpty()) {
-                append(" focused on ")
-                append(highlights.joinToString(" and ") { it.lowercase() })
-            }
-        }
-
-        return AiCuratedTripStarter(
-            title = "${durationDays}-day ${displayDestination(destination)}",
-            destination = destination,
-            durationDays = durationDays,
-            travelStyle = style,
-            summary = summary,
-            matchReason = "Fresh starter built from your current chat signals.",
-            source = AiCuratedTripSource.GENERATED
         )
     }
 
