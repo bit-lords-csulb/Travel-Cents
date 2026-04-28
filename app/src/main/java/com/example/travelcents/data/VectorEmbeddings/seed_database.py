@@ -9,6 +9,21 @@ from sentence_transformers import SentenceTransformer
 
 load_dotenv()
 
+DEMO_CITIES = {
+    "London": "737",
+    "Paris": "479",
+    "Amsterdam": "525",
+    "New York": "687",
+    "Miami": "662",
+    "Cairo": "722",
+    "Sydney": "357",
+    "Tokyo": "334"
+}
+
+VIATOR_PRODUCT_SEARCH_URL = "https://api.viator.com/partner/products/search"
+VIATOR_PAGE_SIZE = 50
+PINECONE_BATCH_SIZE = 100
+
 
 def step_one_fetch_and_filter(api_key):
     print("Connecting to Viator PRODUCTION API...")
@@ -18,47 +33,84 @@ def step_one_fetch_and_filter(api_key):
         "Accept": "application/json;version=2.0"
     }
 
-    demo_cities = {
-        "London": "737", "Paris": "479", "Amsterdam": "525",
-        "New York": "687", "Miami": "662", "Cairo": "722",
-        "Sydney": "357", "Tokyo": "334"
-    }
     all_activities = []
 
-    for city_name, dest_id in demo_cities.items():
+    for city_name, dest_id in DEMO_CITIES.items():
         print(f"Fetching inventory for {city_name} (ID: {dest_id})...")
-        payload = {
-            "filtering": {"destination": dest_id},
-            "currency": "USD"
-        }
+        city_activity_count = 0
+        page_start = 1
 
-        response = requests.post(
-            "https://api.viator.com/partner/products/search",
-            headers=headers,
-            json=payload
-        )
+        while True:
+            payload = {
+                "filtering": {"destination": dest_id},
+                "pagination": {
+                    "start": page_start,
+                    "count": VIATOR_PAGE_SIZE
+                },
+                "currency": "USD"
+            }
 
-        if response.status_code == 200:
+            response = requests.post(
+                VIATOR_PRODUCT_SEARCH_URL,
+                headers=headers,
+                json=payload
+            )
+
+            if response.status_code != 200:
+                print(f"Failed to fetch {city_name}. Status: {response.status_code}")
+                print(response.text)
+                break
+
             data = response.json()
-            for item in data.get('products', []):
+            products = data.get('products', [])
+
+            if not products:
+                break
+
+            for item in products:
+                activity_id = item.get('productCode')
+                if not activity_id:
+                    continue
+
                 all_activities.append({
-                    "activity_id": item.get('productCode'),
-                    "title": item.get('title'),
+                    "activity_id": activity_id,
+                    "title": item.get('title') or '',
                     "description": item.get('description', ''),
                     "city": city_name,
                     "booking_url": item.get('productUrl', '')
                 })
-        else:
-            print(f"Failed to fetch {city_name}. Status: {response.status_code}")
+                city_activity_count += 1
+
+            print(
+                f"  Page starting at {page_start}: "
+                f"fetched {len(products)} activities "
+                f"({city_activity_count} total for {city_name})"
+            )
+
+            if len(products) < VIATOR_PAGE_SIZE:
+                break
+
+            page_start += VIATOR_PAGE_SIZE
+            time.sleep(2)
+
+        print(f"Completed {city_name}: {city_activity_count} activities fetched.")
         time.sleep(2)
 
     df = pd.DataFrame(all_activities)
-    df = df.dropna(subset=['description', 'booking_url'])
+    if df.empty:
+        print("No activities fetched.\n")
+        return df
+
+    df = df.fillna('')
     print(f"Successfully fetched {len(df)} activities ready for VRAM.\n")
     return df
 
 
 def step_two_embed_and_upload(df, pinecone_key):
+    if df.empty:
+        print("No activities to upload.")
+        return 0
+
     # 1. Prep the text for the AI
     df['semantic_text'] = df['title'] + " - " + df['description']
     sentences = df['semantic_text'].tolist()
@@ -82,25 +134,28 @@ def step_two_embed_and_upload(df, pinecone_key):
 
     # 5. Upload in Batches
     print("Uploading vectors to the cloud...")
-    upload_batch_size = 100
-    for i in range(0, len(df), upload_batch_size):
-        batch_df = df.iloc[i:i + upload_batch_size]
-        batch_embeddings = embeddings[i:i + upload_batch_size]
+    total_seeded = 0
+    for i in range(0, len(df), PINECONE_BATCH_SIZE):
+        batch_df = df.iloc[i:i + PINECONE_BATCH_SIZE]
+        batch_embeddings = embeddings[i:i + PINECONE_BATCH_SIZE]
 
         vectors_to_upsert = []
         for j, (_, row) in enumerate(batch_df.iterrows()):
             vectors_to_upsert.append({
-                "id": str(row['activity_id']),
+                "id": f"{row['city']}::{row['activity_id']}",
                 "values": batch_embeddings[j].tolist(),
                 "metadata": {
+                    "activity_id": str(row['activity_id']),
                     "title": row['title'],
                     "booking_url": row['booking_url'],
                     "city": row['city']
                 }
             })
         index.upsert(vectors=vectors_to_upsert)
+        total_seeded += len(vectors_to_upsert)
 
     print("\nSUCCESS: Database fully seeded and ready for the cloud!")
+    return total_seeded
 
 
 if __name__ == "__main__":
@@ -112,4 +167,8 @@ if __name__ == "__main__":
     else:
         # Run the full pipeline
         demo_dataframe = step_one_fetch_and_filter(v_key)
-        step_two_embed_and_upload(demo_dataframe, p_key)
+        seeded_count = step_two_embed_and_upload(demo_dataframe, p_key)
+        print(
+            f"Successfully seeded {seeded_count} total activities "
+            f"across {len(DEMO_CITIES)} cities!"
+        )
