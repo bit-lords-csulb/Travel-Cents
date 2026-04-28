@@ -232,16 +232,25 @@ data class AiTripIntakeTurnResult(
         )
     }
 ) {
+    private val hasValidCardPayload: Boolean
+        get() = nextAction == AiTripIntakeNextAction.ASK_MORE &&
+            questionId.isNotBlank() &&
+            questionTitle.isNotBlank() &&
+            options.size in 2..6
+
+    private val effectiveQuestionKind: AiTripIntakeQuestionKind
+        get() = when {
+            questionKind == AiTripIntakeQuestionKind.TEXT -> AiTripIntakeQuestionKind.TEXT
+            questionKind == AiTripIntakeQuestionKind.CARDS || hasValidCardPayload -> AiTripIntakeQuestionKind.CARDS
+            else -> AiTripIntakeQuestionKind.NONE
+        }
+
     val assistantMessage: String
         get() = buildList {
             add(ackKey.displayText())
-            when (questionKind) {
+            when (effectiveQuestionKind) {
                 AiTripIntakeQuestionKind.CARDS -> {
-                    listOf(questionTitle, questionSubtitle)
-                        .filter { value -> value.isNotBlank() }
-                        .joinToString(" ")
-                        .takeIf { prompt -> prompt.isNotBlank() }
-                        ?.let(::add)
+                    questionTitle.takeIf { it.isNotBlank() }?.let(::add)
                 }
 
                 AiTripIntakeQuestionKind.TEXT -> {
@@ -260,14 +269,13 @@ data class AiTripIntakeTurnResult(
             AiTripIntakeNextAction.BUILD_TRIP -> "Build the trip"
             AiTripIntakeNextAction.ASK_MORE -> {
                 questionTitle.ifBlank { textPrompt }
-                    .ifBlank { nextActionReason }
                     .ifBlank { "Refine the plan" }
             }
         }
 
     val followUpQuestion: AiTripIntakeFollowUpQuestion?
         get() {
-            if (questionKind != AiTripIntakeQuestionKind.CARDS) return null
+            if (effectiveQuestionKind != AiTripIntakeQuestionKind.CARDS) return null
 
             return AiTripIntakeFollowUpQuestion(
                 id = questionId,
@@ -439,7 +447,7 @@ private fun shortenOptionLabel(rawLabel: String): String {
     return trimmed
         .split(Regex("\\s+"))
         .filter { token -> token.isNotBlank() }
-        .take(2)
+        .take(4)
         .joinToString(" ")
 }
 

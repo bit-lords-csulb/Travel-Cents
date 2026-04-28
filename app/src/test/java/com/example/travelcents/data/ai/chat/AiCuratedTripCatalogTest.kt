@@ -90,26 +90,6 @@ class AiCuratedTripCatalogTest {
     }
 
     @Test
-    fun recommendDestinationRecommendations_returnsTopSeededDestinations_whenDestinationMissing() {
-        val row = catalog.recommendDestinationRecommendations(
-            profile = AiTravelerProfile(
-                travelPace = "Relaxed",
-                budgetSummary = "Comfort leaning",
-                interests = listOf("Beach", "Food"),
-                notes = listOf("Want somewhere warm")
-            )
-        )
-
-        assertNotNull(row)
-        assertEquals("Good destination fits", row?.title)
-        assertEquals(3, row?.recommendations?.size)
-        assertEquals(
-            row?.recommendations?.map { recommendation -> recommendation.destination }?.distinct()?.size,
-            row?.recommendations?.size
-        )
-    }
-
-    @Test
     fun recommendPlaceRecommendations_returnsSeededPlaces_whenDestinationMatchesSeed() {
         val row = catalog.recommendPlaceRecommendations(
             profile = AiTravelerProfile(

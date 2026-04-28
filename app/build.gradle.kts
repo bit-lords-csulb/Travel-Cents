@@ -39,7 +39,7 @@ android {
         )
         buildConfigField(
             "String", "LLM_INTAKE_MODEL",
-            "\"${localProperties.getProperty("LLM_INTAKE_MODEL") ?: "openai/gpt-oss-20b"}\""
+            "\"${localProperties.getProperty("LLM_INTAKE_MODEL") ?: "llama-3.3-70b-versatile"}\""
         )
         buildConfigField(
             "String", "SERP_API_KEY",

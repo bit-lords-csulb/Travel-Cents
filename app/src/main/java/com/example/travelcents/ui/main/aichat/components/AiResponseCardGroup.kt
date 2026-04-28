@@ -85,6 +85,14 @@ fun AiResponseCardGroup(
                     }
                 }
             }
+
+            Text(
+                text = "You can also type your own answer below.",
+                color = DeepSea4.copy(alpha = 0.7f),
+                fontSize = 11.sp,
+                lineHeight = 15.sp,
+                fontFamily = TravelCentsFonts.Body
+            )
         }
     }
 }

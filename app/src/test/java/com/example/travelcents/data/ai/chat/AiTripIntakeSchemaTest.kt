@@ -39,7 +39,7 @@ class AiTripIntakeSchemaTest {
     }
 
     @Test
-    fun toCardGroup_shortensLabelsToTwoWords() {
+    fun toCardGroup_keepsLabelsWithinFourWords() {
         val question = AiTripIntakeFollowUpQuestion(
             id = "party_shape",
             title = "Who is going?",
@@ -52,7 +52,7 @@ class AiTripIntakeSchemaTest {
         val group = question.toCardGroup()
 
         assertNotNull(group)
-        assertEquals(listOf("Family with", "Group of"), group?.options?.map { option -> option.label })
+        assertEquals(listOf("Family with kids", "Group of friends"), group?.options?.map { option -> option.label })
     }
 
     @Test
@@ -128,14 +128,40 @@ class AiTripIntakeSchemaTest {
     }
 
     @Test
-    fun assistantMessage_includesCardQuestionTitle() {
+    fun assistantMessage_includesCardQuestionTitleFromMinimalPayload() {
         val result = AiTripIntakeTurnResult(
             ackKey = AiTripIntakeAckKey.UNDERSTOOD,
-            questionKind = AiTripIntakeQuestionKind.CARDS,
-            questionTitle = "What type of trip are you planning?"
+            nextAction = AiTripIntakeNextAction.ASK_MORE,
+            questionId = "trip_type",
+            questionTitle = "What type of trip are you planning?",
+            options = listOf(
+                option("romantic", "Romantic"),
+                option("family", "Family")
+            )
         )
 
         assertEquals("Understood. What type of trip are you planning?", result.assistantMessage)
+    }
+
+    @Test
+    fun followUpQuestion_isDerivedFromMinimalAskMorePayload() {
+        val result = AiTripIntakeTurnResult(
+            nextAction = AiTripIntakeNextAction.ASK_MORE,
+            questionId = "destination_type",
+            questionTitle = "What kind of destination?",
+            options = listOf(
+                option("tropical", "Tropical"),
+                option("coastal_town", "Coastal town"),
+                option("beach_resort", "Beach resort")
+            )
+        )
+
+        val followUpQuestion = result.followUpQuestion
+
+        assertNotNull(followUpQuestion)
+        assertEquals("destination_type", followUpQuestion?.id)
+        assertEquals("What kind of destination?", followUpQuestion?.title)
+        assertEquals(3, followUpQuestion?.options?.size)
     }
 
     @Test

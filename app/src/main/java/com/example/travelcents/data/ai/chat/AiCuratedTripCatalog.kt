@@ -10,16 +10,6 @@ import kotlin.math.abs
 class AiCuratedTripCatalog(
     private val tripRepository: TripRepository = FirestoreTripRepository()
 ) {
-    private val destinationRecommendationEngine = AiDestinationRecommendationEngine()
-
-    fun recommendDestinationRecommendations(profile: AiTravelerProfile): AiDestinationRecommendationRow? {
-        if (profile.destination.isNotBlank()) return null
-
-        return AiRecommendationMapper.destinationRowFromEngine(
-            destinationRecommendationEngine.rankDestinations(profile.intakeProfile())
-        )
-    }
-
     fun recommendFreshLandingStarterRow(): AiCuratedTripRow? {
         val popularTrips = AiCuratedTripSeedCatalog.seeds
             .take(3)

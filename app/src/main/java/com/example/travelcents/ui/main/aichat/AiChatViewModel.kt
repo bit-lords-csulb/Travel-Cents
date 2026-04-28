@@ -9,7 +9,6 @@ import com.example.travelcents.data.ai.chat.AiChatCardGroup
 import com.example.travelcents.data.ai.chat.AiChatCardOption
 import com.example.travelcents.data.ai.chat.AiCuratedTripCatalog
 import com.example.travelcents.data.ai.chat.AiDestinationRecommendation
-import com.example.travelcents.data.ai.chat.AiDestinationRecommendationEngine
 import com.example.travelcents.data.ai.chat.AiCuratedTripSource
 import com.example.travelcents.data.ai.chat.AiCuratedTripStarter
 import com.example.travelcents.data.ai.chat.AiChatItem
@@ -24,7 +23,6 @@ import com.example.travelcents.data.ai.chat.AiChatTripOption
 import com.example.travelcents.data.ai.chat.AiPlaceRecommendationRow
 import com.example.travelcents.data.ai.chat.AiPlaceRecommendationRowType
 import com.example.travelcents.data.ai.chat.AiPlaceRecommendationCoordinator
-import com.example.travelcents.data.ai.chat.AiRecommendationMapper
 import com.example.travelcents.data.ai.chat.AiSingleEventCoordinator
 import com.example.travelcents.data.ai.chat.AiSingleEventResolution
 import com.example.travelcents.data.ai.chat.AiSingleEventSuggestion
@@ -68,7 +66,6 @@ class AiChatViewModel(application: Application) : AndroidViewModel(application) 
     private val conversationItems = mutableListOf<AiChatItem.TextMessage>()
     private val sessionStore = AiChatSessionStore(application)
     private val curatedTripCatalog = AiCuratedTripCatalog()
-    private val destinationRecommendationEngine = AiDestinationRecommendationEngine()
     private val placeRecommendationCoordinator = AiPlaceRecommendationCoordinator(curatedTripCatalog = curatedTripCatalog)
     private val singleEventCoordinator = AiSingleEventCoordinator()
     private val intakeOrchestrator = AiTripIntakeOrchestrator()
@@ -194,59 +191,10 @@ class AiChatViewModel(application: Application) : AndroidViewModel(application) 
         val destination = recommendation.destination.trim()
         if (destination.isBlank()) return
 
-        val isFirstTurn = conversationItems.isEmpty()
-        val userMessage = AiChatItem.TextMessage(
-            text = "Let's plan around $destination",
-            sender = AiChatSender.USER
+        submitUserTurn(
+            visibleMessage = "Let's plan around $destination",
+            llmUserMessage = buildDestinationRecommendationPrompt(recommendation)
         )
-        conversationItems += userMessage
-
-        val llmUserMessage = buildDestinationRecommendationPrompt(recommendation)
-        val updatedIntakeProfile = sessionState.intakeProfile.mergePatch(
-            AiTripIntakeProfile(
-                destination = destination,
-                confidence = mapOf("destination" to 0.95)
-            )
-        )
-        val updatedProfile = sessionState.profile.mergeIntakeProfile(updatedIntakeProfile)
-        val assistantReply = buildDestinationRecommendationReply(recommendation)
-        if (!isFirstTurn) {
-            conversationItems += AiChatItem.TextMessage(
-                text = assistantReply,
-                sender = AiChatSender.ASSISTANT
-            )
-        }
-
-        sessionState = sessionState.copy(
-            profile = updatedProfile,
-            intakeProfile = updatedIntakeProfile,
-            planningObjective = if (recommendation.seedId != null) {
-                "Pick a starter"
-            } else {
-                "Refine ${shortDestinationLabel(destination)}"
-            },
-            stage = AiTravelerProfileReducer.stageFor(updatedProfile),
-            llmHistory = buildList {
-                addAll(sessionState.llmHistory)
-                add(LlmMessage(role = "user", content = llmUserMessage))
-                if (!isFirstTurn) {
-                    add(LlmMessage(role = "assistant", content = assistantReply))
-                }
-            },
-            activeResponseCardGroup = null,
-            activeDestinationRecommendationRow = null,
-            activeCuratedTripRow = null,
-            activePlaceRecommendationRow = null,
-            activeSingleEventCard = null,
-            draftText = "",
-            selectedDraftOptions = emptyList(),
-            anchorMessageId = userMessage.id
-        )
-
-        persistLastSession()
-        publishUiState()
-        generateTitleIfNeeded()
-        launchHeroImageEnrichment(sessionState.activeCuratedTripRow?.id)
     }
 
     fun selectPlaceRecommendation(name: String, category: String, area: String) {
@@ -584,24 +532,6 @@ class AiChatViewModel(application: Application) : AndroidViewModel(application) 
         )
         isLoading = false
         processSnapshot = null
-        populateQuickIdeaSurfaces()
-    }
-
-    private fun populateQuickIdeaSurfaces() {
-        val targetSessionId = sessionState.sessionId ?: return
-        viewModelScope.launch {
-            val emptyProfile = AiTravelerProfile()
-            val destinationRow = curatedTripCatalog.recommendDestinationRecommendations(emptyProfile)
-            if (sessionState.sessionId != targetSessionId) return@launch
-            if (sessionState.profile.hasSignals) return@launch
-            if (conversationItems.isNotEmpty()) return@launch
-
-            sessionState = sessionState.copy(
-                activeDestinationRecommendationRow = destinationRow,
-                activeCuratedTripRow = null
-            )
-            publishUiState()
-        }
     }
 
     private fun persistLastSession() {
@@ -812,17 +742,6 @@ class AiChatViewModel(application: Application) : AndroidViewModel(application) 
                 append(recommendation.matchReason)
                 append('.')
             }
-        }
-    }
-
-    private fun buildDestinationRecommendationReply(
-        recommendation: AiDestinationRecommendation
-    ): String {
-        val destinationLabel = shortDestinationLabel(recommendation.destination)
-        return if (recommendation.seedId != null) {
-            "I can anchor the plan on $destinationLabel. Here are curated starter ideas to shape first."
-        } else {
-            "I can anchor the trip on $destinationLabel. Tell me what you want it to lean into and I will build from there."
         }
     }
 
@@ -1209,19 +1128,7 @@ class AiChatViewModel(application: Application) : AndroidViewModel(application) 
         intakeProfile: AiTripIntakeProfile
     ): AiDestinationRecommendationRow? {
         if (profile.destination.isNotBlank() || intakeProfile.destination.isNotBlank()) return null
-
-        val intakeRow = intakeResult?.toDestinationRecommendationRow()
-        if (intakeRow != null) return intakeRow
-
-        return when (intakeResult?.nextAction) {
-            AiTripIntakeNextAction.SUGGEST_DESTINATIONS,
-            null -> AiRecommendationMapper.destinationRowFromEngine(
-                destinationRecommendationEngine.rankDestinations(intakeProfile)
-            )
-
-            AiTripIntakeNextAction.ASK_MORE,
-            AiTripIntakeNextAction.BUILD_TRIP -> null
-        }
+        return intakeResult?.toDestinationRecommendationRow()
     }
 
     private fun recordAskedFollowUpGroupId(

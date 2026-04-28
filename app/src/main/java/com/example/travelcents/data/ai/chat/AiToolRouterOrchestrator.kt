@@ -108,14 +108,7 @@ class AiToolRouterOrchestrator {
     }
 
     private fun toolRouterResponseFormat(): Map<String, Any> {
-        return mapOf(
-            "type" to "json_schema",
-            "json_schema" to mapOf(
-                "name" to "travelcents_tool_router",
-                "strict" to true,
-                "schema" to buildToolRouterSchema()
-            )
-        )
+        return mapOf("type" to "json_object")
     }
 
     private fun buildToolRouterSchema(): Map<String, Any> {
