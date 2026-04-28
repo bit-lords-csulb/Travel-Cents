@@ -17,7 +17,7 @@ import androidx.room.TypeConverters
         EventOptionEntity::class,
         MediaAssetEntity::class
     ],
-    version = 5,
+    version = 6,
     exportSchema = false
 )
 @TypeConverters(TripLocalConverters::class)
