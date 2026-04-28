@@ -30,9 +30,6 @@ import com.example.travelcents.data.trip.model.ATTR_TICKETMASTER_EVENT_ID
 import com.example.travelcents.data.trip.model.ATTR_VENUE_NAME
 import com.example.travelcents.data.trip.model.YelpOptionPoolItem
 import com.example.travelcents.data.trip.remote.FlightHeroImageRepository
-import com.example.travelcents.data.trip.model.Itinerary
-import com.example.travelcents.data.trip.model.TravelEvent
-import com.example.travelcents.data.trip.model.TravelRequest
 import com.example.travelcents.data.trip.remote.SerpRepository
 import com.example.travelcents.data.trip.model.detailValue
 import com.example.travelcents.data.trip.remote.TicketmasterRepository
