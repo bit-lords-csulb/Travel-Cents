@@ -74,12 +74,8 @@ android {
             "\"${localProperties.getProperty("UNSPLASH_ACCESS_KEY") ?: ""}\""
         )
         buildConfigField(
-            "String", "OPENSKY_CLIENT_ID",
-            "\"${localProperties.getProperty("OPENSKY_CLIENT_ID") ?: ""}\""
-        )
-        buildConfigField(
-            "String", "OPENSKY_CLIENT_SECRET",
-            "\"${localProperties.getProperty("OPENSKY_CLIENT_SECRET") ?: ""}\""
+            "String", "AVIATIONSTACK_KEY",
+            "\"${localProperties.getProperty("AVIATIONSTACK_KEY") ?: ""}\""
         )
     }
 

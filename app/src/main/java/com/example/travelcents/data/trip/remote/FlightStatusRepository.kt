@@ -2,14 +2,10 @@ package com.example.travelcents.data.trip.remote
 
 import com.example.travelcents.BuildConfig
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.sync.Mutex
-import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
-import okhttp3.FormBody
 import okhttp3.HttpUrl.Companion.toHttpUrl
 import okhttp3.OkHttpClient
 import okhttp3.Request
-import org.json.JSONArray
 import org.json.JSONObject
 import java.time.Instant
 import java.time.LocalDate
@@ -20,28 +16,58 @@ import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.TimeUnit
 
 /**
- * OpenSky Network-backed live flight status. Free for non-commercial use:
- * anonymous = 100 req/24h, free account = 1000 req/24h. ADS-B-derived data —
- * we get position + on-ground + actual departure time, but no gate/terminal
- * (those come from airline feeds, not transponders).
+ * AviationStack-backed live flight status. Free tier: 100 requests/month, HTTP only.
+ * Quota guards: 12-hour time gate and 30-minute cache.
  */
 object FlightStatusRepository {
 
-    private const val OPEN_SKY_BASE = "https://opensky-network.org/api"
-    private const val CACHE_TTL_MS = 10 * 60 * 1000L
-    private const val LIVE_WINDOW_HOURS = 24
+    private const val BASE_URL = "http://api.aviationstack.com/v1/flights"
+    private const val CACHE_TTL_MS = 30 * 60 * 1000L
+    private const val LIVE_WINDOW_HOURS = 12
 
-    enum class Status { SCHEDULED, IN_AIR, LANDED, ON_GROUND_AT_ORIGIN, UNKNOWN }
+    enum class Status { SCHEDULED, ACTIVE, LANDED, CANCELLED, DIVERTED, INCIDENT, UNKNOWN }
+
+    data class Endpoint(
+        val airportName: String?,
+        val iata: String?,
+        val icao: String?,
+        val terminal: String?,
+        val gate: String?,
+        val baggageBelt: String?,
+        val timezone: String?,
+        val delayMinutes: Long?,
+        val scheduledUnix: Long?,
+        val estimatedUnix: Long?,
+        val actualUnix: Long?
+    )
+
+    data class LivePosition(
+        val updatedUnix: Long?,
+        val latitude: Double?,
+        val longitude: Double?,
+        val altitudeMeters: Double?,
+        val speedKph: Double?,
+        val verticalSpeedKph: Double?,
+        val headingDeg: Double?,
+        val isGround: Boolean?
+    ) {
+        val hasAnySignal: Boolean
+            get() = latitude != null || longitude != null || altitudeMeters != null ||
+                speedKph != null || headingDeg != null
+    }
 
     data class Snapshot(
         val status: Status,
-        val callsign: String?,
-        val icao24: String?,
-        val latitude: Double?,
-        val longitude: Double?,
-        val onGround: Boolean?,
-        val actualDepartureUnix: Long?,
-        val delayMinutes: Long?,
+        val flightIata: String?,
+        val flightNumber: String?,
+        val airlineName: String?,
+        val airlineIata: String?,
+        val aircraftType: String?,
+        val aircraftRegistration: String?,
+        val aircraftIcao24: String?,
+        val departure: Endpoint,
+        val arrival: Endpoint,
+        val live: LivePosition?,
         val updatedAtUnix: Long
     )
 
@@ -62,188 +88,179 @@ object FlightStatusRepository {
         originIata: String,
         scheduledZone: String
     ): Snapshot? {
-        if (flightNumber.isBlank() || originIata.isBlank()) return null
+        val apiKey = BuildConfig.AVIATIONSTACK_KEY
+        if (apiKey.isBlank() || flightNumber.isBlank()) return null
 
-        val originIcao = AirportIcao.lookup(originIata) ?: return null
+        val flightIata = normalizeFlightIata(flightNumber) ?: return null
         val scheduledUnix = parseScheduledUnix(scheduledDepartureLocal, scheduledZone) ?: return null
         val nowUnix = Instant.now().epochSecond
         if (kotlin.math.abs(scheduledUnix - nowUnix) > LIVE_WINDOW_HOURS * 3600) return null
 
-        val cacheKey = "${flightNumber.uppercase(Locale.US)}|$scheduledUnix"
+        val flightDate = scheduledDateLocal(scheduledDepartureLocal)
+            ?: scheduledDateUtc(scheduledUnix)
+        val cacheKey = "$flightIata|$flightDate"
         val now = System.currentTimeMillis()
         cache[cacheKey]?.takeIf { it.expiresAtMs > now }?.let { return it.snapshot }
 
         val snapshot = withContext(Dispatchers.IO) {
-            runCatching {
-                val begin = scheduledUnix - 3 * 3600
-                val end = scheduledUnix + 6 * 3600
-                val match = findDeparture(originIcao, begin, end, flightNumber)
-                if (match == null) {
-                    Snapshot(
-                        status = if (nowUnix < scheduledUnix) Status.SCHEDULED else Status.UNKNOWN,
-                        callsign = null,
-                        icao24 = null,
-                        latitude = null,
-                        longitude = null,
-                        onGround = null,
-                        actualDepartureUnix = null,
-                        delayMinutes = null,
-                        updatedAtUnix = nowUnix
-                    )
-                } else {
-                    val state = fetchLiveState(match.icao24)
-                    val onGround = state?.onGround
-                    val derivedStatus = when {
-                        state == null -> Status.UNKNOWN
-                        onGround == false -> Status.IN_AIR
-                        onGround == true && state.lastContact != null &&
-                            nowUnix - state.lastContact > 600 -> Status.LANDED
-                        onGround == true -> Status.ON_GROUND_AT_ORIGIN
-                        else -> Status.UNKNOWN
-                    }
-                    val delay = match.firstSeen?.let { actual ->
-                        ((actual - scheduledUnix) / 60).coerceAtLeast(0)
-                    }
-                    Snapshot(
-                        status = derivedStatus,
-                        callsign = match.callsign,
-                        icao24 = match.icao24,
-                        latitude = state?.latitude,
-                        longitude = state?.longitude,
-                        onGround = onGround,
-                        actualDepartureUnix = match.firstSeen,
-                        delayMinutes = delay,
-                        updatedAtUnix = nowUnix
-                    )
-                }
-            }.getOrNull()
+            runCatching { queryAviationStack(apiKey, flightIata, flightDate, originIata) }
+                .getOrNull()
         }
 
         cache[cacheKey] = CacheEntry(snapshot, now + CACHE_TTL_MS)
         return snapshot
     }
 
-    private data class DepartureMatch(
-        val icao24: String,
-        val callsign: String?,
-        val firstSeen: Long?
-    )
-
-    private data class LiveState(
-        val latitude: Double?,
-        val longitude: Double?,
-        val onGround: Boolean?,
-        val lastContact: Long?
-    )
-
-    private suspend fun findDeparture(
-        originIcao: String,
-        beginUnix: Long,
-        endUnix: Long,
-        flightNumber: String
-    ): DepartureMatch? {
-        val url = "$OPEN_SKY_BASE/flights/departure".toHttpUrl().newBuilder()
-            .addQueryParameter("airport", originIcao)
-            .addQueryParameter("begin", beginUnix.toString())
-            .addQueryParameter("end", endUnix.toString())
+    private fun queryAviationStack(
+        apiKey: String,
+        flightIata: String,
+        flightDate: String,
+        originIata: String
+    ): Snapshot? {
+        val url = BASE_URL.toHttpUrl().newBuilder()
+            .addQueryParameter("access_key", apiKey)
+            .addQueryParameter("flight_iata", flightIata)
+            .addQueryParameter("flight_date", flightDate)
             .build()
+
         val body = httpGet(url.toString()) ?: return null
-        val array = runCatching { JSONArray(body) }.getOrNull() ?: return null
-        val normalizedTarget = normalizeCallsign(flightNumber)
-        for (i in 0 until array.length()) {
-            val obj = array.optJSONObject(i) ?: continue
-            val callsign = obj.optString("callsign").takeIf { it.isNotBlank() }?.trim()
-            if (callsign != null && normalizeCallsign(callsign) == normalizedTarget) {
-                return DepartureMatch(
-                    icao24 = obj.optString("icao24").lowercase(Locale.US),
-                    callsign = callsign,
-                    firstSeen = obj.optLong("firstSeen", -1L).takeIf { it > 0 }
-                )
+        val root = runCatching { JSONObject(body) }.getOrNull() ?: return null
+        val dataArray = root.optJSONArray("data") ?: return null
+        if (dataArray.length() == 0) return null
+
+        var match: JSONObject? = null
+        val originKey = originIata.trim().uppercase(Locale.US)
+        if (originKey.isNotBlank()) {
+            for (i in 0 until dataArray.length()) {
+                val obj = dataArray.optJSONObject(i) ?: continue
+                val depIata = obj.optJSONObject("departure")?.optString("iata")
+                    ?.uppercase(Locale.US).orEmpty()
+                if (depIata == originKey) {
+                    match = obj
+                    break
+                }
             }
         }
-        return null
+        if (match == null) match = dataArray.optJSONObject(0) ?: return null
+        return parseFlight(match)
     }
 
-    private suspend fun fetchLiveState(icao24: String): LiveState? {
-        if (icao24.isBlank()) return null
-        val url = "$OPEN_SKY_BASE/states/all".toHttpUrl().newBuilder()
-            .addQueryParameter("icao24", icao24.lowercase(Locale.US))
-            .build()
-        val body = httpGet(url.toString()) ?: return null
-        val obj = runCatching { JSONObject(body) }.getOrNull() ?: return null
-        val states = obj.optJSONArray("states") ?: return null
-        val first = states.optJSONArray(0) ?: return null
-        // OpenSky state vector index map per https://openskynetwork.github.io/opensky-api/rest.html
-        return LiveState(
-            longitude = first.optDouble(5).takeUnless { it.isNaN() },
-            latitude = first.optDouble(6).takeUnless { it.isNaN() },
-            onGround = if (first.isNull(8)) null else first.optBoolean(8),
-            lastContact = first.optLong(4, -1L).takeIf { it > 0 }
+    private fun parseFlight(obj: JSONObject): Snapshot {
+        val statusRaw = obj.optString("flight_status").lowercase(Locale.US)
+        val airline = obj.optJSONObject("airline")
+        val flight = obj.optJSONObject("flight")
+        val aircraft = obj.optJSONObject("aircraft")
+        val live = obj.optJSONObject("live")
+
+        val status = when (statusRaw) {
+            "scheduled" -> Status.SCHEDULED
+            "active" -> Status.ACTIVE
+            "landed" -> Status.LANDED
+            "cancelled" -> Status.CANCELLED
+            "diverted" -> Status.DIVERTED
+            "incident" -> Status.INCIDENT
+            else -> Status.UNKNOWN
+        }
+
+        return Snapshot(
+            status = status,
+            flightIata = flight?.optStringOrNull("iata"),
+            flightNumber = flight?.optStringOrNull("number"),
+            airlineName = airline?.optStringOrNull("name"),
+            airlineIata = airline?.optStringOrNull("iata"),
+            aircraftType = aircraft?.optStringOrNull("iata"),
+            aircraftRegistration = aircraft?.optStringOrNull("registration"),
+            aircraftIcao24 = aircraft?.optStringOrNull("icao24"),
+            departure = parseEndpoint(obj.optJSONObject("departure"), includeBaggage = false),
+            arrival = parseEndpoint(obj.optJSONObject("arrival"), includeBaggage = true),
+            live = parseLive(live),
+            updatedAtUnix = parseIsoUnix(live?.optStringOrNull("updated"))
+                ?: Instant.now().epochSecond
         )
     }
 
-    private const val TOKEN_URL =
-        "https://auth.opensky-network.org/auth/realms/opensky-network/protocol/openid-connect/token"
+    private fun parseEndpoint(obj: JSONObject?, includeBaggage: Boolean): Endpoint {
+        if (obj == null) {
+            return Endpoint(null, null, null, null, null, null, null, null, null, null, null)
+        }
+        return Endpoint(
+            airportName = obj.optStringOrNull("airport"),
+            iata = obj.optStringOrNull("iata"),
+            icao = obj.optStringOrNull("icao"),
+            terminal = obj.optStringOrNull("terminal"),
+            gate = obj.optStringOrNull("gate"),
+            baggageBelt = if (includeBaggage) obj.optStringOrNull("baggage") else null,
+            timezone = obj.optStringOrNull("timezone"),
+            delayMinutes = obj.optIntOrNull("delay")?.toLong(),
+            scheduledUnix = parseIsoUnix(obj.optStringOrNull("scheduled")),
+            estimatedUnix = parseIsoUnix(obj.optStringOrNull("estimated")),
+            actualUnix = parseIsoUnix(obj.optStringOrNull("actual"))
+        )
+    }
 
-    @Volatile private var cachedAccessToken: String? = null
-    @Volatile private var tokenExpiresAtMs: Long = 0L
-    private val tokenMutex = Mutex()
+    private fun parseLive(obj: JSONObject?): LivePosition? {
+        if (obj == null) return null
+        val pos = LivePosition(
+            updatedUnix = parseIsoUnix(obj.optStringOrNull("updated")),
+            latitude = obj.optDoubleOrNull("latitude"),
+            longitude = obj.optDoubleOrNull("longitude"),
+            altitudeMeters = obj.optDoubleOrNull("altitude"),
+            speedKph = obj.optDoubleOrNull("speed_horizontal"),
+            verticalSpeedKph = obj.optDoubleOrNull("speed_vertical"),
+            headingDeg = obj.optDoubleOrNull("direction"),
+            isGround = if (obj.has("is_ground") && !obj.isNull("is_ground")) obj.optBoolean("is_ground") else null
+        )
+        return if (pos.hasAnySignal) pos else null
+    }
 
-    private suspend fun bearerTokenOrNull(): String? {
-        val clientId = BuildConfig.OPENSKY_CLIENT_ID
-        val clientSecret = BuildConfig.OPENSKY_CLIENT_SECRET
-        if (clientId.isBlank() || clientSecret.isBlank()) return null
-
-        val now = System.currentTimeMillis()
-        cachedAccessToken?.takeIf { tokenExpiresAtMs - 30_000 > now }?.let { return it }
-
-        return tokenMutex.withLock {
-            val recheck = cachedAccessToken
-            if (recheck != null && tokenExpiresAtMs - 30_000 > System.currentTimeMillis()) {
-                return@withLock recheck
+    private fun httpGet(url: String): String? {
+        val request = Request.Builder().url(url).get().build()
+        return runCatching {
+            client.newCall(request).execute().use { response ->
+                if (!response.isSuccessful) return@use null
+                response.body?.string()
             }
-            val form = FormBody.Builder()
-                .add("grant_type", "client_credentials")
-                .add("client_id", clientId)
-                .add("client_secret", clientSecret)
-                .build()
-            val request = Request.Builder()
-                .url(TOKEN_URL)
-                .post(form)
-                .build()
-            runCatching {
-                client.newCall(request).execute().use { response ->
-                    if (!response.isSuccessful) return@use null
-                    val body = response.body?.string()?.takeIf { it.isNotBlank() }
-                        ?: return@use null
-                    val obj = JSONObject(body)
-                    val token = obj.optString("access_token").takeIf { it.isNotBlank() }
-                        ?: return@use null
-                    val expiresIn = obj.optLong("expires_in", 60L)
-                    cachedAccessToken = token
-                    tokenExpiresAtMs = System.currentTimeMillis() + (expiresIn * 1000L)
-                    token
-                }
-            }.getOrNull()
-        }
+        }.getOrNull()
     }
 
-    private suspend fun httpGet(url: String): String? {
-        val builder = Request.Builder().url(url).get()
-        bearerTokenOrNull()?.let { builder.header("Authorization", "Bearer $it") }
-        return withContext(Dispatchers.IO) {
-            runCatching {
-                client.newCall(builder.build()).execute().use { response ->
-                    if (!response.isSuccessful) return@use null
-                    response.body?.string()
-                }
-            }.getOrNull()
-        }
+    private fun JSONObject.optStringOrNull(key: String): String? {
+        if (!has(key) || isNull(key)) return null
+        val raw = optString(key, "").trim()
+        return raw.takeIf { it.isNotBlank() && !it.equals("null", ignoreCase = true) }
     }
 
-    private fun normalizeCallsign(input: String): String {
-        return input.uppercase(Locale.US)
-            .filter { it.isLetterOrDigit() }
+    private fun JSONObject.optIntOrNull(key: String): Int? {
+        if (!has(key) || isNull(key)) return null
+        val v = optInt(key, Int.MIN_VALUE)
+        return if (v == Int.MIN_VALUE) null else v
+    }
+
+    private fun JSONObject.optDoubleOrNull(key: String): Double? {
+        if (!has(key) || isNull(key)) return null
+        val v = optDouble(key, Double.NaN)
+        return if (v.isNaN()) null else v
+    }
+
+    private fun normalizeFlightIata(input: String): String? {
+        val trimmed = input.trim().uppercase(Locale.US).filter { it.isLetterOrDigit() }
+        if (trimmed.length < 3) return null
+        return trimmed
+    }
+
+    private fun scheduledDateLocal(scheduledLocal: String): String? {
+        val datePart = scheduledLocal.trim().substringBefore(" ").takeIf { it.isNotBlank() }
+            ?: return null
+        return runCatching {
+            LocalDate.parse(datePart, DateTimeFormatter.ISO_LOCAL_DATE)
+                .format(DateTimeFormatter.ISO_LOCAL_DATE)
+        }.getOrNull()
+    }
+
+    private fun scheduledDateUtc(scheduledUnix: Long): String {
+        return Instant.ofEpochSecond(scheduledUnix)
+            .atZone(ZoneOffset.UTC)
+            .toLocalDate()
+            .format(DateTimeFormatter.ISO_LOCAL_DATE)
     }
 
     private fun parseScheduledUnix(localDateTime: String, zoneId: String): Long? {
@@ -254,89 +271,19 @@ object FlightStatusRepository {
             val parser = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm")
             java.time.LocalDateTime.parse(trimmed, parser).atZone(zone).toEpochSecond()
         }.recoverCatching {
-            // Fallback: date-only, treat as midnight local
             val date = LocalDate.parse(trimmed.substringBefore(" "), DateTimeFormatter.ISO_LOCAL_DATE)
             val zone = if (zoneId.isBlank()) ZoneOffset.UTC else java.time.ZoneId.of(zoneId)
             date.atStartOfDay(zone).toEpochSecond()
         }.getOrNull()
     }
-}
 
-/**
- * Minimal IATA → ICAO airport-code lookup for the airports the app's flight
- * search already covers. OpenSky requires ICAO; SerpAPI gives us IATA.
- */
-private object AirportIcao {
-    private val map = mapOf(
-        // United States — ICAO is "K" + IATA
-        "ATL" to "KATL", "AUS" to "KAUS", "BNA" to "KBNA", "BOS" to "KBOS",
-        "BUR" to "KBUR", "BWI" to "KBWI", "CLT" to "KCLT", "DAL" to "KDAL",
-        "DCA" to "KDCA", "DEN" to "KDEN", "DFW" to "KDFW", "DTW" to "KDTW",
-        "EWR" to "KEWR", "FLL" to "KFLL", "GEG" to "KGEG", "HOU" to "KHOU",
-        "IAD" to "KIAD", "IAH" to "KIAH", "JFK" to "KJFK", "LAS" to "KLAS",
-        "LAX" to "KLAX", "LGA" to "KLGA", "LGB" to "KLGB", "MCI" to "KMCI",
-        "MCO" to "KMCO", "MDW" to "KMDW", "MEM" to "KMEM", "MHT" to "KMHT",
-        "MIA" to "KMIA", "MSP" to "KMSP", "MSY" to "KMSY", "OAK" to "KOAK",
-        "OKC" to "KOKC", "OMA" to "KOMA", "ONT" to "KONT", "ORD" to "KORD",
-        "ORF" to "KORF", "PBI" to "KPBI", "PDX" to "KPDX", "PHL" to "KPHL",
-        "PHX" to "KPHX", "PIT" to "KPIT", "PVD" to "KPVD", "RDU" to "KRDU",
-        "RNO" to "KRNO", "SAN" to "KSAN", "SAT" to "KSAT", "SEA" to "KSEA",
-        "SFO" to "KSFO", "SJC" to "KSJC", "SLC" to "KSLC", "SMF" to "KSMF",
-        "SNA" to "KSNA", "STL" to "KSTL", "TPA" to "KTPA",
-        // Hawaii / Alaska — keep K prefix exception
-        "HNL" to "PHNL", "OGG" to "PHOG", "KOA" to "PHKO", "ITO" to "PHTO",
-        "ANC" to "PANC",
-        // Canada — ICAO is "C" + IATA for most
-        "YYZ" to "CYYZ", "YVR" to "CYVR", "YUL" to "CYUL", "YYC" to "CYYC",
-        "YOW" to "CYOW", "YEG" to "CYEG", "YHZ" to "CYHZ", "YWG" to "CYWG",
-        "YTZ" to "CYTZ",
-        // Europe
-        "LHR" to "EGLL", "LGW" to "EGKK", "STN" to "EGSS", "LCY" to "EGLC",
-        "MAN" to "EGCC", "EDI" to "EGPH",
-        "CDG" to "LFPG", "ORY" to "LFPO", "NCE" to "LFMN",
-        "FRA" to "EDDF", "MUC" to "EDDM", "TXL" to "EDDB", "BER" to "EDDB",
-        "DUS" to "EDDL", "HHN" to "EDFH", "HAM" to "EDDH",
-        "AMS" to "EHAM", "BRU" to "EBBR", "ZRH" to "LSZH", "GVA" to "LSGG",
-        "VIE" to "LOWW", "MAD" to "LEMD", "BCN" to "LEBL",
-        "FCO" to "LIRF", "CIA" to "LIRA", "MXP" to "LIMC", "VCE" to "LIPZ",
-        "ATH" to "LGAV", "IST" to "LTFM",
-        "WAW" to "EPWA", "PRG" to "LKPR", "BUD" to "LHBP", "OTP" to "LROP",
-        "SOF" to "LBSF", "BEG" to "LYBE", "ZAG" to "LDZA",
-        "CPH" to "EKCH", "ARN" to "ESSA", "OSL" to "ENGM", "HEL" to "EFHK",
-        "DUB" to "EIDW", "KEF" to "BIKF",
-        "SVO" to "UUEE", "DME" to "UUDD", "LED" to "ULLI",
-        // Middle East
-        "DXB" to "OMDB", "AUH" to "OMAA", "DOH" to "OTHH", "RUH" to "OERK",
-        "JED" to "OEJN", "KWI" to "OKBK", "BAH" to "OBBI", "MCT" to "OOMS",
-        "TLV" to "LLBG", "AMM" to "OJAI", "BEY" to "OLBA",
-        // Asia
-        "NRT" to "RJAA", "HND" to "RJTT", "KIX" to "RJBB", "ITM" to "RJOO",
-        "ICN" to "RKSI", "GMP" to "RKSS", "PEK" to "ZBAA", "PKX" to "ZBAD",
-        "PVG" to "ZSPD", "SHA" to "ZSSS", "CAN" to "ZGGG", "CTU" to "ZUUU",
-        "HKG" to "VHHH", "TPE" to "RCTP", "SIN" to "WSSS", "KUL" to "WMKK",
-        "BKK" to "VTBS", "DMK" to "VTBD", "HAN" to "VVNB", "SGN" to "VVTS",
-        "MNL" to "RPLL", "CGK" to "WIII", "DPS" to "WADD",
-        "DEL" to "VIDP", "BOM" to "VABB", "BLR" to "VOBL", "MAA" to "VOMM",
-        "HYD" to "VOHS", "CCU" to "VECC",
-        "KHI" to "OPKC", "LHE" to "OPLA", "ISB" to "OPRN",
-        "DAC" to "VGHS", "CMB" to "VCBI",
-        // Oceania
-        "SYD" to "YSSY", "MEL" to "YMML", "BNE" to "YBBN", "PER" to "YPPH",
-        "ADL" to "YPAD", "CBR" to "YSCB",
-        "AKL" to "NZAA", "WLG" to "NZWN", "CHC" to "NZCH",
-        // Latin America
-        "GRU" to "SBGR", "GIG" to "SBGL", "EZE" to "SAEZ", "AEP" to "SABE",
-        "SCL" to "SCEL", "LIM" to "SPJC", "BOG" to "SKBO", "MEX" to "MMMX",
-        "CUN" to "MMUN", "PTY" to "MPTO", "UIO" to "SEQM",
-        // Africa
-        "JNB" to "FAOR", "CPT" to "FACT", "DUR" to "FALE",
-        "CAI" to "HECA", "CMN" to "GMMN", "RAK" to "GMMX", "NBO" to "HKJK",
-        "ADD" to "HAAB", "LOS" to "DNMM"
-    )
-
-    fun lookup(iata: String): String? {
-        val key = iata.trim().uppercase(Locale.US)
-        if (key.length != 3) return null
-        return map[key]
+    private fun parseIsoUnix(input: String?): Long? {
+        val trimmed = input?.trim().orEmpty()
+        if (trimmed.isBlank() || trimmed.equals("null", ignoreCase = true)) return null
+        return runCatching {
+            java.time.OffsetDateTime.parse(trimmed).toEpochSecond()
+        }.recoverCatching {
+            java.time.LocalDateTime.parse(trimmed).atOffset(ZoneOffset.UTC).toEpochSecond()
+        }.getOrNull()
     }
 }
