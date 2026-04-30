@@ -1,8 +1,4 @@
-<<<<<<< HEAD
-package com.example.travelcents.ui.main.newtrip
-=======
 package com.example.travelcents.ui.main.newTrip
->>>>>>> f3ada09702446ecc92076fe613e8dffd76d7694a
 
 import androidx.compose.ui.graphics.Color
 
@@ -16,7 +12,4 @@ object TripWizardColors {
     val OnSurfaceVariant = Color(0xFF9EABC8)
     val SecondaryContainer = Color(0xFF3A485B)
 }
-<<<<<<< HEAD
-=======
 
->>>>>>> f3ada09702446ecc92076fe613e8dffd76d7694a
