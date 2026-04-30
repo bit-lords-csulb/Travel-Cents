@@ -1,4 +1,4 @@
-package com.example.travelcents.ui.main.newTrip
+﻿package com.example.travelcents.ui.main.newTrip
 
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.expandVertically
@@ -221,7 +221,7 @@ private fun StepCard(label: String, isDone: Boolean, isActive: Boolean) {
 
             when {
                 isDone -> Text(
-                    text = "âœ“",
+                    text = "Done",
                     color = GenGreen,
                     fontSize = 16.sp,
                     fontWeight = FontWeight.Bold
