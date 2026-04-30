@@ -9,6 +9,9 @@ import com.example.travelcents.data.trip.model.ATTR_BUSINESS_NAME
 import com.example.travelcents.data.trip.model.ATTR_CATEGORIES
 import com.example.travelcents.data.trip.model.ATTR_CHECK_IN_TIME
 import com.example.travelcents.data.trip.model.ATTR_CHECK_OUT_TIME
+import com.example.travelcents.data.trip.model.ATTR_CUISINE
+import com.example.travelcents.data.trip.model.ATTR_HOTEL_CITY
+import com.example.travelcents.data.trip.model.ATTR_HOTEL_NAME
 import com.example.travelcents.data.trip.model.ATTR_HOTEL_RATING
 import com.example.travelcents.data.trip.model.ATTR_HOURS_SUMMARY
 import com.example.travelcents.data.trip.model.ATTR_IS_CLOSED
@@ -27,7 +30,9 @@ import com.example.travelcents.ui.modules.formatDisplayTimeRange
 import com.example.travelcents.ui.modules.formatTimeZoneLabel
 import com.example.travelcents.ui.modules.formatTripDate
 import com.example.travelcents.ui.modules.parseFlexibleTime
+import com.example.travelcents.ui.modules.todayIsoDate
 import java.time.Duration
+import java.time.ZoneId
 import java.util.Locale
 
 internal fun eventOfficialUrl(event: TravelEvent): String? {
@@ -42,6 +47,15 @@ internal fun eventOfficialUrl(event: TravelEvent): String? {
 }
 
 internal fun eventMapsQuery(event: TravelEvent): String {
+    if (event.type.equals("hotel", ignoreCase = true)) {
+        val hotelName = event.detailValue(ATTR_HOTEL_NAME, "hotel_name")?.takeIf { it.isNotBlank() }
+        if (hotelName != null) {
+            val city = event.detailValue(ATTR_HOTEL_CITY)?.takeIf { it.isNotBlank() }
+                ?: event.detailValue(ATTR_BUSINESS_ADDRESS, "address")?.takeIf { it.isNotBlank() }
+                ?: event.details["location"]?.takeIf { it.isNotBlank() }
+            return if (city != null) "$hotelName, $city" else hotelName
+        }
+    }
     val latitude = event.detailValue(ATTR_LATITUDE)?.toDoubleOrNull()
     val longitude = event.detailValue(ATTR_LONGITUDE)?.toDoubleOrNull()
     if (latitude != null && longitude != null) {
@@ -51,7 +65,7 @@ internal fun eventMapsQuery(event: TravelEvent): String {
         event.detailValue(ATTR_BUSINESS_ADDRESS, "address"),
         event.details["location"],
         event.details["destination_airport"],
-        event.detailValue("attr_hotel_name", "hotel_name"),
+        event.detailValue(ATTR_HOTEL_NAME, "hotel_name"),
         event.detailValue(ATTR_BUSINESS_NAME, "restaurant_name", "activity_name"),
         event.details["title"],
         eventTitle(event)
@@ -168,17 +182,7 @@ internal data class HotelStayMoment(
 )
 
 internal fun hotelStayMoments(event: TravelEvent): List<HotelStayMoment> {
-    val zoneLabel = event.tz
-        .takeIf { it.isNotBlank() }
-        ?.let { tz ->
-            val date = event.details["check_in_date"]
-                ?: event.details["check_out_date"]
-                ?: event.date
-            val time = event.detailValue(ATTR_CHECK_IN_TIME, "check_in_time", "check_in")
-                ?: event.detailValue(ATTR_CHECK_OUT_TIME, "check_out_time", "check_out")
-                ?: event.startTime
-            if (date.isBlank() || time.isBlank()) null else formatTimeZoneLabel(tz, date, time)
-        }
+    val zoneLabel = hotelStayTimeZoneLabel(event)
 
     return listOf(
         HotelStayMoment(
@@ -202,13 +206,62 @@ internal fun hotelStayMoments(event: TravelEvent): List<HotelStayMoment> {
     }
 }
 
+private fun hotelStayTimeZoneLabel(event: TravelEvent): String? {
+    return localTimeZoneLabel(
+        context = "Hotel",
+        event = event,
+        referenceDates = listOf(
+            event.details["check_in_date"],
+            event.details["check_out_date"],
+            event.date
+        ),
+        referenceTimes = listOf(
+            event.detailValue(ATTR_CHECK_IN_TIME, "check_in_time", "check_in"),
+            event.detailValue(ATTR_CHECK_OUT_TIME, "check_out_time", "check_out"),
+            event.startTime
+        )
+    )
+}
+
+internal fun restaurantHoursTimeZoneLabel(
+    event: TravelEvent,
+    referenceDate: String? = null,
+    referenceTime: String? = null
+): String {
+    return localTimeZoneLabel(
+        context = "Restaurant",
+        event = event,
+        referenceDates = listOf(referenceDate, event.date),
+        referenceTimes = listOf(referenceTime, event.startTime)
+    )
+}
+
+private fun localTimeZoneLabel(
+    context: String,
+    event: TravelEvent,
+    referenceDates: List<String?>,
+    referenceTimes: List<String?>
+): String {
+    val unavailableLabel = "$context local time zone unavailable"
+    val timeZoneId = event.tz.takeIf { it.isNotBlank() } ?: return unavailableLabel
+    val zoneId = runCatching { ZoneId.of(timeZoneId) }.getOrNull() ?: return unavailableLabel
+    val referenceDate = referenceDates.firstNotNullOfOrNull { value ->
+        value?.takeIf { it.isNotBlank() }
+    } ?: todayIsoDate(zoneId)
+    val referenceTime = referenceTimes.firstNotNullOfOrNull { value ->
+        value?.takeIf { it.isNotBlank() }
+    } ?: "12:00 PM"
+
+    return "$context local time: ${formatTimeZoneLabel(timeZoneId, referenceDate, referenceTime)}"
+}
+
 internal fun eventExperienceText(event: TravelEvent): String {
     return listOf(
         event.details["description"],
         event.details["notes"],
         eventSubtitle(event).takeIf { it != "Tap to edit details" },
         event.detailValue(ATTR_CATEGORIES, "categories"),
-        event.details["cuisine"]
+        event.detailValue(ATTR_CUISINE, "cuisine")
     ).firstOrNull { !it.isNullOrBlank() }
         ?: "Add notes or switch options to give this stop more context."
 }

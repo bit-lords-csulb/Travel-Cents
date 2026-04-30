@@ -21,6 +21,15 @@ fun HotelStayCard(event: TravelEvent) {
     if (stayMoments.isEmpty()) return
 
     DetailCardFrame(accent = CardLavender) {
+        stayMoments.firstOrNull()?.timeZoneLabel?.let {
+            Text(
+                text = it,
+                color = CardTextMuted,
+                fontSize = 12.sp,
+                lineHeight = 16.sp,
+                modifier = Modifier.padding(bottom = 12.dp)
+            )
+        }
         Row(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.spacedBy(10.dp)
@@ -58,15 +67,6 @@ fun HotelStayCard(event: TravelEvent) {
                     }
                 }
             }
-        }
-        stayMoments.firstOrNull()?.timeZoneLabel?.let {
-            Text(
-                text = it,
-                color = CardTextMuted,
-                fontSize = 12.sp,
-                lineHeight = 16.sp,
-                modifier = Modifier.padding(top = 12.dp)
-            )
         }
     }
 }

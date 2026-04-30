@@ -121,6 +121,7 @@ class UserProfileRepository(
                 .orEmpty()
                 .ifBlank { authUser.googleProfilePhotoUrl().orEmpty() },
             profileImageSource = snapshot?.getString("profileImageSource").orEmpty(),
+            doNotShareData = snapshot?.getBoolean("doNotShareData") ?: false,
             isLoading = isLoading
         )
     }

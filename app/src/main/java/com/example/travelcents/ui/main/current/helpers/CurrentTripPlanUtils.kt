@@ -1,12 +1,12 @@
 package com.example.travelcents.ui.main.current
 
-import com.example.travelcents.data.trip.model.TravelEvent
 import com.example.travelcents.data.trip.model.ATTR_AVERAGE_RATING
 import com.example.travelcents.data.trip.model.ATTR_BUSINESS_ADDRESS
 import com.example.travelcents.data.trip.model.ATTR_BUSINESS_NAME
+import com.example.travelcents.data.trip.model.ATTR_CUISINE
 import com.example.travelcents.data.trip.model.ATTR_HOTEL_NAME
 import com.example.travelcents.data.trip.model.ATTR_HOTEL_RATING
-import com.example.travelcents.data.trip.model.ATTR_REVIEW_COUNT
+import com.example.travelcents.data.trip.model.TravelEvent
 import com.example.travelcents.data.trip.model.displayName
 import com.example.travelcents.data.trip.model.firstNonBlank
 import com.example.travelcents.ui.modules.defaultPlanTimeZoneId
@@ -99,7 +99,7 @@ fun eventSubtitle(event: TravelEvent): String {
             event.details.firstNonBlank(ATTR_HOTEL_RATING, ATTR_AVERAGE_RATING, "rating")?.takeIf { it.isNotBlank() }?.let { "★$it" }
         ).joinToString(" · ")
         "restaurant", "dining", "food" -> listOfNotNull(
-            event.details["cuisine"]?.takeIf { it.isNotBlank() },
+            event.details.firstNonBlank(ATTR_CUISINE, "cuisine")?.takeIf { it.isNotBlank() },
             event.details["location"]?.takeIf { it.isNotBlank() },
             event.details.firstNonBlank(ATTR_BUSINESS_ADDRESS, "address")?.takeIf { it.isNotBlank() }
         ).joinToString(" · ")
@@ -123,7 +123,7 @@ fun editableLocation(event: TravelEvent): String {
 
 fun editableNotes(event: TravelEvent): String {
     return event.details["description"]
-        ?: event.details["cuisine"]
+        ?: event.details.firstNonBlank(ATTR_CUISINE, "cuisine")
         ?: event.details["notes"]
         ?: listOf(event.details["airline"], event.details["flight_number"])
             .filter { !it.isNullOrBlank() }

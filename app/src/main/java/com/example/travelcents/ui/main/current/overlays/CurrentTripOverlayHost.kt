@@ -57,6 +57,9 @@ fun CurrentTripOverlayHost(
                 (eventId !in eventOptions || eventOptions[eventId].orEmpty().size > 1)
             CurrentTripEventDetailsDialog(
                 event = event,
+                tripDestination = uiState.destination,
+                tripAdults = uiState.adults,
+                tripChildren = uiState.children,
                 currentOptions = eventOptions[eventId].orEmpty(),
                 yelpReviews = yelpReviews[yelpId].orEmpty(),
                 reviewsLoading = reviewsLoading.contains(yelpId),

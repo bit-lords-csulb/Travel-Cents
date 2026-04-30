@@ -197,8 +197,12 @@ object AirportTimeZones {
         "SYD" to "Australia/Sydney"
     )
 
-    fun zoneIdForIata(iata: String): ZoneId {
-        val zoneId = airportZones[iata.trim().uppercase(Locale.US)] ?: "UTC"
+    fun zoneIdForIataOrNull(iata: String): ZoneId? {
+        val zoneId = airportZones[iata.trim().uppercase(Locale.US)] ?: return null
         return ZoneId.of(zoneId)
+    }
+
+    fun zoneIdForIata(iata: String): ZoneId {
+        return zoneIdForIataOrNull(iata) ?: ZoneId.of("UTC")
     }
 }

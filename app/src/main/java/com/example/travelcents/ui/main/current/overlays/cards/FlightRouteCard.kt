@@ -15,14 +15,31 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.example.travelcents.data.trip.model.ATTR_STOP_AIRPORTS
 import com.example.travelcents.data.trip.model.TravelEvent
+import com.example.travelcents.data.trip.model.detailValue
 
 @Composable
 fun FlightRouteCard(event: TravelEvent) {
-    val origin = event.details["origin_airport"] ?: "—"
-    val destination = event.details["destination_airport"] ?: "—"
+    val origin = event.detailValue("origin_airport") ?: "—"
+    val destination = event.detailValue("destination_airport") ?: "—"
+    val stopCount = event.detailValue("stops")?.toIntOrNull() ?: 0
+    val stopAirports = event.detailValue(ATTR_STOP_AIRPORTS)
+        ?.split(",")
+        ?.filter { it.isNotBlank() }
+        ?: emptyList()
+    val stopsLabel = when {
+        stopCount == 0 -> "Nonstop"
+        stopCount == 1 && stopAirports.isNotEmpty() -> "1 stop · ${stopAirports.first()}"
+        stopAirports.isNotEmpty() -> "$stopCount stops · ${stopAirports.joinToString(", ")}"
+        stopCount == 1 -> "1 stop"
+        else -> "$stopCount stops"
+    }
+    val durationMin = event.detailValue("flight_duration_min")?.toIntOrNull()
+    val durationLabel = durationMin?.let { "${it / 60}h ${it % 60}m" }
+
     DetailCardFrame(accent = CardSky) {
-        DetailCardHeader(eyebrow = "Route", title = "$origin to $destination")
+        DetailCardHeader(eyebrow = "Route", title = "$origin → $destination")
         Spacer(modifier = Modifier.height(10.dp))
         Row(
             modifier = Modifier.fillMaxWidth(),
@@ -30,22 +47,35 @@ fun FlightRouteCard(event: TravelEvent) {
             verticalAlignment = Alignment.CenterVertically
         ) {
             AirportBlock(modifier = Modifier.weight(1f), label = "From", airport = origin, alignEnd = false)
-            Text(
-                text = "→",
-                color = CardSky,
-                fontSize = 24.sp,
-                fontWeight = FontWeight.Bold,
-                textAlign = TextAlign.Center,
+            Column(
+                horizontalAlignment = Alignment.CenterHorizontally,
                 modifier = Modifier.padding(horizontal = 8.dp)
-            )
+            ) {
+                Text(
+                    text = "→",
+                    color = CardSky,
+                    fontSize = 24.sp,
+                    fontWeight = FontWeight.Bold
+                )
+                if (durationLabel != null) {
+                    Text(
+                        text = durationLabel,
+                        color = CardTextMuted,
+                        fontSize = 10.sp,
+                        fontWeight = FontWeight.SemiBold,
+                        textAlign = TextAlign.Center
+                    )
+                }
+            }
             AirportBlock(modifier = Modifier.weight(1f), label = "To", airport = destination, alignEnd = true)
         }
         Spacer(modifier = Modifier.height(10.dp))
         DetailBadgeRow(
-            badges = listOf(
-                event.details["airline"] ?: "",
-                event.details["flight_number"] ?: "",
-                event.details["cabin_class"] ?: "Economy"
+            badges = listOfNotNull(
+                event.detailValue("airline"),
+                event.detailValue("flight_number"),
+                event.detailValue("cabin_class") ?: "Economy",
+                stopsLabel
             ),
             accent = CardSky
         )
