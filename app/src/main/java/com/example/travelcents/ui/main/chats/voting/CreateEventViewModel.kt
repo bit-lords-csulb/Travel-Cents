@@ -23,15 +23,20 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import kotlinx.serialization.json.Json
+import org.json.JSONArray
 import org.json.JSONObject
 
 data class PlaceSuggestion(
-    val fsqId: String = "",
+    val yelpId: String = "",
     val name: String = "",
     val interest: String = "",
     val address: String = "",
     val category: String = "",
-    val photoUrl: String = ""
+    val categories: List<String> = emptyList(),
+    val photoUrl: String = "",
+    val yelpUrl: String = "",
+    val rating: Double? = null,
+    val reviewCount: Int = 0
 )
 
 class CreateEventViewModel(private val groupId: String) : ViewModel() {
@@ -72,6 +77,7 @@ class CreateEventViewModel(private val groupId: String) : ViewModel() {
     val isCreating = _isCreating.asStateFlow()
 
     private var creatorName = ""
+    private var selectedPlace: PlaceSuggestion? = null
 
     init {
         fetchCreatorName()
@@ -85,6 +91,9 @@ class CreateEventViewModel(private val groupId: String) : ViewModel() {
     }
 
     fun onTitleChange(v: String) {
+        if (selectedPlace?.name != v) {
+            selectedPlace = null
+        }
         _title.value = v
     }
 
@@ -132,18 +141,28 @@ class CreateEventViewModel(private val groupId: String) : ViewModel() {
                     for (i in 0 until it.length()) {
                         val b = it.getJSONObject(i)
                         val loc = b.optJSONObject("location")
+                        val categories = b.optJSONArray("categories")
+                            .toStringListFromObjects("title")
+                        val displayAddress = loc?.optJSONArray("display_address")
+                            .toStringList()
+                            .joinToString(", ")
+                            .ifBlank { loc?.optString("address1", "").orEmpty() }
+                        val rating = b.optDouble("rating", 0.0).takeIf { value -> value > 0.0 }
                         results.add(
                             PlaceSuggestion(
-                                fsqId = b.optString("id"),
+                                yelpId = b.optString("id"),
                                 name = b.optString("name"),
-                                interest = "${
-                                    b.optJSONArray("categories")?.optJSONObject(0)
-                                        ?.optString("title")
-                                } • ${b.optDouble("rating")} ⭐",
-                                address = loc?.optString("address1", "") ?: "",
-                                category = b.optJSONArray("categories")?.optJSONObject(0)
-                                    ?.optString("title") ?: "Activity",
-                                photoUrl = b.optString("image_url")
+                                interest = buildInterestLabel(
+                                    category = categories.firstOrNull().orEmpty(),
+                                    rating = rating
+                                ),
+                                address = displayAddress,
+                                category = categories.firstOrNull() ?: "Activity",
+                                categories = categories,
+                                photoUrl = b.optString("image_url"),
+                                yelpUrl = b.optString("url"),
+                                rating = rating,
+                                reviewCount = b.optInt("review_count", 0)
                             )
                         )
                     }
@@ -161,6 +180,7 @@ class CreateEventViewModel(private val groupId: String) : ViewModel() {
     // Updates the form fields with the selected place's data
     // Fetches a more detailed description from Wikipedia
     fun selectPlace(place: PlaceSuggestion) {
+        selectedPlace = place
         _title.value = place.name
         _location.value = place.address
         _photoUrl.value = place.photoUrl
@@ -209,7 +229,8 @@ class CreateEventViewModel(private val groupId: String) : ViewModel() {
     fun createEvent(onSuccess: () -> Unit) {
         val uid = auth.currentUser?.uid ?: return
         _isCreating.value = true
-        val data = hashMapOf(
+        val place = selectedPlace
+        val data = hashMapOf<String, Any>(
             "title" to _title.value,
             "description" to _description.value,
             "location" to _location.value,
@@ -225,6 +246,15 @@ class CreateEventViewModel(private val groupId: String) : ViewModel() {
             "commentCount" to 0,
             "isWon" to false
         )
+        place?.let { selected ->
+            if (selected.yelpId.isNotBlank()) data["yelpId"] = selected.yelpId
+            if (selected.yelpUrl.isNotBlank()) data["yelpUrl"] = selected.yelpUrl
+            if (selected.category.isNotBlank()) data["yelpCategory"] = selected.category
+            if (selected.categories.isNotEmpty()) data["yelpCategories"] = selected.categories
+            selected.rating?.let { data["yelpRating"] = it }
+            if (selected.reviewCount > 0) data["yelpReviewCount"] = selected.reviewCount
+            if (selected.photoUrl.isNotBlank()) data["yelpImageUrl"] = selected.photoUrl
+        }
         db.collection("groups").document(groupId).collection("events").add(data)
             .addOnSuccessListener { _isCreating.value = false; onSuccess() }
     }
@@ -237,6 +267,7 @@ class CreateEventViewModel(private val groupId: String) : ViewModel() {
         _endTime.value = ""
         _location.value = ""
         _photoUrl.value = ""
+        selectedPlace = null
     }
 
     fun clearSuggestions() {
@@ -252,5 +283,33 @@ class CreateEventViewModel(private val groupId: String) : ViewModel() {
     class Factory(private val groupId: String) : ViewModelProvider.Factory {
         override fun <T : ViewModel> create(modelClass: Class<T>): T =
             CreateEventViewModel(groupId) as T
+    }
+}
+
+private fun buildInterestLabel(category: String, rating: Double?): String {
+    val categoryLabel = category.ifBlank { "Activity" }
+    return if (rating != null) "$categoryLabel • $rating ⭐" else categoryLabel
+}
+
+private fun JSONArray?.toStringList(): List<String> {
+    if (this == null) return emptyList()
+    return buildList {
+        for (index in 0 until length()) {
+            optString(index)
+                .takeIf { it.isNotBlank() }
+                ?.let(::add)
+        }
+    }
+}
+
+private fun JSONArray?.toStringListFromObjects(key: String): List<String> {
+    if (this == null) return emptyList()
+    return buildList {
+        for (index in 0 until length()) {
+            optJSONObject(index)
+                ?.optString(key)
+                ?.takeIf { it.isNotBlank() }
+                ?.let(::add)
+        }
     }
 }
