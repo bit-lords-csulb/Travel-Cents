@@ -6,14 +6,11 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.Icon
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -26,12 +23,18 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImage
+import com.example.travelcents.data.trip.model.ATTR_AIRLINE_LOGO_URL
 import com.example.travelcents.data.trip.model.ATTR_BUSINESS_ADDRESS
 import com.example.travelcents.data.trip.model.TravelEvent
 import com.example.travelcents.data.trip.model.firstNonBlank
 import com.example.travelcents.ui.main.current.eventSubtitle
 import com.example.travelcents.ui.main.current.eventTitle
 import com.example.travelcents.ui.modules.PhotoGalleryButton
+import com.example.travelcents.ui.modules.formatDisplayTimeRange
+import com.example.travelcents.ui.modules.formatLongDuration
+import com.example.travelcents.ui.modules.formatLongTripDateWithYear
+import com.example.travelcents.ui.modules.parseFlexibleTime
+import java.time.Duration
 import java.util.Locale
 
 @Composable
@@ -51,6 +54,31 @@ fun EventSummaryCard(
             heroImage = heroImage,
             photoCount = photoCount,
             title = title,
+            onOpenGallery = onOpenGallery
+        )
+        return
+    }
+    if (event.type.equals("restaurant", ignoreCase = true) ||
+        event.type.equals("dining", ignoreCase = true) ||
+        event.type.equals("food", ignoreCase = true)
+    ) {
+        RestaurantSummaryVariant(
+            event = event,
+            heroImage = heroImage,
+            photoCount = photoCount,
+            title = title,
+            onOpenGallery = onOpenGallery
+        )
+        return
+    }
+    if (event.type.equals("flight", ignoreCase = true)) {
+        FlightSummaryVariant(
+            event = event,
+            heroImage = heroImage,
+            photoCount = photoCount,
+            title = title,
+            timeSummary = timeSummary,
+            durationSummary = durationSummary,
             onOpenGallery = onOpenGallery
         )
         return
@@ -221,15 +249,22 @@ private fun HotelSummaryCard(
                     )
                 }
 
-                if (photoCount > 1 && onOpenGallery != null) {
-                    PhotoGalleryButton(
-                        photoCount = photoCount,
-                        onClick = onOpenGallery,
-                        containerAlpha = 0.28f,
+                if (photoCount > 0) {
+                    Surface(
+                        color = CardBackground.copy(alpha = 0.62f),
+                        shape = RoundedCornerShape(999.dp),
                         modifier = Modifier
-                            .align(Alignment.TopEnd)
+                            .align(Alignment.BottomStart)
                             .padding(10.dp)
-                    )
+                    ) {
+                        Text(
+                            text = "1/$photoCount",
+                            color = CardText,
+                            fontSize = 11.sp,
+                            fontWeight = FontWeight.Bold,
+                            modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp)
+                        )
+                    }
                 }
             }
 
@@ -252,6 +287,259 @@ private fun HotelSummaryCard(
                         lineHeight = 18.sp
                     )
                 }
+            }
+        }
+    }
+}
+
+@Composable
+private fun RestaurantSummaryVariant(
+    event: TravelEvent,
+    heroImage: String?,
+    photoCount: Int,
+    title: String,
+    onOpenGallery: (() -> Unit)?
+) {
+    val dateLine = event.date.takeIf { it.isNotBlank() }
+        ?.let(::formatLongTripDateWithYear)
+    val timeRange = formatDisplayTimeRange(event.startTime, event.endTime)
+        .takeIf { it.isNotBlank() && it != "TIME TBD" }
+    val totalMinutes = run {
+        val start = parseFlexibleTime(event.startTime)
+        val end = parseFlexibleTime(event.endTime)
+        if (start != null && end != null && end.isAfter(start)) {
+            Duration.between(start, end).toMinutes()
+        } else 0L
+    }
+    val durationLabel = formatLongDuration(totalMinutes).takeIf { it.isNotBlank() }
+    val durationLine = when {
+        timeRange != null && durationLabel != null -> "$timeRange ($durationLabel)"
+        timeRange != null -> timeRange
+        durationLabel != null -> durationLabel
+        else -> null
+    }
+
+    DetailCardFrame(accent = CardCoral) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(16.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Box(
+                modifier = Modifier
+                    .weight(0.42f)
+                    .aspectRatio(0.92f)
+                    .clip(RoundedCornerShape(24.dp))
+                    .background(CardSurfaceHighest)
+                    .then(if (onOpenGallery != null) Modifier.clickable(onClick = onOpenGallery) else Modifier)
+            ) {
+                if (!heroImage.isNullOrBlank()) {
+                    AsyncImage(
+                        model = heroImage,
+                        contentDescription = title,
+                        modifier = Modifier.matchParentSize(),
+                        contentScale = ContentScale.Crop
+                    )
+                    Box(
+                        modifier = Modifier
+                            .matchParentSize()
+                            .background(
+                                Brush.verticalGradient(
+                                    colors = listOf(
+                                        androidx.compose.ui.graphics.Color.Transparent,
+                                        CardBackground.copy(alpha = 0.12f),
+                                        CardBackground.copy(alpha = 0.42f)
+                                    )
+                                )
+                            )
+                    )
+                } else {
+                    Box(
+                        modifier = Modifier
+                            .matchParentSize()
+                            .background(accentGradientForType(event.type))
+                    )
+                }
+
+                if (photoCount > 1) {
+                    Surface(
+                        color = CardBackground.copy(alpha = 0.62f),
+                        shape = RoundedCornerShape(999.dp),
+                        modifier = Modifier
+                            .align(Alignment.BottomStart)
+                            .padding(10.dp)
+                    ) {
+                        Text(
+                            text = "1/$photoCount",
+                            color = CardText,
+                            fontSize = 11.sp,
+                            fontWeight = FontWeight.Bold,
+                            modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp)
+                        )
+                    }
+                }
+            }
+
+            Column(
+                modifier = Modifier.weight(0.58f),
+                verticalArrangement = Arrangement.spacedBy(10.dp)
+            ) {
+                Text(
+                    text = title,
+                    color = CardText,
+                    fontSize = 26.sp,
+                    lineHeight = 30.sp,
+                    fontWeight = FontWeight.ExtraBold
+                )
+                dateLine?.let {
+                    Text(
+                        text = it,
+                        color = CardText,
+                        fontSize = 14.sp,
+                        fontWeight = FontWeight.SemiBold,
+                        lineHeight = 18.sp
+                    )
+                }
+                durationLine?.let {
+                    Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                        Text(
+                            text = "DURATION",
+                            color = CardTextMuted,
+                            fontSize = 10.sp,
+                            fontWeight = FontWeight.Bold,
+                            letterSpacing = 1.2.sp
+                        )
+                        Text(
+                            text = it,
+                            color = CardCoral,
+                            fontSize = 13.sp,
+                            fontWeight = FontWeight.SemiBold,
+                            lineHeight = 17.sp
+                        )
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun FlightSummaryVariant(
+    event: TravelEvent,
+    heroImage: String?,
+    photoCount: Int,
+    title: String,
+    timeSummary: String,
+    durationSummary: String,
+    onOpenGallery: (() -> Unit)?
+) {
+    val airlineLogo = event.details.firstNonBlank(ATTR_AIRLINE_LOGO_URL, "airline_logo")
+        ?.takeIf { it.isNotBlank() }
+
+    DetailCardFrame(accent = CardSky) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(16.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Box(
+                modifier = Modifier
+                    .weight(0.42f)
+                    .aspectRatio(0.92f)
+                    .clip(RoundedCornerShape(24.dp))
+                    .background(CardSurfaceHighest)
+                    .then(if (onOpenGallery != null) Modifier.clickable(onClick = onOpenGallery) else Modifier)
+            ) {
+                if (!heroImage.isNullOrBlank()) {
+                    AsyncImage(
+                        model = heroImage,
+                        contentDescription = title,
+                        modifier = Modifier.matchParentSize(),
+                        contentScale = ContentScale.Crop
+                    )
+                    Box(
+                        modifier = Modifier
+                            .matchParentSize()
+                            .background(
+                                Brush.verticalGradient(
+                                    colors = listOf(
+                                        androidx.compose.ui.graphics.Color.Transparent,
+                                        CardBackground.copy(alpha = 0.18f),
+                                        CardBackground.copy(alpha = 0.72f)
+                                    )
+                                )
+                            )
+                    )
+                } else {
+                    Box(
+                        modifier = Modifier
+                            .matchParentSize()
+                            .background(accentGradientForType(event.type))
+                    )
+                }
+
+                if (photoCount > 1 && onOpenGallery != null) {
+                    PhotoGalleryButton(
+                        photoCount = photoCount,
+                        onClick = onOpenGallery,
+                        modifier = Modifier
+                            .align(Alignment.TopEnd)
+                            .padding(10.dp)
+                    )
+                }
+
+                if (airlineLogo != null) {
+                    Surface(
+                        color = androidx.compose.ui.graphics.Color.White,
+                        shape = RoundedCornerShape(999.dp),
+                        modifier = Modifier
+                            .align(Alignment.BottomStart)
+                            .padding(10.dp)
+                            .size(36.dp)
+                    ) {
+                        AsyncImage(
+                            model = airlineLogo,
+                            contentDescription = null,
+                            modifier = Modifier
+                                .padding(6.dp),
+                            contentScale = ContentScale.Fit
+                        )
+                    }
+                } else {
+                    Surface(
+                        color = CardBackground.copy(alpha = 0.62f),
+                        shape = RoundedCornerShape(999.dp),
+                        modifier = Modifier
+                            .align(Alignment.BottomStart)
+                            .padding(10.dp)
+                    ) {
+                        Text(
+                            text = event.type.uppercase(Locale.US),
+                            color = CardSky,
+                            fontSize = 9.sp,
+                            fontWeight = FontWeight.Bold,
+                            letterSpacing = 1.3.sp,
+                            modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp)
+                        )
+                    }
+                }
+            }
+
+            Column(
+                modifier = Modifier.weight(0.58f),
+                verticalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                Text(
+                    text = title,
+                    color = CardText,
+                    fontSize = 24.sp,
+                    lineHeight = 28.sp,
+                    fontWeight = FontWeight.ExtraBold
+                )
+                DetailBadgeRow(
+                    badges = listOf(timeSummary, durationSummary),
+                    accent = CardSky
+                )
             }
         }
     }

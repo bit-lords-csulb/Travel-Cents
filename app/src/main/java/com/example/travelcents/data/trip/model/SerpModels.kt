@@ -61,6 +61,9 @@ data class SerpHotelResponse(
 
 data class SerpHotelProperty(
     val name: String = "",
+    val link: String? = null,
+    @SerializedName("property_token") val propertyToken: String? = null,
+    @SerializedName("serpapi_property_details_link") val serpapiPropertyDetailsLink: String? = null,
     @SerializedName("overall_rating") val overallRating: Double? = null,
     val reviews: Int? = null,
     @SerializedName("reviews_breakdown") val reviewsBreakdown: List<SerpReviewBreakdown>? = null,

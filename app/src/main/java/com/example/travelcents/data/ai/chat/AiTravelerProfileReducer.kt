@@ -7,9 +7,11 @@ object AiTravelerProfileReducer {
         "paris" to "Paris",
         "tokyo" to "Tokyo",
         "bali" to "Bali",
+        "bangkok" to "Bangkok",
         "london" to "London",
         "rome" to "Rome",
         "barcelona" to "Barcelona",
+        "cancun" to "Cancun",
         "new york" to "New York",
         "los angeles" to "Los Angeles",
         "san francisco" to "San Francisco",
@@ -83,56 +85,6 @@ object AiTravelerProfileReducer {
         }
     }
 
-    fun quickRepliesFor(profile: AiTravelerProfile): List<AiChatQuickReply> {
-        return when {
-            !profile.hasSignals -> listOf(
-                quickReply("pick_destination", "Pick a destination", "Help me pick a destination."),
-                quickReply("city_break", "City break", "I want a city break with good food and walkable neighborhoods."),
-                quickReply("beach_escape", "Beach escape", "I want a beach escape with a relaxed pace."),
-                quickReply("family_trip", "Family trip", "I am planning a family-friendly trip.")
-            )
-
-            profile.destination.isBlank() -> listOf(
-                quickReply("food_trip", "Food-focused", "I want a destination with great food."),
-                quickReply("culture_trip", "Culture-heavy", "I want culture, museums, and walkable city areas."),
-                quickReply("nature_trip", "Nature first", "I want a nature-heavy trip with scenic views."),
-                quickReply("surprise_trip", "Surprise me", "Suggest a destination based on the rest of my vibe.")
-            )
-
-            profile.partySummary.isBlank() -> listOf(
-                quickReply("solo_trip", "Solo trip", "This is a solo trip."),
-                quickReply("couple_trip", "For two", "This trip is for two adults."),
-                quickReply("friends_trip", "Group getaway", "This is a friends trip."),
-                quickReply("kids_trip", "With kids", "We are traveling with kids.")
-            )
-
-            profile.budgetSummary.isBlank() -> listOf(
-                quickReply("budget_trip", "Budget-friendly", "Keep it budget-friendly."),
-                quickReply("comfort_trip", "Comfort", "I care more about comfort than luxury."),
-                quickReply("luxury_trip", "Upscale", "I want something more upscale and polished."),
-                quickReply("balanced_trip", "Balanced spend", "I want a balanced budget with a few splurges.")
-            )
-
-            profile.interests.isEmpty() -> listOf(
-                quickReply("food_interest", "Food-first", "Make this a food-first trip."),
-                quickReply("adventure_interest", "Adventure", "I want adventure and active days."),
-                quickReply("culture_interest", "Culture", "I want culture, museums, and local neighborhoods."),
-                quickReply("nightlife_interest", "Nightlife", "I want nightlife and late-evening options.")
-            )
-
-            else -> listOf(
-                quickReply("relaxed_pace", "Keep it relaxed", "Keep the pace relaxed."),
-                quickReply("packed_pace", "Keep it packed", "I want a fuller schedule with more to do."),
-                quickReply("restaurant_help", "Food ideas", "Help me narrow down food and dining preferences."),
-                quickReply("refine_vibe", "Refine the vibe", "Summarize what you know and tell me what is still missing.")
-            )
-        }
-    }
-
-    private fun quickReply(id: String, label: String, message: String): AiChatQuickReply {
-        return AiChatQuickReply(id = id, label = label, message = message)
-    }
-
     private fun inferDestination(current: String, normalized: String): String {
         if (current.isNotBlank()) return current
         return knownDestinations.entries.firstOrNull { it.key in normalized }?.value.orEmpty()
@@ -182,7 +134,17 @@ object AiTravelerProfileReducer {
         if (current.isNotBlank()) return current
         return when {
             "solo" in normalized -> "Solo traveler"
-            "couple" in normalized || "two adults" in normalized || "for two" in normalized ->
+            "couple" in normalized ||
+                "two adults" in normalized ||
+                "for two" in normalized ||
+                "wife" in normalized ||
+                "husband" in normalized ||
+                "partner" in normalized ||
+                "spouse" in normalized ||
+                "boyfriend" in normalized ||
+                "girlfriend" in normalized ||
+                "fiance" in normalized ||
+                "fiancee" in normalized ->
                 "Two adults"
             "family" in normalized || "kids" in normalized || "children" in normalized ->
                 "Family trip"
@@ -232,6 +194,6 @@ object AiTravelerProfileReducer {
         if (trimmed.length < 18) return current
         if (current.any { it.equals(trimmed, ignoreCase = true) }) return current
 
-        return (current + trimmed.take(120)).takeLast(3)
+        return (current + trimmed.take(240)).takeLast(3)
     }
 }

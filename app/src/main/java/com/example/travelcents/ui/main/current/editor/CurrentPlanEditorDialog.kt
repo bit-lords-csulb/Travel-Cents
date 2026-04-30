@@ -71,9 +71,9 @@ import com.example.travelcents.data.trip.model.ATTR_CHECK_OUT_TIME
 import com.example.travelcents.data.trip.model.ATTR_HOTEL_NAME
 import com.example.travelcents.data.trip.model.ATTR_HOTEL_RATING
 import com.example.travelcents.data.trip.model.DETAIL_YELP_ID
-import com.example.travelcents.data.trip.model.firstNonBlank
 import com.example.travelcents.data.trip.model.EventOption
 import com.example.travelcents.data.trip.model.YelpReview
+import com.example.travelcents.data.trip.model.firstNonBlank
 import com.example.travelcents.ui.modules.defaultPlanTimeZoneId
 import com.example.travelcents.ui.modules.formatDisplayTime
 import com.example.travelcents.ui.modules.formatTimeZoneLabel
@@ -83,7 +83,6 @@ import com.example.travelcents.ui.modules.parseIsoDate
 import com.example.travelcents.ui.modules.plusMinutes
 import com.example.travelcents.ui.modules.todayIsoDate
 import com.example.travelcents.ui.theme.DeepSea4
-import com.example.travelcents.ui.theme.DeepSea5
 import java.util.Calendar
 import java.util.Locale
 

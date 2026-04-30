@@ -86,7 +86,7 @@ fun SettingsPage(
         // Tab content
         when (selectedTab) {
             "Account" -> AccountTab(viewModel = viewModel, onLoggedOut = onLoggedOut)
-            "Security" -> SecurityTab()
+            "Security" -> SecurityTab(viewModel = viewModel)
             "Preferences" -> PreferencesTab()
         }
 

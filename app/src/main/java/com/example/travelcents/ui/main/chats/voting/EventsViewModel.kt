@@ -3,14 +3,19 @@ package com.example.travelcents.ui.main.chats.voting
 import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
+import androidx.lifecycle.viewModelScope
 import com.example.travelcents.data.social.model.Group
+import com.example.travelcents.data.sync.TripSyncRemoteDataSource
 import com.example.travelcents.data.trip.TripAccessRole
+import com.example.travelcents.data.trip.TripKey
 import com.example.travelcents.data.trip.model.Event
 import com.google.firebase.Firebase
 import com.google.firebase.auth.auth
 import com.google.firebase.firestore.FieldValue
 import com.google.firebase.firestore.ListenerRegistration
 import com.google.firebase.firestore.firestore
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.tasks.await
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -19,6 +24,7 @@ class EventsViewModel(initialGroup: Group) : ViewModel() {
 
     private val auth = Firebase.auth
     private val db = Firebase.firestore
+    private val tripSyncRemoteDataSource = TripSyncRemoteDataSource(db)
 
     private var _group = initialGroup
     val group: Group get() = _group
@@ -90,7 +96,16 @@ class EventsViewModel(initialGroup: Group) : ViewModel() {
                         downvotes = downvotes,
                         photoUrl = doc.getString("photoUrl") ?: "",
                         commentCount = (doc.getLong("commentCount") ?: 0L).toInt(),
-                        isWon = doc.getBoolean("isWon") ?: false
+                        isWon = doc.getBoolean("isWon") ?: false,
+                        yelpId = doc.getString("yelpId") ?: "",
+                        yelpUrl = doc.getString("yelpUrl") ?: "",
+                        yelpCategory = doc.getString("yelpCategory") ?: "",
+                        yelpCategories = (doc.get("yelpCategories") as? List<*>)
+                            ?.filterIsInstance<String>()
+                            .orEmpty(),
+                        yelpRating = doc.getDouble("yelpRating"),
+                        yelpReviewCount = (doc.getLong("yelpReviewCount") ?: 0L).toInt(),
+                        yelpImageUrl = doc.getString("yelpImageUrl") ?: ""
                     )
                 }
                 _events.value =
@@ -194,18 +209,22 @@ class EventsViewModel(initialGroup: Group) : ViewModel() {
             return
         }
 
-        val tripRef = db.collection("users").document(group.linkedTripOwnerId)
-            .collection("trips").document(group.linkedTripId)
-        val tripEventRef = tripRef.collection("events").document(event.id)
+        if (!_canWriteLinkedTrip.value) {
+            Log.e(
+                "EventsViewModel",
+                "Unauthorized: User $currentUid cannot delete trip event ${event.id}"
+            )
+            return
+        }
 
-        db.runBatch { batch ->
-            batch.delete(groupEventRef)
-            batch.delete(tripEventRef)
-            batch.update(tripRef, "eventIds", FieldValue.arrayRemove(event.id))
-        }.addOnSuccessListener {
-            onComplete()
-        }.addOnFailureListener { e ->
-            Log.e("EventsViewModel", "Error deleting event: ", e)
+        val tripKey = TripKey(ownerUid = group.linkedTripOwnerId, tripId = group.linkedTripId)
+        viewModelScope.launch {
+            runCatching {
+                tripSyncRemoteDataSource.deleteEvent(tripKey = tripKey, eventId = event.id)
+                groupEventRef.delete().await()
+            }.onFailure { e ->
+                Log.e("EventsViewModel", "Error deleting event: ", e)
+            }
             onComplete()
         }
     }
@@ -234,19 +253,30 @@ class EventsViewModel(initialGroup: Group) : ViewModel() {
 
         val groupEventRef = db.collection("groups").document(groupId)
             .collection("events").document(event.id)
-        val tripRef = db.collection("users").document(group.linkedTripOwnerId)
-            .collection("trips").document(group.linkedTripId)
-        val tripEventRef = tripRef.collection("events").document(event.id)
-        val wonEvent = event.copy(isWon = true)
+        val linkedGroup = group
+        val tripKey = TripKey(ownerUid = linkedGroup.linkedTripOwnerId, tripId = linkedGroup.linkedTripId)
 
-        db.runBatch { batch ->
-            batch.update(groupEventRef, "isWon", true)
-            batch.set(tripEventRef, wonEvent)
-            batch.update(tripRef, "eventIds", FieldValue.arrayUnion(event.id))
-        }.addOnSuccessListener {
-            onComplete()
-        }.addOnFailureListener { e ->
-            Log.e("EventsViewModel", "Error adding event to itinerary: ", e)
+        viewModelScope.launch {
+            runCatching {
+                val linkedTrip = runCatching {
+                    tripSyncRemoteDataSource.fetchTripSummary(tripKey)
+                }.onFailure { e ->
+                    Log.w("EventsViewModel", "Unable to load linked trip summary for ${tripKey.tripId}", e)
+                }.getOrNull()
+                val travelEvent = event.toLinkedTripTravelEvent(
+                    group = linkedGroup,
+                    linkedTrip = linkedTrip
+                )
+                tripSyncRemoteDataSource.upsertEvent(tripKey = tripKey, event = travelEvent)
+                groupEventRef.update(
+                    mapOf(
+                        "isWon" to true,
+                        "linkedTripEventId" to travelEvent.eventId
+                    )
+                ).await()
+            }.onFailure { e ->
+                Log.e("EventsViewModel", "Error adding event to itinerary: ", e)
+            }
             onComplete()
         }
     }

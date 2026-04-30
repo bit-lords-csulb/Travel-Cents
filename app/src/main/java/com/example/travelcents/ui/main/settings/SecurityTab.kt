@@ -36,6 +36,7 @@ import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.example.travelcents.ui.components.TcTextField
 import com.example.travelcents.ui.main.newTrip.TripWizardColors
 import com.example.travelcents.ui.theme.DeepSea3
@@ -45,10 +46,14 @@ import com.google.firebase.auth.EmailAuthProvider
 import com.google.firebase.auth.FirebaseAuth
 
 @Composable
-fun SecurityTab() {
+fun SecurityTab(viewModel: SettingsViewModel) {
+    val userState by viewModel.userState.collectAsStateWithLifecycle()
     Column(modifier = Modifier.fillMaxWidth()) {
         ChangePasswordSection()
-        PrivacySection()
+        PrivacySection(
+            doNotShareData = userState.doNotShareData,
+            onDoNotShareDataChange = viewModel::setDoNotShareData
+        )
     }
 }
 
@@ -204,8 +209,10 @@ private fun ChangePasswordSection() {
 }
 
 @Composable
-private fun PrivacySection() {
-    var doNotShareData by remember { mutableStateOf(false) }
+private fun PrivacySection(
+    doNotShareData: Boolean,
+    onDoNotShareDataChange: (Boolean) -> Unit
+) {
     var showDataPrivacyInfo by remember { mutableStateOf(false) }
 
     SettingHeader("Privacy & Security")
@@ -214,7 +221,7 @@ private fun PrivacySection() {
             title = "Do Not Share My Data",
             subtitle = "Opt out of data sharing with third parties",
             checked = doNotShareData,
-            onCheckedChange = { doNotShareData = it }
+            onCheckedChange = onDoNotShareDataChange
         )
         // Tappable row that expands/collapses the privacy info
         Row(

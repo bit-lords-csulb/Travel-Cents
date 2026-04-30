@@ -5,6 +5,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
@@ -35,6 +36,7 @@ import com.example.travelcents.ui.theme.TravelCentsFonts
 fun AiChatBubble(
     text: String,
     sender: AiChatSender,
+    tags: List<String> = emptyList(),
     modifier: Modifier = Modifier
 ) {
     val isUser = sender == AiChatSender.USER
@@ -92,12 +94,7 @@ fun AiChatBubble(
                 }
             )
         ) {
-            Text(
-                text = text,
-                color = if (isUser) DeepSea5 else DeepSea4.copy(alpha = 0.98f),
-                fontSize = 14.sp,
-                lineHeight = 21.sp,
-                fontFamily = TravelCentsFonts.Body,
+            Column(
                 modifier = Modifier
                     .widthIn(max = 324.dp)
                     .background(
@@ -117,8 +114,51 @@ fun AiChatBubble(
                             )
                         }
                     )
-                    .padding(horizontal = 16.dp, vertical = 14.dp)
-            )
+                    .padding(horizontal = 16.dp, vertical = 14.dp),
+                verticalArrangement = Arrangement.spacedBy(10.dp)
+            ) {
+                if (isUser && tags.isNotEmpty()) {
+                    FlowRow(
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        verticalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        tags.forEach { tag ->
+                            UserBubbleTag(tag = tag)
+                        }
+                    }
+                }
+
+                if (text.isNotBlank()) {
+                    Text(
+                        text = text,
+                        color = if (isUser) DeepSea5 else DeepSea4.copy(alpha = 0.98f),
+                        fontSize = 14.sp,
+                        lineHeight = 21.sp,
+                        fontFamily = TravelCentsFonts.Body
+                    )
+                }
+            }
         }
+    }
+}
+
+@Composable
+private fun UserBubbleTag(tag: String) {
+    Surface(
+        shape = RoundedCornerShape(999.dp),
+        color = TripWizardColors.ContainerHighest,
+        border = BorderStroke(
+            width = 1.dp,
+            color = TripWizardColors.Blue.copy(alpha = 0.24f)
+        )
+    ) {
+        Text(
+            text = tag,
+            modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
+            color = TripWizardColors.Blue,
+            fontSize = 11.sp,
+            fontWeight = FontWeight.SemiBold,
+            fontFamily = TravelCentsFonts.Body
+        )
     }
 }
