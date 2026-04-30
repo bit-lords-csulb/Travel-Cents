@@ -104,6 +104,13 @@ const val ATTR_ARRIVAL_TERMINAL = "attr_arrival_terminal"
 const val ATTR_BAGGAGE_BELT = "attr_baggage_belt"
 const val ATTR_AIRCRAFT_REGISTRATION = "attr_aircraft_registration"
 
+// Flight booking offers + loyalty (Phase 3)
+const val ATTR_AIRLINE_IATA = "attr_airline_iata"
+const val ATTR_AIRLINE_BOOKING_URL = "attr_airline_booking_url"
+const val ATTR_LOYALTY_PROGRAM = "attr_loyalty_program"
+const val ATTR_POINTS_EARNED = "attr_points_earned"
+const val ATTR_FREQUENT_FLYER_NUMBER = "attr_frequent_flyer_number"
+
 fun Map<String, String>.firstNonBlank(vararg keys: String): String? {
     return keys.asSequence()
         .mapNotNull { key -> this[key]?.takeIf { it.isNotBlank() } }
