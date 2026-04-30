@@ -1,8 +1,11 @@
 from firebase_functions import https_fn
 from firebase_admin import initialize_app
+import difflib
 import os
+import re
 import requests
 import json
+import unicodedata
 from groq import Groq
 from pinecone import Pinecone
 from dotenv import load_dotenv
@@ -11,12 +14,101 @@ from dotenv import load_dotenv
 initialize_app()
 load_dotenv()
 
+CITY_ALIASES = {
+    "london": "London",
+    "london uk": "London",
+    "london united kingdom": "London",
+    "london england": "London",
+    "greater london": "London",
+    "lhr": "London",
+    "lgw": "London",
+    "paris": "Paris",
+    "paris france": "Paris",
+    "cdg": "Paris",
+    "ory": "Paris",
+    "amsterdam": "Amsterdam",
+    "amsterdam netherlands": "Amsterdam",
+    "amsterdam holland": "Amsterdam",
+    "ams": "Amsterdam",
+    "new york": "New York",
+    "new york city": "New York",
+    "new york usa": "New York",
+    "new york united states": "New York",
+    "new york ny": "New York",
+    "nyc": "New York",
+    "jfk": "New York",
+    "lga": "New York",
+    "ewr": "New York",
+    "miami": "Miami",
+    "miami usa": "Miami",
+    "miami united states": "Miami",
+    "miami fl": "Miami",
+    "miami florida": "Miami",
+    "mia": "Miami",
+    "cairo": "Cairo",
+    "cairo egypt": "Cairo",
+    "cai": "Cairo",
+    "sydney": "Sydney",
+    "sydney australia": "Sydney",
+    "syd": "Sydney",
+    "tokyo": "Tokyo",
+    "tokyo japan": "Tokyo",
+    "tokyo jp": "Tokyo",
+    "tyo": "Tokyo",
+    "hnd": "Tokyo",
+    "nrt": "Tokyo",
+}
+
+
+def normalize_city_key(value):
+    normalized = unicodedata.normalize("NFKD", str(value or ""))
+    ascii_text = normalized.encode("ascii", "ignore").decode("ascii")
+    key = re.sub(r"[^a-z0-9]+", " ", ascii_text.lower()).strip()
+    return re.sub(r"\s+", " ", key)
+
+
+def fallback_city_name(value):
+    first_segment = re.split(r"[,/|(-]", str(value or ""))[0].strip()
+    return first_segment.title() if first_segment else "London"
+
+
+def resolve_inventory_city(destination):
+    destination_key = normalize_city_key(destination)
+    if not destination_key:
+        return "London"
+
+    if destination_key in CITY_ALIASES:
+        return CITY_ALIASES[destination_key]
+
+    first_segment_key = normalize_city_key(fallback_city_name(destination))
+    if first_segment_key in CITY_ALIASES:
+        return CITY_ALIASES[first_segment_key]
+
+    padded_key = f" {destination_key} "
+    for alias_key, canonical_city in sorted(CITY_ALIASES.items(), key=lambda item: len(item[0]), reverse=True):
+        if f" {alias_key} " in padded_key:
+            return canonical_city
+
+    close_matches = difflib.get_close_matches(first_segment_key, CITY_ALIASES.keys(), n=1, cutoff=0.86)
+    if close_matches:
+        return CITY_ALIASES[close_matches[0]]
+
+    return fallback_city_name(destination)
+
+
 @https_fn.on_call()
 def generate_itinerary(req: https_fn.CallableRequest):
     # 1. Extract all the travel details sent from the Android app's TravelRequest model
     req_data = req.data or {}
-    destination = req_data.get("destination", "London")
-    target_city = destination.split(',')[0].strip()
+    if not isinstance(req_data, dict):
+        req_data = {"destination": str(req_data)}
+    if isinstance(req_data.get("data"), dict):
+        req_data = req_data["data"]
+
+    destination = req_data.get("destination") or req_data.get("city") or "London"
+    target_city = resolve_inventory_city(destination)
+    if normalize_city_key(destination) != normalize_city_key(target_city):
+        print(f"Normalized destination '{destination}' to Pinecone city '{target_city}'.", flush=True)
 
     date_from = req_data.get("dateFrom", "Unknown")
     date_to = req_data.get("dateTo", "Unknown")
