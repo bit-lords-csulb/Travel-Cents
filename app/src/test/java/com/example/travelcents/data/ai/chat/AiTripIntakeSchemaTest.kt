@@ -165,6 +165,35 @@ class AiTripIntakeSchemaTest {
     }
 
     @Test
+    fun assistantMessage_ignoresLegacyTextPromptWithoutCardPayload() {
+        val result = AiTripIntakeTurnResult(
+            ackKey = AiTripIntakeAckKey.PERFECT,
+            nextAction = AiTripIntakeNextAction.ASK_MORE,
+            textPrompt = "Tell me more about your dates."
+        )
+
+        assertEquals("Perfect.", result.assistantMessage)
+        assertNull(result.followUpQuestion)
+    }
+
+    @Test
+    fun followUpQuestion_isSuppressedWhenNextActionIsNotAskMore() {
+        val result = AiTripIntakeTurnResult(
+            nextAction = AiTripIntakeNextAction.BUILD_TRIP,
+            questionKind = AiTripIntakeQuestionKind.CARDS,
+            questionId = "budget",
+            questionTitle = "What's your budget?",
+            options = listOf(
+                option("budget", "Budget"),
+                option("luxury", "Luxury")
+            )
+        )
+
+        assertEquals("Got it!", result.assistantMessage)
+        assertNull(result.followUpQuestion)
+    }
+
+    @Test
     fun toPromptJson_usesSchemaFriendlyValuesOnly() {
         val profile = AiTripIntakeProfile(
             tripType = AiTripType.ROMANTIC,

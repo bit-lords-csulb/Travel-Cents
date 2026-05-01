@@ -52,8 +52,7 @@ enum class AiTripIntakeNextAction {
 
 enum class AiTripIntakeQuestionKind {
     NONE,
-    CARDS,
-    TEXT
+    CARDS
 }
 
 data class AiTripIntakeProfile(
@@ -240,7 +239,7 @@ data class AiTripIntakeTurnResult(
 
     private val effectiveQuestionKind: AiTripIntakeQuestionKind
         get() = when {
-            questionKind == AiTripIntakeQuestionKind.TEXT -> AiTripIntakeQuestionKind.TEXT
+            nextAction != AiTripIntakeNextAction.ASK_MORE -> AiTripIntakeQuestionKind.NONE
             questionKind == AiTripIntakeQuestionKind.CARDS || hasValidCardPayload -> AiTripIntakeQuestionKind.CARDS
             else -> AiTripIntakeQuestionKind.NONE
         }
@@ -253,12 +252,6 @@ data class AiTripIntakeTurnResult(
                     questionTitle.takeIf { it.isNotBlank() }?.let(::add)
                 }
 
-                AiTripIntakeQuestionKind.TEXT -> {
-                    textPrompt.ifBlank { questionTitle }
-                        .takeIf { prompt -> prompt.isNotBlank() }
-                        ?.let(::add)
-                }
-
                 AiTripIntakeQuestionKind.NONE -> Unit
             }
         }.joinToString(" ").trim()
@@ -267,10 +260,7 @@ data class AiTripIntakeTurnResult(
         get() = when (nextAction) {
             AiTripIntakeNextAction.SUGGEST_DESTINATIONS -> "Review destination ideas"
             AiTripIntakeNextAction.BUILD_TRIP -> "Build the trip"
-            AiTripIntakeNextAction.ASK_MORE -> {
-                questionTitle.ifBlank { textPrompt }
-                    .ifBlank { "Refine the plan" }
-            }
+            AiTripIntakeNextAction.ASK_MORE -> questionTitle.ifBlank { "Refine the plan" }
         }
 
     val followUpQuestion: AiTripIntakeFollowUpQuestion?

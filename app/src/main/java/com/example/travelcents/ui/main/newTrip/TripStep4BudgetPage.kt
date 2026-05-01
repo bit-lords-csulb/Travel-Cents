@@ -92,35 +92,12 @@ fun TripStep4BudgetPage(
                 .fillMaxSize()
                 .background(DeepSea1)
         ) {
-        // Top bar
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .background(Color(0xFF010E24))
-                .statusBarsPadding()
-        ) {
-            Row(
-                modifier = Modifier.fillMaxWidth().padding(horizontal = 8.dp, vertical = 4.dp),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    IconButton(onClick = onBackClick) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, "Back", tint = TripWizardColors.Blue)
-                    }
-                    Text("Step 4 of 5", fontSize = 17.sp, fontWeight = FontWeight.Bold, color = DeepSea5)
-                }
-                IconButton(onClick = onCloseClick) {
-                    Icon(Icons.Default.Close, "Close", tint = TripWizardColors.Blue)
-                }
-            }
-            Box(modifier = Modifier.fillMaxWidth().height(3.dp).background(TripWizardColors.ContainerHigh)) {
-                Box(
-                    modifier = Modifier.fillMaxWidth(0.8f).height(3.dp)
-                        .background(Brush.horizontalGradient(listOf(TripWizardColors.Blue, TripWizardColors.Blue.copy(alpha = 0.7f))))
-                )
-            }
-        }
+        WizardHeader(
+            currentStep = 4,
+            title = "What's your budget?",
+            onBack = onBackClick,
+            onClose = onCloseClick
+        )
 
         // Scrollable content
         Column(
@@ -132,21 +109,6 @@ fun TripStep4BudgetPage(
         ) {
             Spacer(Modifier.height(16.dp))
 
-            // Progress widget
-            S4ProgressWidget(stepsComplete = 4)
-            Spacer(Modifier.height(20.dp))
-
-            // Headline
-            Text(
-                "What's your budget?",
-                fontSize = 30.sp,
-                fontWeight = FontWeight.ExtraBold,
-                color = DeepSea5,
-                textAlign = TextAlign.Center,
-                letterSpacing = (-1).sp,
-                fontFamily = TravelCentsFonts.Headline
-            )
-            Spacer(Modifier.height(6.dp))
             Text(
                 "TravelCents will create the perfect itinerary within your budget",
                 fontSize = 14.sp,
@@ -325,50 +287,5 @@ fun TripStep4BudgetPage(
         }
     }
 }
-}
-
-@Composable
-private fun S4ProgressWidget(stepsComplete: Int) {
-    Box(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clip(RoundedCornerShape(16.dp))
-            .background(TripWizardColors.ContainerHigh.copy(alpha = 0.5f))
-            .border(1.dp, Color.White.copy(alpha = 0.05f), RoundedCornerShape(16.dp))
-            .padding(16.dp)
-    ) {
-        Column {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Column {
-                    Text("YOUR PROGRESS", fontSize = 10.sp, fontWeight = FontWeight.Bold, color = TripWizardColors.OnSurfaceVariant, letterSpacing = 1.5.sp)
-                    Text("Step $stepsComplete of 5", fontSize = 18.sp, fontWeight = FontWeight.Bold, color = DeepSea5)
-                }
-                Box(
-                    modifier = Modifier
-                        .background(TripWizardColors.Blue.copy(alpha = 0.2f), RoundedCornerShape(12.dp))
-                        .border(1.dp, TripWizardColors.Blue.copy(alpha = 0.2f), RoundedCornerShape(12.dp))
-                        .padding(horizontal = 14.dp, vertical = 8.dp)
-                ) {
-                    Text("${stepsComplete * 20}%", fontSize = 14.sp, fontWeight = FontWeight.Bold, color = TripWizardColors.Blue)
-                }
-            }
-            Spacer(Modifier.height(12.dp))
-            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                repeat(5) { i ->
-                    Box(
-                        modifier = Modifier
-                            .weight(1f)
-                            .height(6.dp)
-                            .clip(RoundedCornerShape(3.dp))
-                            .background(if (i < stepsComplete) TripWizardColors.Blue else TripWizardColors.ContainerHighest)
-                    )
-                }
-            }
-        }
-    }
 }
 
