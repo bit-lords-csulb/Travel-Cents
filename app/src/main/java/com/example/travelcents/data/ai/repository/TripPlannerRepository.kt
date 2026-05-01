@@ -4,6 +4,8 @@ import com.example.travelcents.BuildConfig
 import com.example.travelcents.data.ai.model.LlmMessage
 import com.example.travelcents.data.ai.remote.LlmClient
 import com.example.travelcents.data.trip.local.DestinationTimeZones
+import com.example.travelcents.data.trip.model.ATTR_BOOKING_URL
+import com.example.travelcents.data.trip.model.EventOption
 import com.example.travelcents.data.trip.model.Itinerary
 import com.example.travelcents.data.trip.model.TravelEvent
 import com.example.travelcents.data.trip.model.TravelRequest
@@ -30,9 +32,23 @@ data class EmulatorActivity(
     val description: String = "",
     val booking_url: String? = null,
     val real_title: String? = null,
-    val isNativeBookable: Boolean = false,
+    val isNativeBookable: String? = null,
     val start_time: String? = null,
-    val end_time: String? = null
+    val end_time: String? = null,
+    val option_id: String? = null,
+    val activity_id: String? = null,
+    val options: List<EmulatorActivityOption>? = null
+)
+
+data class EmulatorActivityOption(
+    val option_id: String? = null,
+    val activity_id: String? = null,
+    val title: String = "",
+    val real_title: String? = null,
+    val booking_url: String? = null,
+    val isNativeBookable: String? = null,
+    val selected: Boolean = false,
+    val score: Double? = null
 )
 
 interface EmulatorApiService {
@@ -112,18 +128,34 @@ object TripPlannerRepository {
         )
 
         return response.result.itinerary.mapIndexed { index, activity ->
+            val eventId = UUID.randomUUID().toString()
             val activityTitle = activity.real_title
                 ?.takeIf { it.isNotBlank() }
                 ?: activity.title.ifBlank { "Recommended activity" }
+            val selectedOptionId = activity.option_id
+                ?.takeIf { it.isNotBlank() }
+                ?: activity.options.orEmpty()
+                    .firstOrNull { it.selected }
+                    ?.resolvedOptionId()
+            val isNativeBookable = activity.isNativeBookable.isTruthy()
+            val eventOptions = buildActivityOptions(
+                eventId = eventId,
+                selectedOptionId = selectedOptionId,
+                fallbackTitle = activityTitle,
+                fallbackDescription = activity.description,
+                fallbackBookingUrl = activity.booking_url,
+                activity = activity
+            )
 
             TravelEvent(
-                eventId = UUID.randomUUID().toString(),
+                eventId = eventId,
                 type = "activity",
                 itineraryId = itineraryId,
+                selectedOptionId = selectedOptionId.orEmpty(),
                 date = dates[index % dates.size],
                 startTime = activity.start_time ?: "10:00",
                 endTime = activity.end_time ?: "13:00",
-                isNativeBookable = activity.isNativeBookable.toString(),
+                isNativeBookable = isNativeBookable.toString(),
                 bookingUrl = activity.booking_url,
                 details = buildMap {
                     put("activity_name", activityTitle)
@@ -134,11 +166,125 @@ object TripPlannerRepository {
                     activity.booking_url
                         ?.takeIf { it.isNotBlank() }
                         ?.let { put("booking_url", it) }
-                    put("isNativeBookable", activity.isNativeBookable.toString())
+                    activity.activity_id
+                        ?.takeIf { it.isNotBlank() }
+                        ?.let { put("viator_activity_id", it) }
+                    selectedOptionId
+                        ?.takeIf { it.isNotBlank() }
+                        ?.let { put("selected_inventory_option_id", it) }
+                    put("isNativeBookable", isNativeBookable.toString())
                     put("source", "emulator")
-                }
+                },
+                options = eventOptions
             )
         }
+    }
+
+    private fun buildActivityOptions(
+        eventId: String,
+        selectedOptionId: String?,
+        fallbackTitle: String,
+        fallbackDescription: String,
+        fallbackBookingUrl: String?,
+        activity: EmulatorActivity
+    ): List<EventOption> {
+        val options = activity.options.orEmpty()
+            .mapNotNull { option ->
+                val optionId = option.resolvedOptionId() ?: return@mapNotNull null
+                val optionTitle = option.real_title
+                    ?.takeIf { it.isNotBlank() }
+                    ?: option.title.ifBlank { fallbackTitle }
+                option.toEventOption(
+                    eventId = eventId,
+                    optionId = optionId,
+                    optionTitle = optionTitle,
+                    fallbackDescription = fallbackDescription,
+                    selected = optionId == selectedOptionId || option.selected
+                )
+            }
+            .toMutableList()
+
+        if (!selectedOptionId.isNullOrBlank() && options.none { it.optionId == selectedOptionId }) {
+            options.add(
+                0,
+                EventOption(
+                    optionId = selectedOptionId,
+                    eventId = eventId,
+                    source = "pinecone",
+                    selected = true,
+                    details = buildActivityOptionDetails(
+                        title = fallbackTitle,
+                        description = fallbackDescription,
+                        bookingUrl = fallbackBookingUrl,
+                        isNativeBookable = !fallbackBookingUrl.isNullOrBlank(),
+                        activityId = activity.activity_id,
+                        score = null
+                    )
+                )
+            )
+        }
+
+        val resolvedSelectedOptionId = selectedOptionId
+            ?: options.firstOrNull { it.selected }?.optionId
+        return options
+            .distinctBy(EventOption::optionId)
+            .map { option -> option.copy(selected = option.optionId == resolvedSelectedOptionId) }
+    }
+
+    private fun EmulatorActivityOption.toEventOption(
+        eventId: String,
+        optionId: String,
+        optionTitle: String,
+        fallbackDescription: String,
+        selected: Boolean
+    ): EventOption {
+        return EventOption(
+            optionId = optionId,
+            eventId = eventId,
+            source = "pinecone",
+            selected = selected,
+            details = buildActivityOptionDetails(
+                title = optionTitle,
+                description = fallbackDescription,
+                bookingUrl = booking_url,
+                isNativeBookable = isNativeBookable.isTruthy() || !booking_url.isNullOrBlank(),
+                activityId = activity_id,
+                score = score
+            )
+        )
+    }
+
+    private fun buildActivityOptionDetails(
+        title: String,
+        description: String,
+        bookingUrl: String?,
+        isNativeBookable: Boolean,
+        activityId: String?,
+        score: Double?
+    ): Map<String, String> = buildMap {
+        put("activity_name", title)
+        put("title", title)
+        if (description.isNotBlank()) put("description", description)
+        if (!bookingUrl.isNullOrBlank()) {
+            put("booking_url", bookingUrl)
+            put(ATTR_BOOKING_URL, bookingUrl)
+        }
+        if (!activityId.isNullOrBlank()) put("viator_activity_id", activityId)
+        score?.let { put("pinecone_score", it.toString()) }
+        put("isNativeBookable", isNativeBookable.toString())
+        put("source", "pinecone")
+    }
+
+    private fun EmulatorActivityOption.resolvedOptionId(): String? {
+        return option_id
+            ?.takeIf { it.isNotBlank() }
+            ?: activity_id
+                ?.takeIf { it.isNotBlank() }
+                ?.let { "viator::$it" }
+    }
+
+    private fun String?.isTruthy(): Boolean {
+        return equals("true", ignoreCase = true)
     }
 
     private fun buildItineraryPrompt(request: TravelRequest): String {

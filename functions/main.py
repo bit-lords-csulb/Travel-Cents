@@ -59,6 +59,9 @@ CITY_ALIASES = {
     "nrt": "Tokyo",
 }
 
+MATCH_SCORE_THRESHOLD = 0.5
+PINECONE_OPTION_COUNT = 6
+
 
 def normalize_city_key(value):
     normalized = unicodedata.normalize("NFKD", str(value or ""))
@@ -94,6 +97,33 @@ def resolve_inventory_city(destination):
         return CITY_ALIASES[close_matches[0]]
 
     return fallback_city_name(destination)
+
+
+def match_field(match, key, default=None):
+    if isinstance(match, dict):
+        return match.get(key, default)
+    return getattr(match, key, default)
+
+
+def match_to_activity_option(match):
+    score = match_field(match, "score", 0.0) or 0.0
+    metadata = match_field(match, "metadata", {}) or {}
+    activity_id = str(metadata.get("activity_id") or "")
+    title = metadata.get("title") or ""
+    booking_url = metadata.get("booking_url") or ""
+    option_id = match_field(match, "id", "") or (
+        f"{metadata.get('city', '')}::{activity_id}" if activity_id else title
+    )
+
+    return {
+        "option_id": option_id,
+        "activity_id": activity_id,
+        "title": title,
+        "real_title": title,
+        "booking_url": booking_url,
+        "isNativeBookable": "true" if booking_url else "false",
+        "score": score
+    }
 
 
 @https_fn.on_call()
@@ -216,35 +246,55 @@ def generate_itinerary(req: https_fn.CallableRequest):
                 # Query Pinecone with the cleaned target_city
                 search_result = index.query(
                     vector=vector,
-                    top_k=1,
+                    top_k=PINECONE_OPTION_COUNT,
                     include_metadata=True,
                     filter={"city": {"$eq": target_city}}
                 )
 
-                if search_result['matches']:
-                    match = search_result['matches'][0]
-                    score = match['score']
-                    best_match_meta = match['metadata']
+                matches = search_result['matches']
+                if matches:
+                    viable_options = [
+                        match_to_activity_option(match)
+                        for match in matches
+                        if (match_field(match, "score", 0.0) or 0.0) > MATCH_SCORE_THRESHOLD
+                    ]
+                    match = matches[0]
+                    score = match_field(match, "score", 0.0) or 0.0
+                    best_match_meta = match_field(match, "metadata", {}) or {}
 
                     print(f"   ✅ Best Match: {best_match_meta.get('title')} (Score: {score:.4f})", flush=True)
 
-                    if score > 0.5:
-                        activity['booking_url'] = best_match_meta.get('booking_url', "")
-                        activity['real_title'] = best_match_meta.get('title', "")
+                    if viable_options:
+                        selected_option = viable_options[0]
+                        activity['option_id'] = selected_option.get('option_id', "")
+                        activity['activity_id'] = selected_option.get('activity_id', "")
+                        activity['booking_url'] = selected_option.get('booking_url', "")
+                        activity['real_title'] = selected_option.get('title', "")
                         activity['isNativeBookable'] = "true"
+                        activity['options'] = [
+                            {
+                                **option,
+                                "selected": option.get("option_id") == selected_option.get("option_id")
+                            }
+                            for option in viable_options
+                        ]
                     else:
                         print(f"   ⚠️ Score too low ({score:.4f}).", flush=True)
                         activity['isNativeBookable'] = "false"
+                        activity['options'] = []
                 else:
                     print(f"   ❌ No database matches for '{activity_title}' in {target_city}.", flush=True)
                     activity['isNativeBookable'] = "false"
+                    activity['options'] = []
             else:
                 print(f"   ❌ HF Error: {hf_response.status_code}", flush=True)
                 activity['isNativeBookable'] = "false"
+                activity['options'] = []
 
         except Exception as e:
             print(f"   🔥 Error: {e}", flush=True)
             activity['isNativeBookable'] = "false"
+            activity['options'] = []
 
         final_itinerary.append(activity)
 
