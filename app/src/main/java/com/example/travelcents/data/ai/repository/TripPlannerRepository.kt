@@ -83,22 +83,29 @@ object TripPlannerRepository {
         request: TravelRequest,
         itineraryId: String,
         dates: List<String>,
-        flightArrival: String
+        flightArrival: String,
+        activityWindow: Map<String, Any> = emptyMap(),
+        flights: List<Map<String, Any>> = emptyList(),
+        hotel: Map<String, Any> = emptyMap()
     ): List<TravelEvent> {
         if (request.destination.isBlank() || itineraryId.isBlank() || dates.isEmpty()) return emptyList()
 
-        val payload: Map<String, Any> = mapOf(
-            "destination" to request.destination,
-            "dateFrom" to request.dateFrom,
-            "dateTo" to request.dateTo,
-            "adults" to request.adults,
-            "children" to request.children,
-            "travelStyle" to request.travelStyle,
-            "budgetTotal" to request.budgetTotal.toString(),
-            "interests" to request.interests,
-            "specialRequests" to request.specialRequests,
-            "flightArrival" to flightArrival
-        )
+        val payload: Map<String, Any> = buildMap {
+            put("destination", request.destination)
+            put("dateFrom", request.dateFrom)
+            put("dateTo", request.dateTo)
+            put("adults", request.adults)
+            put("children", request.children)
+            put("travelStyle", request.travelStyle)
+            put("budgetTotal", request.budgetTotal.toString())
+            put("interests", request.interests)
+            put("specialRequests", request.specialRequests)
+            put("flightArrival", flightArrival)
+            put("activityDates", dates)
+            if (activityWindow.isNotEmpty()) put("activityWindow", activityWindow)
+            if (flights.isNotEmpty()) put("flights", flights)
+            if (hotel.isNotEmpty()) put("hotel", hotel)
+        }
 
         val response = emulatorApi.getLocalItinerary(
             EmulatorRequest(data = payload)

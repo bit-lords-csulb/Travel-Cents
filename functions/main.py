@@ -118,6 +118,11 @@ def generate_itinerary(req: https_fn.CallableRequest):
     budget = req_data.get("budgetTotal", "Flexible")
     interests = req_data.get("interests", [])
     special_requests = req_data.get("specialRequests", "None")
+    flight_arrival = req_data.get("flightArrival", "Unknown")
+    activity_dates = req_data.get("activityDates", [])
+    activity_window = req_data.get("activityWindow") or {}
+    flights = req_data.get("flights") or []
+    hotel = req_data.get("hotel") or {}
 
     # 2. Get API Keys
     groq_key = os.getenv("GROQ_API_KEY")
@@ -128,6 +133,10 @@ def generate_itinerary(req: https_fn.CallableRequest):
 
     # Format the interests list into a readable string
     interests_str = ", ".join(interests) if interests else "general exploring"
+    activity_dates_str = ", ".join(activity_dates) if activity_dates else f"{date_from} to {date_to}"
+    activity_window_str = json.dumps(activity_window, ensure_ascii=True)
+    flights_str = json.dumps(flights, ensure_ascii=True)
+    hotel_str = json.dumps(hotel, ensure_ascii=True)
 
     # 3. Dynamic Prompting: Feed the user's exact parameters to Groq
     prompt = f"""
@@ -140,6 +149,20 @@ def generate_itinerary(req: https_fn.CallableRequest):
     - Estimated Budget: {budget}
     - Core Interests: {interests_str}
     - Special Requests: {special_requests}
+    - Flight Arrival: {flight_arrival}
+    - Allowed Activity Dates: {activity_dates_str}
+
+    Scheduling Context:
+    - Activity Window JSON: {activity_window_str}
+    - Flights JSON: {flights_str}
+    - Hotel JSON: {hotel_str}
+
+    Scheduling Rules:
+    - Never schedule an activity before the activityWindow minimumStartTime on the activityWindow startDate.
+    - Never schedule an activity after the activityWindow maximumEndTime on the activityWindow endDate.
+    - Use the hotel location as the daily planning anchor when hotel coordinates or city are available.
+    - Account for hotel check-in/check-out timing when choosing first-day and last-day activities.
+    - Return start_time and end_time for every activity in 24-hour HH:MM format.
 
     Skip the generic tourist traps. Based strictly on the traveler profile above, focus on hidden gems, enchanting local experiences, and highly creative activities that fit their specific vibe, budget, and age group.
 
@@ -148,7 +171,7 @@ def generate_itinerary(req: https_fn.CallableRequest):
     Return ONLY a JSON object with this exact structure:
     {{
       "itinerary": [
-        {{ "title": "Activity Name", "description": "A short, captivating description that highlights why this experience is magical and why it perfectly fits their specific interests." }}
+        {{ "title": "Activity Name", "description": "A short, captivating description that highlights why this experience is magical and why it perfectly fits their specific interests.", "start_time": "10:00", "end_time": "12:00" }}
       ]
     }}
     """
