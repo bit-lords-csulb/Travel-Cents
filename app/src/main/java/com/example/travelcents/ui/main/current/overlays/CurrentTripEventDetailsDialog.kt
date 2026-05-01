@@ -34,9 +34,13 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
+import com.example.travelcents.data.trip.model.ATTR_HOTEL_DETAIL_URL
+import com.example.travelcents.data.trip.model.ATTR_YELP_URL
 import com.example.travelcents.data.trip.model.EventOption
+import com.example.travelcents.data.trip.model.ATTR_TICKETMASTER_EVENT_ID
 import com.example.travelcents.data.trip.model.TravelEvent
 import com.example.travelcents.data.trip.model.YelpReview
+import com.example.travelcents.data.trip.model.detailValue
 import com.example.travelcents.ui.main.current.overlays.cards.ActivityHoursCard
 import com.example.travelcents.ui.main.current.overlays.cards.ActivitySummaryCard
 import com.example.travelcents.ui.main.current.overlays.cards.CardBackground
@@ -45,20 +49,34 @@ import com.example.travelcents.ui.main.current.overlays.cards.CardLavender
 import com.example.travelcents.ui.main.current.overlays.cards.CardSurface
 import com.example.travelcents.ui.main.current.overlays.cards.CardText
 import com.example.travelcents.ui.main.current.overlays.cards.CardTextMuted
+import com.example.travelcents.ui.main.current.overlays.cards.CurrencyCostCard
 import com.example.travelcents.ui.main.current.overlays.cards.DetailActionRow
 import com.example.travelcents.ui.main.current.overlays.cards.EventSummaryCard
+import com.example.travelcents.ui.main.current.overlays.cards.FlightBookingOffersCard
+import com.example.travelcents.ui.main.current.overlays.cards.FlightLegsCard
 import com.example.travelcents.ui.main.current.overlays.cards.FlightPricingCard
 import com.example.travelcents.ui.main.current.overlays.cards.FlightRouteCard
+import com.example.travelcents.ui.main.current.overlays.cards.FlightStatusCard
 import com.example.travelcents.ui.main.current.overlays.cards.FlightTimingCard
+import com.example.travelcents.ui.main.current.overlays.cards.LoyaltyCard
 import com.example.travelcents.ui.main.current.overlays.cards.HotelAmenitiesCard
+import com.example.travelcents.ui.main.current.overlays.cards.HotelBookingCard
 import com.example.travelcents.ui.main.current.overlays.cards.HotelOverviewCard
 import com.example.travelcents.ui.main.current.overlays.cards.HotelPricingCard
 import com.example.travelcents.ui.main.current.overlays.cards.HotelStayCard
 import com.example.travelcents.ui.main.current.overlays.cards.LocationMapCard
+import com.example.travelcents.ui.main.current.overlays.cards.NeighborhoodCard
 import com.example.travelcents.ui.main.current.overlays.cards.RestaurantHoursCard
+import com.example.travelcents.ui.main.current.overlays.cards.RestaurantMenuCard
+import com.example.travelcents.ui.main.current.overlays.cards.RestaurantOverviewCard
+import com.example.travelcents.ui.main.current.overlays.cards.RestaurantReservationsCard
 import com.example.travelcents.ui.main.current.overlays.cards.RestaurantServicesCard
-import com.example.travelcents.ui.main.current.overlays.cards.RestaurantSummaryCard
 import com.example.travelcents.ui.main.current.overlays.cards.ReviewsCard
+import com.example.travelcents.ui.main.current.overlays.cards.TransportCard
+import com.example.travelcents.ui.main.current.overlays.cards.WaitTimeCard
+import com.example.travelcents.ui.main.current.overlays.cards.WeatherCard
+import com.example.travelcents.ui.main.current.overlays.cards.TicketPricingCard
+import com.example.travelcents.ui.main.current.overlays.cards.VenueCard
 import com.example.travelcents.ui.main.current.overlays.cards.compactHostLabel
 import com.example.travelcents.ui.main.current.overlays.cards.eventDurationSummary
 import com.example.travelcents.ui.main.current.overlays.cards.eventLocationLabel
@@ -70,14 +88,16 @@ import com.example.travelcents.ui.main.current.overlays.cards.eventTimeSummary
 import com.example.travelcents.ui.main.current.overlays.cards.googleMapsDirectionsUrl
 import com.example.travelcents.ui.main.current.overlays.cards.googleMapsSearchUrl
 import com.example.travelcents.ui.modules.TripPhotoGalleryDialog
-import com.example.travelcents.ui.modules.embeddedMapUrl
 import com.example.travelcents.ui.modules.galleryPhotoModels
+import com.example.travelcents.ui.modules.hasStaticMapSource
 import com.example.travelcents.ui.modules.heroImageModel
-import com.example.travelcents.ui.modules.rememberStaticMapModel
 
 @Composable
 fun CurrentTripEventDetailsDialog(
     event: TravelEvent,
+    tripDestination: String,
+    tripAdults: Int,
+    tripChildren: Int,
     currentOptions: List<EventOption>,
     yelpReviews: List<YelpReview>,
     reviewsLoading: Boolean,
@@ -95,15 +115,19 @@ fun CurrentTripEventDetailsDialog(
     val officialUrl = remember(event) { eventOfficialUrl(event) }
     val mapsQuery = remember(event) { eventMapsQuery(event) }
     val mapsUrl = remember(mapsQuery) { googleMapsSearchUrl(mapsQuery) }
+    val hotelReviewsUrl = remember(event, mapsUrl) {
+        event.detailValue(ATTR_HOTEL_DETAIL_URL)?.takeIf { it.isNotBlank() } ?: mapsUrl
+    }
     val directionsUrl = remember(mapsQuery) { googleMapsDirectionsUrl(mapsQuery) }
     val locationLabel = remember(event) { eventLocationLabel(event) }
-    val staticMapModel = rememberStaticMapModel(event)
-    val embeddedMapUrl = remember(event) { event.embeddedMapUrl() }
     val timeSummary = remember(event) { eventTimeSummary(event) }
     val durationSummary = remember(event) { eventDurationSummary(event) }
     val ratingLabel = remember(event, yelpReviews) { eventRatingLabel(event, yelpReviews) }
     val reviewCountLabel = remember(event, yelpReviews) { eventReviewCountLabel(event, yelpReviews) }
-    val reviewUrl = yelpReviews.firstOrNull()?.url?.takeIf { it.isNotBlank() } ?: officialUrl
+    val reviewUrl = remember(event, yelpReviews) {
+        yelpReviews.firstOrNull()?.url?.takeIf { it.isNotBlank() }
+            ?: event.detailValue(ATTR_YELP_URL)
+    }
     val websiteLabel = remember(officialUrl, mapsUrl) {
         officialUrl?.let(::compactHostLabel) ?: compactHostLabel(mapsUrl)
     }
@@ -211,10 +235,12 @@ fun CurrentTripEventDetailsDialog(
 
                     EventDetailCardStack(
                         event = event,
-                        staticMapModel = staticMapModel,
-                        embeddedMapUrl = embeddedMapUrl,
+                        tripDestination = tripDestination,
+                        tripAdults = tripAdults,
+                        tripChildren = tripChildren,
                         locationLabel = locationLabel,
                         mapsUrl = mapsUrl,
+                        hotelReviewsUrl = hotelReviewsUrl,
                         websiteLabel = websiteLabel,
                         officialUrl = officialUrl,
                         ratingLabel = ratingLabel,
@@ -241,10 +267,12 @@ fun CurrentTripEventDetailsDialog(
 @Composable
 private fun EventDetailCardStack(
     event: TravelEvent,
-    staticMapModel: String?,
-    embeddedMapUrl: String?,
+    tripDestination: String,
+    tripAdults: Int,
+    tripChildren: Int,
     locationLabel: String,
     mapsUrl: String,
+    hotelReviewsUrl: String,
     websiteLabel: String,
     officialUrl: String?,
     ratingLabel: String,
@@ -254,58 +282,78 @@ private fun EventDetailCardStack(
     reviewUrl: String?
 ) {
     val uriHandler = LocalUriHandler.current
-    val showLocationCard = !staticMapModel.isNullOrBlank() ||
-        !embeddedMapUrl.isNullOrBlank() ||
+    val showLocationCard = event.hasStaticMapSource() ||
         locationLabel != "Location information unavailable"
+    val isTicketmasterBacked = !event.detailValue(ATTR_TICKETMASTER_EVENT_ID).isNullOrBlank()
+    val showActivityReviews = reviewsLoading ||
+        yelpReviews.isNotEmpty() ||
+        reviewCountLabel.isNotBlank() ||
+        (ratingLabel.isNotBlank() && ratingLabel != "N/A")
 
     when (event.type.lowercase()) {
         "flight" -> {
             FlightTimingCard(event)
             FlightRouteCard(event)
+            FlightStatusCard(event)
+            FlightLegsCard(event)
             FlightPricingCard(event)
+            FlightBookingOffersCard(event = event, adults = tripAdults)
+            LoyaltyCard(event)
         }
-
         "hotel" -> {
             HotelStayCard(event)
             HotelOverviewCard(
                 event = event,
-                onOpenReviews = { uriHandler.openUri(mapsUrl) }
+                onOpenReviews = { uriHandler.openUri(hotelReviewsUrl) }
             )
             HotelPricingCard(event)
+            HotelBookingCard(event)
             HotelAmenitiesCard(event)
             if (showLocationCard) {
                 LocationMapCard(
                     title = "Map & Coordinates",
+                    event = event,
                     locationLabel = locationLabel,
-                    staticMapModel = staticMapModel,
-                    embeddedMapUrl = embeddedMapUrl,
                     onOpenMaps = { uriHandler.openUri(mapsUrl) }
                 )
             }
         }
-
         "restaurant", "dining", "food" -> {
-            RestaurantSummaryCard(event)
+            val restaurantReviewsUrl = yelpReviews.firstOrNull()?.url?.takeIf { it.isNotBlank() }
+                ?: event.detailValue(ATTR_YELP_URL)?.takeIf { it.isNotBlank() }
+            RestaurantMenuCard(event)
+            RestaurantOverviewCard(
+                event = event,
+                onOpenReviews = restaurantReviewsUrl?.let { { uriHandler.openUri(it) } }
+            )
+            RestaurantReservationsCard(
+                event = event,
+                tripDestination = tripDestination,
+                tripAdults = tripAdults,
+                tripChildren = tripChildren
+            )
             RestaurantServicesCard(event)
             RestaurantHoursCard(event)
-            LocationMapCard(
-                locationLabel = locationLabel,
-                staticMapModel = staticMapModel,
-                embeddedMapUrl = embeddedMapUrl,
-                onOpenMaps = { uriHandler.openUri(mapsUrl) }
-            )
-            ReviewsCard(
-                ratingLabel = ratingLabel,
-                reviewCountLabel = reviewCountLabel,
-                reviews = yelpReviews,
-                reviewsLoading = reviewsLoading,
-                onReadAll = reviewUrl?.let { { uriHandler.openUri(it) } }
-            )
+            if (showLocationCard) {
+                TransportCard(event)
+            }
+            if (showLocationCard) {
+                LocationMapCard(
+                    event = event,
+                    locationLabel = locationLabel,
+                    onOpenMaps = { uriHandler.openUri(mapsUrl) }
+                )
+            }
+            WaitTimeCard(event)
+            NeighborhoodCard(event)
+            WeatherCard(event)
+            CurrencyCostCard(event)
         }
-
         else -> {
             ActivitySummaryCard(event)
             ActivityHoursCard(event)
+            VenueCard(event)
+            TicketPricingCard(event)
             val isBookable = event.isNativeBookable?.toString() == "true"
             val bookingUrl = event.bookingUrl
             if (isBookable && !bookingUrl.isNullOrBlank()) {
@@ -315,20 +363,29 @@ private fun EventDetailCardStack(
                     accent = com.example.travelcents.ui.main.current.overlays.cards.CardMint,
                     onClick = { uriHandler.openUri(bookingUrl) }
                 )
+            } else if (isTicketmasterBacked && officialUrl != null) {
+                com.example.travelcents.ui.main.current.overlays.cards.DetailLinkRow(
+                    label = "Tickets",
+                    value = "Buy tickets",
+                    onClick = { uriHandler.openUri(officialUrl) }
+                )
             }
-            LocationMapCard(
-                locationLabel = locationLabel,
-                staticMapModel = staticMapModel,
-                embeddedMapUrl = embeddedMapUrl,
-                onOpenMaps = { uriHandler.openUri(mapsUrl) }
-            )
-            ReviewsCard(
-                ratingLabel = ratingLabel,
-                reviewCountLabel = reviewCountLabel,
-                reviews = yelpReviews,
-                reviewsLoading = reviewsLoading,
-                onReadAll = reviewUrl?.let { { uriHandler.openUri(it) } }
-            )
+            if (showLocationCard) {
+                LocationMapCard(
+                    event = event,
+                    locationLabel = locationLabel,
+                    onOpenMaps = { uriHandler.openUri(mapsUrl) }
+                )
+            }
+            if (showActivityReviews) {
+                ReviewsCard(
+                    ratingLabel = ratingLabel,
+                    reviewCountLabel = reviewCountLabel,
+                    reviews = yelpReviews,
+                    reviewsLoading = reviewsLoading,
+                    onReadAll = reviewUrl?.let { { uriHandler.openUri(it) } }
+                )
+            }
         }
     }
 }

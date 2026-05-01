@@ -208,7 +208,7 @@ fun TripStep3TravelersPage(
             S3ToggleRow(
                 icon = Icons.Default.ChildCare,
                 title = "Children",
-                subtitle = "Ages 2 - 12",
+                subtitle = "Ages 2 – 12",
                 checked = hasChildren,
                 onCheckedChange = {
                     hasChildren = it
@@ -315,6 +315,7 @@ private fun S3ProgressWidget(stepsComplete: Int) {
         }
     }
 }
+
 @Composable
 private fun S3InlineStepper(
     count: Int,
@@ -372,6 +373,7 @@ private fun S3InlineStepper(
         }
     }
 }
+
 @Composable
 private fun S3ToggleRow(
     icon: ImageVector,

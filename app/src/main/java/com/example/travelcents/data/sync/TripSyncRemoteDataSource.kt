@@ -1,20 +1,19 @@
 package com.example.travelcents.data.sync
 
+import com.example.travelcents.data.local.trip.LocalUserStub
 import com.example.travelcents.data.trip.TripAccessRole
 import com.example.travelcents.data.trip.TripKey
-import com.example.travelcents.data.local.trip.LocalUserStub
 import com.example.travelcents.data.trip.model.EventOption
 import com.example.travelcents.data.trip.model.Itinerary
 import com.example.travelcents.data.trip.model.TravelEvent
-import com.example.travelcents.data.trip.model.YelpOptionPoolItem
 import com.example.travelcents.data.trip.model.YELP_POOL_TYPE_ACTIVITIES
 import com.example.travelcents.data.trip.model.YELP_POOL_TYPE_RESTAURANTS
+import com.example.travelcents.data.trip.model.YelpOptionPoolItem
 import com.example.travelcents.data.trip.model.resolveTripName
 import com.google.firebase.firestore.DocumentReference
 import com.google.firebase.firestore.DocumentSnapshot
 import com.google.firebase.firestore.FieldValue
 import com.google.firebase.firestore.FirebaseFirestore
-import com.google.firebase.firestore.FirebaseFirestoreException
 import com.google.firebase.firestore.SetOptions
 import kotlinx.coroutines.tasks.await
 import kotlin.random.Random
@@ -75,6 +74,7 @@ class TripSyncRemoteDataSource(
                     origin = document.getString("origin").orEmpty(),
                     originIata = document.getString("originIata").orEmpty(),
                     destinationIata = document.getString("destinationIata").orEmpty(),
+                    timeZoneId = document.getString("timeZoneId").orEmpty(),
                     dateFrom = document.getString("dateFrom").orEmpty(),
                     dateTo = document.getString("dateTo").orEmpty(),
                     durationDays = (document.getLong("durationDays") ?: 0L).toInt(),
@@ -135,6 +135,7 @@ class TripSyncRemoteDataSource(
             origin = snapshot.getString("origin").orEmpty(),
             originIata = snapshot.getString("originIata").orEmpty(),
             destinationIata = snapshot.getString("destinationIata").orEmpty(),
+            timeZoneId = snapshot.getString("timeZoneId").orEmpty(),
             dateFrom = snapshot.getString("dateFrom").orEmpty(),
             dateTo = snapshot.getString("dateTo").orEmpty(),
             durationDays = (snapshot.getLong("durationDays") ?: 0L).toInt(),
@@ -756,6 +757,7 @@ class TripSyncRemoteDataSource(
             put("origin", snapshot["origin"]?.toString().orEmpty())
             put("originIata", snapshot["originIata"]?.toString().orEmpty())
             put("destinationIata", snapshot["destinationIata"]?.toString().orEmpty())
+            put("timeZoneId", snapshot["timeZoneId"]?.toString().orEmpty())
             put("dateFrom", snapshot["dateFrom"]?.toString().orEmpty())
             put("dateTo", snapshot["dateTo"]?.toString().orEmpty())
             put("createdAt", snapshot["createdAt"]?.toString().orEmpty())
@@ -844,6 +846,7 @@ class TripSyncRemoteDataSource(
                 origin = getString("origin") ?: "",
                 originIata = getString("originIata") ?: "",
                 destinationIata = getString("destinationIata") ?: "",
+                timeZoneId = getString("timeZoneId") ?: "",
                 dateFrom = getString("dateFrom") ?: "",
                 dateTo = getString("dateTo") ?: "",
                 durationDays = (getLong("durationDays") ?: 0L).toInt(),

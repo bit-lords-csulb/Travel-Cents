@@ -1,23 +1,22 @@
 package com.example.travelcents.data.trip
 
 import android.util.Log
+import com.example.travelcents.data.sync.TripSyncRemoteDataSource
 import com.example.travelcents.data.trip.model.EventOption
 import com.example.travelcents.data.trip.model.Itinerary
 import com.example.travelcents.data.trip.model.TravelEvent
 import com.example.travelcents.data.trip.model.YELP_POOL_TYPE_ACTIVITIES
 import com.example.travelcents.data.trip.model.YELP_POOL_TYPE_RESTAURANTS
 import com.example.travelcents.data.trip.model.resolveTripName
-import com.example.travelcents.data.sync.TripSyncRemoteDataSource
 import com.google.firebase.firestore.DocumentSnapshot
 import com.google.firebase.firestore.FirebaseFirestore
-import com.google.firebase.firestore.FirebaseFirestoreException
 import com.google.firebase.firestore.Query
 import com.google.firebase.firestore.QuerySnapshot
 import com.google.firebase.firestore.SetOptions
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
-import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.channels.awaitClose
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.callbackFlow
 import kotlinx.coroutines.tasks.await
@@ -629,6 +628,7 @@ class FirestoreTripRepository(
                 origin = document.getString("origin") ?: "",
                 originIata = document.getString("originIata") ?: "",
                 destinationIata = document.getString("destinationIata") ?: "",
+                timeZoneId = document.getString("timeZoneId") ?: "",
                 dateFrom = document.getString("dateFrom") ?: "",
                 dateTo = document.getString("dateTo") ?: "",
                 durationDays = (document.getLong("durationDays") ?: 0L).toInt(),

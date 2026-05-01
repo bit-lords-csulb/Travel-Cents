@@ -1,4 +1,4 @@
-﻿package com.example.travelcents.ui.main.newTrip
+package com.example.travelcents.ui.main.newTrip
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement

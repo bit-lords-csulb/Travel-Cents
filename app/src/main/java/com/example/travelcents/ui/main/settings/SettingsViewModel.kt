@@ -16,6 +16,7 @@ data class SettingsUserState(
     val username: String = "",
     val email: String = "",
     val profileImageUrl: String = "",
+    val doNotShareData: Boolean = false,
     val isLoading: Boolean = true
 ) {
     val displayName: String get() = "$firstName $lastName".trim().ifEmpty { "User" }
@@ -42,6 +43,7 @@ class SettingsViewModel : ViewModel() {
                     username = profile.username,
                     email = profile.email,
                     profileImageUrl = profile.profileImageUrl,
+                    doNotShareData = profile.doNotShareData,
                     isLoading = profile.isLoading
                 )
             }
@@ -65,6 +67,17 @@ class SettingsViewModel : ViewModel() {
                 onSuccess()
             }
             .addOnFailureListener { e -> onError(e.message ?: "Update failed") }
+    }
+
+    fun setDoNotShareData(enabled: Boolean) {
+        val uid = auth.currentUser?.uid ?: return
+        val previous = _userState.value.doNotShareData
+        _userState.value = _userState.value.copy(doNotShareData = enabled)
+        db.collection("users").document(uid)
+            .update("doNotShareData", enabled)
+            .addOnFailureListener {
+                _userState.value = _userState.value.copy(doNotShareData = previous)
+            }
     }
 
     fun signOut(onComplete: () -> Unit) {

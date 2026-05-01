@@ -15,7 +15,6 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
-import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.itemsIndexed
@@ -351,7 +350,7 @@ fun TripStep2DatesPage(
                                 val cal1 = Calendar.getInstance().apply { set(s.year, s.month, s.day, 0, 0, 0) }
                                 val cal2 = Calendar.getInstance().apply { set(e.year, e.month, e.day, 0, 0, 0) }
                                 val nights = ((cal2.timeInMillis - cal1.timeInMillis) / 86400000L).toInt()
-                                "${shortMonthNames[s.month]} ${s.day} - ${shortMonthNames[e.month]} ${e.day}  ($nights night${if (nights != 1) "s" else ""})"
+                                "${shortMonthNames[s.month]} ${s.day} – ${shortMonthNames[e.month]} ${e.day}  ($nights night${if (nights != 1) "s" else ""})"
                             } else {
                                 "${shortMonthNames[s.month]} ${s.day}  (tap end date)"
                             }
@@ -559,7 +558,7 @@ private fun S2MonthYearPickerDialog(
             }
         },
         text = {
-            // 3x4 month grid
+            // 3×4 month grid
             LazyVerticalGrid(
                 columns = GridCells.Fixed(3),
                 verticalArrangement = Arrangement.spacedBy(8.dp),

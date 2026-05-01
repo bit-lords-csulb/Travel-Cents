@@ -5,6 +5,8 @@ import androidx.room.Database
 import androidx.room.Room
 import androidx.room.RoomDatabase
 import androidx.room.TypeConverters
+import androidx.room.migration.Migration
+import androidx.sqlite.db.SupportSQLiteDatabase
 
 @Database(
     entities = [
@@ -32,6 +34,14 @@ abstract class TravelCentsDatabase : RoomDatabase() {
     abstract fun mediaAssetDao(): MediaAssetDao
 
     companion object {
+        private val MIGRATION_5_6 = object : Migration(5, 6) {
+            override fun migrate(database: SupportSQLiteDatabase) {
+                database.execSQL(
+                    "ALTER TABLE trip_summary ADD COLUMN timeZoneId TEXT NOT NULL DEFAULT ''"
+                )
+            }
+        }
+
         @Volatile
         private var instance: TravelCentsDatabase? = null
 
@@ -42,6 +52,7 @@ abstract class TravelCentsDatabase : RoomDatabase() {
                     TravelCentsDatabase::class.java,
                     "travel_cents.db"
                 )
+                    .addMigrations(MIGRATION_5_6)
                     .fallbackToDestructiveMigration()
                     .build()
                     .also { built -> instance = built }

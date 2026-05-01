@@ -1,4 +1,4 @@
-﻿package com.example.travelcents.ui.main.newTrip
+package com.example.travelcents.ui.main.newTrip
 
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.expandVertically
@@ -36,7 +36,6 @@ import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.example.travelcents.data.trip.TripKey
 import com.example.travelcents.ui.components.TcButton
 import com.example.travelcents.ui.theme.TravelCentsFonts
 
@@ -62,11 +61,10 @@ private val generationSteps = listOf(
 fun TripGeneratingPage(
     modifier: Modifier = Modifier,
     viewModel: NewTripViewModel,
-    onTripReady: (TripKey) -> Unit
+    onTripReady: () -> Unit
 ) {
     val currentStep by viewModel.generationStep.collectAsState()
     val uiState by viewModel.uiState.collectAsState()
-    val generatedItinerary = (uiState as? TripUiState.Success)?.itinerary
 
     ProvideTextStyle(value = TextStyle(fontFamily = TravelCentsFonts.Body)) {
         Column(
@@ -132,14 +130,8 @@ fun TripGeneratingPage(
         ) {
             TcButton(
                 onClick = {
-                    generatedItinerary?.let { itinerary ->
-                        onTripReady(
-                            TripKey(
-                                ownerUid = itinerary.ownerUid.ifBlank { itinerary.userId },
-                                tripId = itinerary.itineraryId
-                            )
-                        )
-                    }
+                    viewModel.resetState()
+                    onTripReady()
                 },
                 modifier = Modifier
                     .fillMaxWidth()
@@ -221,7 +213,7 @@ private fun StepCard(label: String, isDone: Boolean, isActive: Boolean) {
 
             when {
                 isDone -> Text(
-                    text = "Done",
+                    text = "✓",
                     color = GenGreen,
                     fontSize = 16.sp,
                     fontWeight = FontWeight.Bold

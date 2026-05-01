@@ -4,11 +4,11 @@ import android.app.Application
 import android.util.Log
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
-import com.example.travelcents.data.user.UserProfileRepository
-import com.example.travelcents.data.user.model.CurrentUserProfile
 import com.example.travelcents.BuildConfig
 import com.example.travelcents.data.local.trip.TravelCentsDatabase
 import com.example.travelcents.data.local.trip.TripLocalDataSource
+import com.example.travelcents.data.sync.TripSyncCoordinator
+import com.example.travelcents.data.sync.TripSyncRemoteDataSource
 import com.example.travelcents.data.trip.FirestoreTripRepository
 import com.example.travelcents.data.trip.LocalFirstTripRepository
 import com.example.travelcents.data.trip.TripKey
@@ -16,19 +16,19 @@ import com.example.travelcents.data.trip.TripPerformanceLogger
 import com.example.travelcents.data.trip.model.Itinerary
 import com.example.travelcents.data.trip.remote.DestinationImageRepository
 import com.example.travelcents.data.trip.remote.WikipediaApiService
-import com.example.travelcents.data.sync.TripSyncCoordinator
-import com.example.travelcents.data.sync.TripSyncRemoteDataSource
+import com.example.travelcents.data.social.model.BookmarkedPlace
+import com.example.travelcents.data.social.repository.BookmarksRepository
+import com.example.travelcents.data.user.UserProfileRepository
+import com.example.travelcents.data.user.model.CurrentUserProfile
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FirebaseFirestore
 import kotlinx.coroutines.Job
-import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import okhttp3.OkHttpClient
-import kotlinx.coroutines.tasks.await
 import retrofit2.Retrofit
 import retrofit2.converter.gson.GsonConverterFactory
 
@@ -39,6 +39,7 @@ data class HomeUiState(
     // itinerary id -> home card image URL
     val tripImages: Map<String, String> = emptyMap(),
     val profile: CurrentUserProfile = CurrentUserProfile(),
+    val bookmarks: List<BookmarkedPlace> = emptyList(),
     val errorMessage: String? = null
 )
 
@@ -47,6 +48,7 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
     private val db = FirebaseFirestore.getInstance()
     private val auth = FirebaseAuth.getInstance()
     private val userProfileRepository = UserProfileRepository(auth = auth, db = db)
+    private val bookmarksRepository = BookmarksRepository(db)
     private val localDataSource = TripLocalDataSource(TravelCentsDatabase.getInstance(application))
     private val remoteRepository = FirestoreTripRepository(db)
     private val tripRepository = LocalFirstTripRepository(
@@ -85,7 +87,24 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
     init {
         observeProfile()
         observeHomeTrips()
+        observeBookmarks()
         loadAllTrips()
+    }
+
+    private fun observeBookmarks() {
+        val uid = auth.currentUser?.uid ?: return
+        viewModelScope.launch {
+            bookmarksRepository.observeBookmarks(uid).collect { places ->
+                _uiState.update { it.copy(bookmarks = places) }
+            }
+        }
+    }
+
+    fun removeBookmark(placeId: String) {
+        val uid = auth.currentUser?.uid ?: return
+        viewModelScope.launch {
+            runCatching { bookmarksRepository.removeBookmark(uid, placeId) }
+        }
     }
 
     private fun observeProfile() {

@@ -8,6 +8,7 @@ data class CurrentUserProfile(
     val email: String = "",
     val profileImageUrl: String = "",
     val profileImageSource: String = "",
+    val doNotShareData: Boolean = false,
     val isLoading: Boolean = true
 ) {
     val displayName: String

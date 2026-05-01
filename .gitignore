@@ -24,3 +24,4 @@ app/src/main/java/com/example/travelcents/data/VectorEmbeddings/.env
 analytics.settings
 __pycache__/
 .codex_tmp_signin_assets.zip
+/credentials.json

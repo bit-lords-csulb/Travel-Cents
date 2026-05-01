@@ -5,6 +5,7 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -23,9 +24,9 @@ import androidx.compose.material.icons.filled.DateRange
 import androidx.compose.material.icons.filled.DeleteOutline
 import androidx.compose.material.icons.filled.DragHandle
 import androidx.compose.material.icons.filled.Edit
+import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.Share
-import androidx.compose.material.icons.filled.SwapVert
 import androidx.compose.material.icons.outlined.Archive
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.DropdownMenu
@@ -49,7 +50,9 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -66,7 +69,7 @@ import com.example.travelcents.ui.theme.DeepSea5
 import com.example.travelcents.ui.theme.TravelCentsFonts
 
 private val SurfaceContainerHigh = Color(0xFF222A3D)
-private val SwitcherButtonShape = RoundedCornerShape(10.dp)
+private val SwitcherButtonShape = RoundedCornerShape(18.dp)
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -105,6 +108,7 @@ fun CurrentTripHeader(
     var showMembersSheet by remember { mutableStateOf(false) }
     var editableTitle by remember { mutableStateOf(tripTitle) }
     val displayTitle = tripTitle.ifBlank { "My Trip" }
+    val titleSidePadding = if (allTrips.size > 1) 60.dp else 64.dp
 
     LaunchedEffect(tripTitle, showRenameDialog) {
         if (!showRenameDialog) {
@@ -220,57 +224,77 @@ fun CurrentTripHeader(
             .fillMaxWidth()
             .statusBarsPadding()
     ) {
-        Box(
+        BoxWithConstraints(
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(horizontal = 8.dp),
-            contentAlignment = Alignment.Center
+            contentAlignment = Alignment.TopCenter
         ) {
+            val selectorMaxWidth = (maxWidth - 124.dp).coerceAtLeast(180.dp)
+
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(horizontal = 52.dp),
-                contentAlignment = Alignment.Center
+                    .padding(start = titleSidePadding, end = titleSidePadding),
+                contentAlignment = Alignment.TopCenter
             ) {
-                Text(
-                    text = displayTitle,
-                    color = CurrentTripHeroAccent,
-                    fontSize = 18.sp,
-                    fontWeight = FontWeight.ExtraBold,
-                    fontFamily = TravelCentsFonts.Headline,
-                    maxLines = 1,
-                    softWrap = false,
-                    overflow = TextOverflow.Ellipsis,
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(end = if (allTrips.size > 1) 40.dp else 0.dp)
-                )
-
                 if (allTrips.size > 1) {
-                    IconButton(
-                        onClick = { switcherExpanded = true },
+                    Row(
                         modifier = Modifier
-                            .align(Alignment.CenterEnd)
-                            .size(34.dp)
+                            .widthIn(max = selectorMaxWidth)
                             .clip(SwitcherButtonShape)
-                            .background(SurfaceContainerHigh)
-                            .border(1.dp, DeepSea3.copy(alpha = 0.75f), SwitcherButtonShape)
+                            .background(SurfaceContainerHigh.copy(alpha = 0.72f))
+                            .border(1.dp, DeepSea3.copy(alpha = 0.72f), SwitcherButtonShape)
+                            .clickable(
+                                role = Role.Button,
+                                onClick = { switcherExpanded = true }
+                            )
+                            .padding(horizontal = 14.dp, vertical = 8.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(6.dp)
                     ) {
+                        Text(
+                            text = displayTitle,
+                            color = CurrentTripHeroAccent,
+                            fontSize = 18.sp,
+                            fontWeight = FontWeight.ExtraBold,
+                            fontFamily = TravelCentsFonts.Headline,
+                            maxLines = 1,
+                            softWrap = false,
+                            overflow = TextOverflow.Ellipsis,
+                            textAlign = TextAlign.Center,
+                            modifier = Modifier.weight(1f, fill = false)
+                        )
                         Icon(
-                            imageVector = Icons.Default.SwapVert,
+                            imageVector = Icons.Default.KeyboardArrowDown,
                             contentDescription = "Switch trip",
                             tint = DeepSea5,
-                            modifier = Modifier.size(16.dp)
+                            modifier = Modifier.size(18.dp)
                         )
                     }
+                } else {
+                    Text(
+                        text = displayTitle,
+                        color = CurrentTripHeroAccent,
+                        fontSize = 18.sp,
+                        fontWeight = FontWeight.ExtraBold,
+                        fontFamily = TravelCentsFonts.Headline,
+                        maxLines = 1,
+                        softWrap = false,
+                        overflow = TextOverflow.Ellipsis,
+                        textAlign = TextAlign.Center,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .widthIn(max = selectorMaxWidth)
+                    )
                 }
 
                 DropdownMenu(
                     expanded = switcherExpanded,
                     onDismissRequest = { switcherExpanded = false },
-                    modifier = Modifier
-                        .background(DeepSea2)
-                        .widthIn(min = 200.dp)
+                    shape = SwitcherButtonShape,
+                    modifier = Modifier.widthIn(min = 200.dp),
+                    containerColor = DeepSea2
                 ) {
                     allTrips.forEach { trip ->
                         val isCurrentTrip = trip.itineraryId == currentTripId && trip.ownerUid == currentTripOwnerUid
@@ -306,18 +330,15 @@ fun CurrentTripHeader(
                 }
             }
 
-            IconButton(
+            HeaderModeButton(
+                icon = if (isInCalendarMode) Icons.AutoMirrored.Filled.ArrowBack else Icons.Default.DateRange,
+                label = if (isInCalendarMode) "Itinerary" else "Calendar",
+                contentDescription = if (isInCalendarMode) "Back to itinerary" else "Open calendar view",
                 onClick = if (isInCalendarMode) onBackClick else onCalendarClick,
-                modifier = Modifier.align(Alignment.CenterStart)
-            ) {
-                Icon(
-                    imageVector = if (isInCalendarMode) Icons.AutoMirrored.Filled.ArrowBack else Icons.Default.DateRange,
-                    contentDescription = if (isInCalendarMode) "Back to itinerary" else "Calendar view",
-                    tint = CurrentTripHeroAccent
-                )
-            }
+                modifier = Modifier.align(Alignment.TopStart)
+            )
 
-            Box(modifier = Modifier.align(Alignment.CenterEnd)) {
+            Box(modifier = Modifier.align(Alignment.TopEnd)) {
                 IconButton(onClick = { menuExpanded = true }) {
                     Icon(
                         imageVector = Icons.Default.MoreVert,
@@ -328,7 +349,8 @@ fun CurrentTripHeader(
                 DropdownMenu(
                     expanded = menuExpanded,
                     onDismissRequest = { menuExpanded = false },
-                    modifier = Modifier.background(DeepSea2)
+                    shape = SwitcherButtonShape,
+                    containerColor = DeepSea2
                 ) {
                     if (canAdd) {
                         DropdownMenuItem(
@@ -457,6 +479,51 @@ fun CurrentTripHeader(
         } else {
             Spacer(modifier = Modifier.height(8.dp))
         }
+    }
+}
+
+@Composable
+private fun HeaderModeButton(
+    icon: androidx.compose.ui.graphics.vector.ImageVector,
+    label: String,
+    contentDescription: String,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    val buttonShape = RoundedCornerShape(14.dp)
+
+    Column(
+        modifier = modifier
+            .clip(buttonShape)
+            .clickable(role = Role.Button, onClick = onClick)
+            .padding(horizontal = 4.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.spacedBy(0.dp)
+    ) {
+        Box(
+            modifier = Modifier
+                .size(34.dp)
+                .clip(buttonShape)
+                .background(SurfaceContainerHigh)
+                .border(1.dp, DeepSea3.copy(alpha = 0.75f), buttonShape),
+            contentAlignment = Alignment.Center
+        ) {
+            Icon(
+                imageVector = icon,
+                contentDescription = contentDescription,
+                tint = CurrentTripHeroAccent,
+                modifier = Modifier.size(18.dp)
+            )
+        }
+        Text(
+            text = label,
+            color = DeepSea4,
+            fontSize = 10.sp,
+            lineHeight = 10.sp,
+            fontWeight = FontWeight.SemiBold,
+            letterSpacing = 0.3.sp,
+            fontFamily = TravelCentsFonts.Body
+        )
     }
 }
 

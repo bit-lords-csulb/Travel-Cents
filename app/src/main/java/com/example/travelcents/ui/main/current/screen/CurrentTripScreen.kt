@@ -5,7 +5,6 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.ProvideTextStyle
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -16,9 +15,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.TextStyle
-import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.travelcents.data.trip.TripPerformanceLogger
 import com.example.travelcents.ui.main.current.calendar.buildTripDateRange
@@ -117,6 +114,7 @@ fun CurrentTripScreen(
             viewModel.fetchYelpReviews(yelpId)
             viewModel.ensureYelpEventEnriched(event.eventId)
         }
+        event?.eventId?.let(viewModel::refreshRestaurantLiveContext)
         event?.eventId?.let(viewModel::ensureEventOptionsLoaded)
     }
 

@@ -1,375 +1,0 @@
-[debug] [2026-04-28T20:45:16.890Z] ----------------------------------------------------------------------
-[debug] [2026-04-28T20:45:16.894Z] Command:       C:\Program Files\nodejs\node.exe C:\Users\spike\AppData\Roaming\npm\node_modules\firebase-tools\lib\bin\firebase.js emulators:start
-[debug] [2026-04-28T20:45:16.895Z] CLI Version:   15.15.0
-[debug] [2026-04-28T20:45:16.895Z] Platform:      win32
-[debug] [2026-04-28T20:45:16.895Z] Node Version:  v24.15.0
-[debug] [2026-04-28T20:45:16.895Z] Time:          Tue Apr 28 2026 13:45:16 GMT-0700 (Pacific Daylight Time)
-[debug] [2026-04-28T20:45:16.895Z] ----------------------------------------------------------------------
-[debug] 
-[debug] [2026-04-28T20:45:18.655Z] > command requires scopes: ["email","openid","https://www.googleapis.com/auth/cloudplatformprojects.readonly","https://www.googleapis.com/auth/firebase","https://www.googleapis.com/auth/cloud-platform"]
-[debug] [2026-04-28T20:45:18.655Z] > authorizing via signed-in user (danthecalfman32@gmail.com)
-[debug] [2026-04-28T20:45:18.731Z] openjdk version "25.0.2" 2026-01-20 LTS
-
-[debug] [2026-04-28T20:45:18.731Z] OpenJDK Runtime Environment Temurin-25.0.2+10 (build 25.0.2+10-LTS)
-OpenJDK 64-Bit Server VM Temurin-25.0.2+10 (build 25.0.2+10-LTS, mixed mode, sharing)
-
-[debug] [2026-04-28T20:45:18.743Z] Parsed Java major version: 25
-[info] i  emulators: Starting emulators: functions, firestore, extensions {"metadata":{"emulator":{"name":"hub"},"message":"Starting emulators: functions, firestore, extensions"}}
-[debug] [2026-04-28T20:45:18.746Z] Checked if tokens are valid: true, expires at: 1777412014796
-[debug] [2026-04-28T20:45:18.747Z] Checked if tokens are valid: true, expires at: 1777412014796
-[debug] [2026-04-28T20:45:18.748Z] >>> [apiv2][query] GET https://cloudresourcemanager.googleapis.com/v1/projects/travel-cents-3e2d9 [none]
-[debug] [2026-04-28T20:45:18.989Z] <<< [apiv2][status] GET https://cloudresourcemanager.googleapis.com/v1/projects/travel-cents-3e2d9 200
-[debug] [2026-04-28T20:45:18.990Z] <<< [apiv2][body] GET https://cloudresourcemanager.googleapis.com/v1/projects/travel-cents-3e2d9 {"projectNumber":"805994740096","projectId":"travel-cents-3e2d9","lifecycleState":"ACTIVE","name":"Travel Cents","labels":{"firebase":"enabled","firebase-core":"disabled"},"createTime":"2026-02-24T22:28:43.908343Z"}
-[debug] [2026-04-28T20:45:19.007Z] [logging] Logging Emulator only supports listening on one address (127.0.0.1). Not listening on ::1
-[debug] [2026-04-28T20:45:19.008Z] [firestore] Firestore Emulator only supports listening on one address (127.0.0.1). Not listening on ::1
-[debug] [2026-04-28T20:45:19.008Z] [firestore.websocket] websocket server for firestore only supports listening on one address (127.0.0.1). Not listening on ::1
-[debug] [2026-04-28T20:45:19.008Z] assigned listening specs for emulators {"user":{"hub":[{"address":"127.0.0.1","family":"IPv4","port":4400},{"address":"::1","family":"IPv6","port":4400}],"ui":[{"address":"127.0.0.1","family":"IPv4","port":4000},{"address":"::1","family":"IPv6","port":4000}],"logging":[{"address":"127.0.0.1","family":"IPv4","port":4500}],"firestore":[{"address":"127.0.0.1","family":"IPv4","port":8080}],"firestore.websocket":[{"address":"127.0.0.1","family":"IPv4","port":9150}]},"metadata":{"message":"assigned listening specs for emulators"}}
-[debug] [2026-04-28T20:45:19.014Z] Write emulator hub locator at C:\Users\spike\AppData\Local\Temp\hub-travel-cents-3e2d9.json
-[debug] [2026-04-28T20:45:19.022Z] [Extensions] Started Extensions emulator, this is a noop.
-[debug] [2026-04-28T20:45:19.030Z] [functions] Functions Emulator only supports listening on one address (127.0.0.1). Not listening on ::1
-[debug] [2026-04-28T20:45:19.030Z] [eventarc] Eventarc Emulator only supports listening on one address (127.0.0.1). Not listening on ::1
-[debug] [2026-04-28T20:45:19.030Z] [tasks] Cloud Tasks Emulator only supports listening on one address (127.0.0.1). Not listening on ::1
-[debug] [2026-04-28T20:45:19.030Z] late-assigned ports for functions and eventarc emulators {"user":{"hub":[{"address":"127.0.0.1","family":"IPv4","port":4400},{"address":"::1","family":"IPv6","port":4400}],"ui":[{"address":"127.0.0.1","family":"IPv4","port":4000},{"address":"::1","family":"IPv6","port":4000}],"logging":[{"address":"127.0.0.1","family":"IPv4","port":4500}],"firestore":[{"address":"127.0.0.1","family":"IPv4","port":8080}],"firestore.websocket":[{"address":"127.0.0.1","family":"IPv4","port":9150}],"functions":[{"address":"127.0.0.1","family":"IPv4","port":5001}],"eventarc":[{"address":"127.0.0.1","family":"IPv4","port":9299}],"tasks":[{"address":"127.0.0.1","family":"IPv4","port":9499}]},"metadata":{"message":"late-assigned ports for functions and eventarc emulators"}}
-[warn] !  functions: The following emulators are not running, calls to these services from the Functions emulator will affect production: apphosting, auth, database, hosting, pubsub, storage, dataconnect {"metadata":{"emulator":{"name":"functions"},"message":"The following emulators are not running, calls to these services from the Functions emulator will affect production: \u001b[1mapphosting, auth, database, hosting, pubsub, storage, dataconnect\u001b[22m"}}
-[debug] [2026-04-28T20:45:19.049Z] defaultcredentials: writing to file C:\Users\spike\AppData\Roaming\firebase\danthecalfman32_gmail_com_application_default_credentials.json
-[debug] [2026-04-28T20:45:19.050Z] Setting GAC to C:\Users\spike\AppData\Roaming\firebase\danthecalfman32_gmail_com_application_default_credentials.json {"metadata":{"emulator":{"name":"functions"},"message":"Setting GAC to C:\\Users\\spike\\AppData\\Roaming\\firebase\\danthecalfman32_gmail_com_application_default_credentials.json"}}
-[debug] [2026-04-28T20:45:19.051Z] Checked if tokens are valid: true, expires at: 1777412014796
-[debug] [2026-04-28T20:45:19.051Z] Checked if tokens are valid: true, expires at: 1777412014796
-[debug] [2026-04-28T20:45:19.051Z] >>> [apiv2][query] GET https://firebase.googleapis.com/v1beta1/projects/travel-cents-3e2d9/adminSdkConfig [none]
-[debug] [2026-04-28T20:45:19.274Z] <<< [apiv2][status] GET https://firebase.googleapis.com/v1beta1/projects/travel-cents-3e2d9/adminSdkConfig 200
-[debug] [2026-04-28T20:45:19.274Z] <<< [apiv2][body] GET https://firebase.googleapis.com/v1beta1/projects/travel-cents-3e2d9/adminSdkConfig {"projectId":"travel-cents-3e2d9","storageBucket":"travel-cents-3e2d9.firebasestorage.app"}
-[debug] [2026-04-28T20:45:19.311Z] Ignoring unsupported arg: auto_download {"metadata":{"emulator":{"name":"firestore"},"message":"Ignoring unsupported arg: auto_download"}}
-[debug] [2026-04-28T20:45:19.312Z] Ignoring unsupported arg: single_project_mode_error {"metadata":{"emulator":{"name":"firestore"},"message":"Ignoring unsupported arg: single_project_mode_error"}}
-[debug] [2026-04-28T20:45:19.312Z] Starting Firestore Emulator with command {"binary":"java","args":["-Dgoogle.cloud_firestore.debug_log_level=FINE","-Duser.language=en","-jar","C:\\Users\\spike\\.cache\\firebase\\emulators\\cloud-firestore-emulator-v1.20.4.jar","--host","127.0.0.1","--port",8080,"--websocket_port",9150,"--database-edition","standard","--project_id","travel-cents-3e2d9","--rules","C:\\Users\\spike\\Documents\\GitHub\\Travel-Cents\\firestore.rules","--single_project_mode",true,"--functions_emulator","127.0.0.1:5001"],"optionalArgs":["port","webchannel_port","host","rules","websocket_port","database-edition","functions_emulator","seed_from_export","project_id","single_project_mode"],"joinArgs":false,"shell":false,"port":8080} {"metadata":{"emulator":{"name":"firestore"},"message":"Starting Firestore Emulator with command {\"binary\":\"java\",\"args\":[\"-Dgoogle.cloud_firestore.debug_log_level=FINE\",\"-Duser.language=en\",\"-jar\",\"C:\\\\Users\\\\spike\\\\.cache\\\\firebase\\\\emulators\\\\cloud-firestore-emulator-v1.20.4.jar\",\"--host\",\"127.0.0.1\",\"--port\",8080,\"--websocket_port\",9150,\"--database-edition\",\"standard\",\"--project_id\",\"travel-cents-3e2d9\",\"--rules\",\"C:\\\\Users\\\\spike\\\\Documents\\\\GitHub\\\\Travel-Cents\\\\firestore.rules\",\"--single_project_mode\",true,\"--functions_emulator\",\"127.0.0.1:5001\"],\"optionalArgs\":[\"port\",\"webchannel_port\",\"host\",\"rules\",\"websocket_port\",\"database-edition\",\"functions_emulator\",\"seed_from_export\",\"project_id\",\"single_project_mode\"],\"joinArgs\":false,\"shell\":false,\"port\":8080}"}}
-[info] i  firestore: Firestore Emulator logging to firestore-debug.log {"metadata":{"emulator":{"name":"firestore"},"message":"Firestore Emulator logging to \u001b[1mfirestore-debug.log\u001b[22m"}}
-[debug] [2026-04-28T20:45:19.793Z] WARNING: A terminally deprecated method in sun.misc.Unsafe has been called
-WARNING: sun.misc.Unsafe::allocateMemory has been called by io.netty.util.internal.PlatformDependent0$2 (file:/C:/Users/spike/.cache/firebase/emulators/cloud-firestore-emulator-v1.20.4.jar)
-WARNING: Please consider reporting this to the maintainers of class io.netty.util.internal.PlatformDependent0$2
-WARNING: sun.misc.Unsafe::allocateMemory will be removed in a future release
- {"metadata":{"emulator":{"name":"firestore"},"message":"WARNING: A terminally deprecated method in sun.misc.Unsafe has been called\nWARNING: sun.misc.Unsafe::allocateMemory has been called by io.netty.util.internal.PlatformDependent0$2 (file:/C:/Users/spike/.cache/firebase/emulators/cloud-firestore-emulator-v1.20.4.jar)\nWARNING: Please consider reporting this to the maintainers of class io.netty.util.internal.PlatformDependent0$2\nWARNING: sun.misc.Unsafe::allocateMemory will be removed in a future release\r\n"}}
-[debug] [2026-04-28T20:45:21.361Z] Apr 28, 2026 1:45:21 PM com.google.cloud.datastore.emulator.firestore.websocket.WebSocketServer start
-INFO: Started WebSocket server on ws://127.0.0.1:9150
- {"metadata":{"emulator":{"name":"firestore"},"message":"Apr 28, 2026 1:45:21 PM com.google.cloud.datastore.emulator.firestore.websocket.WebSocketServer start\r\nINFO: Started WebSocket server on ws://127.0.0.1:9150\r\n"}}
-[debug] [2026-04-28T20:45:21.503Z] 
-API endpoint: http:// {"metadata":{"emulator":{"name":"firestore"},"message":"\nAPI endpoint: http://"}}
-[debug] [2026-04-28T20:45:21.503Z] 127.0.0.1:8080
-Database Edition: STANDARD
-Database Mode: CLOUD_FIRESTORE
-
-If you are using a library that supports the FIRESTORE_EMULATOR_HOST environment variable, run:
-
-   export FIRESTORE_EMULATOR_HOST=127.0.0.1:8080
-
-If you are running a Firestore in Datastore Mode project, run:
-
-   export DATASTORE_EMULATOR_HOST=127.0.0.1:8080
-
-Note: Support for Datastore Mode is in preview. If you encounter any bugs please file at https://github.com/firebase/firebase-tools/issues.
-Dev App Server is now running.
-
- {"metadata":{"emulator":{"name":"firestore"},"message":"127.0.0.1:8080\nDatabase Edition: STANDARD\nDatabase Mode: CLOUD_FIRESTORE\n\nIf you are using a library that supports the FIRESTORE_EMULATOR_HOST environment variable, run:\r\n\n   export FIRESTORE_EMULATOR_HOST=127.0.0.1:8080\n\nIf you are running a Firestore in Datastore Mode project, run:\r\n\n   export DATASTORE_EMULATOR_HOST=127.0.0.1:8080\n\nNote: Support for Datastore Mode is in preview. If you encounter any bugs please file at https://github.com/firebase/firebase-tools/issues.\r\nDev App Server is now running.\n\r\n"}}
-[info] +  firestore: Firestore Emulator was started in standard edition. {"metadata":{"emulator":{"name":"firestore"},"message":"Firestore Emulator was started in standard edition."}}
-[info] +  firestore: Firestore Emulator UI websocket is running on 9150. {"metadata":{"emulator":{"name":"firestore"},"message":"Firestore Emulator UI websocket is running on 9150."}}
-[debug] [2026-04-28T20:45:21.565Z] [Extensions] Connecting Extensions emulator, this is a noop.
-[info] i  functions: Watching "C:\Users\spike\Documents\GitHub\Travel-Cents\functions" for Cloud Functions... {"metadata":{"emulator":{"name":"functions"},"message":"Watching \"C:\\Users\\spike\\Documents\\GitHub\\Travel-Cents\\functions\" for Cloud Functions..."}}
-[debug] [2026-04-28T20:45:21.570Z] Customer code is not Node
-[debug] [2026-04-28T20:45:21.571Z] Validating python source
-[debug] [2026-04-28T20:45:21.571Z] Building python source
-[info] i  functions: Loaded environment variables from .env. 
-[debug] [2026-04-28T20:45:21.575Z] Could not find functions.yaml. Must use http discovery
-[debug] [2026-04-28T20:45:21.590Z] Running command with virtualenv: command="C:\Users\spike\Documents\GitHub\Travel-Cents\functions\venv\Scripts\activate.bat", args=["","&&","python.exe","-c","\"import firebase_functions; import os; print(os.path.dirname(firebase_functions.__file__))\""]
-[debug] [2026-04-28T20:45:21.834Z] stdout: C:\Users\spike\Documents\GitHub\Travel-Cents\functions\venv\Lib\site-packages\firebase_functions
-
-[debug] [2026-04-28T20:45:21.845Z] Running admin server with args: ["python.exe","\"C:\\Users\\spike\\Documents\\GitHub\\Travel-Cents\\functions\\venv\\Lib\\site-packages\\firebase_functions\\private\\serving.py\""] and env: {"GCLOUD_PROJECT":"travel-cents-3e2d9","K_REVISION":"1","PORT":"80","GOOGLE_CLOUD_QUOTA_PROJECT":"travel-cents-3e2d9","FUNCTIONS_EMULATOR":"true","TZ":"UTC","FIREBASE_DEBUG_MODE":"true","FIREBASE_DEBUG_FEATURES":"{\"skipTokenVerification\":true,\"enableCors\":true}","FIREBASE_EMULATOR_HUB":"127.0.0.1:4400","FIRESTORE_EMULATOR_HOST":"127.0.0.1:8080","FIREBASE_FIRESTORE_EMULATOR_ADDRESS":"127.0.0.1:8080","CLOUD_EVENTARC_EMULATOR_HOST":"http://127.0.0.1:9299","CLOUD_TASKS_EMULATOR_HOST":"127.0.0.1:9499","FIREBASE_CONFIG":"{\"storageBucket\":\"travel-cents-3e2d9.firebasestorage.app\",\"projectId\":\"travel-cents-3e2d9\"}","GOOGLE_APPLICATION_CREDENTIALS":"C:\\Users\\spike\\AppData\\Roaming\\firebase\\danthecalfman32_gmail_com_application_default_credentials.json","ADMIN_PORT":"8081"} in C:\Users\spike\Documents\GitHub\Travel-Cents\functions
-[debug] [2026-04-28T20:45:21.846Z] Running command with virtualenv: command="C:\Users\spike\Documents\GitHub\Travel-Cents\functions\venv\Scripts\activate.bat", args=["","&&","python.exe","\"C:\\Users\\spike\\Documents\\GitHub\\Travel-Cents\\functions\\venv\\Lib\\site-packages\\firebase_functions\\private\\serving.py\""]
-[info]  * Serving Flask app 'serving'
- * Debug mode: off
-
-[error] WARNING: This is a development server. Do not use it in a production deployment. Use a production WSGI server instead.
- * Running on http://127.0.0.1:8081
-
-[error] Press CTRL+C to quit
-
-[error] 127.0.0.1 - - [28/Apr/2026 20:45:24] "GET /__/functions.yaml HTTP/1.1" 200 -
-
-[debug] [2026-04-28T20:45:24.014Z] Got response from /__/functions.yaml endpoints:
-  generate_itinerary:
-    availableMemoryMb: null
-    callableTrigger: {}
-    concurrency: null
-    entryPoint: generate_itinerary
-    ingressSettings: null
-    labels:
-      deployment-callable: 'true'
-    maxInstances: null
-    minInstances: null
-    platform: gcfv2
-    secretEnvironmentVariables: []
-    serviceAccountEmail: null
-    timeoutSeconds: null
-params: []
-requiredAPIs: []
-specVersion: v1alpha1
-
-[error] 127.0.0.1 - - [28/Apr/2026 20:45:24] "GET /__/quitquitquit HTTP/1.1" 200 -
-
-[info] +  functions: Loaded functions definitions from source: generate_itinerary. {"metadata":{"emulator":{"name":"functions"},"message":"Loaded functions definitions from source: generate_itinerary."}}
-[info] +  functions[us-central1-generate_itinerary]: http function initialized (http://127.0.0.1:5001/travel-cents-3e2d9/us-central1/generate_itinerary). {"metadata":{"emulator":{"name":"functions"},"message":"\u001b[1mhttp\u001b[22m function initialized (http://127.0.0.1:5001/travel-cents-3e2d9/us-central1/generate_itinerary)."}}
-[debug] [2026-04-28T20:45:24.057Z] Could not find VSCode notification endpoint: FetchError: request to http://localhost:40001/vscode/notify failed, reason: . If you are not running the Firebase SQL Connect VSCode extension, this is expected and not an issue.
-[info] 
-┌─────────────────────────────────────────────────────────────┐
-│ ✔  All emulators ready! It is now safe to connect your app. │
-│ i  View Emulator UI at http://127.0.0.1:4000/               │
-└─────────────────────────────────────────────────────────────┘
-
-┌────────────┬────────────────┬──────────────────────────────────┐
-│ Emulator   │ Host:Port      │ View in Emulator UI              │
-├────────────┼────────────────┼──────────────────────────────────┤
-│ Functions  │ 127.0.0.1:5001 │ http://127.0.0.1:4000/functions  │
-├────────────┼────────────────┼──────────────────────────────────┤
-│ Firestore  │ 127.0.0.1:8080 │ http://127.0.0.1:4000/firestore  │
-├────────────┼────────────────┼──────────────────────────────────┤
-│ Extensions │ 127.0.0.1:5001 │ http://127.0.0.1:4000/extensions │
-└────────────┴────────────────┴──────────────────────────────────┘
-  Emulator Hub host: 127.0.0.1 port: 4400
-  Other reserved ports: 4500, 9150
-┌─────────────────────────┬───────────────┬─────────────────────┐
-│ Extension Instance Name │ Extension Ref │ View in Emulator UI │
-└─────────────────────────┴───────────────┴─────────────────────┘
-Issues? Report them at https://github.com/firebase/firebase-tools/issues and attach the *-debug.log files.
- 
-[debug] [2026-04-28T20:49:15.071Z] File C:\Users\spike\Documents\GitHub\Travel-Cents\functions\main.py changed, reloading triggers {"metadata":{"emulator":{"name":"functions"},"message":"File C:\\Users\\spike\\Documents\\GitHub\\Travel-Cents\\functions\\main.py changed, reloading triggers"}}
-[debug] [2026-04-28T20:49:16.088Z] Customer code is not Node
-[debug] [2026-04-28T20:49:16.091Z] Validating python source
-[debug] [2026-04-28T20:49:16.091Z] Building python source
-[info] i  functions: Loaded environment variables from .env. 
-[debug] [2026-04-28T20:49:16.094Z] Could not find functions.yaml. Must use http discovery
-[debug] [2026-04-28T20:49:16.109Z] Running command with virtualenv: command="C:\Users\spike\Documents\GitHub\Travel-Cents\functions\venv\Scripts\activate.bat", args=["","&&","python.exe","-c","\"import firebase_functions; import os; print(os.path.dirname(firebase_functions.__file__))\""]
-[debug] [2026-04-28T20:49:16.317Z] stdout: C:\Users\spike\Documents\GitHub\Travel-Cents\functions\venv\Lib\site-packages\firebase_functions
-
-[debug] [2026-04-28T20:49:16.329Z] Running admin server with args: ["python.exe","\"C:\\Users\\spike\\Documents\\GitHub\\Travel-Cents\\functions\\venv\\Lib\\site-packages\\firebase_functions\\private\\serving.py\""] and env: {"GCLOUD_PROJECT":"travel-cents-3e2d9","K_REVISION":"1","PORT":"80","GOOGLE_CLOUD_QUOTA_PROJECT":"travel-cents-3e2d9","FUNCTIONS_EMULATOR":"true","TZ":"UTC","FIREBASE_DEBUG_MODE":"true","FIREBASE_DEBUG_FEATURES":"{\"skipTokenVerification\":true,\"enableCors\":true}","FIREBASE_EMULATOR_HUB":"127.0.0.1:4400","FIRESTORE_EMULATOR_HOST":"127.0.0.1:8080","FIREBASE_FIRESTORE_EMULATOR_ADDRESS":"127.0.0.1:8080","CLOUD_EVENTARC_EMULATOR_HOST":"http://127.0.0.1:9299","CLOUD_TASKS_EMULATOR_HOST":"127.0.0.1:9499","FIREBASE_CONFIG":"{\"storageBucket\":\"travel-cents-3e2d9.firebasestorage.app\",\"projectId\":\"travel-cents-3e2d9\"}","GOOGLE_APPLICATION_CREDENTIALS":"C:\\Users\\spike\\AppData\\Roaming\\firebase\\danthecalfman32_gmail_com_application_default_credentials.json","ADMIN_PORT":"8081"} in C:\Users\spike\Documents\GitHub\Travel-Cents\functions
-[debug] [2026-04-28T20:49:16.329Z] Running command with virtualenv: command="C:\Users\spike\Documents\GitHub\Travel-Cents\functions\venv\Scripts\activate.bat", args=["","&&","python.exe","\"C:\\Users\\spike\\Documents\\GitHub\\Travel-Cents\\functions\\venv\\Lib\\site-packages\\firebase_functions\\private\\serving.py\""]
-[info]  * Serving Flask app 'serving'
- * Debug mode: off
-
-[error] WARNING: This is a development server. Do not use it in a production deployment. Use a production WSGI server instead.
- * Running on http://127.0.0.1:8081
-
-[error] Press CTRL+C to quit
-
-[error] [2026-04-28 20:49:17,764] ERROR in app: Exception on /__/functions.yaml [GET]
-Traceback (most recent call last):
-  File "C:\Users\spike\Documents\GitHub\Travel-Cents\functions\venv\Lib\site-packages\flask\app.py", line 1511, in wsgi_app
-    response = self.full_dispatch_request()
-               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-  File "C:\Users\spike\Documents\GitHub\Travel-Cents\functions\venv\Lib\site-packages\flask\app.py", line 919, in full_dispatch_request
-    rv = self.handle_user_exception(e)
-         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-  File "C:\Users\spike\Documents\GitHub\Travel-Cents\functions\venv\Lib\site-packages\flask\app.py", line 917, in full_dispatch_request
-    rv = self.dispatch_request()
-         ^^^^^^^^^^^^^^^^^^^^^^^
-  File "C:\Users\spike\Documents\GitHub\Travel-Cents\functions\venv\Lib\site-packages\flask\app.py", line 902, in dispatch_request
-    return self.ensure_sync(self.view_functions[rule.endpoint])(**view_args)  # type: ignore[no-any-return]
-           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-  File "C:\Users\spike\Documents\GitHub\Travel-Cents\functions\venv\Lib\site-packages\firebase_functions\private\serving.py", line 121, in get_functions_yaml
-    functions = get_functions()
-                ^^^^^^^^^^^^^^^
-  File "C:\Users\spike\Documents\GitHub\Travel-Cents\functions\venv\Lib\site-packages\firebase_functions\private\serving.py", line 41, in get_functions
-    spec.loader.exec_module(module)
-  File "<frozen importlib._bootstrap_external>", line 991, in exec_module
-  File "<frozen importlib._bootstrap_external>", line 1129, in get_code
-  File "<frozen importlib._bootstrap_external>", line 1059, in source_to_code
-  File "<frozen importlib._bootstrap>", line 488, in _call_with_frames_removed
-  File "C:\Users\spike\Documents\GitHub\Travel-Cents\functions\main.py", line 28
-    prompt = f"""
-IndentationError: unexpected indent
-
-[error] 127.0.0.1 - - [28/Apr/2026 20:49:17] "GET /__/functions.yaml HTTP/1.1" 500 -
-
-[debug] [2026-04-28T20:49:17.772Z] Got response code 500; body <!doctype html>
-<html lang=en>
-<title>500 Internal Server Error</title>
-<h1>Internal Server Error</h1>
-<p>The server encountered an internal error and was unable to complete your request. Either the server is overloaded or there is an error in the application.</p>
-
-[error] 127.0.0.1 - - [28/Apr/2026 20:49:17] "GET /__/quitquitquit HTTP/1.1" 200 -
-
-[error] !!  functions: Failed to load function definition from source: FirebaseError: Functions codebase could not be analyzed successfully. It may have a syntax or runtime error {"metadata":{"emulator":{"name":"functions"},"message":"Failed to load function definition from source: FirebaseError: Functions codebase could not be analyzed successfully. It may have a syntax or runtime error"}}
-[debug] [2026-04-28T20:53:48.444Z] File C:\Users\spike\Documents\GitHub\Travel-Cents\functions\main.py changed, reloading triggers {"metadata":{"emulator":{"name":"functions"},"message":"File C:\\Users\\spike\\Documents\\GitHub\\Travel-Cents\\functions\\main.py changed, reloading triggers"}}
-[debug] [2026-04-28T20:53:49.453Z] Customer code is not Node
-[debug] [2026-04-28T20:53:49.454Z] Validating python source
-[debug] [2026-04-28T20:53:49.454Z] Building python source
-[info] i  functions: Loaded environment variables from .env. 
-[debug] [2026-04-28T20:53:49.456Z] Could not find functions.yaml. Must use http discovery
-[debug] [2026-04-28T20:53:49.473Z] Running command with virtualenv: command="C:\Users\spike\Documents\GitHub\Travel-Cents\functions\venv\Scripts\activate.bat", args=["","&&","python.exe","-c","\"import firebase_functions; import os; print(os.path.dirname(firebase_functions.__file__))\""]
-[debug] [2026-04-28T20:53:49.678Z] stdout: C:\Users\spike\Documents\GitHub\Travel-Cents\functions\venv\Lib\site-packages\firebase_functions
-
-[debug] [2026-04-28T20:53:49.690Z] Running admin server with args: ["python.exe","\"C:\\Users\\spike\\Documents\\GitHub\\Travel-Cents\\functions\\venv\\Lib\\site-packages\\firebase_functions\\private\\serving.py\""] and env: {"GCLOUD_PROJECT":"travel-cents-3e2d9","K_REVISION":"1","PORT":"80","GOOGLE_CLOUD_QUOTA_PROJECT":"travel-cents-3e2d9","FUNCTIONS_EMULATOR":"true","TZ":"UTC","FIREBASE_DEBUG_MODE":"true","FIREBASE_DEBUG_FEATURES":"{\"skipTokenVerification\":true,\"enableCors\":true}","FIREBASE_EMULATOR_HUB":"127.0.0.1:4400","FIRESTORE_EMULATOR_HOST":"127.0.0.1:8080","FIREBASE_FIRESTORE_EMULATOR_ADDRESS":"127.0.0.1:8080","CLOUD_EVENTARC_EMULATOR_HOST":"http://127.0.0.1:9299","CLOUD_TASKS_EMULATOR_HOST":"127.0.0.1:9499","FIREBASE_CONFIG":"{\"storageBucket\":\"travel-cents-3e2d9.firebasestorage.app\",\"projectId\":\"travel-cents-3e2d9\"}","GOOGLE_APPLICATION_CREDENTIALS":"C:\\Users\\spike\\AppData\\Roaming\\firebase\\danthecalfman32_gmail_com_application_default_credentials.json","ADMIN_PORT":"8081"} in C:\Users\spike\Documents\GitHub\Travel-Cents\functions
-[debug] [2026-04-28T20:53:49.690Z] Running command with virtualenv: command="C:\Users\spike\Documents\GitHub\Travel-Cents\functions\venv\Scripts\activate.bat", args=["","&&","python.exe","\"C:\\Users\\spike\\Documents\\GitHub\\Travel-Cents\\functions\\venv\\Lib\\site-packages\\firebase_functions\\private\\serving.py\""]
-[info]  * Serving Flask app 'serving'
- * Debug mode: off
-
-[error] WARNING: This is a development server. Do not use it in a production deployment. Use a production WSGI server instead.
- * Running on http://127.0.0.1:8081
-
-[error] Press CTRL+C to quit
-
-[debug] [2026-04-28T20:53:51.148Z] File C:\Users\spike\Documents\GitHub\Travel-Cents\functions\__pycache__\main.cpython-312.pyc changed, reloading triggers {"metadata":{"emulator":{"name":"functions"},"message":"File C:\\Users\\spike\\Documents\\GitHub\\Travel-Cents\\functions\\__pycache__\\main.cpython-312.pyc changed, reloading triggers"}}
-[error] 127.0.0.1 - - [28/Apr/2026 20:53:51] "GET /__/functions.yaml HTTP/1.1" 200 -
-
-[debug] [2026-04-28T20:53:51.552Z] Got response from /__/functions.yaml endpoints:
-  generate_itinerary:
-    availableMemoryMb: null
-    callableTrigger: {}
-    concurrency: null
-    entryPoint: generate_itinerary
-    ingressSettings: null
-    labels:
-      deployment-callable: 'true'
-    maxInstances: null
-    minInstances: null
-    platform: gcfv2
-    secretEnvironmentVariables: []
-    serviceAccountEmail: null
-    timeoutSeconds: null
-params: []
-requiredAPIs: []
-specVersion: v1alpha1
-
-[error] 127.0.0.1 - - [28/Apr/2026 20:53:51] "GET /__/quitquitquit HTTP/1.1" 200 -
-
-[info] +  functions: Loaded functions definitions from source: generate_itinerary. {"metadata":{"emulator":{"name":"functions"},"message":"Loaded functions definitions from source: generate_itinerary."}}
-[debug] [2026-04-28T20:53:52.151Z] Customer code is not Node
-[debug] [2026-04-28T20:53:52.152Z] Validating python source
-[debug] [2026-04-28T20:53:52.152Z] Building python source
-[info] i  functions: Loaded environment variables from .env. 
-[debug] [2026-04-28T20:53:52.154Z] Could not find functions.yaml. Must use http discovery
-[debug] [2026-04-28T20:53:52.165Z] Running command with virtualenv: command="C:\Users\spike\Documents\GitHub\Travel-Cents\functions\venv\Scripts\activate.bat", args=["","&&","python.exe","-c","\"import firebase_functions; import os; print(os.path.dirname(firebase_functions.__file__))\""]
-[debug] [2026-04-28T20:53:52.335Z] stdout: C:\Users\spike\Documents\GitHub\Travel-Cents\functions\venv\Lib\site-packages\firebase_functions
-
-[debug] [2026-04-28T20:53:52.346Z] Running admin server with args: ["python.exe","\"C:\\Users\\spike\\Documents\\GitHub\\Travel-Cents\\functions\\venv\\Lib\\site-packages\\firebase_functions\\private\\serving.py\""] and env: {"GCLOUD_PROJECT":"travel-cents-3e2d9","K_REVISION":"1","PORT":"80","GOOGLE_CLOUD_QUOTA_PROJECT":"travel-cents-3e2d9","FUNCTIONS_EMULATOR":"true","TZ":"UTC","FIREBASE_DEBUG_MODE":"true","FIREBASE_DEBUG_FEATURES":"{\"skipTokenVerification\":true,\"enableCors\":true}","FIREBASE_EMULATOR_HUB":"127.0.0.1:4400","FIRESTORE_EMULATOR_HOST":"127.0.0.1:8080","FIREBASE_FIRESTORE_EMULATOR_ADDRESS":"127.0.0.1:8080","CLOUD_EVENTARC_EMULATOR_HOST":"http://127.0.0.1:9299","CLOUD_TASKS_EMULATOR_HOST":"127.0.0.1:9499","FIREBASE_CONFIG":"{\"storageBucket\":\"travel-cents-3e2d9.firebasestorage.app\",\"projectId\":\"travel-cents-3e2d9\"}","GOOGLE_APPLICATION_CREDENTIALS":"C:\\Users\\spike\\AppData\\Roaming\\firebase\\danthecalfman32_gmail_com_application_default_credentials.json","ADMIN_PORT":"8081"} in C:\Users\spike\Documents\GitHub\Travel-Cents\functions
-[debug] [2026-04-28T20:53:52.347Z] Running command with virtualenv: command="C:\Users\spike\Documents\GitHub\Travel-Cents\functions\venv\Scripts\activate.bat", args=["","&&","python.exe","\"C:\\Users\\spike\\Documents\\GitHub\\Travel-Cents\\functions\\venv\\Lib\\site-packages\\firebase_functions\\private\\serving.py\""]
-[info]  * Serving Flask app 'serving'
- * Debug mode: off
-
-[error] WARNING: This is a development server. Do not use it in a production deployment. Use a production WSGI server instead.
- * Running on http://127.0.0.1:8081
-
-[error] Press CTRL+C to quit
-
-[error] 127.0.0.1 - - [28/Apr/2026 20:53:53] "GET /__/functions.yaml HTTP/1.1" 200 -
-
-[debug] [2026-04-28T20:53:53.947Z] Got response from /__/functions.yaml endpoints:
-  generate_itinerary:
-    availableMemoryMb: null
-    callableTrigger: {}
-    concurrency: null
-    entryPoint: generate_itinerary
-    ingressSettings: null
-    labels:
-      deployment-callable: 'true'
-    maxInstances: null
-    minInstances: null
-    platform: gcfv2
-    secretEnvironmentVariables: []
-    serviceAccountEmail: null
-    timeoutSeconds: null
-params: []
-requiredAPIs: []
-specVersion: v1alpha1
-
-[error] 127.0.0.1 - - [28/Apr/2026 20:53:53] "GET /__/quitquitquit HTTP/1.1" 200 -
-
-[info] +  functions: Loaded functions definitions from source: generate_itinerary. {"metadata":{"emulator":{"name":"functions"},"message":"Loaded functions definitions from source: generate_itinerary."}}
-[debug] [2026-04-28T21:23:08.096Z] [work-queue] {"queuedWork":["/travel-cents-3e2d9/us-central1/generate_itinerary-2026-04-28T21:23:08.092Z"],"queueLength":1,"runningWork":[],"workRunningCount":0}
-[debug] [2026-04-28T21:23:08.106Z] [work-queue] {"queuedWork":[],"queueLength":0,"runningWork":["/travel-cents-3e2d9/us-central1/generate_itinerary-2026-04-28T21:23:08.092Z"],"workRunningCount":1}
-[debug] [2026-04-28T21:23:08.109Z] Accepted request POST /travel-cents-3e2d9/us-central1/generate_itinerary --> us-central1-generate_itinerary
-[debug] [2026-04-28T21:23:08.116Z] [functions] Runtime ready! Sending request! {"metadata":{"emulator":{"name":"functions"},"message":"[functions] Runtime ready! Sending request!"}}
-[debug] [2026-04-28T21:23:08.122Z] [functions] Got req.url=/travel-cents-3e2d9/us-central1/generate_itinerary, mapping to path=/ {"metadata":{"emulator":{"name":"functions"},"message":"[functions] Got req.url=/travel-cents-3e2d9/us-central1/generate_itinerary, mapping to path=/"}}
-[info] i  functions: Loaded environment variables from .env. 
-[debug] [2026-04-28T21:23:08.164Z] Running command with virtualenv: command="C:\Users\spike\Documents\GitHub\Travel-Cents\functions\venv\Scripts\activate.bat", args=["","&&","functions-framework"]
-[debug] [2026-04-28T21:23:08.185Z] [worker-pool] addWorker(us-central1-generate_itinerary) {"metadata":{"emulator":{"name":"functions"},"message":"[worker-pool] addWorker(us-central1-generate_itinerary)"}}
-[debug] [2026-04-28T21:23:08.195Z] [worker-pool] Adding worker with key us-central1-generate_itinerary, total=1 {"metadata":{"emulator":{"name":"functions"},"message":"[worker-pool] Adding worker with key us-central1-generate_itinerary, total=1"}}
-[info] >   * Serving Flask app 'generate_itinerary' {"user":" * Serving Flask app 'generate_itinerary'\r","metadata":{"emulator":{"name":"functions"},"function":{"name":"us-central1-generate_itinerary"},"extension":{},"message":"\u001b[90m> \u001b[39m  * Serving Flask app 'generate_itinerary'\r"}}
-[info] >   * Debug mode: off {"user":" * Debug mode: off\r","metadata":{"emulator":{"name":"functions"},"function":{"name":"us-central1-generate_itinerary"},"extension":{},"message":"\u001b[90m> \u001b[39m  * Debug mode: off\r"}}
-[info] >  WARNING: This is a development server. Do not use it in a production deployment. Use a production WSGI server instead. {"user":"WARNING: This is a development server. Do not use it in a production deployment. Use a production WSGI server instead.\r","metadata":{"emulator":{"name":"functions"},"function":{"name":"us-central1-generate_itinerary"},"extension":{},"message":"\u001b[90m> \u001b[39m WARNING: This is a development server. Do not use it in a production deployment. Use a production WSGI server instead.\r"}}
-[info] >   * Running on http://127.0.0.1:8520 {"user":" * Running on http://127.0.0.1:8520\r","metadata":{"emulator":{"name":"functions"},"function":{"name":"us-central1-generate_itinerary"},"extension":{},"message":"\u001b[90m> \u001b[39m  * Running on http://127.0.0.1:8520\r"}}
-[info] >  Press CTRL+C to quit {"user":"Press CTRL+C to quit\r","metadata":{"emulator":{"name":"functions"},"function":{"name":"us-central1-generate_itinerary"},"extension":{},"message":"\u001b[90m> \u001b[39m Press CTRL+C to quit\r"}}
-[info] >  WARNING:root:Request has invalid method. GET {"user":"WARNING:root:Request has invalid method. GET\r","metadata":{"emulator":{"name":"functions"},"function":{"name":"us-central1-generate_itinerary"},"extension":{},"message":"\u001b[90m> \u001b[39m WARNING:root:Request has invalid method. GET\r"}}
-[info] >  ERROR:root:Invalid request, unable to process. {"user":"ERROR:root:Invalid request, unable to process.\r","metadata":{"emulator":{"name":"functions"},"function":{"name":"us-central1-generate_itinerary"},"extension":{},"message":"\u001b[90m> \u001b[39m ERROR:root:Invalid request, unable to process.\r"}}
-[debug] [2026-04-28T21:23:11.275Z] [worker-us-central1-generate_itinerary-7bcdb2e9-097f-47eb-b94c-e72991b1a108]: IDLE {"metadata":{"emulator":{"name":"functions"},"function":{"name":"us-central1-generate_itinerary"},"extension":{},"message":"[worker-us-central1-generate_itinerary-7bcdb2e9-097f-47eb-b94c-e72991b1a108]: IDLE"}}
-[debug] [2026-04-28T21:23:11.275Z] [worker-pool] submitRequest(triggerId=us-central1-generate_itinerary) {"metadata":{"emulator":{"name":"functions"},"message":"[worker-pool] submitRequest(triggerId=us-central1-generate_itinerary)"}}
-[info] i  functions: Beginning execution of "us-central1-generate_itinerary" {"metadata":{"emulator":{"name":"functions"},"function":{"name":"us-central1-generate_itinerary"},"extension":{},"message":"Beginning execution of \"us-central1-generate_itinerary\""}}
-[debug] [2026-04-28T21:23:11.280Z] [worker-us-central1-generate_itinerary-7bcdb2e9-097f-47eb-b94c-e72991b1a108]: BUSY {"metadata":{"emulator":{"name":"functions"},"function":{"name":"us-central1-generate_itinerary"},"extension":{},"message":"[worker-us-central1-generate_itinerary-7bcdb2e9-097f-47eb-b94c-e72991b1a108]: BUSY"}}
-[info] >  127.0.0.1 - - [28/Apr/2026 21:23:11] "GET /__/health HTTP/1.1" 400 - {"user":"127.0.0.1 - - [28/Apr/2026 21:23:11] \"GET /__/health HTTP/1.1\" 400 -\r","metadata":{"emulator":{"name":"functions"},"function":{"name":"us-central1-generate_itinerary"},"extension":{},"message":"\u001b[90m> \u001b[39m 127.0.0.1 - - [28/Apr/2026 21:23:11] \"GET /__/health HTTP/1.1\" 400 -\r"}}
-[info] >  INFO:werkzeug:127.0.0.1 - - [28/Apr/2026 21:23:11] "GET /__/health HTTP/1.1" 400 - {"user":"INFO:werkzeug:127.0.0.1 - - [28/Apr/2026 21:23:11] \"\u001b[31m\u001b[1mGET /__/health HTTP/1.1\u001b[0m\" 400 -\r","metadata":{"emulator":{"name":"functions"},"function":{"name":"us-central1-generate_itinerary"},"extension":{},"message":"\u001b[90m> \u001b[39m INFO:werkzeug:127.0.0.1 - - [28/Apr/2026 21:23:11] \"\u001b[31m\u001b[1mGET /__/health HTTP/1.1\u001b[0m\" 400 -\r"}}
-[info] >  --- 🚀 STARTING MATCHMAKING FOR london --- {"user":"--- 🚀 STARTING MATCHMAKING FOR london ---\r","metadata":{"emulator":{"name":"functions"},"function":{"name":"us-central1-generate_itinerary"},"extension":{},"message":"\u001b[90m> \u001b[39m --- 🚀 STARTING MATCHMAKING FOR london ---\r"}}
-[info] >  🔍 Analyzing: Private Dinner at The Sky Garden's Observation Deck... {"user":"🔍 Analyzing: Private Dinner at The Sky Garden's Observation Deck...\r","metadata":{"emulator":{"name":"functions"},"function":{"name":"us-central1-generate_itinerary"},"extension":{},"message":"\u001b[90m> \u001b[39m 🔍 Analyzing: Private Dinner at The Sky Garden's Observation Deck...\r"}}
-[info] >     ❌ No database matches for 'Private Dinner at The Sky Garden's Observation Deck' in london. {"user":"   ❌ No database matches for 'Private Dinner at The Sky Garden's Observation Deck' in london.\r","metadata":{"emulator":{"name":"functions"},"function":{"name":"us-central1-generate_itinerary"},"extension":{},"message":"\u001b[90m> \u001b[39m    ❌ No database matches for 'Private Dinner at The Sky Garden's Observation Deck' in london.\r"}}
-[info] >  🔍 Analyzing: Exclusive Cocktail-Making Class at the Hoxton Shoreditch... {"user":"🔍 Analyzing: Exclusive Cocktail-Making Class at the Hoxton Shoreditch...\r","metadata":{"emulator":{"name":"functions"},"function":{"name":"us-central1-generate_itinerary"},"extension":{},"message":"\u001b[90m> \u001b[39m 🔍 Analyzing: Exclusive Cocktail-Making Class at the Hoxton Shoreditch...\r"}}
-[info] >     ❌ No database matches for 'Exclusive Cocktail-Making Class at the Hoxton Shoreditch' in london. {"user":"   ❌ No database matches for 'Exclusive Cocktail-Making Class at the Hoxton Shoreditch' in london.\r","metadata":{"emulator":{"name":"functions"},"function":{"name":"us-central1-generate_itinerary"},"extension":{},"message":"\u001b[90m> \u001b[39m    ❌ No database matches for 'Exclusive Cocktail-Making Class at the Hoxton Shoreditch' in london.\r"}}
-[info] >  🔍 Analyzing: Guided Street Art Tour in Shoreditch... {"user":"🔍 Analyzing: Guided Street Art Tour in Shoreditch...\r","metadata":{"emulator":{"name":"functions"},"function":{"name":"us-central1-generate_itinerary"},"extension":{},"message":"\u001b[90m> \u001b[39m 🔍 Analyzing: Guided Street Art Tour in Shoreditch...\r"}}
-[info] >     ❌ No database matches for 'Guided Street Art Tour in Shoreditch' in london. {"user":"   ❌ No database matches for 'Guided Street Art Tour in Shoreditch' in london.\r","metadata":{"emulator":{"name":"functions"},"function":{"name":"us-central1-generate_itinerary"},"extension":{},"message":"\u001b[90m> \u001b[39m    ❌ No database matches for 'Guided Street Art Tour in Shoreditch' in london.\r"}}
-[info] >  🔍 Analyzing: Private Wine Tasting at the prestigious Hush Wine Bar... {"user":"🔍 Analyzing: Private Wine Tasting at the prestigious Hush Wine Bar...\r","metadata":{"emulator":{"name":"functions"},"function":{"name":"us-central1-generate_itinerary"},"extension":{},"message":"\u001b[90m> \u001b[39m 🔍 Analyzing: Private Wine Tasting at the prestigious Hush Wine Bar...\r"}}
-[info] >     ❌ No database matches for 'Private Wine Tasting at the prestigious Hush Wine Bar' in london. {"user":"   ❌ No database matches for 'Private Wine Tasting at the prestigious Hush Wine Bar' in london.\r","metadata":{"emulator":{"name":"functions"},"function":{"name":"us-central1-generate_itinerary"},"extension":{},"message":"\u001b[90m> \u001b[39m    ❌ No database matches for 'Private Wine Tasting at the prestigious Hush Wine Bar' in london.\r"}}
-[info] >  🔍 Analyzing: Magical Sunset Cruise along the River Thames... {"user":"🔍 Analyzing: Magical Sunset Cruise along the River Thames...\r","metadata":{"emulator":{"name":"functions"},"function":{"name":"us-central1-generate_itinerary"},"extension":{},"message":"\u001b[90m> \u001b[39m 🔍 Analyzing: Magical Sunset Cruise along the River Thames...\r"}}
-[info] >     ❌ No database matches for 'Magical Sunset Cruise along the River Thames' in london. {"user":"   ❌ No database matches for 'Magical Sunset Cruise along the River Thames' in london.\r","metadata":{"emulator":{"name":"functions"},"function":{"name":"us-central1-generate_itinerary"},"extension":{},"message":"\u001b[90m> \u001b[39m    ❌ No database matches for 'Magical Sunset Cruise along the River Thames' in london.\r"}}
-[info] >  🔍 Analyzing: Private Cooking Class with a British Celebrity Chef... {"user":"🔍 Analyzing: Private Cooking Class with a British Celebrity Chef...\r","metadata":{"emulator":{"name":"functions"},"function":{"name":"us-central1-generate_itinerary"},"extension":{},"message":"\u001b[90m> \u001b[39m 🔍 Analyzing: Private Cooking Class with a British Celebrity Chef...\r"}}
-[info] >     ❌ No database matches for 'Private Cooking Class with a British Celebrity Chef' in london. {"user":"   ❌ No database matches for 'Private Cooking Class with a British Celebrity Chef' in london.\r","metadata":{"emulator":{"name":"functions"},"function":{"name":"us-central1-generate_itinerary"},"extension":{},"message":"\u001b[90m> \u001b[39m    ❌ No database matches for 'Private Cooking Class with a British Celebrity Chef' in london.\r"}}
-[info] >  🔍 Analyzing: Exclusive Access to the members-only Cahoots Club... {"user":"🔍 Analyzing: Exclusive Access to the members-only Cahoots Club...\r","metadata":{"emulator":{"name":"functions"},"function":{"name":"us-central1-generate_itinerary"},"extension":{},"message":"\u001b[90m> \u001b[39m 🔍 Analyzing: Exclusive Access to the members-only Cahoots Club...\r"}}
-[info] >     ❌ No database matches for 'Exclusive Access to the members-only Cahoots Club' in london. {"user":"   ❌ No database matches for 'Exclusive Access to the members-only Cahoots Club' in london.\r","metadata":{"emulator":{"name":"functions"},"function":{"name":"us-central1-generate_itinerary"},"extension":{},"message":"\u001b[90m> \u001b[39m    ❌ No database matches for 'Exclusive Access to the members-only Cahoots Club' in london.\r"}}
-[info] >  🔍 Analyzing: Private Guided Tour of the British Museum's hidden gems... {"user":"🔍 Analyzing: Private Guided Tour of the British Museum's hidden gems...\r","metadata":{"emulator":{"name":"functions"},"function":{"name":"us-central1-generate_itinerary"},"extension":{},"message":"\u001b[90m> \u001b[39m 🔍 Analyzing: Private Guided Tour of the British Museum's hidden gems...\r"}}
-[info] >     ❌ No database matches for 'Private Guided Tour of the British Museum's hidden gems' in london. {"user":"   ❌ No database matches for 'Private Guided Tour of the British Museum's hidden gems' in london.\r","metadata":{"emulator":{"name":"functions"},"function":{"name":"us-central1-generate_itinerary"},"extension":{},"message":"\u001b[90m> \u001b[39m    ❌ No database matches for 'Private Guided Tour of the British Museum's hidden gems' in london.\r"}}
-[info] >  🔍 Analyzing: Luxurious Afternoon Tea at the Grosvenor Hotel... {"user":"🔍 Analyzing: Luxurious Afternoon Tea at the Grosvenor Hotel...\r","metadata":{"emulator":{"name":"functions"},"function":{"name":"us-central1-generate_itinerary"},"extension":{},"message":"\u001b[90m> \u001b[39m 🔍 Analyzing: Luxurious Afternoon Tea at the Grosvenor Hotel...\r"}}
-[info] >     ❌ No database matches for 'Luxurious Afternoon Tea at the Grosvenor Hotel' in london. {"user":"   ❌ No database matches for 'Luxurious Afternoon Tea at the Grosvenor Hotel' in london.\r","metadata":{"emulator":{"name":"functions"},"function":{"name":"us-central1-generate_itinerary"},"extension":{},"message":"\u001b[90m> \u001b[39m    ❌ No database matches for 'Luxurious Afternoon Tea at the Grosvenor Hotel' in london.\r"}}
-[info] >  --- ✅ MATCHMAKING COMPLETE --- {"user":"--- ✅ MATCHMAKING COMPLETE ---\r","metadata":{"emulator":{"name":"functions"},"function":{"name":"us-central1-generate_itinerary"},"extension":{},"message":"\u001b[90m> \u001b[39m --- ✅ MATCHMAKING COMPLETE ---\r"}}
-[info] >  127.0.0.1 - - [28/Apr/2026 21:23:31] "POST / HTTP/1.1" 200 - {"user":"127.0.0.1 - - [28/Apr/2026 21:23:31] \"POST / HTTP/1.1\" 200 -\r","metadata":{"emulator":{"name":"functions"},"function":{"name":"us-central1-generate_itinerary"},"extension":{},"message":"\u001b[90m> \u001b[39m 127.0.0.1 - - [28/Apr/2026 21:23:31] \"POST / HTTP/1.1\" 200 -\r"}}
-[info] >  INFO:werkzeug:127.0.0.1 - - [28/Apr/2026 21:23:31] "POST / HTTP/1.1" 200 - {"user":"INFO:werkzeug:127.0.0.1 - - [28/Apr/2026 21:23:31] \"POST / HTTP/1.1\" 200 -\r","metadata":{"emulator":{"name":"functions"},"function":{"name":"us-central1-generate_itinerary"},"extension":{},"message":"\u001b[90m> \u001b[39m INFO:werkzeug:127.0.0.1 - - [28/Apr/2026 21:23:31] \"POST / HTTP/1.1\" 200 -\r"}}
-[debug] [2026-04-28T21:23:31.322Z] Finishing up request with event=pause {"metadata":{"emulator":{"name":"functions"},"function":{"name":"us-central1-generate_itinerary"},"extension":{},"message":"Finishing up request with event=pause"}}
-[info] i  functions: Finished "us-central1-generate_itinerary" in 20042.2493ms {"metadata":{"emulator":{"name":"functions"},"function":{"name":"us-central1-generate_itinerary"},"extension":{},"message":"Finished \"us-central1-generate_itinerary\" in 20042.2493ms"}}
-[debug] [2026-04-28T21:23:31.324Z] [worker-us-central1-generate_itinerary-7bcdb2e9-097f-47eb-b94c-e72991b1a108]: IDLE {"metadata":{"emulator":{"name":"functions"},"function":{"name":"us-central1-generate_itinerary"},"extension":{},"message":"[worker-us-central1-generate_itinerary-7bcdb2e9-097f-47eb-b94c-e72991b1a108]: IDLE"}}
-[debug] [2026-04-28T21:23:31.324Z] Finishing up request with event=finish {"metadata":{"emulator":{"name":"functions"},"function":{"name":"us-central1-generate_itinerary"},"extension":{},"message":"Finishing up request with event=finish"}}
-[debug] [2026-04-28T21:23:31.324Z] Finishing up request with event=close {"metadata":{"emulator":{"name":"functions"},"function":{"name":"us-central1-generate_itinerary"},"extension":{},"message":"Finishing up request with event=close"}}
-[debug] [2026-04-28T21:23:31.325Z] [work-queue] {"queuedWork":[],"queueLength":0,"runningWork":[],"workRunningCount":0}
-[debug] [2026-04-28T21:27:10.321Z] [work-queue] {"queuedWork":["/travel-cents-3e2d9/us-central1/generate_itinerary-2026-04-28T21:27:10.321Z"],"queueLength":1,"runningWork":[],"workRunningCount":0}
-[debug] [2026-04-28T21:27:10.321Z] [work-queue] {"queuedWork":[],"queueLength":0,"runningWork":["/travel-cents-3e2d9/us-central1/generate_itinerary-2026-04-28T21:27:10.321Z"],"workRunningCount":1}
-[debug] [2026-04-28T21:27:10.321Z] Accepted request POST /travel-cents-3e2d9/us-central1/generate_itinerary --> us-central1-generate_itinerary
-[debug] [2026-04-28T21:27:10.323Z] [functions] Runtime ready! Sending request! {"metadata":{"emulator":{"name":"functions"},"message":"[functions] Runtime ready! Sending request!"}}
-[debug] [2026-04-28T21:27:10.325Z] [functions] Got req.url=/travel-cents-3e2d9/us-central1/generate_itinerary, mapping to path=/ {"metadata":{"emulator":{"name":"functions"},"message":"[functions] Got req.url=/travel-cents-3e2d9/us-central1/generate_itinerary, mapping to path=/"}}
-[debug] [2026-04-28T21:27:10.325Z] [worker-pool] submitRequest(triggerId=us-central1-generate_itinerary) {"metadata":{"emulator":{"name":"functions"},"message":"[worker-pool] submitRequest(triggerId=us-central1-generate_itinerary)"}}
-[info] i  functions: Beginning execution of "us-central1-generate_itinerary" {"metadata":{"emulator":{"name":"functions"},"function":{"name":"us-central1-generate_itinerary"},"extension":{},"message":"Beginning execution of \"us-central1-generate_itinerary\""}}
-[debug] [2026-04-28T21:27:10.326Z] [worker-us-central1-generate_itinerary-7bcdb2e9-097f-47eb-b94c-e72991b1a108]: BUSY {"metadata":{"emulator":{"name":"functions"},"function":{"name":"us-central1-generate_itinerary"},"extension":{},"message":"[worker-us-central1-generate_itinerary-7bcdb2e9-097f-47eb-b94c-e72991b1a108]: BUSY"}}
-[info] >  --- 🚀 STARTING MATCHMAKING FOR London --- {"user":"--- 🚀 STARTING MATCHMAKING FOR London ---\r","metadata":{"emulator":{"name":"functions"},"function":{"name":"us-central1-generate_itinerary"},"extension":{},"message":"\u001b[90m> \u001b[39m --- 🚀 STARTING MATCHMAKING FOR London ---\r"}}
-[info] >  🔍 Analyzing: Private Gin Distillery Tour... {"user":"🔍 Analyzing: Private Gin Distillery Tour...\r","metadata":{"emulator":{"name":"functions"},"function":{"name":"us-central1-generate_itinerary"},"extension":{},"message":"\u001b[90m> \u001b[39m 🔍 Analyzing: Private Gin Distillery Tour...\r"}}
-[info] >     ✅ Best Match: Private London Gin History Tour with Tastings (Score: 0.7427) {"user":"   ✅ Best Match: Private London Gin History Tour with Tastings (Score: 0.7427)\r","metadata":{"emulator":{"name":"functions"},"function":{"name":"us-central1-generate_itinerary"},"extension":{},"message":"\u001b[90m> \u001b[39m    ✅ Best Match: Private London Gin History Tour with Tastings (Score: 0.7427)\r"}}
-[info] >  🔍 Analyzing: Sunset Dinner Cruise along the Thames... {"user":"🔍 Analyzing: Sunset Dinner Cruise along the Thames...\r","metadata":{"emulator":{"name":"functions"},"function":{"name":"us-central1-generate_itinerary"},"extension":{},"message":"\u001b[90m> \u001b[39m 🔍 Analyzing: Sunset Dinner Cruise along the Thames...\r"}}
-[info] >     ✅ Best Match: River Thames Evening Cruise with Sparkling wine and Canapés (Score: 0.8095) {"user":"   ✅ Best Match: River Thames Evening Cruise with Sparkling wine and Canapés (Score: 0.8095)\r","metadata":{"emulator":{"name":"functions"},"function":{"name":"us-central1-generate_itinerary"},"extension":{},"message":"\u001b[90m> \u001b[39m    ✅ Best Match: River Thames Evening Cruise with Sparkling wine and Canapés (Score: 0.8095)\r"}}
-[info] >  🔍 Analyzing: Private Street Art Walking Tour in Shoreditch... {"user":"🔍 Analyzing: Private Street Art Walking Tour in Shoreditch...\r","metadata":{"emulator":{"name":"functions"},"function":{"name":"us-central1-generate_itinerary"},"extension":{},"message":"\u001b[90m> \u001b[39m 🔍 Analyzing: Private Street Art Walking Tour in Shoreditch...\r"}}
-[info] >     ✅ Best Match: Shoreditch Street Art and Graffiti Tour (Private Group Booking) (Score: 0.8761) {"user":"   ✅ Best Match: Shoreditch Street Art and Graffiti Tour (Private Group Booking) (Score: 0.8761)\r","metadata":{"emulator":{"name":"functions"},"function":{"name":"us-central1-generate_itinerary"},"extension":{},"message":"\u001b[90m> \u001b[39m    ✅ Best Match: Shoreditch Street Art and Graffiti Tour (Private Group Booking) (Score: 0.8761)\r"}}
-[info] >  🔍 Analyzing: Private Afternoon Tea at a Secret Garden... {"user":"🔍 Analyzing: Private Afternoon Tea at a Secret Garden...\r","metadata":{"emulator":{"name":"functions"},"function":{"name":"us-central1-generate_itinerary"},"extension":{},"message":"\u001b[90m> \u001b[39m 🔍 Analyzing: Private Afternoon Tea at a Secret Garden...\r"}}
-[info] >     ✅ Best Match: Private Tour: Royal High Tea At Kensington Palace Gardens (Score: 0.7261) {"user":"   ✅ Best Match: Private Tour: Royal High Tea At Kensington Palace Gardens (Score: 0.7261)\r","metadata":{"emulator":{"name":"functions"},"function":{"name":"us-central1-generate_itinerary"},"extension":{},"message":"\u001b[90m> \u001b[39m    ✅ Best Match: Private Tour: Royal High Tea At Kensington Palace Gardens (Score: 0.7261)\r"}}
-[info] >  🔍 Analyzing: Exclusive Access to the Sky Garden... {"user":"🔍 Analyzing: Exclusive Access to the Sky Garden...\r","metadata":{"emulator":{"name":"functions"},"function":{"name":"us-central1-generate_itinerary"},"extension":{},"message":"\u001b[90m> \u001b[39m 🔍 Analyzing: Exclusive Access to the Sky Garden...\r"}}
-[info] >     ✅ Best Match: Sky Garden Early Access Ticket and Breakfast Treat (Score: 0.7557) {"user":"   ✅ Best Match: Sky Garden Early Access Ticket and Breakfast Treat (Score: 0.7557)\r","metadata":{"emulator":{"name":"functions"},"function":{"name":"us-central1-generate_itinerary"},"extension":{},"message":"\u001b[90m> \u001b[39m    ✅ Best Match: Sky Garden Early Access Ticket and Breakfast Treat (Score: 0.7557)\r"}}
-[info] >  🔍 Analyzing: Private Jazz Club Experience in Camden... {"user":"🔍 Analyzing: Private Jazz Club Experience in Camden...\r","metadata":{"emulator":{"name":"functions"},"function":{"name":"us-central1-generate_itinerary"},"extension":{},"message":"\u001b[90m> \u001b[39m 🔍 Analyzing: Private Jazz Club Experience in Camden...\r"}}
-[info] >     ✅ Best Match: Private Camden’s Best Silent Disco Tour up to 15 participants (Score: 0.6886) {"user":"   ✅ Best Match: Private Camden’s Best Silent Disco Tour up to 15 participants (Score: 0.6886)\r","metadata":{"emulator":{"name":"functions"},"function":{"name":"us-central1-generate_itinerary"},"extension":{},"message":"\u001b[90m> \u001b[39m    ✅ Best Match: Private Camden’s Best Silent Disco Tour up to 15 participants (Score: 0.6886)\r"}}
-[info] >  🔍 Analyzing: Private Food Tour of Borough Market... {"user":"🔍 Analyzing: Private Food Tour of Borough Market...\r","metadata":{"emulator":{"name":"functions"},"function":{"name":"us-central1-generate_itinerary"},"extension":{},"message":"\u001b[90m> \u001b[39m 🔍 Analyzing: Private Food Tour of Borough Market...\r"}}
-[info] >     ✅ Best Match: Borough Market Food Tour | Private Brunch Experience in London (Score: 0.8909) {"user":"   ✅ Best Match: Borough Market Food Tour | Private Brunch Experience in London (Score: 0.8909)\r","metadata":{"emulator":{"name":"functions"},"function":{"name":"us-central1-generate_itinerary"},"extension":{},"message":"\u001b[90m> \u001b[39m    ✅ Best Match: Borough Market Food Tour | Private Brunch Experience in London (Score: 0.8909)\r"}}
-[info] >  🔍 Analyzing: Private Stargazing Experience in Hampstead Heath... {"user":"🔍 Analyzing: Private Stargazing Experience in Hampstead Heath...\r","metadata":{"emulator":{"name":"functions"},"function":{"name":"us-central1-generate_itinerary"},"extension":{},"message":"\u001b[90m> \u001b[39m 🔍 Analyzing: Private Stargazing Experience in Hampstead Heath...\r"}}
-[info] >     ✅ Best Match: Private Celebrity Houses Tour of London (Score: 0.7163) {"user":"   ✅ Best Match: Private Celebrity Houses Tour of London (Score: 0.7163)\r","metadata":{"emulator":{"name":"functions"},"function":{"name":"us-central1-generate_itinerary"},"extension":{},"message":"\u001b[90m> \u001b[39m    ✅ Best Match: Private Celebrity Houses Tour of London (Score: 0.7163)\r"}}
-[info] >  🔍 Analyzing: Exclusive Access to the Tate Modern's Private View... {"user":"🔍 Analyzing: Exclusive Access to the Tate Modern's Private View...\r","metadata":{"emulator":{"name":"functions"},"function":{"name":"us-central1-generate_itinerary"},"extension":{},"message":"\u001b[90m> \u001b[39m 🔍 Analyzing: Exclusive Access to the Tate Modern's Private View...\r"}}
-[info] >     ✅ Best Match: Private Tour of Tate Modern Explore 20th century American Art (Score: 0.7807) {"user":"   ✅ Best Match: Private Tour of Tate Modern Explore 20th century American Art (Score: 0.7807)\r","metadata":{"emulator":{"name":"functions"},"function":{"name":"us-central1-generate_itinerary"},"extension":{},"message":"\u001b[90m> \u001b[39m    ✅ Best Match: Private Tour of Tate Modern Explore 20th century American Art (Score: 0.7807)\r"}}
-[info] >  🔍 Analyzing: Private Cocktail-Making Class at a Classic London Pub... {"user":"🔍 Analyzing: Private Cocktail-Making Class at a Classic London Pub...\r","metadata":{"emulator":{"name":"functions"},"function":{"name":"us-central1-generate_itinerary"},"extension":{},"message":"\u001b[90m> \u001b[39m 🔍 Analyzing: Private Cocktail-Making Class at a Classic London Pub...\r"}}
-[info] >     ✅ Best Match: London Private Pub Tour - Central London's Best Pubs! (Score: 0.7587) {"user":"   ✅ Best Match: London Private Pub Tour - Central London's Best Pubs! (Score: 0.7587)\r","metadata":{"emulator":{"name":"functions"},"function":{"name":"us-central1-generate_itinerary"},"extension":{},"message":"\u001b[90m> \u001b[39m    ✅ Best Match: London Private Pub Tour - Central London's Best Pubs! (Score: 0.7587)\r"}}
-[info] >  🔍 Analyzing: Private Dinner at a Secret Chef's Table... {"user":"🔍 Analyzing: Private Dinner at a Secret Chef's Table...\r","metadata":{"emulator":{"name":"functions"},"function":{"name":"us-central1-generate_itinerary"},"extension":{},"message":"\u001b[90m> \u001b[39m 🔍 Analyzing: Private Dinner at a Secret Chef's Table...\r"}}
-[info] >     ✅ Best Match: Royal Family Favourites Cooking Class With 5 Course Dinner (Score: 0.6937) {"user":"   ✅ Best Match: Royal Family Favourites Cooking Class With 5 Course Dinner (Score: 0.6937)\r","metadata":{"emulator":{"name":"functions"},"function":{"name":"us-central1-generate_itinerary"},"extension":{},"message":"\u001b[90m> \u001b[39m    ✅ Best Match: Royal Family Favourites Cooking Class With 5 Course Dinner (Score: 0.6937)\r"}}
-[info] >  🔍 Analyzing: Private Comedy Club Experience in Soho... {"user":"🔍 Analyzing: Private Comedy Club Experience in Soho...\r","metadata":{"emulator":{"name":"functions"},"function":{"name":"us-central1-generate_itinerary"},"extension":{},"message":"\u001b[90m> \u001b[39m 🔍 Analyzing: Private Comedy Club Experience in Soho...\r"}}
-[info] >     ✅ Best Match: Experience Fitzrovia Comedy Club in London (Score: 0.7453) {"user":"   ✅ Best Match: Experience Fitzrovia Comedy Club in London (Score: 0.7453)\r","metadata":{"emulator":{"name":"functions"},"function":{"name":"us-central1-generate_itinerary"},"extension":{},"message":"\u001b[90m> \u001b[39m    ✅ Best Match: Experience Fitzrovia Comedy Club in London (Score: 0.7453)\r"}}
-[info] >  --- ✅ MATCHMAKING COMPLETE --- {"user":"--- ✅ MATCHMAKING COMPLETE ---\r","metadata":{"emulator":{"name":"functions"},"function":{"name":"us-central1-generate_itinerary"},"extension":{},"message":"\u001b[90m> \u001b[39m --- ✅ MATCHMAKING COMPLETE ---\r"}}
-[info] >  127.0.0.1 - - [28/Apr/2026 21:27:29] "POST / HTTP/1.1" 200 - {"user":"127.0.0.1 - - [28/Apr/2026 21:27:29] \"POST / HTTP/1.1\" 200 -\r","metadata":{"emulator":{"name":"functions"},"function":{"name":"us-central1-generate_itinerary"},"extension":{},"message":"\u001b[90m> \u001b[39m 127.0.0.1 - - [28/Apr/2026 21:27:29] \"POST / HTTP/1.1\" 200 -\r"}}
-[info] >  INFO:werkzeug:127.0.0.1 - - [28/Apr/2026 21:27:29] "POST / HTTP/1.1" 200 - {"user":"INFO:werkzeug:127.0.0.1 - - [28/Apr/2026 21:27:29] \"POST / HTTP/1.1\" 200 -\r","metadata":{"emulator":{"name":"functions"},"function":{"name":"us-central1-generate_itinerary"},"extension":{},"message":"\u001b[90m> \u001b[39m INFO:werkzeug:127.0.0.1 - - [28/Apr/2026 21:27:29] \"POST / HTTP/1.1\" 200 -\r"}}
-[debug] [2026-04-28T21:27:29.926Z] Finishing up request with event=pause {"metadata":{"emulator":{"name":"functions"},"function":{"name":"us-central1-generate_itinerary"},"extension":{},"message":"Finishing up request with event=pause"}}
-[info] i  functions: Finished "us-central1-generate_itinerary" in 19600.2606ms {"metadata":{"emulator":{"name":"functions"},"function":{"name":"us-central1-generate_itinerary"},"extension":{},"message":"Finished \"us-central1-generate_itinerary\" in 19600.2606ms"}}
-[debug] [2026-04-28T21:27:29.927Z] [worker-us-central1-generate_itinerary-7bcdb2e9-097f-47eb-b94c-e72991b1a108]: IDLE {"metadata":{"emulator":{"name":"functions"},"function":{"name":"us-central1-generate_itinerary"},"extension":{},"message":"[worker-us-central1-generate_itinerary-7bcdb2e9-097f-47eb-b94c-e72991b1a108]: IDLE"}}
-[debug] [2026-04-28T21:27:29.927Z] Finishing up request with event=finish {"metadata":{"emulator":{"name":"functions"},"function":{"name":"us-central1-generate_itinerary"},"extension":{},"message":"Finishing up request with event=finish"}}
-[debug] [2026-04-28T21:27:29.927Z] Finishing up request with event=close {"metadata":{"emulator":{"name":"functions"},"function":{"name":"us-central1-generate_itinerary"},"extension":{},"message":"Finishing up request with event=close"}}
-[debug] [2026-04-28T21:27:29.927Z] [work-queue] {"queuedWork":[],"queueLength":0,"runningWork":[],"workRunningCount":0}

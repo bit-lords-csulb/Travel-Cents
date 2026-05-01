@@ -60,12 +60,34 @@ service cloud.firestore {
       );
     }
 
-    function canMutateTripEventIdsOnly() {
-      return request.resource.data.diff(resource.data).affectedKeys().hasOnly(['eventIds']);
+    function canMutateTripEventMetadataOnly() {
+      return request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+        'eventIds',
+        'eventsVersion',
+        'optionsVersion',
+        'updatedAtEpochMs',
+        'updatedAt'
+      ]);
     }
 
     function isExistingChatMember(path) {
       return signedIn() && exists(path) && isMemberList(get(path).data.members);
+    }
+
+    function canWriteSharedTripRef(userUid, tripRefId) {
+      let ownerUid = request.resource.data.ownerUid;
+      let tripId = request.resource.data.tripId;
+      return signedIn() &&
+        ownerUid is string &&
+        tripId is string &&
+        tripRefId == ownerUid + "_" + tripId &&
+        tripExists(ownerUid, tripId) &&
+        canMutateTripEvents(ownerUid, tripId) &&
+        userUid in tripDoc(ownerUid, tripId).data.memberUids &&
+        request.resource.data.eventIds == tripDoc(ownerUid, tripId).data.eventIds &&
+        request.resource.data.eventsVersion == tripDoc(ownerUid, tripId).data.eventsVersion &&
+        request.resource.data.memberUids == tripDoc(ownerUid, tripId).data.memberUids &&
+        request.resource.data.roleByUid == tripDoc(ownerUid, tripId).data.roleByUid;
     }
 
     match /usernames/{username} {
@@ -93,7 +115,7 @@ service cloud.firestore {
           request.resource.data.ownerUid == userUid &&
           request.resource.data.roleByUid[userUid] == 'owner';
         allow update: if isSelf(userUid) ||
-          (canMutateTripEvents(userUid, tripId) && canMutateTripEventIdsOnly());
+          (canMutateTripEvents(userUid, tripId) && canMutateTripEventMetadataOnly());
         allow delete: if isSelf(userUid);
 
         match /events/{eventId} {
@@ -118,7 +140,9 @@ service cloud.firestore {
       }
 
       match /tripRefs/{tripRefId} {
-        allow read, write: if isSelf(userUid);
+        allow read: if isSelf(userUid);
+        allow create, update: if isSelf(userUid) || canWriteSharedTripRef(userUid, tripRefId);
+        allow delete: if isSelf(userUid);
       }
 
       match /sync/{syncDocId} {

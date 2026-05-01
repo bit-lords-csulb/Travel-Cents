@@ -1,4 +1,4 @@
-﻿package com.example.travelcents.ui.main.newTrip
+package com.example.travelcents.ui.main.newTrip
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -16,6 +16,8 @@ import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.BasicTextField
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
@@ -26,13 +28,9 @@ import androidx.compose.material.icons.filled.TrendingUp
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.ProvideTextStyle
-import androidx.compose.foundation.text.BasicTextField
-import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.Slider
 import androidx.compose.material3.SliderDefaults
 import androidx.compose.material3.Text
-import androidx.compose.ui.graphics.SolidColor
-import androidx.compose.ui.text.TextStyle
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
@@ -44,6 +42,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
@@ -188,7 +188,7 @@ fun TripStep4BudgetPage(
                     }
                     Spacer(Modifier.height(24.dp))
 
-                    // Large price - tap to edit directly
+                    // Large price — tap to edit directly
                     BasicTextField(
                         value = textInput,
                         onValueChange = { input ->
@@ -248,7 +248,7 @@ fun TripStep4BudgetPage(
                     }
                     Spacer(Modifier.height(28.dp))
 
-                    // Slider with $50 increments ($500-$20,000)
+                    // Slider with $50 increments ($500–$20,000)
                     Slider(
                         value = budgetInt.toFloat(),
                         onValueChange = { value ->
