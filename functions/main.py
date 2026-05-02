@@ -163,6 +163,9 @@ def generate_itinerary(req: https_fn.CallableRequest):
     - Use the hotel location as the daily planning anchor when hotel coordinates or city are available.
     - Account for hotel check-in/check-out timing when choosing first-day and last-day activities.
     - Return start_time and end_time for every activity in 24-hour HH:MM format.
+    - For each activity, classify whether it is indoor, outdoor, mixed, or unknown.
+    - For each activity, classify weather_sensitivity as rain, heat, wind, or none.
+    - For each activity, set environment_confidence to high, medium, or low.
 
     Skip the generic tourist traps. Based strictly on the traveler profile above, focus on hidden gems, enchanting local experiences, and highly creative activities that fit their specific vibe, budget, and age group.
 
@@ -171,7 +174,15 @@ def generate_itinerary(req: https_fn.CallableRequest):
     Return ONLY a JSON object with this exact structure:
     {{
       "itinerary": [
-        {{ "title": "Activity Name", "description": "A short, captivating description that highlights why this experience is magical and why it perfectly fits their specific interests.", "start_time": "10:00", "end_time": "12:00" }}
+        {{
+          "title": "Activity Name",
+          "description": "A short, captivating description that highlights why this experience is magical and why it perfectly fits their specific interests.",
+          "start_time": "10:00",
+          "end_time": "12:00",
+          "activity_environment": "outdoor",
+          "weather_sensitivity": "rain",
+          "environment_confidence": "high"
+        }}
       ]
     }}
     """

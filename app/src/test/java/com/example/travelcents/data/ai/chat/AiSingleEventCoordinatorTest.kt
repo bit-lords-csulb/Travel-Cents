@@ -29,11 +29,12 @@ class AiSingleEventCoordinatorTest {
                 didSearch = true
                 emptyList()
             },
-            isSearchAvailable = { true },
+            isSearchAvailable = { false },
             clock = fixedClock()
         )
 
         val grounding = coordinator.buildGroundingContext(
+            toolCall = AiToolCall.SearchEvents(city = "", classification = null, keyword = null),
             userMessage = "Find me some good ramen in Nashville",
             intakeProfile = AiTripIntakeProfile(
                 destination = "Nashville, TN",
@@ -90,6 +91,7 @@ class AiSingleEventCoordinatorTest {
         )
 
         val grounding = coordinator.buildGroundingContext(
+            toolCall = AiToolCall.SearchEvents(city = "Nashville, TN", classification = "Music", keyword = null),
             userMessage = "Any good concerts while I'm in Nashville?",
             intakeProfile = AiTripIntakeProfile(
                 destination = "Nashville, TN",
@@ -122,6 +124,7 @@ class AiSingleEventCoordinatorTest {
         )
 
         val grounding = coordinator.buildGroundingContext(
+            toolCall = AiToolCall.SearchEvents(city = "Nashville, TN", classification = null, keyword = null),
             userMessage = "Any tickets this weekend in Nashville?",
             intakeProfile = AiTripIntakeProfile(destination = "Nashville, TN"),
             profile = AiTravelerProfile(destination = "Nashville, TN")

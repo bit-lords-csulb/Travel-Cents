@@ -1,11 +1,9 @@
 package com.example.travelcents.data.media
 
-import android.util.Log
 import com.example.travelcents.BuildConfig
 import java.util.Locale
 
 object StaticMapUrlFactory {
-    private const val TAG = "StaticMapUrlFactory"
     const val PROVIDER_MAPBOX = "mapbox_staticmap"
     const val PROVIDER_OSM = "osm_staticmap"
 
@@ -20,15 +18,11 @@ object StaticMapUrlFactory {
         height: Int = 360
     ): String {
         val token = BuildConfig.MAPBOX_TOKEN
-        Log.d(TAG, "buildUrl: token.isBlank=${token.isBlank()}, tokenLen=${token.length}, lat=$latitude, lon=$longitude")
-        val url = if (token.isNotBlank()) {
+        return if (token.isNotBlank()) {
             mapboxUrl(latitude, longitude, zoom, width, height, token)
         } else {
             osmUrl(latitude, longitude, zoom, width, height)
         }
-        val masked = url.replace(Regex("access_token=[^&]+"), "access_token=***")
-        Log.d(TAG, "buildUrl: url=$masked")
-        return url
     }
 
     private fun mapboxUrl(

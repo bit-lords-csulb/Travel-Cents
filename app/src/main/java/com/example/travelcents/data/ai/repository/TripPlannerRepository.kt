@@ -3,7 +3,12 @@ package com.example.travelcents.data.ai.repository
 import com.example.travelcents.BuildConfig
 import com.example.travelcents.data.ai.model.LlmMessage
 import com.example.travelcents.data.ai.remote.LlmClient
+import com.example.travelcents.data.trip.advisory.ActivityEnvironmentClassifier
+import com.example.travelcents.data.trip.advisory.ActivityEnvironmentMetadata
 import com.example.travelcents.data.trip.local.DestinationTimeZones
+import com.example.travelcents.data.trip.model.ATTR_ACTIVITY_ENVIRONMENT
+import com.example.travelcents.data.trip.model.ATTR_ENVIRONMENT_CONFIDENCE
+import com.example.travelcents.data.trip.model.ATTR_WEATHER_SENSITIVITY
 import com.example.travelcents.data.trip.model.Itinerary
 import com.example.travelcents.data.trip.model.TravelEvent
 import com.example.travelcents.data.trip.model.TravelRequest
@@ -32,7 +37,10 @@ data class EmulatorActivity(
     val real_title: String? = null,
     val isNativeBookable: Boolean = false,
     val start_time: String? = null,
-    val end_time: String? = null
+    val end_time: String? = null,
+    val activity_environment: String? = null,
+    val weather_sensitivity: String? = null,
+    val environment_confidence: String? = null
 )
 
 interface EmulatorApiService {
@@ -102,6 +110,14 @@ object TripPlannerRepository {
             put("specialRequests", request.specialRequests)
             put("flightArrival", flightArrival)
             put("activityDates", dates)
+            put(
+                "activityMetadataContract",
+                mapOf(
+                    "activity_environment" to "indoor|outdoor|mixed|unknown",
+                    "weather_sensitivity" to "rain|heat|wind|none",
+                    "environment_confidence" to "high|medium|low"
+                )
+            )
             if (activityWindow.isNotEmpty()) put("activityWindow", activityWindow)
             if (flights.isNotEmpty()) put("flights", flights)
             if (hotel.isNotEmpty()) put("hotel", hotel)
@@ -136,9 +152,53 @@ object TripPlannerRepository {
                         ?.let { put("booking_url", it) }
                     put("isNativeBookable", activity.isNativeBookable.toString())
                     put("source", "emulator")
+                    putAll(activityEnvironmentDetails(activity, activityTitle))
                 }
             )
         }
+    }
+
+    private fun activityEnvironmentDetails(
+        activity: EmulatorActivity,
+        activityTitle: String
+    ): Map<String, String> {
+        val baseDetails = buildMap {
+            put("title", activityTitle)
+            put("activity_name", activityTitle)
+            if (activity.description.isNotBlank()) {
+                put("description", activity.description)
+            }
+            activity.activity_environment
+                ?.takeIf { it.isNotBlank() }
+                ?.let { put(ATTR_ACTIVITY_ENVIRONMENT, it) }
+            activity.weather_sensitivity
+                ?.takeIf { it.isNotBlank() }
+                ?.let { put(ATTR_WEATHER_SENSITIVITY, it) }
+            activity.environment_confidence
+                ?.takeIf { it.isNotBlank() }
+                ?.let { put(ATTR_ENVIRONMENT_CONFIDENCE, it) }
+        }
+        val classified = ActivityEnvironmentClassifier.classify(
+            TravelEvent(
+                eventId = "metadata_preview",
+                type = "activity",
+                itineraryId = "",
+                details = baseDetails
+            )
+        )
+
+        if (
+            classified.environment == ActivityEnvironmentMetadata.ENVIRONMENT_UNKNOWN &&
+            activity.activity_environment.isNullOrBlank()
+        ) {
+            return emptyMap()
+        }
+
+        return mapOf(
+            ATTR_ACTIVITY_ENVIRONMENT to classified.environment,
+            ATTR_WEATHER_SENSITIVITY to classified.weatherSensitivity,
+            ATTR_ENVIRONMENT_CONFIDENCE to classified.confidence
+        )
     }
 
     private fun buildItineraryPrompt(request: TravelRequest): String {

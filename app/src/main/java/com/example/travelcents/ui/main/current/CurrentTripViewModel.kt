@@ -21,6 +21,11 @@ import com.example.travelcents.data.trip.TripKey
 import com.example.travelcents.data.trip.TripPlanActionService
 import com.example.travelcents.data.trip.TripPerformanceLogger
 import com.example.travelcents.data.trip.TripRepository
+import com.example.travelcents.data.trip.advisory.DummyTripAlternativeProvider
+import com.example.travelcents.data.trip.advisory.DummyTripTransportContextProvider
+import com.example.travelcents.data.trip.advisory.DummyTripWeatherContextProvider
+import com.example.travelcents.data.trip.advisory.TripAdvisory
+import com.example.travelcents.data.trip.advisory.TripAdvisoryEngine
 import com.example.travelcents.data.trip.local.DestinationTimeZones
 import com.example.travelcents.data.trip.model.ATTR_BIKE_SCORE
 import com.example.travelcents.data.trip.model.ATTR_BUSINESS_ADDRESS
@@ -184,6 +189,13 @@ class CurrentTripViewModel(application: Application) : AndroidViewModel(applicat
     private val _yelpEnrichmentInFlight = MutableStateFlow<Set<String>>(emptySet())
     private val _restaurantLiveContextInFlight = MutableStateFlow<Set<String>>(emptySet())
 
+    private val _advisories = MutableStateFlow<List<TripAdvisory>>(emptyList())
+    val advisories: StateFlow<List<TripAdvisory>> = _advisories.asStateFlow()
+
+    private val _isAdvisoryDemoModeEnabled = MutableStateFlow(false)
+    val isAdvisoryDemoModeEnabled: StateFlow<Boolean> = _isAdvisoryDemoModeEnabled.asStateFlow()
+    private val dismissedAdvisoryKeys = mutableSetOf<String>()
+
     private val _shareTargets = MutableStateFlow<List<ShareTarget>>(emptyList())
     val shareTargets: StateFlow<List<ShareTarget>> = _shareTargets.asStateFlow()
 
@@ -211,6 +223,7 @@ class CurrentTripViewModel(application: Application) : AndroidViewModel(applicat
     private var currentTripEventsJob: Job? = null
     private var currentTripMembersJob: Job? = null
     private var currentTripOptionsJob: Job? = null
+    private var advisoryEvaluationJob: Job? = null
     private var allTripsJob: Job? = null
     private var allTripsObserverUid: String? = null
     private var currentTripKey: TripKey? = null
@@ -222,6 +235,11 @@ class CurrentTripViewModel(application: Application) : AndroidViewModel(applicat
     private val sharedYelpWindowBoost = mutableMapOf<String, Int>()
     private val mediaDetailPipeline = TripMediaDetailPipeline(application)
     private val currencyPreviewRepository = CurrencyPreviewRepository(application)
+    private val demoAdvisoryEngine = TripAdvisoryEngine(
+        weatherProvider = DummyTripWeatherContextProvider(),
+        transportProvider = DummyTripTransportContextProvider(),
+        alternativeProvider = DummyTripAlternativeProvider()
+    )
     private var liveEventDetailOverrides: Map<String, Map<String, String>> = emptyMap()
 
     private fun resetTripState(
@@ -238,6 +256,8 @@ class CurrentTripViewModel(application: Application) : AndroidViewModel(applicat
         currentTripMembersJob = null
         currentTripOptionsJob?.cancel()
         currentTripOptionsJob = null
+        advisoryEvaluationJob?.cancel()
+        advisoryEvaluationJob = null
         currentTripKey = null
         currentTripSummary = null
         currentTripDestination = ""
@@ -254,6 +274,8 @@ class CurrentTripViewModel(application: Application) : AndroidViewModel(applicat
         _reviewsLoading.value = emptySet()
         _yelpEnrichmentInFlight.value = emptySet()
         _restaurantLiveContextInFlight.value = emptySet()
+        _advisories.value = emptyList()
+        dismissedAdvisoryKeys.clear()
         _shareTargets.value = emptyList()
         _tripMembers.value = emptyList()
         liveEventDetailOverrides = emptyMap()
@@ -578,6 +600,152 @@ class CurrentTripViewModel(application: Application) : AndroidViewModel(applicat
         _uiState.update { it.copy(errorMessage = message) }
     }
 
+    fun setAdvisoryDemoModeEnabled(enabled: Boolean) {
+        if (_isAdvisoryDemoModeEnabled.value == enabled) return
+        _isAdvisoryDemoModeEnabled.value = enabled
+        if (!enabled) {
+            advisoryEvaluationJob?.cancel()
+            advisoryEvaluationJob = null
+            _advisories.value = emptyList()
+            dismissedAdvisoryKeys.clear()
+            removeUnselectedDemoAdvisoryOptions()
+        }
+    }
+
+    fun onItineraryVisible() {
+        if (!_isAdvisoryDemoModeEnabled.value) return
+        evaluateDemoAdvisories()
+    }
+
+    fun dismissAdvisory(advisoryId: String) {
+        val advisory = _advisories.value.firstOrNull { it.advisoryId == advisoryId } ?: return
+        dismissedAdvisoryKeys += advisory.dismissalKey
+        _advisories.update { current -> current.filterNot { it.advisoryId == advisoryId } }
+    }
+
+    fun replaceAdvisoryOption(
+        advisoryId: String,
+        eventId: String,
+        optionId: String
+    ) {
+        dismissAdvisory(advisoryId)
+        selectOption(eventId, optionId)
+    }
+
+    fun saveAdvisoryOption(
+        advisoryId: String,
+        eventId: String,
+        optionId: String
+    ) {
+        val tripKey = requireTripContributorKey("save advisory options") ?: return
+        val event = localEventsSnapshot.firstOrNull { it.eventId == eventId }
+            ?: _uiState.value.events.firstOrNull { it.eventId == eventId }
+            ?: return
+        val option = _eventOptions.value[eventId].orEmpty()
+            .firstOrNull { it.optionId == optionId }
+            ?: return
+
+        viewModelScope.launch {
+            try {
+                val result = tripPlanActionService.saveOption(
+                    tripKey = tripKey,
+                    event = event,
+                    existingOptions = _eventOptions.value[eventId].orEmpty(),
+                    option = option
+                )
+                val updatedOptionsByEvent = _eventOptions.value + (eventId to result.options)
+                _eventOptions.value = updatedOptionsByEvent
+                publishCurrentEvents(localEventsSnapshot, updatedOptionsByEvent)
+                persistLocalTripSnapshot(
+                    events = localEventsSnapshot,
+                    options = updatedOptionsByEvent,
+                    persistOptions = true
+                )
+                dismissAdvisory(advisoryId)
+                _uiState.update {
+                    it.copy(infoMessage = result.confirmationMessage, errorMessage = null)
+                }
+                refreshCurrentTripInBackground(tripKey)
+            } catch (e: Exception) {
+                Log.e("CurrentTripViewModel", "Failed to save advisory option", e)
+                _uiState.update { it.copy(errorMessage = e.message ?: "Failed to save this suggestion.") }
+            }
+        }
+    }
+
+    private fun evaluateDemoAdvisories() {
+        val summary = currentTripSummary ?: return
+        val events = _uiState.value.events
+        if (events.isEmpty()) {
+            _advisories.value = emptyList()
+            return
+        }
+
+        advisoryEvaluationJob?.cancel()
+        advisoryEvaluationJob = viewModelScope.launch {
+            try {
+                val evaluated = demoAdvisoryEngine.evaluate(
+                    trip = summary,
+                    events = events,
+                    optionsByEvent = _eventOptions.value
+                ).filterNot { advisory -> advisory.dismissalKey in dismissedAdvisoryKeys }
+
+                mergeAdvisoryOptions(evaluated)
+                _advisories.value = evaluated
+            } catch (e: Exception) {
+                Log.w("CurrentTripViewModel", "Failed to evaluate demo advisories", e)
+            }
+        }
+    }
+
+    private fun mergeAdvisoryOptions(advisories: List<TripAdvisory>) {
+        if (advisories.isEmpty()) return
+        val tripKey = currentTripKey
+        val currentOptions = _eventOptions.value.toMutableMap()
+        var changed = false
+
+        advisories.forEach { advisory ->
+            val scopedSuggestions = advisory.suggestedOptions.map { option ->
+                option.scopedTo(
+                    ownerUid = tripKey?.ownerUid.orEmpty(),
+                    tripId = tripKey?.tripId ?: option.tripId,
+                    eventId = advisory.eventId
+                )
+            }
+            val merged = (currentOptions[advisory.eventId].orEmpty() + scopedSuggestions)
+                .distinctBy(EventOption::optionId)
+            if (merged != currentOptions[advisory.eventId].orEmpty()) {
+                currentOptions[advisory.eventId] = merged
+                changed = true
+            }
+        }
+
+        if (changed) {
+            val updatedOptions = currentOptions.toMap()
+            _eventOptions.value = updatedOptions
+            publishCurrentEvents(localEventsSnapshot, updatedOptions)
+        }
+    }
+
+    private fun removeUnselectedDemoAdvisoryOptions() {
+        val updatedOptions = _eventOptions.value.mapValues { (_, options) ->
+            options.filterNot { option ->
+                option.source.equals("dummy_advisory", ignoreCase = true) && !option.selected
+            }
+        }.filterValues { it.isNotEmpty() }
+
+        if (updatedOptions != _eventOptions.value) {
+            _eventOptions.value = updatedOptions
+            publishCurrentEvents(localEventsSnapshot, updatedOptions)
+        }
+    }
+
+    private fun reevaluateDemoAdvisoriesIfEnabled() {
+        if (_isAdvisoryDemoModeEnabled.value) {
+            evaluateDemoAdvisories()
+        }
+    }
+
     fun upsertPlan(plan: EditablePlan) {
         val tripKey = requireTripContributorKey("add or edit plans")
         if (auth.currentUser?.uid == null) {
@@ -633,6 +801,7 @@ class CurrentTripViewModel(application: Application) : AndroidViewModel(applicat
                         errorMessage = null
                     )
                 }
+                reevaluateDemoAdvisoriesIfEnabled()
             } catch (e: Exception) {
                 Log.e("CurrentTripViewModel", "Failed to save event", e)
                 _uiState.update { it.copy(errorMessage = e.message ?: "Failed to save plan.") }
@@ -1408,6 +1577,7 @@ class CurrentTripViewModel(application: Application) : AndroidViewModel(applicat
 
             refreshCurrentTripInBackground(tripKey)
             ensureYelpEventEnriched(eventId)
+            reevaluateDemoAdvisoriesIfEnabled()
         }
     }
 
@@ -1513,6 +1683,7 @@ class CurrentTripViewModel(application: Application) : AndroidViewModel(applicat
             try {
                 tripPlanActionService.updateEvent(tripKey = tripKey, event = updatedEvent)
                 refreshCurrentTripInBackground(tripKey)
+                reevaluateDemoAdvisoriesIfEnabled()
             } catch (e: Exception) {
                 Log.e("CurrentTripViewModel", "Failed to patch event", e)
                 _uiState.update { it.copy(errorMessage = e.message ?: "Failed to save event changes.") }
@@ -1588,6 +1759,7 @@ class CurrentTripViewModel(application: Application) : AndroidViewModel(applicat
                     }
                 )
                 refreshCurrentTripInBackground(tripKey)
+                reevaluateDemoAdvisoriesIfEnabled()
             } catch (e: Exception) {
                 Log.e("CurrentTripViewModel", "Failed to persist placements", e)
                 _uiState.update { it.copy(errorMessage = e.message ?: "Failed to save event order.") }
@@ -1949,6 +2121,7 @@ class CurrentTripViewModel(application: Application) : AndroidViewModel(applicat
         currentTripEventsJob?.cancel()
         currentTripMembersJob?.cancel()
         currentTripOptionsJob?.cancel()
+        advisoryEvaluationJob?.cancel()
         allTripsJob?.cancel()
         super.onCleared()
     }
