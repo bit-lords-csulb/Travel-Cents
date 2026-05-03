@@ -97,12 +97,14 @@ fun ChatPage(
         factory = ChatViewModel.Factory(group)
     ),
     onEventsClick: () -> Unit,
+    onEditClick: () -> Unit = {},
     onTripCardClick: ((tripId: String, ownerUid: String) -> Unit)? = null
 ) {
     val messages by viewModel.messages.collectAsState()
     val messageText by viewModel.messageText.collectAsState()
     val currentUid = viewModel.currentUid
     val listState = rememberLazyListState()
+    val liveGroup by viewModel.groupState.collectAsState()
 
     // Auto-scroll to bottom on new messages
     LaunchedEffect(messages.size) {
@@ -131,6 +133,7 @@ fun ChatPage(
                     Icon(Icons.AutoMirrored.Filled.ArrowBack, modifier = Modifier.size(32.dp), contentDescription = "Back", tint = DeepSea5)
                 }
 
+                // Group Chat Image - Fixed to use liveGroup
                 Box(
                     modifier = Modifier
                         .size(42.dp)
@@ -138,16 +141,22 @@ fun ChatPage(
                         .background(DeepSea3),
                     contentAlignment = Alignment.Center
                 ) {
-                    if (group.groupImageUrl.isNotEmpty()) {
+                    // Priority: Live Data -> Static Initial Data
+                    val url = liveGroup?.groupImageUrl ?: group.groupImageUrl
+                    val currentName = liveGroup?.name ?: group.name
+
+                    if (url.startsWith("http")) {
                         AsyncImage(
-                            model = group.groupImageUrl,
+                            model = url,
                             contentDescription = null,
                             contentScale = ContentScale.Crop,
-                            modifier = Modifier.size(42.dp).clip(CircleShape)
+                            modifier = Modifier.fillMaxSize()
                         )
+                    } else if (url.isNotEmpty() && url.length <= 4) {
+                        Text(url, fontSize = 20.sp)
                     } else {
                         Text(
-                            text = group.name.take(2).uppercase(),
+                            text = currentName.take(2).uppercase(),
                             color = DeepSea5,
                             fontWeight = FontWeight.Bold,
                             fontSize = 14.sp
@@ -158,9 +167,16 @@ fun ChatPage(
                 Spacer(modifier = Modifier.width(10.dp))
 
                 Column(modifier = Modifier.weight(1f)) {
-                    Text(text = group.name, color = DeepSea5, fontWeight = FontWeight.Bold, fontSize = 16.sp)
+                    // Title - Fixed to use liveGroup
                     Text(
-                        text = "${group.members.size} members",
+                        text = liveGroup?.name ?: group.name,
+                        color = DeepSea5,
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 16.sp
+                    )
+                    // Member Count - Fixed to use liveGroup
+                    Text(
+                        text = "${liveGroup?.members?.size ?: group.members.size} members",
                         color = DeepSea5.copy(alpha = 0.5f),
                         fontSize = 12.sp
                     )
@@ -178,9 +194,9 @@ fun ChatPage(
                     Text("EVENTS", fontSize = 11.sp, fontWeight = FontWeight.SemiBold)
                 }
 
-                // More Options Dots
-                IconButton(onClick = { }) {
-                    Icon(Icons.Default.MoreVert, contentDescription = "More", tint = DeepSea5)
+                // Edit Chat Button Dots
+                IconButton(onClick = onEditClick) {
+                    Icon(Icons.Default.MoreVert, contentDescription = "Edit Chat", tint = DeepSea5)
                 }
             }
         }

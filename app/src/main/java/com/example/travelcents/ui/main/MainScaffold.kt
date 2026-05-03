@@ -24,6 +24,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -35,12 +36,16 @@ import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
-import com.example.travelcents.data.ai.chat.AiCuratedTripStarter
-import com.example.travelcents.data.ai.chat.AiTripIntakeProfile
 import com.example.travelcents.data.trip.TripKey
+import com.example.travelcents.data.social.model.DirectChatPreview
+import com.example.travelcents.data.social.model.Friend
+import com.example.travelcents.data.social.model.Group
+import com.example.travelcents.data.trip.model.Event
 import com.example.travelcents.ui.components.MainBottomNavBar
 import com.example.travelcents.ui.main.aichat.AiTripChatPage
-import com.example.travelcents.ui.main.chats.chat.ChatsScreen
+import com.example.travelcents.ui.main.chats.chat.*
+import com.example.travelcents.ui.main.chats.friends.*
+import com.example.travelcents.ui.main.chats.groups.*
 import com.example.travelcents.ui.main.current.CurrentDisplayMode
 import com.example.travelcents.ui.main.current.CurrentTripRoutes
 import com.example.travelcents.ui.main.current.CurrentTripScreen
@@ -102,8 +107,8 @@ private val bottomNavRoutes = setOf(
 
 private fun shouldShowBottomNav(route: String): Boolean {
     return route in bottomNavRoutes ||
-        route.startsWith("${MainRoutes.CURRENT}/") ||
-        route.startsWith(MainRoutes.NEW_TRIP)
+            route.startsWith("${MainRoutes.CURRENT}/") ||
+            route.startsWith(MainRoutes.NEW_TRIP)
 }
 
 private fun selectedBottomRoute(route: String): String {
@@ -121,7 +126,22 @@ fun MainScaffold(modifier: Modifier = Modifier, onLogout: () -> Unit = {}) {
     val newTripViewModel: NewTripViewModel = viewModel()
     val currentTripViewModel: CurrentTripViewModel = viewModel()
     val navController = rememberNavController()
+
     var pendingPreview by remember { mutableStateOf<PreviewSource.CuratedStarter?>(null) }
+
+    // Chat navigation states
+    var selectedGroup   by remember { mutableStateOf<Group?>(null) }
+    var showNewTrip     by remember { mutableStateOf(false) }
+    var showFriends     by remember { mutableStateOf(false) }
+    var selectedFriend  by remember { mutableStateOf<Friend?>(null) }
+    var showAddFriend   by remember { mutableStateOf(false) }
+    var showRequests    by remember { mutableStateOf(false) }
+    var selectedDM      by remember { mutableStateOf<DirectChatPreview?>(null) }
+    var activeTab       by remember { mutableIntStateOf(0) }
+    var showEvents      by remember { mutableStateOf(false) }
+    var showCreateEvent by remember { mutableStateOf(false) }
+    var selectedEvent   by remember { mutableStateOf<Event?>(null) }
+    var showEditChat    by remember { mutableStateOf(false) }
 
     val navBackStackEntry by navController.currentBackStackEntryAsState()
     val currentRoute = navBackStackEntry?.destination?.route ?: MainRoutes.HOME
@@ -306,15 +326,85 @@ fun MainScaffold(modifier: Modifier = Modifier, onLogout: () -> Unit = {}) {
                     SavedPlacesPage(onBack = { navController.popBackStack() })
                 }
                 composable(MainRoutes.CHATS) {
-                    ChatsScreen(
-                        modifier = Modifier.fillMaxSize(),
-                        onTripCardClick = { tripId, ownerUid ->
-                            currentTripViewModel.loadTrip(TripKey(ownerUid = ownerUid, tripId = tripId))
-                            navController.navigate(MainRoutes.CURRENT_ITINERARY) {
-                                launchSingleTop = true
-                            }
+                    val onTripCardClick: (String, String) -> Unit = { tripId, ownerUid ->
+                        currentTripViewModel.loadTrip(TripKey(ownerUid = ownerUid, tripId = tripId))
+                        navController.navigate(MainRoutes.CURRENT_ITINERARY) {
+                            launchSingleTop = true
                         }
-                    )
+                    }
+
+                    when {
+                        selectedGroup != null && selectedEvent != null ->
+                            com.example.travelcents.ui.main.chats.voting.EventCommentsPage(
+                                event       = selectedEvent!!,
+                                groupId     = selectedGroup!!.id,
+                                onBackClick = { selectedEvent = null }
+                            )
+
+                        selectedGroup != null && showCreateEvent ->
+                            com.example.travelcents.ui.main.chats.voting.CreateEventPage(
+                                group          = selectedGroup!!,
+                                onBackClick    = { showCreateEvent = false },
+                                onEventCreated = { showCreateEvent = false }
+                            )
+
+                        selectedGroup != null && showEvents ->
+                            com.example.travelcents.ui.main.chats.voting.EventsPage(
+                                group        = selectedGroup!!,
+                                onBackClick  = { showEvents = false },
+                                onNewEvent   = { showCreateEvent = true },
+                                onEventClick = { event -> selectedEvent = event }
+                            )
+
+                        selectedGroup != null && showEditChat ->
+                            EditChatPage(
+                                group             = selectedGroup!!,
+                                onBackClick       = { showEditChat = false },
+                                onNavigateToChats = {
+                                    showEditChat = false
+                                    selectedGroup = null
+                                }
+                            )
+
+                        selectedGroup != null -> ChatPage(
+                            group           = selectedGroup!!,
+                            onBackClick     = { selectedGroup = null },
+                            onEventsClick   = { showEvents = true },
+                            onEditClick     = { showEditChat = true },
+                            onTripCardClick = onTripCardClick
+                        )
+
+                        selectedFriend != null -> DirectChatPage(
+                            friend      = selectedFriend!!,
+                            onBackClick = { selectedFriend = null },
+                            onTripCardClick = onTripCardClick
+                        )
+                        selectedDM != null -> DirectChatPage(
+                            friend      = Friend(uid = selectedDM!!.otherUid, displayName = selectedDM!!.otherUserName),
+                            onBackClick = { selectedDM = null; activeTab = 1 },
+                            onTripCardClick = onTripCardClick
+                        )
+                        showAddFriend -> AddFriendPage(onBackClick = { showAddFriend = false })
+                        showRequests  -> FriendRequestsPage(onBackClick = { showRequests = false })
+                        showNewTrip   -> NewTripChatPage(
+                            onBackClick   = { showNewTrip = false },
+                            onTripCreated = { newGroup -> showNewTrip = false; selectedGroup = newGroup }
+                        )
+                        showFriends -> FriendsPage(
+                            onBackClick          = { showFriends = false },
+                            onMessageFriendClick = { friend -> showFriends = false; selectedFriend = friend },
+                            onAddFriendClick     = { showAddFriend = true },
+                            onRequestsClick      = { showRequests = true }
+                        )
+                        else -> ChatsPage(
+                            modifier          = Modifier.fillMaxSize(),
+                            startTab          = activeTab,
+                            onNewChatClick    = { showNewTrip = true },
+                            onFriendsClick    = { showFriends = true },
+                            onGroupClick      = { group -> selectedGroup = group; activeTab = 0 },
+                            onDirectChatClick = { dm -> selectedDM = dm; activeTab = 1 }
+                        )
+                    }
                 }
                 composable(MainRoutes.SETTINGS) {
                     SettingsPage(
@@ -438,4 +528,3 @@ private fun PreviewActionBar(
         }
     }
 }
-
