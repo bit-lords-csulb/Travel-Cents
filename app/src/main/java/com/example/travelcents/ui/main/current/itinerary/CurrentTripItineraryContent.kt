@@ -60,6 +60,10 @@ import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImage
 import com.example.travelcents.data.trip.model.EventOption
 import com.example.travelcents.data.trip.model.TravelEvent
+import com.example.travelcents.ui.main.current.overlays.cards.CompactFlightSummaryContent
+import com.example.travelcents.ui.main.current.overlays.cards.FlightSummaryModel
+import com.example.travelcents.ui.main.current.overlays.cards.FlightHeroMedia
+import com.example.travelcents.ui.main.current.overlays.cards.toFlightSummaryModel
 import com.example.travelcents.ui.modules.formatDisplayTime
 import com.example.travelcents.ui.modules.heroImageModel
 import com.example.travelcents.ui.modules.normalizeTime
@@ -278,6 +282,7 @@ private fun CurrentTripItineraryCard(
     val title = eventTitle(event)
     val description = eventSubtitle(event).ifBlank { "Tap to edit details" }
     val heroImage = remember(event, context) { event.heroImageModel(context) }
+    val flightSummary = remember(event) { event.toFlightSummaryModel() }
 
     Row(
         modifier = Modifier
@@ -334,13 +339,29 @@ private fun CurrentTripItineraryCard(
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .heightIn(min = 116.dp)
+                        .heightIn(min = if (flightSummary != null) 96.dp else 116.dp)
                 ) {
-                    if (heroImage.isNotBlank()) {
+                    if (flightSummary != null) {
+                        FlightHeroMedia(
+                            heroImage = heroImage,
+                            title = title,
+                            airlineLogoUrl = flightSummary.airlineLogoUrl,
+                            photoCount = 0,
+                            onOpenGallery = null,
+                            modifier = Modifier
+                                .width(92.dp)
+                                .fillMaxHeight(),
+                            shape = RoundedCornerShape(topStart = 16.dp, bottomStart = 16.dp)
+                        )
+                    } else if (heroImage.isNotBlank()) {
                         Box(
                             modifier = Modifier
                                 .width(116.dp)
                                 .fillMaxHeight()
+                                .background(
+                                    DeepSea2,
+                                    RoundedCornerShape(topStart = 16.dp, bottomStart = 16.dp)
+                                )
                         ) {
                             AsyncImage(
                                 model = heroImage,
@@ -371,51 +392,61 @@ private fun CurrentTripItineraryCard(
                     Column(
                         modifier = Modifier
                             .weight(1f)
-                            .padding(horizontal = 14.dp, vertical = 14.dp)
+                            .padding(
+                                horizontal = if (flightSummary != null) 12.dp else 14.dp,
+                                vertical = if (flightSummary != null) 10.dp else 14.dp
+                            )
                     ) {
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            Surface(
-                                color = accent.copy(alpha = 0.16f),
-                                shape = RoundedCornerShape(999.dp)
-                            ) {
-                                Text(
-                                    text = event.type.uppercase(Locale.US),
-                                    color = accent,
-                                    fontSize = 9.sp,
-                                    fontWeight = FontWeight.Bold,
-                                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp)
-                                )
+                        if (flightSummary != null) {
+                            CompactFlightCardContent(
+                                accent = accent,
+                                summary = flightSummary
+                            )
+                        } else {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Surface(
+                                    color = accent.copy(alpha = 0.16f),
+                                    shape = RoundedCornerShape(999.dp)
+                                ) {
+                                    Text(
+                                        text = event.type.uppercase(Locale.US),
+                                        color = accent,
+                                        fontSize = 9.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp)
+                                    )
+                                }
+                                if (event.startTime.isNotBlank()) {
+                                    Spacer(modifier = Modifier.width(8.dp))
+                                    Text(
+                                        text = formatDisplayTime(event.startTime),
+                                        color = DeepSea4,
+                                        fontSize = 10.sp,
+                                        fontWeight = FontWeight.SemiBold
+                                    )
+                                }
                             }
-                            if (event.startTime.isNotBlank()) {
-                                Spacer(modifier = Modifier.width(8.dp))
-                                Text(
-                                    text = formatDisplayTime(event.startTime),
-                                    color = DeepSea4,
-                                    fontSize = 10.sp,
-                                    fontWeight = FontWeight.SemiBold
-                                )
-                            }
+
+                            Spacer(modifier = Modifier.height(8.dp))
+
+                            Text(
+                                text = title,
+                                color = DeepSea5,
+                                fontSize = 16.sp,
+                                fontWeight = FontWeight.Bold,
+                                maxLines = 2,
+                                overflow = TextOverflow.Ellipsis
+                            )
+                            Spacer(modifier = Modifier.height(4.dp))
+                            Text(
+                                text = description,
+                                color = DeepSea4,
+                                fontSize = 12.sp,
+                                lineHeight = 16.sp,
+                                maxLines = 3,
+                                overflow = TextOverflow.Ellipsis
+                            )
                         }
-
-                        Spacer(modifier = Modifier.height(8.dp))
-
-                        Text(
-                            text = title,
-                            color = DeepSea5,
-                            fontSize = 16.sp,
-                            fontWeight = FontWeight.Bold,
-                            maxLines = 2,
-                            overflow = TextOverflow.Ellipsis
-                        )
-                        Spacer(modifier = Modifier.height(4.dp))
-                        Text(
-                            text = description,
-                            color = DeepSea4,
-                            fontSize = 12.sp,
-                            lineHeight = 16.sp,
-                            maxLines = 3,
-                            overflow = TextOverflow.Ellipsis
-                        )
                     }
                 }
 
@@ -481,6 +512,19 @@ private fun CurrentTripItineraryCard(
         }
     }
 
+}
+
+@Composable
+private fun CompactFlightCardContent(
+    accent: Color,
+    summary: FlightSummaryModel
+) {
+    CompactFlightSummaryContent(
+        summary = summary,
+        accent = accent,
+        primaryText = DeepSea5,
+        secondaryText = DeepSea4
+    )
 }
 
 private fun buildCurrentTripItineraryItems(events: List<TravelEvent>): List<CurrentTripItineraryItem> {

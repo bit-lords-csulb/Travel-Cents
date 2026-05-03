@@ -11,7 +11,6 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -20,6 +19,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.rememberScrollState
@@ -56,6 +56,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -80,7 +81,6 @@ import java.time.temporal.ChronoUnit
 private val Primary = Color(0xFF64B5F6)
 private val PrimaryDim = Color(0xFF54A7E7)
 private val SurfaceBright = Color(0xFF243447)
-
 // ─────────────────────────────────────────────────────────────
 // Entry point
 // ─────────────────────────────────────────────────────────────
@@ -532,8 +532,7 @@ private fun SavedPlacesWidget(
                     }
                 }
             } else {
-                val extraCount = bookmarks.size - 3
-                // 2 × 2 photo grid
+                val extraCount = (bookmarks.size - 3).coerceAtLeast(0)
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -546,13 +545,13 @@ private fun SavedPlacesWidget(
                             .fillMaxHeight(),
                         verticalArrangement = Arrangement.spacedBy(6.dp)
                     ) {
-                        BookmarkPhotoCell(
+                        BookmarkSlot(
                             bookmark = bookmarks.getOrNull(0),
                             modifier = Modifier
                                 .weight(1f)
                                 .fillMaxWidth()
                         )
-                        BookmarkPhotoCell(
+                        BookmarkSlot(
                             bookmark = bookmarks.getOrNull(1),
                             modifier = Modifier
                                 .weight(1f)
@@ -565,27 +564,19 @@ private fun SavedPlacesWidget(
                             .fillMaxHeight(),
                         verticalArrangement = Arrangement.spacedBy(6.dp)
                     ) {
-                        BookmarkPhotoCell(
+                        BookmarkSlot(
                             bookmark = bookmarks.getOrNull(2),
                             modifier = Modifier
                                 .weight(1f)
                                 .fillMaxWidth()
                         )
                         if (extraCount > 0) {
-                            Box(
+                            MoreSavedPlacesTile(
+                                count = extraCount,
                                 modifier = Modifier
                                     .weight(1f)
                                     .fillMaxWidth()
-                                    .background(SurfaceBright, RoundedCornerShape(10.dp)),
-                                contentAlignment = Alignment.Center
-                            ) {
-                                Text(
-                                    text = "+$extraCount",
-                                    color = Primary,
-                                    fontSize = 13.sp,
-                                    fontWeight = FontWeight.Bold
-                                )
-                            }
+                            )
                         } else {
                             Spacer(modifier = Modifier.weight(1f))
                         }
@@ -597,20 +588,81 @@ private fun SavedPlacesWidget(
 }
 
 @Composable
-private fun BookmarkPhotoCell(
+private fun BookmarkSlot(
     bookmark: BookmarkedPlace?,
     modifier: Modifier = Modifier
 ) {
-    if (bookmark?.imageUrl != null) {
-        AsyncImage(
-            model = bookmark.imageUrl,
-            contentDescription = bookmark.name,
-            contentScale = ContentScale.Crop,
-            modifier = modifier.clip(RoundedCornerShape(10.dp))
-        )
+    if (bookmark != null) {
+        HomeBookmarkTile(bookmark = bookmark, modifier = modifier)
     } else {
-        Box(
-            modifier = modifier.background(SurfaceBright, RoundedCornerShape(10.dp))
+        Box(modifier = modifier.background(SurfaceBright, RoundedCornerShape(10.dp)))
+    }
+}
+
+@Composable
+private fun HomeBookmarkTile(
+    bookmark: BookmarkedPlace,
+    modifier: Modifier = Modifier
+) {
+    Box(
+        modifier = modifier
+            .clip(RoundedCornerShape(10.dp))
+            .background(SurfaceBright)
+            .padding(8.dp)
+    ) {
+        Column(
+            modifier = Modifier.fillMaxSize(),
+            verticalArrangement = Arrangement.SpaceBetween
+        ) {
+            Box(
+                modifier = Modifier
+                    .size(34.dp)
+                    .clip(RoundedCornerShape(8.dp))
+                    .background(Primary.copy(alpha = 0.18f)),
+                contentAlignment = Alignment.Center
+            ) {
+                Text(
+                    text = bookmark.name.take(1).uppercase(),
+                    color = Primary,
+                    fontSize = 13.sp,
+                    fontWeight = FontWeight.Bold
+                )
+            }
+            Text(
+                text = bookmark.name,
+                color = DeepSea5,
+                fontSize = 10.sp,
+                fontWeight = FontWeight.SemiBold,
+                maxLines = 2,
+                overflow = TextOverflow.Ellipsis
+            )
+            Text(
+                text = bookmark.category.ifBlank { bookmark.area.ifBlank { "Saved place" } },
+                color = DeepSea4,
+                fontSize = 8.sp,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
+            )
+        }
+    }
+}
+
+@Composable
+private fun MoreSavedPlacesTile(
+    count: Int,
+    modifier: Modifier = Modifier
+) {
+    Box(
+        modifier = modifier
+            .clip(RoundedCornerShape(10.dp))
+            .background(Primary.copy(alpha = 0.14f)),
+        contentAlignment = Alignment.Center
+    ) {
+        Text(
+            text = "+$count",
+            color = Primary,
+            fontSize = 18.sp,
+            fontWeight = FontWeight.Bold
         )
     }
 }

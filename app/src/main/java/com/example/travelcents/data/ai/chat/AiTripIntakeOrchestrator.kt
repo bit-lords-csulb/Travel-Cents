@@ -28,6 +28,25 @@ private val SUPPORTED_INTAKE_PROFILE_PATCH_FIELDS = listOf(
     "notes"
 )
 
+private val MINIMAL_DESTINATION_RESPONSE_EXAMPLE = """
+{
+  "recommendations": [
+    {
+      "id": "lisbon_portugal",
+      "destination": "Lisbon, Portugal",
+      "summary": "Coastal capital with hilltop views and Atlantic seafood.",
+      "reason": "Romantic, walkable, and budget-friendly relative to Western Europe."
+    },
+    {
+      "id": "santorini_greece",
+      "destination": "Santorini, Greece",
+      "summary": "Cliffside Cycladic island known for caldera sunsets.",
+      "reason": "Beach + romance fit; works well at a relaxed pace."
+    }
+  ]
+}
+""".trimIndent()
+
 private val MINIMAL_INTAKE_RESPONSE_EXAMPLE = """
 {
   "ack_key": "got_it",
@@ -96,16 +115,36 @@ class AiTripIntakeOrchestrator {
             maxTokens = 600,
             responseFormat = destinationSuggestionResponseFormat()
         )
-        if (rawResponse.isBlank()) return emptyList()
+        if (rawResponse.isBlank()) {
+            android.util.Log.w(
+                "AiTripIntakeOrchestrator",
+                "suggestDestinations: blank response from LLM"
+            )
+            return emptyList()
+        }
 
         val root = runCatching {
             JsonParser.parseString(rawResponse).asJsonObject
-        }.getOrNull() ?: return emptyList()
+        }.getOrNull() ?: run {
+            android.util.Log.w(
+                "AiTripIntakeOrchestrator",
+                "suggestDestinations: response was not a JSON object. Raw: ${rawResponse.take(200)}"
+            )
+            return emptyList()
+        }
 
-        return root.getAsJsonArrayOrNull("recommendations")
+        val recommendations = root.getAsJsonArrayOrNull("recommendations")
             ?.toDestinationRecommendations()
             .orEmpty()
             .take(3)
+
+        if (recommendations.isEmpty()) {
+            android.util.Log.w(
+                "AiTripIntakeOrchestrator",
+                "suggestDestinations: parsed 0 recommendations. Raw: ${rawResponse.take(300)}"
+            )
+        }
+        return recommendations
     }
 
     private fun buildIntakeMessages(
@@ -208,6 +247,20 @@ class AiTripIntakeOrchestrator {
                         "Prefer varied but realistic fits. " +
                         "Keep each summary and reason concise. " +
                         "Return JSON only."
+            ),
+            LlmMessage(
+                role = "system",
+                content = buildString {
+                    appendLine("Return exactly one JSON object with a top-level 'recommendations' array of 2 or 3 items.")
+                    appendLine("Each item must have these fields and no others:")
+                    appendLine("  id: stable snake_case slug derived from the destination, e.g. 'lisbon_portugal'")
+                    appendLine("  destination: human-readable place name, e.g. 'Lisbon, Portugal'")
+                    appendLine("  summary: 1 short sentence describing the place")
+                    appendLine("  reason: 1 short sentence explaining why it fits the user's profile")
+                    appendLine()
+                    appendLine("Example:")
+                    append(MINIMAL_DESTINATION_RESPONSE_EXAMPLE)
+                }
             ),
             LlmMessage(
                 role = "system",

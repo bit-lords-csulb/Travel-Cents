@@ -26,6 +26,7 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import okhttp3.OkHttpClient
@@ -84,18 +85,39 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
     private val _uiState = MutableStateFlow(HomeUiState())
     val uiState: StateFlow<HomeUiState> = _uiState.asStateFlow()
 
+    private var bookmarksJob: Job? = null
+    private var lastBookmarksUid: String? = null
+    private val authStateListener = FirebaseAuth.AuthStateListener { firebaseAuth ->
+        attachBookmarksObserver(firebaseAuth.currentUser?.uid)
+    }
+
     init {
         observeProfile()
         observeHomeTrips()
-        observeBookmarks()
+        attachBookmarksObserver(auth.currentUser?.uid)
+        auth.addAuthStateListener(authStateListener)
         loadAllTrips()
     }
 
-    private fun observeBookmarks() {
-        val uid = auth.currentUser?.uid ?: return
-        viewModelScope.launch {
-            bookmarksRepository.observeBookmarks(uid).collect { places ->
-                _uiState.update { it.copy(bookmarks = places) }
+    override fun onCleared() {
+        super.onCleared()
+        auth.removeAuthStateListener(authStateListener)
+    }
+
+    private fun attachBookmarksObserver(uid: String?) {
+        if (uid == lastBookmarksUid && bookmarksJob?.isActive == true) return
+        bookmarksJob?.cancel()
+        lastBookmarksUid = uid
+        Log.d("HomeViewModel", "attachBookmarksObserver: subscribing for uid=$uid")
+        val firestoreFlow = if (uid.isNullOrBlank()) {
+            flowOf(emptyList())
+        } else {
+            bookmarksRepository.observeBookmarks(uid)
+        }
+        bookmarksJob = viewModelScope.launch {
+            firestoreFlow.collect { bookmarks ->
+                Log.d("HomeViewModel", "bookmarks update uid=$uid count=${bookmarks.size}")
+                _uiState.update { it.copy(bookmarks = bookmarks) }
             }
         }
     }

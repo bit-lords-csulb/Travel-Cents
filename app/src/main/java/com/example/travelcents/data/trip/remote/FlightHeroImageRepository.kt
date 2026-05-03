@@ -47,13 +47,6 @@ class FlightHeroImageRepository(
             unsplashSearch("$destinationCity skyline")?.let { return it }
             unsplashSearch("$destinationCity aerial")?.let { return it }
         }
-
-        if (airlineIata.isNotBlank()) {
-            return HeroResolution(
-                imageUrl = "https://logos.skyscnr.com/images/airlines/favicon/${airlineIata.uppercase(Locale.US)}.png",
-                attribution = null
-            )
-        }
         return null
     }
 

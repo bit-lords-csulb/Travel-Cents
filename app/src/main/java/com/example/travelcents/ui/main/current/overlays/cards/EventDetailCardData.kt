@@ -11,6 +11,7 @@ import com.example.travelcents.data.trip.model.ATTR_CHECK_IN_TIME
 import com.example.travelcents.data.trip.model.ATTR_CHECK_OUT_TIME
 import com.example.travelcents.data.trip.model.ATTR_CUISINE
 import com.example.travelcents.data.trip.model.ATTR_HOTEL_CITY
+import com.example.travelcents.data.trip.model.ATTR_HOTEL_DETAIL_URL
 import com.example.travelcents.data.trip.model.ATTR_HOTEL_NAME
 import com.example.travelcents.data.trip.model.ATTR_HOTEL_RATING
 import com.example.travelcents.data.trip.model.ATTR_HOURS_SUMMARY
@@ -38,6 +39,7 @@ import java.util.Locale
 internal fun eventOfficialUrl(event: TravelEvent): String? {
     return listOf(
         event.detailValue(ATTR_BOOKING_URL, "booking_url"),
+        event.detailValue(ATTR_HOTEL_DETAIL_URL),
         event.details["tickets_url"],
         event.detailValue(ATTR_MENU_URL, "yelp_menu_url"),
         event.detailValue(ATTR_YELP_URL),
@@ -230,6 +232,19 @@ internal fun restaurantHoursTimeZoneLabel(
 ): String {
     return localTimeZoneLabel(
         context = "Restaurant",
+        event = event,
+        referenceDates = listOf(referenceDate, event.date),
+        referenceTimes = listOf(referenceTime, event.startTime)
+    )
+}
+
+internal fun activityHoursTimeZoneLabel(
+    event: TravelEvent,
+    referenceDate: String? = null,
+    referenceTime: String? = null
+): String {
+    return localTimeZoneLabel(
+        context = "Activity",
         event = event,
         referenceDates = listOf(referenceDate, event.date),
         referenceTimes = listOf(referenceTime, event.startTime)

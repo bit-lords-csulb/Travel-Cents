@@ -23,19 +23,18 @@ import com.example.travelcents.data.trip.model.TravelEvent
 import com.example.travelcents.data.trip.model.TravelRequest
 import com.example.travelcents.data.trip.model.ATTR_BUSINESS_ADDRESS
 import com.example.travelcents.data.trip.model.ATTR_BUSINESS_NAME
-import com.example.travelcents.data.trip.model.ATTR_DESTINATION_CITY
-import com.example.travelcents.data.trip.model.ATTR_HERO_IMAGE_ATTRIBUTION
-import com.example.travelcents.data.trip.model.ATTR_HERO_IMAGE_URL
 import com.example.travelcents.data.trip.model.ATTR_TICKETMASTER_EVENT_ID
 import com.example.travelcents.data.trip.model.ATTR_VENUE_NAME
 import com.example.travelcents.data.trip.model.YelpOptionPoolItem
 import com.example.travelcents.data.trip.remote.FlightHeroImageRepository
 import com.example.travelcents.data.trip.remote.SerpRepository
-import com.example.travelcents.data.trip.model.detailValue
+import com.example.travelcents.data.trip.remote.buildFlightHeroImageRepository
+import com.example.travelcents.data.trip.remote.enrichFlightHeroImages
 import com.example.travelcents.data.trip.remote.TicketmasterRepository
 import com.example.travelcents.data.trip.remote.YelpRepository
 import com.example.travelcents.data.trip.model.YELP_POOL_TYPE_ACTIVITIES
 import com.example.travelcents.data.trip.model.YELP_POOL_TYPE_RESTAURANTS
+import com.example.travelcents.data.trip.model.detailValue
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FirebaseFirestore
 import kotlinx.coroutines.async
@@ -43,10 +42,8 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
-import java.time.Duration
 import java.time.Instant
 import java.time.LocalDate
-import java.time.LocalTime
 import java.time.format.DateTimeFormatter
 import java.util.Locale
 import java.util.UUID
@@ -129,19 +126,7 @@ class NewTripViewModel(application: Application) : AndroidViewModel(application)
     val generationStep: StateFlow<GenerationStep> = _generationStep.asStateFlow()
 
     private val flightHeroImages: FlightHeroImageRepository by lazy {
-        val wikipediaClient = okhttp3.OkHttpClient.Builder()
-            .connectTimeout(20, java.util.concurrent.TimeUnit.SECONDS)
-            .readTimeout(20, java.util.concurrent.TimeUnit.SECONDS)
-            .build()
-        val wikipedia = retrofit2.Retrofit.Builder()
-            .baseUrl("https://en.wikipedia.org/")
-            .client(wikipediaClient)
-            .addConverterFactory(retrofit2.converter.gson.GsonConverterFactory.create())
-            .build()
-            .create(com.example.travelcents.data.trip.remote.WikipediaApiService::class.java)
-        FlightHeroImageRepository(
-            destinationImages = com.example.travelcents.data.trip.remote.DestinationImageRepository(wikipedia)
-        )
+        buildFlightHeroImageRepository()
     }
 
     fun generateTrip() {
@@ -199,10 +184,15 @@ class NewTripViewModel(application: Application) : AndroidViewModel(application)
                 val flightArrivalDate = outboundFlight?.details?.get("arrival_date")
                     ?.takeIf { it.isNotBlank() }
                     ?: request.dateFrom
-                val minimumStartTime = minimumActivityStartTime(outboundFlight, request.dateFrom)
-                val maximumEndTime = maximumActivityEndTime(returnFlight, request.dateTo)
+                val tripEdgeGuardrails = TripEdgeScheduler.buildGuardrails(
+                    outboundFlight = outboundFlight,
+                    tripStartDate = request.dateFrom,
+                    returnFlight = returnFlight,
+                    tripEndDate = request.dateTo
+                )
                 val tripDates = generateActivityDates(request.dateFrom, request.dateTo, flightArrivalDate)
                 val yelpOptionPools = linkedMapOf<String, List<YelpOptionPoolItem>>()
+                val constrainedHotels = TripEdgeScheduler.applyFlexibleEventWindow(realHotels, tripEdgeGuardrails)
 
                 // Step 3: Yelp restaurants — fetch a compact shared pool and only persist the selected daily event.
                 _generationStep.value = GenerationStep.FINDING_RESTAURANTS
@@ -223,10 +213,7 @@ class NewTripViewModel(application: Application) : AndroidViewModel(application)
                         YelpRepository.distributePoolToSelectedEvents(
                             restaurantPool, tripDates, "restaurant", itinerary.itineraryId
                         ),
-                        earliestDate = flightArrivalDate,
-                        minimumStartTime = minimumStartTime,
-                        latestDate = request.dateTo,
-                        maximumEndTime = maximumEndTime
+                        tripEdgeGuardrails = tripEdgeGuardrails
                     )
                 }
 
@@ -276,27 +263,19 @@ class NewTripViewModel(application: Application) : AndroidViewModel(application)
                         YelpRepository.distributePoolToSelectedEvents(
                             activityPool, tripDates, "activity", itinerary.itineraryId
                         ),
-                        earliestDate = flightArrivalDate,
-                        minimumStartTime = minimumStartTime,
-                        latestDate = request.dateTo,
-                        maximumEndTime = maximumEndTime
+                        tripEdgeGuardrails = tripEdgeGuardrails
                     )
                     val mergedLocalEvents = mergeLocalActivityEvents(
                         yelpEvents = yelpEventsDeferred.await(),
                         ticketmasterEvents = ticketmasterEventsDeferred.await()
                     )
-                    localEvents = filterEventsAfterTime(
-                        filterEventsBeforeTime(
-                            mergedLocalEvents,
-                            flightArrivalDate,
-                            minimumStartTime
-                        ),
-                        request.dateTo,
-                        maximumEndTime
+                    localEvents = TripEdgeScheduler.filterFixedEventWindow(
+                        mergedLocalEvents,
+                        tripEdgeGuardrails
                     )
                 }
 
-                val allEvents = realFlights + realHotels + restaurantEvents + activityEvents + localEvents
+                val allEvents = realFlights + constrainedHotels + restaurantEvents + activityEvents + localEvents
                 val linkedItinerary = itinerary.copy(eventIds = allEvents.map { it.eventId })
 
                 // Step 5: Download selected hero images plus the selected hotel galleries.
@@ -448,107 +427,11 @@ class NewTripViewModel(application: Application) : AndroidViewModel(application)
         return runCatching { LocalDate.parse(rawDate, DateTimeFormatter.ISO_LOCAL_DATE) }.getOrNull()
     }
 
-    private fun minimumActivityStartTime(outboundFlight: TravelEvent?, departureDate: String): String? {
-        if (outboundFlight == null) return null
-        val arrivalDate = outboundFlight.details["arrival_date"]
-            ?.takeIf { it.isNotBlank() }
-            ?: outboundFlight.date
-        if (arrivalDate != departureDate) return null
-
-        val arrivalTime = outboundFlight.details["arrival_time"]
-            ?.takeIf { it.isNotBlank() }
-            ?: outboundFlight.endTime.takeIf { it.isNotBlank() }
-            ?: return null
-
-        return parseTripTime(arrivalTime)
-            ?.plusHours(2)
-            ?.format(TRIP_TIME_FORMATTER)
-    }
-
-    private fun maximumActivityEndTime(returnFlight: TravelEvent?, returnDate: String): String? {
-        if (returnFlight == null) return null
-        val departureDate = returnFlight.date.takeIf { it.isNotBlank() } ?: returnDate
-        if (departureDate != returnDate) return null
-
-        val departureTime = returnFlight.startTime
-            .takeIf { it.isNotBlank() }
-            ?: returnFlight.details["departure_time"]
-                ?.substringAfterLast(" ")
-                ?.takeIf { it.isNotBlank() }
-            ?: return null
-
-        return parseTripTime(departureTime)?.format(TRIP_TIME_FORMATTER)
-    }
-
     private fun applyActivityWindow(
         events: List<TravelEvent>,
-        earliestDate: String,
-        minimumStartTime: String?,
-        latestDate: String,
-        maximumEndTime: String?
+        tripEdgeGuardrails: TripEdgeGuardrails
     ): List<TravelEvent> {
-        return filterEventsAfterTime(
-            deferSyntheticEvents(events, earliestDate, minimumStartTime),
-            latestDate,
-            maximumEndTime
-        )
-    }
-
-    private fun deferSyntheticEvents(
-        events: List<TravelEvent>,
-        targetDate: String,
-        minimumStartTime: String?
-    ): List<TravelEvent> {
-        val minTime = parseTripTime(minimumStartTime) ?: return events
-        return events.map { event ->
-            if (event.date != targetDate) return@map event
-
-            val start = parseTripTime(event.startTime) ?: return@map event
-            if (!start.isBefore(minTime)) return@map event
-
-            val end = parseTripTime(event.endTime)
-            val durationMinutes = if (end != null && end.isAfter(start)) {
-                Duration.between(start, end).toMinutes()
-            } else {
-                120L
-            }
-            event.copy(
-                startTime = minTime.format(TRIP_TIME_FORMATTER),
-                endTime = minTime.plusMinutes(durationMinutes).format(TRIP_TIME_FORMATTER)
-            )
-        }
-    }
-
-    private fun filterEventsBeforeTime(
-        events: List<TravelEvent>,
-        targetDate: String,
-        minimumStartTime: String?
-    ): List<TravelEvent> {
-        val minTime = parseTripTime(minimumStartTime) ?: return events
-        return events.filterNot { event ->
-            event.date == targetDate && (parseTripTime(event.startTime)?.isBefore(minTime) == true)
-        }
-    }
-
-    private fun filterEventsAfterTime(
-        events: List<TravelEvent>,
-        targetDate: String,
-        maximumEndTime: String?
-    ): List<TravelEvent> {
-        val maxTime = parseTripTime(maximumEndTime) ?: return events
-        return events.filterNot { event ->
-            if (event.date != targetDate) return@filterNot false
-
-            val start = parseTripTime(event.startTime)
-            val end = parseTripTime(event.endTime)
-            (start != null && !start.isBefore(maxTime)) ||
-                (end != null && end.isAfter(maxTime))
-        }
-    }
-
-    private fun parseTripTime(rawTime: String?): LocalTime? {
-        val value = rawTime?.takeIf { it.isNotBlank() } ?: return null
-        return runCatching { LocalTime.parse(value, TRIP_TIME_FORMATTER) }.getOrNull()
+        return TripEdgeScheduler.applyFlexibleEventWindow(events, tripEdgeGuardrails)
     }
 
     private fun sharedYelpPoolTarget(dayCount: Int): Int {
@@ -740,23 +623,7 @@ class NewTripViewModel(application: Application) : AndroidViewModel(application)
     }
 
     private suspend fun enrichFlightsWithHeroImages(flights: List<TravelEvent>): List<TravelEvent> {
-        if (flights.isEmpty()) return flights
-        return flights.map { event ->
-            if (!event.type.equals("flight", ignoreCase = true)) return@map event
-            val destinationCity = event.details[ATTR_DESTINATION_CITY]
-                ?.takeIf { it.isNotBlank() }
-                .orEmpty()
-            val airlineIata = FlightHeroImageRepository.extractAirlineIata(event.details["flight_number"])
-            val resolved = flightHeroImages.resolveFlightHero(destinationCity, airlineIata)
-                ?: return@map event
-            event.copy(
-                imageUrl = resolved.imageUrl,
-                details = event.details + buildMap {
-                    put(ATTR_HERO_IMAGE_URL, resolved.imageUrl)
-                    resolved.attribution?.let { put(ATTR_HERO_IMAGE_ATTRIBUTION, it) }
-                }
-            )
-        }
+        return enrichFlightHeroImages(flights, flightHeroImages)
     }
 
     private fun inferTravelerCounts(intakeProfile: AiTripIntakeProfile): Pair<Int, Int> {

@@ -245,16 +245,7 @@ data class AiTripIntakeTurnResult(
         }
 
     val assistantMessage: String
-        get() = buildList {
-            add(ackKey.displayText())
-            when (effectiveQuestionKind) {
-                AiTripIntakeQuestionKind.CARDS -> {
-                    questionTitle.takeIf { it.isNotBlank() }?.let(::add)
-                }
-
-                AiTripIntakeQuestionKind.NONE -> Unit
-            }
-        }.joinToString(" ").trim()
+        get() = ackKey.displayText()
 
     val planningObjective: String
         get() = when (nextAction) {

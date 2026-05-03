@@ -128,7 +128,7 @@ class AiTripIntakeSchemaTest {
     }
 
     @Test
-    fun assistantMessage_includesCardQuestionTitleFromMinimalPayload() {
+    fun assistantMessage_returnsAckOnlyEvenWithCardPayload() {
         val result = AiTripIntakeTurnResult(
             ackKey = AiTripIntakeAckKey.UNDERSTOOD,
             nextAction = AiTripIntakeNextAction.ASK_MORE,
@@ -140,7 +140,7 @@ class AiTripIntakeSchemaTest {
             )
         )
 
-        assertEquals("Understood. What type of trip are you planning?", result.assistantMessage)
+        assertEquals("Understood.", result.assistantMessage)
     }
 
     @Test

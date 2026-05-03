@@ -1,4 +1,4 @@
-package com.example.travelcents.ui.main.current
+package com.example.travelcents.ui.main.current.overlays
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
@@ -41,8 +41,9 @@ import com.example.travelcents.data.trip.model.ATTR_TICKETMASTER_EVENT_ID
 import com.example.travelcents.data.trip.model.TravelEvent
 import com.example.travelcents.data.trip.model.YelpReview
 import com.example.travelcents.data.trip.model.detailValue
+import com.example.travelcents.ui.main.current.overlays.cards.ActivityActionRow
 import com.example.travelcents.ui.main.current.overlays.cards.ActivityHoursCard
-import com.example.travelcents.ui.main.current.overlays.cards.ActivitySummaryCard
+import com.example.travelcents.ui.main.current.overlays.cards.ActivityContactCard
 import com.example.travelcents.ui.main.current.overlays.cards.CardBackground
 import com.example.travelcents.ui.main.current.overlays.cards.CardCoral
 import com.example.travelcents.ui.main.current.overlays.cards.CardLavender
@@ -52,12 +53,12 @@ import com.example.travelcents.ui.main.current.overlays.cards.CardTextMuted
 import com.example.travelcents.ui.main.current.overlays.cards.CurrencyCostCard
 import com.example.travelcents.ui.main.current.overlays.cards.DetailActionRow
 import com.example.travelcents.ui.main.current.overlays.cards.EventSummaryCard
+import com.example.travelcents.ui.main.current.overlays.cards.FlightActionRow
 import com.example.travelcents.ui.main.current.overlays.cards.FlightBookingOffersCard
 import com.example.travelcents.ui.main.current.overlays.cards.FlightLegsCard
+import com.example.travelcents.ui.main.current.overlays.cards.FlightOverviewCard
 import com.example.travelcents.ui.main.current.overlays.cards.FlightPricingCard
-import com.example.travelcents.ui.main.current.overlays.cards.FlightRouteCard
 import com.example.travelcents.ui.main.current.overlays.cards.FlightStatusCard
-import com.example.travelcents.ui.main.current.overlays.cards.FlightTimingCard
 import com.example.travelcents.ui.main.current.overlays.cards.LoyaltyCard
 import com.example.travelcents.ui.main.current.overlays.cards.HotelAmenitiesCard
 import com.example.travelcents.ui.main.current.overlays.cards.HotelBookingCard
@@ -76,7 +77,6 @@ import com.example.travelcents.ui.main.current.overlays.cards.TransportCard
 import com.example.travelcents.ui.main.current.overlays.cards.WaitTimeCard
 import com.example.travelcents.ui.main.current.overlays.cards.WeatherCard
 import com.example.travelcents.ui.main.current.overlays.cards.TicketPricingCard
-import com.example.travelcents.ui.main.current.overlays.cards.VenueCard
 import com.example.travelcents.ui.main.current.overlays.cards.compactHostLabel
 import com.example.travelcents.ui.main.current.overlays.cards.eventDurationSummary
 import com.example.travelcents.ui.main.current.overlays.cards.eventLocationLabel
@@ -87,6 +87,7 @@ import com.example.travelcents.ui.main.current.overlays.cards.eventReviewCountLa
 import com.example.travelcents.ui.main.current.overlays.cards.eventTimeSummary
 import com.example.travelcents.ui.main.current.overlays.cards.googleMapsDirectionsUrl
 import com.example.travelcents.ui.main.current.overlays.cards.googleMapsSearchUrl
+import com.example.travelcents.ui.main.current.overlays.cards.toFlightSummaryModel
 import com.example.travelcents.ui.modules.TripPhotoGalleryDialog
 import com.example.travelcents.ui.modules.galleryPhotoModels
 import com.example.travelcents.ui.modules.hasStaticMapSource
@@ -200,7 +201,7 @@ fun CurrentTripEventDetailsDialog(
                                     )
                                 }
                                 DropdownMenuItem(
-                                    text = { Text("Delete plan", color = CardCoral) },
+                                    text = { Text("Delete event", color = CardCoral) },
                                     onClick = {
                                         menuExpanded = false
                                         onDelete()
@@ -227,11 +228,44 @@ fun CurrentTripEventDetailsDialog(
                         onOpenGallery = if (photos.isNotEmpty()) ({ showGallery = true }) else null
                     )
 
-                    DetailActionRow(
-                        type = event.type,
-                        onDirections = { uriHandler.openUri(directionsUrl) },
-                        onEdit = onEdit
-                    )
+                    if (event.type.lowercase() == "flight") {
+                        val summary = event.toFlightSummaryModel()
+                        FlightActionRow(
+                            event = event,
+                            onTrack = {
+                                val query = listOfNotNull(summary?.airlineName, summary?.flightNumber).joinToString(" ")
+                                if (query.isNotBlank()) {
+                                    uriHandler.openUri("https://www.google.com/search?q=$query")
+                                }
+                            },
+                            onBook = {
+                                val url = summary?.bookingUrl ?: officialUrl ?: run {
+                                    val airline = summary?.airlineName?.takeIf { it.isNotBlank() }
+                                    if (airline != null) {
+                                        "https://www.google.com/search?q=${airline}+official+site"
+                                    } else {
+                                        mapsUrl
+                                    }
+                                }
+                                uriHandler.openUri(url)
+                            }
+                        )
+                    } else if (event.type.lowercase() in setOf("activity", "tour", "event")) {
+                        ActivityActionRow(
+                            event = event,
+                            onBook = {
+                                val ticketsUrl = event.details["tickets_url"]?.takeIf { it.isNotBlank() }
+                                val url = ticketsUrl ?: officialUrl ?: mapsUrl
+                                uriHandler.openUri(url)
+                            }
+                        )
+                    } else {
+                        DetailActionRow(
+                            type = event.type,
+                            onDirections = { uriHandler.openUri(directionsUrl) },
+                            onEdit = onEdit
+                        )
+                    }
 
                     EventDetailCardStack(
                         event = event,
@@ -292,8 +326,7 @@ private fun EventDetailCardStack(
 
     when (event.type.lowercase()) {
         "flight" -> {
-            FlightTimingCard(event)
-            FlightRouteCard(event)
+            FlightOverviewCard(event)
             FlightStatusCard(event)
             FlightLegsCard(event)
             FlightPricingCard(event)
@@ -349,10 +382,39 @@ private fun EventDetailCardStack(
             WeatherCard(event)
             CurrencyCostCard(event)
         }
-        else -> {
-            ActivitySummaryCard(event)
+        "activity", "tour", "event" -> {
+            ActivityContactCard(
+                event = event,
+                websiteLabel = websiteLabel,
+                onOpenWebsite = officialUrl?.let { { uriHandler.openUri(it) } }
+            )
             ActivityHoursCard(event)
-            VenueCard(event)
+            TicketPricingCard(event)
+            if (officialUrl != null) {
+                com.example.travelcents.ui.main.current.overlays.cards.DetailLinkRow(
+                    label = if (isTicketmasterBacked) "Tickets" else "Source",
+                    value = if (isTicketmasterBacked) "Buy tickets" else websiteLabel,
+                    onClick = { uriHandler.openUri(officialUrl) }
+                )
+            }
+            if (showLocationCard) {
+                LocationMapCard(
+                    event = event,
+                    locationLabel = locationLabel,
+                    onOpenMaps = { uriHandler.openUri(mapsUrl) }
+                )
+            }
+            if (showActivityReviews) {
+                ReviewsCard(
+                    ratingLabel = ratingLabel,
+                    reviewCountLabel = reviewCountLabel,
+                    reviews = yelpReviews,
+                    reviewsLoading = reviewsLoading,
+                    onReadAll = reviewUrl?.let { { uriHandler.openUri(it) } }
+                )
+            }
+        }
+        else -> {
             TicketPricingCard(event)
             if (officialUrl != null) {
                 com.example.travelcents.ui.main.current.overlays.cards.DetailLinkRow(

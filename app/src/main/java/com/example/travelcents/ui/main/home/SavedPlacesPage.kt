@@ -49,7 +49,7 @@ import com.example.travelcents.data.trip.model.ATTR_BUSINESS_NAME
 import com.example.travelcents.data.trip.model.ATTR_CATEGORIES
 import com.example.travelcents.data.trip.model.ATTR_YELP_URL
 import com.example.travelcents.data.trip.model.TravelEvent
-import com.example.travelcents.ui.main.current.CurrentTripEventDetailsDialog
+import com.example.travelcents.ui.main.current.overlays.CurrentTripEventDetailsDialog
 import com.example.travelcents.ui.theme.DeepSea1
 import com.example.travelcents.ui.theme.DeepSea2
 import com.example.travelcents.ui.theme.DeepSea3
@@ -99,8 +99,8 @@ fun SavedPlacesPage(
                 tripDestination = place.area,
                 tripAdults = 1,
                 tripChildren = 0,
-                currentOptions = emptyList(),
-                yelpReviews = emptyList(),
+                currentOptions = emptyList<com.example.travelcents.data.trip.model.EventOption>(),
+                yelpReviews = emptyList<com.example.travelcents.data.trip.model.YelpReview>(),
                 reviewsLoading = false,
                 canEditTrip = false,
                 canShowAlternatives = false,

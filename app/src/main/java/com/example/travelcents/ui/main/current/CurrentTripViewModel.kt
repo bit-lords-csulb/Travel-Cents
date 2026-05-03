@@ -65,11 +65,15 @@ import com.example.travelcents.data.trip.model.detailValue
 import com.example.travelcents.data.trip.model.displayName
 import com.example.travelcents.data.trip.model.resolveTripName
 import com.example.travelcents.data.trip.remote.CurrencyPreviewRepository
+import com.example.travelcents.data.trip.remote.FlightHeroImageRepository
 import com.example.travelcents.data.trip.remote.PopularTimesRepository
 import com.example.travelcents.data.trip.remote.TransportRepository
 import com.example.travelcents.data.trip.remote.WalkScoreRepository
 import com.example.travelcents.data.trip.remote.WeatherRepository
 import com.example.travelcents.data.trip.remote.YelpRepository
+import com.example.travelcents.data.trip.remote.buildFlightHeroImageRepository
+import com.example.travelcents.data.trip.remote.enrichFlightHeroImages
+import com.example.travelcents.data.trip.remote.needsFlightHeroBackfill
 import com.example.travelcents.ui.main.shared.TripMediaDetailPipeline
 import com.example.travelcents.ui.modules.defaultPlanTimeZoneId
 import com.example.travelcents.ui.modules.normalizeDate
@@ -222,6 +226,8 @@ class CurrentTripViewModel(application: Application) : AndroidViewModel(applicat
     private val sharedYelpWindowBoost = mutableMapOf<String, Int>()
     private val mediaDetailPipeline = TripMediaDetailPipeline(application)
     private val currencyPreviewRepository = CurrencyPreviewRepository(application)
+    private val flightHeroImages: FlightHeroImageRepository by lazy { buildFlightHeroImageRepository() }
+    private val flightHeroBackfillInFlight = mutableSetOf<String>()
     private var liveEventDetailOverrides: Map<String, Map<String, String>> = emptyMap()
 
     private fun resetTripState(
@@ -257,6 +263,7 @@ class CurrentTripViewModel(application: Application) : AndroidViewModel(applicat
         _shareTargets.value = emptyList()
         _tripMembers.value = emptyList()
         liveEventDetailOverrides = emptyMap()
+        flightHeroBackfillInFlight.clear()
         _uiState.value = CurrentTripUiState(
             isLoading = isLoading,
             tripTitle = tripTitle,
@@ -286,6 +293,7 @@ class CurrentTripViewModel(application: Application) : AndroidViewModel(applicat
             tripLocalDataSource.observeTripEvents(tripKey).collect { events ->
                 localEventsSnapshot = sortPlanEvents(events)
                 publishCurrentEvents(localEventsSnapshot, _eventOptions.value)
+                backfillFlightHeroesIfNeeded(tripKey, localEventsSnapshot)
             }
         }
 
@@ -371,6 +379,7 @@ class CurrentTripViewModel(application: Application) : AndroidViewModel(applicat
             resolvedItinerary = effectiveItinerary,
             canManageTrip = canManageTrip
         )
+        backfillFlightHeroesIfNeeded(tripKey, localEventsSnapshot)
 
         if (canManageTrip && nextTripTitle != storedTripTitle.trim()) {
             viewModelScope.launch {
@@ -482,6 +491,52 @@ class CurrentTripViewModel(application: Application) : AndroidViewModel(applicat
             }
         }
         publishCurrentEvents(localEventsSnapshot, _eventOptions.value)
+    }
+
+    private fun backfillFlightHeroesIfNeeded(
+        tripKey: TripKey,
+        events: List<TravelEvent>
+    ) {
+        if (!_uiState.value.canEditTrip) return
+
+        val candidates = events.filter { event ->
+            event.type.equals("flight", ignoreCase = true) &&
+                event.eventId !in flightHeroBackfillInFlight &&
+                event.needsFlightHeroBackfill()
+        }
+        if (candidates.isEmpty()) return
+
+        val candidateIds = candidates.mapTo(mutableSetOf()) { it.eventId }
+        flightHeroBackfillInFlight.addAll(candidateIds)
+
+        viewModelScope.launch {
+            try {
+                val enrichedCandidates = enrichFlightHeroImages(candidates, flightHeroImages)
+                val changedById = enrichedCandidates
+                    .zip(candidates)
+                    .mapNotNull { (updated, original) ->
+                        updated.takeIf { it != original }?.let { it.eventId to it }
+                    }
+                    .toMap()
+                if (changedById.isEmpty()) return@launch
+
+                localEventsSnapshot = sortPlanEvents(
+                    localEventsSnapshot.map { event -> changedById[event.eventId] ?: event }
+                )
+                publishCurrentEvents(localEventsSnapshot, _eventOptions.value)
+                persistLocalTripSnapshot(events = localEventsSnapshot)
+
+                changedById.values.forEach { event ->
+                    runCatching {
+                        tripSyncRemoteDataSource.upsertEvent(tripKey = tripKey, event = event)
+                    }.onFailure { error ->
+                        Log.w("CurrentTripViewModel", "Failed to backfill flight hero image", error)
+                    }
+                }
+            } finally {
+                flightHeroBackfillInFlight.removeAll(candidateIds)
+            }
+        }
     }
 
     private fun alignEventOptionsWithSelectedState(

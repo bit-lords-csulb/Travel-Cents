@@ -20,10 +20,10 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImage
-import com.example.travelcents.data.trip.model.ATTR_AIRLINE_LOGO_URL
 import com.example.travelcents.data.trip.model.ATTR_BUSINESS_ADDRESS
 import com.example.travelcents.data.trip.model.TravelEvent
 import com.example.travelcents.data.trip.model.firstNonBlank
@@ -249,22 +249,31 @@ private fun HotelSummaryCard(
                     )
                 }
 
-                if (photoCount > 0) {
-                    Surface(
-                        color = CardBackground.copy(alpha = 0.62f),
-                        shape = RoundedCornerShape(999.dp),
+                if (photoCount > 1 && onOpenGallery != null) {
+                    PhotoGalleryButton(
+                        photoCount = photoCount,
+                        onClick = onOpenGallery,
                         modifier = Modifier
-                            .align(Alignment.BottomStart)
+                            .align(Alignment.TopEnd)
                             .padding(10.dp)
-                    ) {
-                        Text(
-                            text = "1/$photoCount",
-                            color = CardText,
-                            fontSize = 11.sp,
-                            fontWeight = FontWeight.Bold,
-                            modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp)
-                        )
-                    }
+                    )
+                }
+
+                Surface(
+                    color = CardBackground.copy(alpha = 0.62f),
+                    shape = RoundedCornerShape(999.dp),
+                    modifier = Modifier
+                        .align(Alignment.BottomStart)
+                        .padding(10.dp)
+                ) {
+                    Text(
+                        text = "HOTEL",
+                        color = CardLavender,
+                        fontSize = 9.sp,
+                        fontWeight = FontWeight.Bold,
+                        letterSpacing = 1.3.sp,
+                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp)
+                    )
                 }
             }
 
@@ -275,16 +284,18 @@ private fun HotelSummaryCard(
                 Text(
                     text = title,
                     color = CardText,
-                    fontSize = 28.sp,
-                    lineHeight = 32.sp,
+                    fontSize = 26.sp,
+                    lineHeight = 30.sp,
                     fontWeight = FontWeight.ExtraBold
                 )
                 subtitle?.let {
                     Text(
                         text = it,
                         color = CardTextMuted,
-                        fontSize = 13.sp,
-                        lineHeight = 18.sp
+                        fontSize = 12.sp,
+                        lineHeight = 16.sp,
+                        maxLines = 2,
+                        overflow = TextOverflow.Ellipsis
                     )
                 }
             }
@@ -300,24 +311,11 @@ private fun RestaurantSummaryVariant(
     title: String,
     onOpenGallery: (() -> Unit)?
 ) {
-    val dateLine = event.date.takeIf { it.isNotBlank() }
-        ?.let(::formatLongTripDateWithYear)
-    val timeRange = formatDisplayTimeRange(event.startTime, event.endTime)
-        .takeIf { it.isNotBlank() && it != "TIME TBD" }
-    val totalMinutes = run {
-        val start = parseFlexibleTime(event.startTime)
-        val end = parseFlexibleTime(event.endTime)
-        if (start != null && end != null && end.isAfter(start)) {
-            Duration.between(start, end).toMinutes()
-        } else 0L
-    }
-    val durationLabel = formatLongDuration(totalMinutes).takeIf { it.isNotBlank() }
-    val durationLine = when {
-        timeRange != null && durationLabel != null -> "$timeRange ($durationLabel)"
-        timeRange != null -> timeRange
-        durationLabel != null -> durationLabel
-        else -> null
-    }
+    val cuisine = event.details.firstNonBlank("cuisine", "category")
+        ?.takeIf { it.isNotBlank() }
+    val priceLevel = event.details["price_level"]?.takeIf { it.isNotBlank() }
+    val rating = event.details["rating"]?.takeIf { it.isNotBlank() }
+    val subtitle = listOfNotNull(cuisine, priceLevel, rating?.let { "★$it" }).joinToString(" • ")
 
     DetailCardFrame(accent = CardCoral) {
         Row(
@@ -357,26 +355,35 @@ private fun RestaurantSummaryVariant(
                     Box(
                         modifier = Modifier
                             .matchParentSize()
-                            .background(accentGradientForType(event.type))
+                            .background(accentGradientForType("restaurant"))
                     )
                 }
 
-                if (photoCount > 1) {
-                    Surface(
-                        color = CardBackground.copy(alpha = 0.62f),
-                        shape = RoundedCornerShape(999.dp),
+                if (photoCount > 1 && onOpenGallery != null) {
+                    PhotoGalleryButton(
+                        photoCount = photoCount,
+                        onClick = onOpenGallery,
                         modifier = Modifier
-                            .align(Alignment.BottomStart)
+                            .align(Alignment.TopEnd)
                             .padding(10.dp)
-                    ) {
-                        Text(
-                            text = "1/$photoCount",
-                            color = CardText,
-                            fontSize = 11.sp,
-                            fontWeight = FontWeight.Bold,
-                            modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp)
-                        )
-                    }
+                    )
+                }
+
+                Surface(
+                    color = CardBackground.copy(alpha = 0.62f),
+                    shape = RoundedCornerShape(999.dp),
+                    modifier = Modifier
+                        .align(Alignment.BottomStart)
+                        .padding(10.dp)
+                ) {
+                    Text(
+                        text = "RESTAURANT",
+                        color = CardCoral,
+                        fontSize = 9.sp,
+                        fontWeight = FontWeight.Bold,
+                        letterSpacing = 1.3.sp,
+                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp)
+                    )
                 }
             }
 
@@ -391,32 +398,15 @@ private fun RestaurantSummaryVariant(
                     lineHeight = 30.sp,
                     fontWeight = FontWeight.ExtraBold
                 )
-                dateLine?.let {
+                if (subtitle.isNotBlank()) {
                     Text(
-                        text = it,
-                        color = CardText,
-                        fontSize = 14.sp,
-                        fontWeight = FontWeight.SemiBold,
-                        lineHeight = 18.sp
+                        text = subtitle,
+                        color = CardTextMuted,
+                        fontSize = 12.sp,
+                        lineHeight = 16.sp,
+                        maxLines = 2,
+                        overflow = TextOverflow.Ellipsis
                     )
-                }
-                durationLine?.let {
-                    Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
-                        Text(
-                            text = "DURATION",
-                            color = CardTextMuted,
-                            fontSize = 10.sp,
-                            fontWeight = FontWeight.Bold,
-                            letterSpacing = 1.2.sp
-                        )
-                        Text(
-                            text = it,
-                            color = CardCoral,
-                            fontSize = 13.sp,
-                            fontWeight = FontWeight.SemiBold,
-                            lineHeight = 17.sp
-                        )
-                    }
                 }
             }
         }
@@ -433,8 +423,7 @@ private fun FlightSummaryVariant(
     durationSummary: String,
     onOpenGallery: (() -> Unit)?
 ) {
-    val airlineLogo = event.details.firstNonBlank(ATTR_AIRLINE_LOGO_URL, "airline_logo")
-        ?.takeIf { it.isNotBlank() }
+    val summary = event.toFlightSummaryModel()
 
     DetailCardFrame(accent = CardSky) {
         Row(
@@ -442,102 +431,44 @@ private fun FlightSummaryVariant(
             horizontalArrangement = Arrangement.spacedBy(16.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            Box(
+            FlightHeroMedia(
+                heroImage = heroImage,
+                title = title,
+                airlineLogoUrl = summary?.airlineLogoUrl,
+                photoCount = photoCount,
+                onOpenGallery = onOpenGallery,
                 modifier = Modifier
                     .weight(0.42f)
-                    .aspectRatio(0.92f)
-                    .clip(RoundedCornerShape(24.dp))
-                    .background(CardSurfaceHighest)
-                    .then(if (onOpenGallery != null) Modifier.clickable(onClick = onOpenGallery) else Modifier)
-            ) {
-                if (!heroImage.isNullOrBlank()) {
-                    AsyncImage(
-                        model = heroImage,
-                        contentDescription = title,
-                        modifier = Modifier.matchParentSize(),
-                        contentScale = ContentScale.Crop
-                    )
-                    Box(
-                        modifier = Modifier
-                            .matchParentSize()
-                            .background(
-                                Brush.verticalGradient(
-                                    colors = listOf(
-                                        androidx.compose.ui.graphics.Color.Transparent,
-                                        CardBackground.copy(alpha = 0.18f),
-                                        CardBackground.copy(alpha = 0.72f)
-                                    )
-                                )
-                            )
-                    )
-                } else {
-                    Box(
-                        modifier = Modifier
-                            .matchParentSize()
-                            .background(accentGradientForType(event.type))
-                    )
-                }
-
-                if (photoCount > 1 && onOpenGallery != null) {
-                    PhotoGalleryButton(
-                        photoCount = photoCount,
-                        onClick = onOpenGallery,
-                        modifier = Modifier
-                            .align(Alignment.TopEnd)
-                            .padding(10.dp)
-                    )
-                }
-
-                if (airlineLogo != null) {
-                    Surface(
-                        color = androidx.compose.ui.graphics.Color.White,
-                        shape = RoundedCornerShape(999.dp),
-                        modifier = Modifier
-                            .align(Alignment.BottomStart)
-                            .padding(10.dp)
-                            .size(36.dp)
-                    ) {
-                        AsyncImage(
-                            model = airlineLogo,
-                            contentDescription = null,
-                            modifier = Modifier
-                                .padding(6.dp),
-                            contentScale = ContentScale.Fit
-                        )
-                    }
-                } else {
-                    Surface(
-                        color = CardBackground.copy(alpha = 0.62f),
-                        shape = RoundedCornerShape(999.dp),
-                        modifier = Modifier
-                            .align(Alignment.BottomStart)
-                            .padding(10.dp)
-                    ) {
-                        Text(
-                            text = event.type.uppercase(Locale.US),
-                            color = CardSky,
-                            fontSize = 9.sp,
-                            fontWeight = FontWeight.Bold,
-                            letterSpacing = 1.3.sp,
-                            modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp)
-                        )
-                    }
-                }
-            }
+                    .aspectRatio(0.92f),
+                shape = RoundedCornerShape(24.dp)
+            )
 
             Column(
                 modifier = Modifier.weight(0.58f),
-                verticalArrangement = Arrangement.spacedBy(8.dp)
+                verticalArrangement = Arrangement.spacedBy(10.dp)
             ) {
                 Text(
                     text = title,
                     color = CardText,
-                    fontSize = 24.sp,
-                    lineHeight = 28.sp,
+                    fontSize = 26.sp,
+                    lineHeight = 30.sp,
                     fontWeight = FontWeight.ExtraBold
                 )
+                
+                if (summary != null) {
+                    Text(
+                        text = "${summary.originCode} \u2192 ${summary.destinationCode}",
+                        color = CardSky,
+                        fontSize = 15.sp,
+                        fontWeight = FontWeight.Bold
+                    )
+                }
+
                 DetailBadgeRow(
-                    badges = listOf(timeSummary, durationSummary),
+                    badges = listOfNotNull(
+                        timeSummary.takeIf { it.isNotBlank() },
+                        durationSummary.takeIf { it.isNotBlank() }
+                    ),
                     accent = CardSky
                 )
             }
