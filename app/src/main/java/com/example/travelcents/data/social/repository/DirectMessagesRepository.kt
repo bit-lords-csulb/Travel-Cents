@@ -4,6 +4,7 @@ import android.util.Log
 import com.example.travelcents.data.social.model.DirectChatPreview
 import com.example.travelcents.data.social.model.Message
 import com.google.firebase.Timestamp
+import com.google.firebase.firestore.DocumentSnapshot
 import com.google.firebase.firestore.FieldPath
 import com.google.firebase.firestore.FieldValue
 import com.google.firebase.firestore.FirebaseFirestore
@@ -136,6 +137,7 @@ class DirectMessagesRepository(
             "text" to text,
             "senderId" to senderId,
             "senderName" to senderName,
+            "messageType" to "text",
             "timestamp" to FieldValue.serverTimestamp()
         )
         val chatRef = db.collection("directChats").document(chatId)
@@ -145,7 +147,9 @@ class DirectMessagesRepository(
                 chatRef,
                 mapOf(
                     "lastMessage" to text,
-                    "lastMessageTime" to FieldValue.serverTimestamp()
+                    "lastMessageTime" to FieldValue.serverTimestamp(),
+                    "lastSenderId" to senderId,
+                    "lastSenderName" to senderName
                 )
             )
         }
@@ -174,5 +178,9 @@ class DirectMessagesRepository(
                     }
                     .addOnFailureListener { onComplete() }
             }
+    }
+
+    private fun DocumentSnapshot.displayName(): String {
+        return getString("name") ?: getString("displayName") ?: "Unknown User"
     }
 }

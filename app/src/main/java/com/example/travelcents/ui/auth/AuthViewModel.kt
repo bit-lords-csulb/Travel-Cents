@@ -236,5 +236,3 @@ class AuthViewModel : ViewModel() {
         else -> error.message ?: "Google login failed. Please try again."
     }
 }
-
-

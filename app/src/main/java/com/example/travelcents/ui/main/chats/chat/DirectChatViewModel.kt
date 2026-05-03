@@ -30,6 +30,7 @@ class DirectChatViewModel(
 
     private val _currentName  = MutableStateFlow("")
     private val _chatId       = MutableStateFlow("")
+    val chatId: StateFlow<String> = _chatId.asStateFlow()
 
     private var messagesListener: ListenerRegistration? = null
 

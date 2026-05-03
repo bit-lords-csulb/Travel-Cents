@@ -63,10 +63,13 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import coil.compose.AsyncImage
 import coil.request.ImageRequest
 import com.example.travelcents.BuildConfig
+import com.example.travelcents.MainActivity
 import com.example.travelcents.data.social.model.BookmarkedPlace
 import com.example.travelcents.data.trip.TripKey
 import com.example.travelcents.data.trip.TripPerformanceLogger
 import com.example.travelcents.data.trip.model.Itinerary
+import com.example.travelcents.notification.ChatNotificationTarget
+import com.example.travelcents.notification.NotificationHelper
 import com.example.travelcents.ui.components.ProfileAvatar
 import com.example.travelcents.ui.theme.DeepSea1
 import com.example.travelcents.ui.theme.DeepSea2
@@ -80,6 +83,7 @@ import java.time.temporal.ChronoUnit
 private val Primary = Color(0xFF64B5F6)
 private val PrimaryDim = Color(0xFF54A7E7)
 private val SurfaceBright = Color(0xFF243447)
+private const val TEST_GROUP_CHAT_ID = "EL4UgmxgFgVPLwkxudK4"
 
 // ─────────────────────────────────────────────────────────────
 // Entry point
@@ -164,6 +168,8 @@ private fun HomeHeader(
     isProfileLoading: Boolean,
     onProfileClick: () -> Unit
 ) {
+    val context = LocalContext.current
+
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -204,7 +210,29 @@ private fun HomeHeader(
             modifier = Modifier
                 .size(40.dp)
                 .clip(CircleShape)
-                .clickable { },
+                .clickable {
+                    if (TEST_GROUP_CHAT_ID.isBlank()) {
+                        Log.w("HomePage", "Test notification group ID is blank")
+                        return@clickable
+                    }
+
+                    val hasNotificationPermission =
+                        (context as? MainActivity)?.requestNotificationPermissionIfNeeded() ?: true
+
+                    if (!hasNotificationPermission) {
+                        Log.w("HomePage", "Notification permission missing; requested permission before posting test notification")
+                        return@clickable
+                    }
+
+                    NotificationHelper.getInstance().showChatNotification(
+                        target = ChatNotificationTarget(
+                            chatType = ChatNotificationTarget.TYPE_GROUP,
+                            chatId = TEST_GROUP_CHAT_ID
+                        ),
+                        title = "Test group notification",
+                        body = "Tap to open this group chat."
+                    )
+                },
             contentAlignment = Alignment.Center
         ) {
             Icon(
@@ -844,4 +872,3 @@ private fun DocumentsWidget() {
 private const val WIKIMEDIA_CONTACT_URL = "https://github.com/bit-lords-csulb/Travel-Cents"
 private val WIKIMEDIA_IMAGE_USER_AGENT =
     "TravelCents/${BuildConfig.VERSION_NAME} (Android app; $WIKIMEDIA_CONTACT_URL)"
-

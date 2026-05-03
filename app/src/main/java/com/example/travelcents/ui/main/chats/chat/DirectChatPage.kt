@@ -60,12 +60,20 @@ fun DirectChatPage(
         key = friend.uid,
         factory = DirectChatViewModel.Factory(friend)
     ),
-    onTripCardClick: ((tripId: String, ownerUid: String) -> Unit)? = null
+    onTripCardClick: ((tripId: String, ownerUid: String) -> Unit)? = null,
+    onChatResolved: (String) -> Unit = {}
 ) {
     val messages     by viewModel.messages.collectAsState()
     val messageText  by viewModel.messageText.collectAsState()
+    val chatId       by viewModel.chatId.collectAsState()
     val currentUid    = viewModel.currentUid
     val listState     = rememberLazyListState()
+
+    LaunchedEffect(chatId) {
+        if (chatId.isNotBlank()) {
+            onChatResolved(chatId)
+        }
+    }
 
     LaunchedEffect(messages.size) {
         if (messages.isNotEmpty()) listState.animateScrollToItem(messages.size - 1)
@@ -190,4 +198,3 @@ fun DirectChatPage(
         }
     }
 }
-
