@@ -61,6 +61,9 @@ CITY_ALIASES = {
 
 MATCH_SCORE_THRESHOLD = 0.5
 PINECONE_OPTION_COUNT = 6
+PINECONE_INDEX_NAME = "travel-cents-inventory"
+HF_EMBEDDING_URL = "https://router.huggingface.co/hf-inference/models/BAAI/bge-base-en-v1.5/pipeline/feature-extraction"
+ADVISORY_MATCH_SCORE_THRESHOLD = 0.35
 VIATOR_PRODUCT_DETAIL_URL = "https://api.viator.com/partner/products/{product_code}"
 
 
@@ -206,14 +209,89 @@ def match_to_activity_option(match):
     }
 
 
-@https_fn.on_call()
-def generate_itinerary(req: https_fn.CallableRequest):
-    # 1. Extract all the travel details sent from the Android app's TravelRequest model
+def callable_payload(req):
     req_data = req.data or {}
     if not isinstance(req_data, dict):
         req_data = {"destination": str(req_data)}
     if isinstance(req_data.get("data"), dict):
         req_data = req_data["data"]
+    return req_data
+
+
+def coerce_embedding_vector(value):
+    if not isinstance(value, list) or not value:
+        return value
+    if all(isinstance(item, (int, float)) for item in value):
+        return value
+    rows = [row for row in value if isinstance(row, list) and row]
+    if not rows:
+        return value
+    width = len(rows[0])
+    if width == 0:
+        return value
+    averaged = []
+    for index in range(width):
+        column = [row[index] for row in rows if len(row) > index and isinstance(row[index], (int, float))]
+        averaged.append(sum(column) / len(column) if column else 0.0)
+    return averaged
+
+
+def metadata_text(metadata, *keys):
+    for key in keys:
+        value = metadata.get(key)
+        if isinstance(value, list):
+            value = ", ".join(str(item) for item in value if item is not None)
+        if value is not None and str(value).strip():
+            return str(value).strip()
+    return ""
+
+
+def advisory_alternative_query(req_data, target_city):
+    explicit_query = req_data.get("query")
+    if explicit_query:
+        return str(explicit_query)
+
+    title = req_data.get("currentActivityTitle", "")
+    description = req_data.get("currentActivityDescription", "")
+    reason = str(req_data.get("reason", "")).lower()
+    if "rain" in reason:
+        activity_type = "indoor rainy day activity"
+    elif "heat" in reason:
+        activity_type = "air-conditioned indoor activity"
+    elif "wind" in reason:
+        activity_type = "indoor activity"
+    else:
+        activity_type = "nearby indoor activity"
+    return f"{activity_type} in {target_city} alternative to {title}: {description}"
+
+
+def match_to_advisory_alternative(match, reason):
+    metadata = match_field(match, "metadata", {}) or {}
+    title = metadata_text(metadata, "title", "name", "activity_name")
+    description = metadata_text(metadata, "description", "summary", "categories", "category")
+    address = metadata_text(metadata, "address", "formatted_address", "location")
+    fallback_environment = "indoor" if "rain" in str(reason).lower() else "mixed"
+    return {
+        "source_id": str(match_field(match, "id", "")),
+        "score": match_field(match, "score", 0.0),
+        "title": title,
+        "description": description,
+        "booking_url": metadata_text(metadata, "booking_url", "url", "website"),
+        "address": address,
+        "city": metadata_text(metadata, "city"),
+        "price_tier": metadata_text(metadata, "price_tier", "price", "price_level"),
+        "latitude": metadata_text(metadata, "latitude", "lat"),
+        "longitude": metadata_text(metadata, "longitude", "lng", "lon", "longitude"),
+        "activity_environment": metadata_text(metadata, "activity_environment", "environment") or fallback_environment,
+        "weather_sensitivity": metadata_text(metadata, "weather_sensitivity") or "none",
+        "environment_confidence": metadata_text(metadata, "environment_confidence") or "medium",
+    }
+
+
+@https_fn.on_call()
+def generate_itinerary(req: https_fn.CallableRequest):
+    # 1. Extract all the travel details sent from the Android app's TravelRequest model
+    req_data = callable_payload(req)
 
     destination = req_data.get("destination") or req_data.get("city") or "London"
     target_city = resolve_inventory_city(destination)
@@ -310,7 +388,7 @@ def generate_itinerary(req: https_fn.CallableRequest):
 
     # 4. Setup Pinecone
     pc = Pinecone(api_key=pinecone_key)
-    index = pc.Index("travel-cents-inventory")
+    index = pc.Index(PINECONE_INDEX_NAME)
 
     final_itinerary = []
 
@@ -325,15 +403,14 @@ def generate_itinerary(req: https_fn.CallableRequest):
         # Hybrid search query
         search_query = f"{activity_title}: {activity_desc}"
 
-        hf_api_url = "https://router.huggingface.co/hf-inference/models/BAAI/bge-base-en-v1.5/pipeline/feature-extraction"
         headers = {"Authorization": f"Bearer {hf_token}"}
         hf_payload = {"inputs": search_query}
 
         try:
-            hf_response = requests.post(hf_api_url, headers=headers, json=hf_payload)
+            hf_response = requests.post(HF_EMBEDDING_URL, headers=headers, json=hf_payload)
 
             if hf_response.status_code == 200:
-                vector = hf_response.json()
+                vector = coerce_embedding_vector(hf_response.json())
 
                 # Query Pinecone with the cleaned target_city
                 search_result = index.query(
@@ -395,3 +472,64 @@ def generate_itinerary(req: https_fn.CallableRequest):
 
     print("--- ✅ MATCHMAKING COMPLETE ---", flush=True)
     return {"itinerary": final_itinerary}
+
+
+@https_fn.on_call()
+def search_activity_alternatives(req: https_fn.CallableRequest):
+    req_data = callable_payload(req)
+    destination = req_data.get("destination") or req_data.get("city") or "London"
+    target_city = resolve_inventory_city(destination)
+    reason = req_data.get("reason", "")
+    limit = req_data.get("limit", 9)
+    try:
+        limit = max(1, min(int(limit), 12))
+    except (TypeError, ValueError):
+        limit = 9
+
+    hf_token = os.getenv("HF_TOKEN")
+    pinecone_key = os.getenv("PINECONE_API_KEY")
+    if not hf_token or not pinecone_key:
+        print("Activity alternatives unavailable: missing HF_TOKEN or PINECONE_API_KEY.", flush=True)
+        return {"alternatives": []}
+
+    query = advisory_alternative_query(req_data, target_city)
+    current_title_key = normalize_city_key(req_data.get("currentActivityTitle", ""))
+    headers = {"Authorization": f"Bearer {hf_token}"}
+
+    try:
+        hf_response = requests.post(HF_EMBEDDING_URL, headers=headers, json={"inputs": query})
+        if hf_response.status_code != 200:
+            print(f"Activity alternatives embedding failed: {hf_response.status_code}", flush=True)
+            return {"alternatives": []}
+
+        vector = coerce_embedding_vector(hf_response.json())
+        pc = Pinecone(api_key=pinecone_key)
+        index = pc.Index(PINECONE_INDEX_NAME)
+        search_result = index.query(
+            vector=vector,
+            top_k=max(limit * 4, 12),
+            include_metadata=True,
+            filter={"city": {"$eq": target_city}}
+        )
+
+        matches = search_result.get("matches", []) if hasattr(search_result, "get") else search_result["matches"]
+        alternatives = []
+        seen_titles = set()
+        for match in matches:
+            score = float(match_field(match, "score", 0.0) or 0.0)
+            if score < ADVISORY_MATCH_SCORE_THRESHOLD:
+                continue
+            alternative = match_to_advisory_alternative(match, reason)
+            title_key = normalize_city_key(alternative.get("title", ""))
+            if not title_key or title_key == current_title_key or title_key in seen_titles:
+                continue
+            seen_titles.add(title_key)
+            alternatives.append(alternative)
+            if len(alternatives) >= limit:
+                break
+
+        print(f"Found {len(alternatives)} advisory alternatives for {target_city}.", flush=True)
+        return {"alternatives": alternatives}
+    except Exception as e:
+        print(f"Activity alternatives search failed: {e}", flush=True)
+        return {"alternatives": []}

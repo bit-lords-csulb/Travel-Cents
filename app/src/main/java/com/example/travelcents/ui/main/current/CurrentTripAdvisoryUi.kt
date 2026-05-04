@@ -277,22 +277,31 @@ fun TripAdvisoryReviewSheet(
                 fontWeight = FontWeight.Bold
             )
             Spacer(modifier = Modifier.height(8.dp))
-            advisory.suggestedOptions.forEachIndexed { index, option ->
-                AdvisoryOptionRow(
-                    option = option,
-                    accent = accent,
-                    canEditTrip = canEditTrip,
-                    onReplace = {
-                        onReplaceOption(option.optionId)
-                        onDismiss()
-                    },
-                    onSave = {
-                        onSaveOption(option.optionId)
-                        onDismiss()
-                    }
+            if (advisory.suggestedOptions.isEmpty()) {
+                Text(
+                    text = "No live inventory alternatives found yet.",
+                    color = DeepSea4,
+                    fontSize = 12.sp,
+                    lineHeight = 16.sp
                 )
-                if (index != advisory.suggestedOptions.lastIndex) {
-                    HorizontalDivider(color = DeepSea3.copy(alpha = 0.3f))
+            } else {
+                advisory.suggestedOptions.forEachIndexed { index, option ->
+                    AdvisoryOptionRow(
+                        option = option,
+                        accent = accent,
+                        canEditTrip = canEditTrip,
+                        onReplace = {
+                            onReplaceOption(option.optionId)
+                            onDismiss()
+                        },
+                        onSave = {
+                            onSaveOption(option.optionId)
+                            onDismiss()
+                        }
+                    )
+                    if (index != advisory.suggestedOptions.lastIndex) {
+                        HorizontalDivider(color = DeepSea3.copy(alpha = 0.3f))
+                    }
                 }
             }
             Spacer(modifier = Modifier.height(12.dp))

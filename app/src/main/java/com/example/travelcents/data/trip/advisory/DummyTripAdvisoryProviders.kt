@@ -157,6 +157,54 @@ class DummyTripAlternativeProvider : TripAlternativeProvider {
                     description = "An indoor backup that keeps the wildlife theme without the rain exposure.",
                     address = "Waterfront, $destination",
                     priceTier = "\$\$"
+                ),
+                AlternativeTemplate(
+                    title = "Wildlife Photography Exhibit",
+                    description = "A covered exhibit that keeps the animal theme while staying dry.",
+                    address = "Civic Gallery, $destination",
+                    priceTier = "\$"
+                ),
+                AlternativeTemplate(
+                    title = "Indoor Botanical Conservatory",
+                    description = "A greenhouse-style stop with nature views protected from the weather.",
+                    address = "Garden Quarter, $destination",
+                    priceTier = "\$\$"
+                ),
+                AlternativeTemplate(
+                    title = "Local Cooking Workshop",
+                    description = "A hands-on indoor activity that works well during a rain window.",
+                    address = "Culinary Studio, $destination",
+                    priceTier = "\$\$"
+                ),
+                AlternativeTemplate(
+                    title = "Science Center Visit",
+                    description = "A covered backup with interactive exhibits and flexible timing.",
+                    address = "Innovation District, $destination",
+                    priceTier = "\$"
+                ),
+                AlternativeTemplate(
+                    title = "Historic House Tour",
+                    description = "An indoor cultural stop with guided rooms and local history.",
+                    address = "Old Town, $destination",
+                    priceTier = "\$\$"
+                ),
+                AlternativeTemplate(
+                    title = "Craft Market Workshop",
+                    description = "A covered market activity with local makers and short-format demos.",
+                    address = "Artisan Hall, $destination",
+                    priceTier = "\$"
+                ),
+                AlternativeTemplate(
+                    title = "Immersive Theater Show",
+                    description = "A scheduled indoor experience that can replace an outdoor block cleanly.",
+                    address = "Theater District, $destination",
+                    priceTier = "\$\$\$"
+                ),
+                AlternativeTemplate(
+                    title = "Tea House Tasting",
+                    description = "A calm indoor tasting stop that leaves room for the rest of the itinerary.",
+                    address = "Central Arcade, $destination",
+                    priceTier = "\$"
                 )
             )
             AdvisoryReason.EXTREME_HEAT -> listOf(

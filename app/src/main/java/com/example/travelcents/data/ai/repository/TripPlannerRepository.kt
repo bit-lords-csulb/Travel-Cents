@@ -8,6 +8,7 @@ import com.example.travelcents.data.trip.advisory.ActivityEnvironmentClassifier
 import com.example.travelcents.data.trip.advisory.ActivityEnvironmentMetadata
 import com.example.travelcents.data.trip.local.DestinationTimeZones
 import com.example.travelcents.data.trip.model.ATTR_ACTIVITY_ENVIRONMENT
+import com.example.travelcents.data.trip.model.ATTR_ADVISORY_REASON
 import com.example.travelcents.data.trip.model.ATTR_AVERAGE_RATING
 import com.example.travelcents.data.trip.model.ATTR_BOOKING_URL
 import com.example.travelcents.data.trip.model.ATTR_BUSINESS_ADDRESS
@@ -40,6 +41,7 @@ import retrofit2.Retrofit
 import retrofit2.converter.gson.GsonConverterFactory
 import retrofit2.http.Body
 import retrofit2.http.POST
+import java.util.Locale
 import java.util.UUID
 import java.util.concurrent.TimeUnit
 
@@ -125,9 +127,41 @@ data class EmulatorActivityOption(
     val score: Double? = null
 )
 
+data class ActivityAlternativeSearchRequest(
+    val destination: String,
+    val currentActivityTitle: String,
+    val currentActivityDescription: String,
+    val reason: String,
+    val query: String,
+    val limit: Int = 9
+)
+
+data class ActivityAlternativesResponse(val result: ActivityAlternativesResult = ActivityAlternativesResult())
+
+data class ActivityAlternativesResult(val alternatives: List<EmulatorActivityAlternative> = emptyList())
+
+data class EmulatorActivityAlternative(
+    val source_id: String? = null,
+    val score: Double? = null,
+    val title: String = "",
+    val description: String = "",
+    val booking_url: String? = null,
+    val address: String? = null,
+    val city: String? = null,
+    val price_tier: String? = null,
+    val latitude: String? = null,
+    val longitude: String? = null,
+    val activity_environment: String? = null,
+    val weather_sensitivity: String? = null,
+    val environment_confidence: String? = null
+)
+
 interface EmulatorApiService {
     @POST("travel-cents-3e2d9/us-central1/generate_itinerary")
     suspend fun getLocalItinerary(@Body request: EmulatorRequest): EmulatorResponse
+
+    @POST("travel-cents-3e2d9/us-central1/search_activity_alternatives")
+    suspend fun searchActivityAlternatives(@Body request: EmulatorRequest): ActivityAlternativesResponse
 }
 
 object TripPlannerRepository {
@@ -251,6 +285,30 @@ object TripPlannerRepository {
                 bookingUrl = activity.booking_url,
                 details = normalizedDetails,
                 options = eventOptions
+            )
+        }
+    }
+
+    suspend fun getActivityAlternatives(searchRequest: ActivityAlternativeSearchRequest): List<EventOption> {
+        if (searchRequest.destination.isBlank() || searchRequest.query.isBlank()) return emptyList()
+
+        val payload: Map<String, Any> = buildMap {
+            put("destination", searchRequest.destination)
+            put("currentActivityTitle", searchRequest.currentActivityTitle)
+            put("currentActivityDescription", searchRequest.currentActivityDescription)
+            put("reason", searchRequest.reason)
+            put("query", searchRequest.query)
+            put("limit", searchRequest.limit)
+        }
+
+        val response = emulatorApi.searchActivityAlternatives(
+            EmulatorRequest(data = payload)
+        )
+
+        return response.result.alternatives.mapIndexedNotNull { index, alternative ->
+            alternative.toAdvisoryOption(
+                reason = searchRequest.reason,
+                index = index
             )
         }
     }
@@ -773,6 +831,78 @@ object TripPlannerRepository {
         } else {
             toString()
         }
+    }
+
+    private fun EmulatorActivityAlternative.toAdvisoryOption(
+        reason: String,
+        index: Int
+    ): EventOption? {
+        val title = realTitle()
+        if (title.isBlank()) return null
+
+        return EventOption(
+            optionId = advisoryOptionId(title, source_id, reason, index),
+            source = "pinecone_advisory",
+            selected = false,
+            details = buildMap {
+                put("title", title)
+                put("activity_name", title)
+                put(ATTR_BUSINESS_NAME, title)
+                if (description.isNotBlank()) put("description", description)
+                booking_url?.takeIf { it.isNotBlank() }?.let { url ->
+                    put("booking_url", url)
+                    put(ATTR_BOOKING_URL, url)
+                }
+                address?.takeIf { it.isNotBlank() }?.let { value ->
+                    put("address", value)
+                    put(ATTR_BUSINESS_ADDRESS, value)
+                }
+                city?.takeIf { it.isNotBlank() }?.let { put("city", it) }
+                price_tier?.takeIf { it.isNotBlank() }?.let { put(ATTR_PRICE_TIER, it) }
+                latitude?.takeIf { it.isNotBlank() }?.let { put(ATTR_LATITUDE, it) }
+                longitude?.takeIf { it.isNotBlank() }?.let { put(ATTR_LONGITUDE, it) }
+                put("isNativeBookable", booking_url?.isNotBlank()?.toString() ?: "false")
+                put("source", "pinecone")
+                put(ATTR_ADVISORY_REASON, reason)
+                putAll(
+                    activityEnvironmentDetails(
+                        title = title,
+                        description = description,
+                        detailMaps = emptyList(),
+                        activityEnvironment = activity_environment,
+                        weatherSensitivity = weather_sensitivity,
+                        environmentConfidence = environment_confidence
+                    )
+                )
+                score?.let { put("pinecone_score", it.toString()) }
+                source_id?.takeIf { it.isNotBlank() }?.let { put("pinecone_id", it) }
+            }
+        )
+    }
+
+    private fun EmulatorActivityAlternative.realTitle(): String {
+        return title.ifBlank { source_id.orEmpty() }
+    }
+
+    private fun advisoryOptionId(
+        title: String,
+        sourceId: String?,
+        reason: String,
+        index: Int
+    ): String {
+        val base = sourceId?.takeIf { it.isNotBlank() } ?: title
+        val token = base
+            .lowercase(Locale.US)
+            .replace(Regex("[^a-z0-9]+"), "_")
+            .trim('_')
+            .take(48)
+            .ifBlank { "match_$index" }
+        val reasonToken = reason
+            .lowercase(Locale.US)
+            .replace(Regex("[^a-z0-9]+"), "_")
+            .trim('_')
+            .ifBlank { "advisory" }
+        return "pinecone_advisory_${reasonToken}_$token"
     }
 
     private fun buildItineraryPrompt(request: TravelRequest): String {

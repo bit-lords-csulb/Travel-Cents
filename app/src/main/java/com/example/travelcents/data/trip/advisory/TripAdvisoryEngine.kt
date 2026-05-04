@@ -5,6 +5,7 @@ import com.example.travelcents.data.trip.model.EventOption
 import com.example.travelcents.data.trip.model.Itinerary
 import com.example.travelcents.data.trip.model.TravelEvent
 import com.example.travelcents.data.trip.model.displayName
+import java.util.Locale
 
 class TripAdvisoryEngine(
     private val weatherProvider: TripWeatherContextProvider,
@@ -12,10 +13,15 @@ class TripAdvisoryEngine(
     private val alternativeProvider: TripAlternativeProvider,
     private val nowEpochMs: () -> Long = { System.currentTimeMillis() }
 ) {
+    private companion object {
+        const val MAX_SUGGESTIONS_PER_ADVISORY = 3
+    }
+
     suspend fun evaluate(
         trip: Itinerary,
         events: List<TravelEvent>,
-        optionsByEvent: Map<String, List<EventOption>>
+        optionsByEvent: Map<String, List<EventOption>>,
+        excludedSuggestionNames: Set<String> = emptySet()
     ): List<TripAdvisory> {
         if (events.isEmpty()) return emptyList()
 
@@ -27,6 +33,10 @@ class TripAdvisoryEngine(
             )
         )
 
+        val selectedChoiceNames = selectedChoiceNames(sortedEvents, optionsByEvent) +
+            excludedSuggestionNames.mapNotNull { it.normalizeSuggestionName() }
+        val usedSuggestionNames = selectedChoiceNames.toMutableSet()
+
         return buildList {
             sortedEvents.forEachIndexed { index, event ->
                 val previousEvent = sortedEvents
@@ -36,14 +46,81 @@ class TripAdvisoryEngine(
                 val weather = weatherProvider.weatherFor(event, trip)
                 val transport = transportProvider.transportFor(event, previousEvent, trip)
 
-                if (weather != null) {
-                    addAll(weatherAdvisories(trip, event, metadata, weather))
+                val rawAdvisories = buildList {
+                    if (weather != null) {
+                        addAll(weatherAdvisories(trip, event, metadata, weather))
+                    }
+                    if (transport != null) {
+                        addAll(transportAdvisories(trip, event, previousEvent, transport, weather))
+                    }
                 }
-                if (transport != null) {
-                    addAll(transportAdvisories(trip, event, previousEvent, transport, weather))
-                }
+
+                rawAdvisories.mapToFreshSuggestions(
+                    selectedChoiceNames = selectedChoiceNames,
+                    usedSuggestionNames = usedSuggestionNames
+                ).forEach(::add)
             }
         }.distinctBy { advisory -> advisory.dismissalKey }
+    }
+
+    private fun List<TripAdvisory>.mapToFreshSuggestions(
+        selectedChoiceNames: Set<String>,
+        usedSuggestionNames: MutableSet<String>
+    ): List<TripAdvisory> {
+        return map { advisory ->
+            val freshSuggestions = advisory.suggestedOptions
+                .uniqueBySuggestionName()
+                .filterNot { option -> option.suggestionName()?.let { it in usedSuggestionNames } == true }
+                .take(MAX_SUGGESTIONS_PER_ADVISORY)
+
+            val suggestions = freshSuggestions.ifEmpty {
+                advisory.suggestedOptions
+                    .uniqueBySuggestionName()
+                    .filterNot { option -> option.suggestionName()?.let { it in selectedChoiceNames } == true }
+                    .take(MAX_SUGGESTIONS_PER_ADVISORY)
+            }
+
+            suggestions.forEach { option ->
+                option.suggestionName()?.let { usedSuggestionNames += it }
+            }
+            advisory.copy(suggestedOptions = suggestions)
+        }
+    }
+
+    private fun List<EventOption>.uniqueBySuggestionName(): List<EventOption> {
+        return distinctBy { option -> option.suggestionName() ?: option.optionId }
+    }
+
+    private fun selectedChoiceNames(
+        events: List<TravelEvent>,
+        optionsByEvent: Map<String, List<EventOption>>
+    ): Set<String> {
+        val eventById = events.associateBy { it.eventId }
+        return buildSet {
+            events.mapNotNull { event -> event.displayName().normalizeSuggestionName() }
+                .forEach(::add)
+
+            optionsByEvent.forEach { (eventId, options) ->
+                val event = eventById[eventId]
+                val eventType = event?.type.orEmpty().ifBlank { "activity" }
+                options.asSequence()
+                    .filter { option -> option.selected || option.optionId == event?.selectedOptionId }
+                    .mapNotNull { option -> option.displayName(eventType).normalizeSuggestionName() }
+                    .forEach(::add)
+            }
+        }
+    }
+
+    private fun EventOption.suggestionName(): String? {
+        return displayName("activity").normalizeSuggestionName()
+    }
+
+    private fun String?.normalizeSuggestionName(): String? {
+        return this
+            ?.trim()
+            ?.replace(Regex("\\s+"), " ")
+            ?.lowercase(Locale.US)
+            ?.takeIf { it.isNotBlank() }
     }
 
     private suspend fun weatherAdvisories(

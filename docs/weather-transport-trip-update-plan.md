@@ -4,7 +4,7 @@
 
 Add a proactive trip-update feature that reviews the current itinerary against weather and transportation context, then suggests practical changes when a planned stop becomes inconvenient or risky.
 
-Initial implementation uses deterministic dummy weather and transportation data. The feature should be structured so real providers can replace the dummy sources later without rewriting the scoring, UI, or persistence flow.
+Initial implementation uses deterministic dummy weather and transportation data. Advisory replacement options should come from the existing Pinecone-backed activity inventory so the alert is demo-controlled, but the activities shown to the user are real inventory matches.
 
 For the demo version, advisories should only activate when a demo-mode switch is enabled and the user navigates to the itinerary/current-trip screen. This keeps normal app behavior unchanged and makes demos predictable.
 
@@ -12,7 +12,7 @@ Example target behavior:
 
 - User has an outdoor safari scheduled at 2:00 PM.
 - Dummy weather says heavy rain starts around that time.
-- App flags the safari as weather-sensitive and suggests an indoor museum, indoor market, aquarium, show, or similar activity for the same time window.
+- App flags the safari as weather-sensitive and suggests real Pinecone-backed indoor activity matches for the same time window.
 - User can accept the replacement, save it as another option, dismiss it, or leave the plan unchanged.
 
 ## Product Principles
@@ -202,7 +202,7 @@ class TripAdvisoryEngine(
 
 ## Alternative Generation
 
-Create `TripAlternativeProvider` with a dummy implementation first.
+Create `TripAlternativeProvider` with a real Pinecone-backed implementation for the Current Trip demo path. Keep the dummy provider available for deterministic tests and development fallback behavior, but do not wire dummy alternatives into the demo experience.
 
 ```kotlin
 interface TripAlternativeProvider {
@@ -214,14 +214,14 @@ interface TripAlternativeProvider {
 }
 ```
 
-Dummy alternative examples:
+Pinecone-backed alternative query examples:
 
-- Outdoor safari rain -> indoor museum, aquarium, covered market, cooking class.
+- Outdoor safari rain -> indoor rainy-day activity alternatives near the destination.
 - Beach heat -> shaded garden, indoor food hall, museum, spa.
 - Long wet walk -> closer indoor cafe/activity near previous stop.
 - Transit delay -> later time slot for same event plus one nearby fallback.
 
-Each dummy option should include realistic `details`:
+Each real option should include useful `details` when available:
 
 - `title`
 - `description`
@@ -229,7 +229,7 @@ Each dummy option should include realistic `details`:
 - `attr_activity_environment`
 - `attr_latitude` / `attr_longitude` when useful
 - `price_tier` or rough cost
-- `source = "dummy_advisory"`
+- `source = "pinecone_advisory"`
 
 This allows the existing option panel and selected-option merge behavior to do most of the work.
 
@@ -338,12 +338,12 @@ Exit criteria:
 
 - Implement `TripAdvisoryEngine`.
 - Add deterministic weather and transport rules.
-- Add dummy alternatives through `TripAlternativeProvider`.
+- Add Pinecone-backed alternatives through `TripAlternativeProvider`.
 - Unit test rain, heat, wind, late-arrival, and no-advisory cases.
 
 Exit criteria:
 
-- Outdoor safari + rain returns a `RAIN_OUTDOOR_ACTIVITY` advisory with at least two indoor `EventOption` alternatives.
+- Outdoor safari + rain returns a `RAIN_OUTDOOR_ACTIVITY` advisory with real inventory-backed `EventOption` alternatives when Pinecone is available.
 - Normal indoor dinner returns no advisory.
 
 ### [ ] Phase 3: Current Trip State Wiring
@@ -385,7 +385,7 @@ Exit criteria:
 
 - Demo mode off produces no dummy advisories.
 - Demo mode on plus itinerary navigation reliably shows the safari-to-indoor-activity suggestion.
-- Demo reliably shows the safari-to-indoor-activity suggestion.
+- Demo reliably shows the rain alert and live inventory alternatives when Pinecone is available.
 - Demo reliably shows one transport-delay suggestion.
 - No advisory appears for unaffected events.
 
@@ -396,7 +396,7 @@ After dummy behavior is accepted:
 - Replace dummy weather with `WeatherRepository` or a provider wrapper around it.
 - Replace dummy transport with `TransportRepository` or a provider wrapper around it.
 - Keep `TripAdvisoryEngine` unchanged except for thresholds if product tuning requires it.
-- Consider using Yelp/LLM/vector retrieval for richer alternatives after the deterministic baseline works.
+- Keep using Pinecone/vector retrieval for advisory alternatives while weather and transport providers are migrated to real APIs.
 
 ## Test Plan
 

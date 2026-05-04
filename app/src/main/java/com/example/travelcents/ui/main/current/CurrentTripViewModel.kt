@@ -8,6 +8,7 @@ import com.example.travelcents.data.ai.chat.AiCuratedTripStarter
 import com.example.travelcents.data.ai.chat.AiCuratedTripToItineraryMapper
 import com.example.travelcents.data.ai.chat.AiTripIntakeProfile
 import com.example.travelcents.data.ai.chat.PREVIEW_TRIP_STATUS
+import com.example.travelcents.data.ai.repository.PineconeTripAlternativeProvider
 import com.example.travelcents.data.media.TripMediaCacheStore
 import com.example.travelcents.data.local.trip.TravelCentsDatabase
 import com.example.travelcents.data.local.trip.TripLocalDataSource
@@ -21,7 +22,6 @@ import com.example.travelcents.data.trip.TripKey
 import com.example.travelcents.data.trip.TripPlanActionService
 import com.example.travelcents.data.trip.TripPerformanceLogger
 import com.example.travelcents.data.trip.TripRepository
-import com.example.travelcents.data.trip.advisory.DummyTripAlternativeProvider
 import com.example.travelcents.data.trip.advisory.DummyTripTransportContextProvider
 import com.example.travelcents.data.trip.advisory.DummyTripWeatherContextProvider
 import com.example.travelcents.data.trip.advisory.TripAdvisory
@@ -214,6 +214,7 @@ class CurrentTripViewModel(application: Application) : AndroidViewModel(applicat
     private val _isAdvisoryDemoModeEnabled = MutableStateFlow(false)
     val isAdvisoryDemoModeEnabled: StateFlow<Boolean> = _isAdvisoryDemoModeEnabled.asStateFlow()
     private val dismissedAdvisoryKeys = mutableSetOf<String>()
+    private val acceptedAdvisoryOptionNames = mutableSetOf<String>()
 
     private val _shareTargets = MutableStateFlow<List<ShareTarget>>(emptyList())
     val shareTargets: StateFlow<List<ShareTarget>> = _shareTargets.asStateFlow()
@@ -257,7 +258,7 @@ class CurrentTripViewModel(application: Application) : AndroidViewModel(applicat
     private val demoAdvisoryEngine = TripAdvisoryEngine(
         weatherProvider = DummyTripWeatherContextProvider(),
         transportProvider = DummyTripTransportContextProvider(),
-        alternativeProvider = DummyTripAlternativeProvider()
+        alternativeProvider = PineconeTripAlternativeProvider()
     )
     private var liveEventDetailOverrides: Map<String, Map<String, String>> = emptyMap()
 
@@ -295,6 +296,7 @@ class CurrentTripViewModel(application: Application) : AndroidViewModel(applicat
         _restaurantLiveContextInFlight.value = emptySet()
         _advisories.value = emptyList()
         dismissedAdvisoryKeys.clear()
+        acceptedAdvisoryOptionNames.clear()
         _shareTargets.value = emptyList()
         _tripMembers.value = emptyList()
         liveEventDetailOverrides = emptyMap()
@@ -651,6 +653,7 @@ class CurrentTripViewModel(application: Application) : AndroidViewModel(applicat
         eventId: String,
         optionId: String
     ) {
+        rememberAcceptedAdvisoryOption(eventId, optionId)
         dismissAdvisory(advisoryId)
         selectOption(eventId, optionId)
     }
@@ -684,6 +687,7 @@ class CurrentTripViewModel(application: Application) : AndroidViewModel(applicat
                     options = updatedOptionsByEvent,
                     persistOptions = true
                 )
+                rememberAcceptedAdvisoryOption(eventId, optionId)
                 dismissAdvisory(advisoryId)
                 _uiState.update {
                     it.copy(infoMessage = result.confirmationMessage, errorMessage = null)
@@ -710,7 +714,8 @@ class CurrentTripViewModel(application: Application) : AndroidViewModel(applicat
                 val evaluated = demoAdvisoryEngine.evaluate(
                     trip = summary,
                     events = events,
-                    optionsByEvent = _eventOptions.value
+                    optionsByEvent = _eventOptions.value,
+                    excludedSuggestionNames = acceptedAdvisoryOptionNames
                 ).filterNot { advisory -> advisory.dismissalKey in dismissedAdvisoryKeys }
 
                 mergeAdvisoryOptions(evaluated)
@@ -750,10 +755,22 @@ class CurrentTripViewModel(application: Application) : AndroidViewModel(applicat
         }
     }
 
+    private fun rememberAcceptedAdvisoryOption(eventId: String, optionId: String) {
+        val eventType = localEventsSnapshot.firstOrNull { it.eventId == eventId }?.type
+            ?: _uiState.value.events.firstOrNull { it.eventId == eventId }?.type
+            ?: "activity"
+        _eventOptions.value[eventId].orEmpty()
+            .firstOrNull { it.optionId == optionId }
+            ?.displayName(eventType)
+            ?.trim()
+            ?.takeIf { it.isNotBlank() }
+            ?.let { acceptedAdvisoryOptionNames += it }
+    }
+
     private fun removeUnselectedDemoAdvisoryOptions() {
         val updatedOptions = _eventOptions.value.mapValues { (_, options) ->
             options.filterNot { option ->
-                option.source.equals("dummy_advisory", ignoreCase = true) && !option.selected
+                option.isAdvisoryGeneratedOption() && !option.selected
             }
         }.filterValues { it.isNotEmpty() }
 
@@ -761,6 +778,11 @@ class CurrentTripViewModel(application: Application) : AndroidViewModel(applicat
             _eventOptions.value = updatedOptions
             publishCurrentEvents(localEventsSnapshot, updatedOptions)
         }
+    }
+
+    private fun EventOption.isAdvisoryGeneratedOption(): Boolean {
+        return source.equals("dummy_advisory", ignoreCase = true) ||
+            source.equals("pinecone_advisory", ignoreCase = true)
     }
 
     private fun reevaluateDemoAdvisoriesIfEnabled() {
