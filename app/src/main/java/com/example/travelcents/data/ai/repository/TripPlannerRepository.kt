@@ -31,6 +31,8 @@ data class EmulatorActivity(
     val title: String = "",
     val description: String = "",
     val booking_url: String? = null,
+    val image_url: String? = null,
+    val photo_urls: List<String>? = null,
     val real_title: String? = null,
     val isNativeBookable: String? = null,
     val start_time: String? = null,
@@ -46,6 +48,8 @@ data class EmulatorActivityOption(
     val title: String = "",
     val real_title: String? = null,
     val booking_url: String? = null,
+    val image_url: String? = null,
+    val photo_urls: List<String>? = null,
     val isNativeBookable: String? = null,
     val selected: Boolean = false,
     val score: Double? = null
@@ -138,12 +142,16 @@ object TripPlannerRepository {
                     .firstOrNull { it.selected }
                     ?.resolvedOptionId()
             val isNativeBookable = activity.isNativeBookable.isTruthy()
+            val activityPhotoUrls = activity.resolvedPhotoUrls()
+            val activityImageUrl = activity.resolvedImageUrl(activityPhotoUrls)
             val eventOptions = buildActivityOptions(
                 eventId = eventId,
                 selectedOptionId = selectedOptionId,
                 fallbackTitle = activityTitle,
                 fallbackDescription = activity.description,
                 fallbackBookingUrl = activity.booking_url,
+                fallbackImageUrl = activityImageUrl,
+                fallbackPhotoUrls = activityPhotoUrls,
                 activity = activity
             )
 
@@ -155,6 +163,8 @@ object TripPlannerRepository {
                 date = dates[index % dates.size],
                 startTime = activity.start_time ?: "10:00",
                 endTime = activity.end_time ?: "13:00",
+                imageUrl = activityImageUrl,
+                photoUrls = activityPhotoUrls,
                 isNativeBookable = isNativeBookable.toString(),
                 bookingUrl = activity.booking_url,
                 details = buildMap {
@@ -166,6 +176,9 @@ object TripPlannerRepository {
                     activity.booking_url
                         ?.takeIf { it.isNotBlank() }
                         ?.let { put("booking_url", it) }
+                    activityImageUrl
+                        .takeIf { it.isNotBlank() }
+                        ?.let { put("image_url", it) }
                     activity.activity_id
                         ?.takeIf { it.isNotBlank() }
                         ?.let { put("viator_activity_id", it) }
@@ -186,6 +199,8 @@ object TripPlannerRepository {
         fallbackTitle: String,
         fallbackDescription: String,
         fallbackBookingUrl: String?,
+        fallbackImageUrl: String,
+        fallbackPhotoUrls: List<String>,
         activity: EmulatorActivity
     ): List<EventOption> {
         val options = activity.options.orEmpty()
@@ -212,6 +227,8 @@ object TripPlannerRepository {
                     eventId = eventId,
                     source = "pinecone",
                     selected = true,
+                    imageUrl = fallbackImageUrl,
+                    photoUrls = fallbackPhotoUrls,
                     details = buildActivityOptionDetails(
                         title = fallbackTitle,
                         description = fallbackDescription,
@@ -238,11 +255,15 @@ object TripPlannerRepository {
         fallbackDescription: String,
         selected: Boolean
     ): EventOption {
+        val optionPhotoUrls = resolvedPhotoUrls()
+        val optionImageUrl = resolvedImageUrl(optionPhotoUrls)
         return EventOption(
             optionId = optionId,
             eventId = eventId,
             source = "pinecone",
             selected = selected,
+            imageUrl = optionImageUrl,
+            photoUrls = optionPhotoUrls,
             details = buildActivityOptionDetails(
                 title = optionTitle,
                 description = fallbackDescription,
@@ -281,6 +302,37 @@ object TripPlannerRepository {
             ?: activity_id
                 ?.takeIf { it.isNotBlank() }
                 ?.let { "viator::$it" }
+    }
+
+    private fun EmulatorActivity.resolvedImageUrl(photoUrls: List<String> = resolvedPhotoUrls()): String {
+        return image_url
+            ?.takeIf { it.isNotBlank() }
+            ?: photoUrls.firstOrNull().orEmpty()
+    }
+
+    private fun EmulatorActivity.resolvedPhotoUrls(): List<String> {
+        return normalizedPhotoUrls(image_url, photo_urls)
+    }
+
+    private fun EmulatorActivityOption.resolvedImageUrl(photoUrls: List<String> = resolvedPhotoUrls()): String {
+        return image_url
+            ?.takeIf { it.isNotBlank() }
+            ?: photoUrls.firstOrNull().orEmpty()
+    }
+
+    private fun EmulatorActivityOption.resolvedPhotoUrls(): List<String> {
+        return normalizedPhotoUrls(image_url, photo_urls)
+    }
+
+    private fun normalizedPhotoUrls(preferredImageUrl: String?, photoUrls: List<String>?): List<String> {
+        return buildList {
+            preferredImageUrl
+                ?.takeIf { it.isNotBlank() }
+                ?.let(::add)
+            photoUrls.orEmpty()
+                .filter { it.isNotBlank() }
+                .forEach(::add)
+        }.distinct()
     }
 
     private fun String?.isTruthy(): Boolean {

@@ -86,6 +86,11 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.tasks.await
+import java.time.Duration
+import java.time.LocalDate
+import java.time.LocalDateTime
+import java.time.LocalTime
+import java.time.format.DateTimeFormatter
 import java.util.Currency
 import java.util.Locale
 import java.util.UUID
@@ -153,6 +158,20 @@ class CurrentTripViewModel(application: Application) : AndroidViewModel(applicat
         private const val NO_TRIP_MESSAGE = "No trip found yet. Create one from the New Trip tab."
         private const val SHARED_YELP_VISIBLE_OPTIONS = 5
         private const val SHARED_YELP_POOL_EXPANSION_SIZE = 10
+        private const val ACTIVITY_BUFFER_AFTER_ARRIVAL_HOURS = 2L
+        private const val DEFAULT_ACTIVITY_DURATION_MINUTES = 120L
+        private val ISO_DATE_REGEX = Regex("\\d{4}-\\d{2}-\\d{2}")
+        private val TRIP_TIME_FORMATTER = DateTimeFormatter.ofPattern("HH:mm")
+        private val DEFAULT_ACTIVITY_START_TIME = LocalTime.of(10, 0)
+        private val LATEST_FIRST_DAY_ACTIVITY_START = LocalTime.of(20, 0)
+        private val TRIP_INPUT_TIME_FORMATTERS = listOf(
+            TRIP_TIME_FORMATTER,
+            DateTimeFormatter.ISO_LOCAL_TIME,
+            DateTimeFormatter.ofPattern("H:mm"),
+            DateTimeFormatter.ofPattern("h:mm a", Locale.US),
+            DateTimeFormatter.ofPattern("hh:mm a", Locale.US)
+        )
+        private val MERIDIEM_REGEX = Regex("\\b[AP]M\\b", RegexOption.IGNORE_CASE)
     }
 
     private val _events = MutableStateFlow<List<TravelEvent>>(emptyList())
@@ -397,15 +416,19 @@ class CurrentTripViewModel(application: Application) : AndroidViewModel(applicat
             optionsByEvent = alignedOptionsByEvent,
             sortEvents = ::sortPlanEvents
         )
-        val visibleEvents = enrichedEvents.map { event ->
-            val eventWithTripTimeZone = applyTripTimeZone(event)
-            val overrides = liveEventDetailOverrides[event.eventId].orEmpty()
-            if (overrides.isEmpty()) {
-                eventWithTripTimeZone
-            } else {
-                eventWithTripTimeZone.copy(details = eventWithTripTimeZone.details + overrides)
-            }
-        }
+        val visibleEvents = sortPlanEvents(
+            applyOutboundArrivalDisplayGuard(
+                enrichedEvents.map { event ->
+                    val eventWithTripTimeZone = applyTripTimeZone(event)
+                    val overrides = liveEventDetailOverrides[event.eventId].orEmpty()
+                    if (overrides.isEmpty()) {
+                        eventWithTripTimeZone
+                    } else {
+                        eventWithTripTimeZone.copy(details = eventWithTripTimeZone.details + overrides)
+                    }
+                }
+            )
+        )
         _events.value = visibleEvents
         _uiState.update {
             it.copy(
@@ -1858,11 +1881,103 @@ class CurrentTripViewModel(application: Application) : AndroidViewModel(applicat
         return events.sortedWith(
             compareBy<TravelEvent>(
                 { normalizeDate(it.date) },
-                { it.details["sortOrder"]?.toIntOrNull() ?: Int.MAX_VALUE },
                 { normalizeTime(it.startTime) },
+                { planEventTypePriority(it) },
+                { it.details["sortOrder"]?.toIntOrNull() ?: Int.MAX_VALUE },
                 { it.eventId }
             )
         )
+    }
+
+    private fun applyOutboundArrivalDisplayGuard(events: List<TravelEvent>): List<TravelEvent> {
+        val outboundFlight = events.firstOrNull { event ->
+            event.type.equals("flight", ignoreCase = true) &&
+                event.details["trip_segment"].equals("outbound", ignoreCase = true)
+        } ?: return events
+
+        val arrivalDate = normalizedIsoDate(
+            outboundFlight.details["arrival_date"]
+                ?: outboundFlight.details["arrival_time"]
+                ?: outboundFlight.date
+        ) ?: return events
+        val arrivalTime = parsePlanTime(
+            outboundFlight.details["arrival_time"]
+                ?: outboundFlight.endTime
+        ) ?: return events
+
+        val earliestCandidate = LocalDateTime.of(arrivalDate, arrivalTime)
+            .plusHours(ACTIVITY_BUFFER_AFTER_ARRIVAL_HOURS)
+        val earliestActivity = if (earliestCandidate.toLocalTime().isAfter(LATEST_FIRST_DAY_ACTIVITY_START)) {
+            LocalDateTime.of(earliestCandidate.toLocalDate().plusDays(1), DEFAULT_ACTIVITY_START_TIME)
+        } else {
+            earliestCandidate
+        }
+
+        return events.map { event ->
+            if (!event.isFlexibleDestinationEvent()) return@map event
+
+            val eventDate = normalizedIsoDate(event.date) ?: return@map event
+            val eventStart = parsePlanTime(event.startTime)
+            val eventDateTime = LocalDateTime.of(eventDate, eventStart ?: DEFAULT_ACTIVITY_START_TIME)
+            if (!eventDateTime.isBefore(earliestActivity)) return@map event
+
+            val originalEnd = parsePlanTime(event.endTime)
+            val durationMinutes = if (eventStart != null && originalEnd != null && originalEnd.isAfter(eventStart)) {
+                Duration.between(eventStart, originalEnd).toMinutes()
+            } else {
+                DEFAULT_ACTIVITY_DURATION_MINUTES
+            }
+            event.copy(
+                date = earliestActivity.toLocalDate().format(DateTimeFormatter.ISO_LOCAL_DATE),
+                startTime = earliestActivity.toLocalTime().format(TRIP_TIME_FORMATTER),
+                endTime = earliestActivity.toLocalTime().plusMinutes(durationMinutes).format(TRIP_TIME_FORMATTER)
+            )
+        }
+    }
+
+    private fun TravelEvent.isFlexibleDestinationEvent(): Boolean {
+        return when (type.lowercase(Locale.US)) {
+            "flight", "hotel" -> false
+            else -> true
+        }
+    }
+
+    private fun normalizedIsoDate(rawDate: String?): LocalDate? {
+        val value = rawDate?.trim()?.takeIf { it.isNotBlank() } ?: return null
+        val dateText = ISO_DATE_REGEX.find(value)?.value ?: return null
+        return runCatching { LocalDate.parse(dateText, DateTimeFormatter.ISO_LOCAL_DATE) }.getOrNull()
+    }
+
+    private fun parsePlanTime(rawTime: String?): LocalTime? {
+        val value = rawTime?.trim()?.takeIf { it.isNotBlank() } ?: return null
+        val normalized = value.replace(Regex("\\s+"), " ")
+        val clockCandidate = if (MERIDIEM_REGEX.containsMatchIn(normalized)) {
+            normalized.split(" ").takeLast(2).joinToString(" ")
+        } else {
+            normalized
+                .substringAfterLast("T")
+                .substringAfterLast(" ")
+                .substringBefore("+")
+                .substringBefore("-")
+                .removeSuffix("Z")
+        }
+        return sequenceOf(clockCandidate, normalized)
+            .distinct()
+            .mapNotNull { candidate ->
+                TRIP_INPUT_TIME_FORMATTERS.firstNotNullOfOrNull { formatter ->
+                    runCatching { LocalTime.parse(candidate, formatter) }.getOrNull()
+                }
+            }
+            .firstOrNull()
+    }
+
+    private fun planEventTypePriority(event: TravelEvent): Int {
+        return when (event.type.lowercase(Locale.US)) {
+            "flight" -> 0
+            "hotel" -> 1
+            "restaurant", "dining", "food" -> 2
+            else -> 3
+        }
     }
 
     private fun isRestaurantEvent(event: TravelEvent): Boolean {
