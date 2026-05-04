@@ -26,7 +26,7 @@ object TripPlannerRepository {
             maxTokens = 4096,
             responseFormat = mapOf("type" to "json_object")
         )
-        return parseItinerary(raw, request.userId)
+        return parseItinerary(raw, request.userId, request.budgetTotal, request.interests)
     }
 
     private fun buildItineraryPrompt(request: TravelRequest): String {
@@ -56,7 +56,7 @@ Return a single JSON object with these fields only:
         """.trimIndent()
     }
 
-    private fun parseItinerary(raw: String, userId: String): Itinerary {
+    private fun parseItinerary(raw: String, userId: String, budgetTotal: Double, interests: List<String>): Itinerary {
         val json = gson.fromJson(raw, JsonObject::class.java)
 
         val travelers = json.getAsJsonObject("travelers")
@@ -85,11 +85,11 @@ Return a single JSON object with these fields only:
             travelStyle = json.get("travel_style")?.asString ?: "comfort",
             adults = travelers?.get("adults")?.asInt ?: 1,
             children = travelers?.get("children")?.asInt ?: 0,
+            budgetTotal = budgetTotal,
+            interests = interests,
             createdAt = json.get("created_at")?.asString ?: java.time.Instant.now().toString(),
             status = json.get("status")?.asString ?: "draft",
             eventIds = emptyList()
         )
     }
 }
-
-

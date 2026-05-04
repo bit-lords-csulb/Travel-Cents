@@ -636,6 +636,8 @@ class FirestoreTripRepository(
                 travelStyle = document.getString("travelStyle") ?: "",
                 adults = (document.getLong("adults") ?: 1L).toInt(),
                 children = (document.getLong("children") ?: 0L).toInt(),
+                budgetTotal = document.getDouble("budgetTotal") ?: 0.0,
+                interests = (document.get("interests") as? List<*>)?.filterIsInstance<String>().orEmpty(),
                 createdAt = document.getString("createdAt") ?: "",
                 status = document.getString("status") ?: "",
                 eventIds = (document.get("eventIds") as? List<*>)?.filterIsInstance<String>().orEmpty(),

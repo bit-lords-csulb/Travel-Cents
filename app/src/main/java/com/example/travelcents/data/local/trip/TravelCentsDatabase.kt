@@ -19,7 +19,7 @@ import androidx.sqlite.db.SupportSQLiteDatabase
         EventOptionEntity::class,
         MediaAssetEntity::class
     ],
-    version = 6,
+    version = 7,
     exportSchema = false
 )
 @TypeConverters(TripLocalConverters::class)
@@ -34,10 +34,13 @@ abstract class TravelCentsDatabase : RoomDatabase() {
     abstract fun mediaAssetDao(): MediaAssetDao
 
     companion object {
-        private val MIGRATION_5_6 = object : Migration(5, 6) {
+        private val MIGRATION_6_7 = object : Migration(6, 7) {
             override fun migrate(database: SupportSQLiteDatabase) {
                 database.execSQL(
-                    "ALTER TABLE trip_summary ADD COLUMN timeZoneId TEXT NOT NULL DEFAULT ''"
+                    "ALTER TABLE trip_summary ADD COLUMN budgetTotal REAL NOT NULL DEFAULT 0.0"
+                )
+                database.execSQL(
+                    "ALTER TABLE trip_summary ADD COLUMN interests TEXT NOT NULL DEFAULT ''"
                 )
             }
         }
@@ -52,7 +55,7 @@ abstract class TravelCentsDatabase : RoomDatabase() {
                     TravelCentsDatabase::class.java,
                     "travel_cents.db"
                 )
-                    .addMigrations(MIGRATION_5_6)
+                    .addMigrations(MIGRATION_6_7)
                     .fallbackToDestructiveMigration()
                     .build()
                     .also { built -> instance = built }

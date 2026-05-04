@@ -133,6 +133,11 @@ fun HomePage(
             modifier = Modifier.padding(horizontal = 16.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
+            // Weekly Summary Feature
+            homeUiState.weeklySummary?.let { summary ->
+                WeeklySummaryWidget(summary = summary)
+            }
+
             Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                 SavedPlacesWidget(
                     bookmarks = homeUiState.bookmarks,
@@ -844,4 +849,3 @@ private fun DocumentsWidget() {
 private const val WIKIMEDIA_CONTACT_URL = "https://github.com/bit-lords-csulb/Travel-Cents"
 private val WIKIMEDIA_IMAGE_USER_AGENT =
     "TravelCents/${BuildConfig.VERSION_NAME} (Android app; $WIKIMEDIA_CONTACT_URL)"
-
