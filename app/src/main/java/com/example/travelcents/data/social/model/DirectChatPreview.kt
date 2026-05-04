@@ -9,6 +9,7 @@ data class DirectChatPreview(
     val lastMessage: String = "",
     val lastMessageTime: Timestamp? = null,
     val lastSenderId: String = "",
-    val lastSenderName: String = ""
+    val lastSenderName: String = "",
+    val otherPhotoUrl: String = ""
 )
 

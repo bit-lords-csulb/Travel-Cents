@@ -91,11 +91,13 @@ class AuthViewModel : ViewModel() {
 
     // Log out and reset all state
     fun signOut() {
-        authRepository.signOut()
-        _isLoggedIn.value = false
-        _isAccountCreated.value = false
-        _errorMessage.value = null
-        _statusMessage.value = null
+        viewModelScope.launch {
+            authRepository.signOut()
+            _isLoggedIn.value = false
+            _isAccountCreated.value = false
+            _errorMessage.value = null
+            _statusMessage.value = null
+        }
     }
 
     // Reset sign-up flow state (e.g. after navigating away)

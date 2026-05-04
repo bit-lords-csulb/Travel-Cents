@@ -18,6 +18,10 @@ import com.example.travelcents.notification.ChatNotificationTarget
 import com.example.travelcents.ui.TravelCentsNavigation
 import com.example.travelcents.ui.auth.AuthViewModel
 import com.example.travelcents.ui.theme.TravelCentsTheme
+import com.google.firebase.auth.FirebaseAuth
+import com.google.firebase.firestore.FieldValue
+import com.google.firebase.firestore.FirebaseFirestore
+import com.google.firebase.firestore.SetOptions
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 
@@ -28,6 +32,19 @@ class MainActivity : ComponentActivity() {
 
     fun clearPendingChatTarget() {
         _pendingChatTarget.value = null
+    }
+
+    private val auth = FirebaseAuth.getInstance()
+    private val db = FirebaseFirestore.getInstance()
+    private var lastPresenceUid: String? = null
+    private val authStateListener = FirebaseAuth.AuthStateListener { authState ->
+        val currentUid = authState.currentUser?.uid
+
+        if (currentUid != null && currentUid != lastPresenceUid) {
+            updateOnlineStatus(currentUid, true)
+        }
+
+        lastPresenceUid = currentUid
     }
 
     private val requestPermissionLauncher = registerForActivityResult(
@@ -45,6 +62,9 @@ class MainActivity : ComponentActivity() {
         enableEdgeToEdge()
         handleIntent(intent)
         requestNotificationPermissionIfNeeded()
+        
+        auth.addAuthStateListener(authStateListener)
+
         val authViewModel : AuthViewModel by viewModels()
         setContent {
             TravelCentsTheme {
@@ -62,10 +82,38 @@ class MainActivity : ComponentActivity() {
         handleIntent(intent)
     }
 
+    override fun onStart() {
+        super.onStart()
+        updateCurrentUserOnlineStatus(true)
+    }
+
     override fun onStop() {
         super.onStop()
+        updateCurrentUserOnlineStatus(false)
         // Clear active chat when minimized so background notifications aren't suppressed
         com.example.travelcents.notification.NotificationHelper.activeChatTarget = null
+    }
+
+    override fun onDestroy() {
+        auth.removeAuthStateListener(authStateListener)
+        super.onDestroy()
+    }
+
+    private fun updateCurrentUserOnlineStatus(isOnline: Boolean) {
+        val uid = auth.currentUser?.uid ?: return
+        updateOnlineStatus(uid, isOnline)
+    }
+
+    private fun updateOnlineStatus(uid: String, isOnline: Boolean) {
+        val updates = mapOf(
+            "isOnline" to isOnline,
+            "lastSeen" to FieldValue.serverTimestamp()
+        )
+        db.collection("users")
+            .document(uid)
+            .set(updates, SetOptions.merge())
+            .addOnSuccessListener { Log.d("Presence", "Status updated: $isOnline") }
+            .addOnFailureListener { Log.e("Presence", "Status update failed", it) }
     }
 
     private fun handleIntent(intent: Intent?) {

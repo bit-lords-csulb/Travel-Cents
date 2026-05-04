@@ -282,23 +282,6 @@ fun FriendRow(
                     )
                 }
             }
-            if (friend.isOnline) {
-                Box(
-                    modifier = Modifier
-                        .size(13.dp)
-                        .align(Alignment.BottomEnd)
-                        .clip(CircleShape)
-                        .background(DeepSea1)
-                        .padding(2.dp)
-                ) {
-                    Box(
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .clip(CircleShape)
-                            .background(Color(0xFF4CAF50))
-                    )
-                }
-            }
         }
 
         Spacer(modifier = Modifier.width(14.dp))
@@ -312,11 +295,20 @@ fun FriendRow(
                 maxLines = 1
             )
             Spacer(modifier = Modifier.height(3.dp))
-            Text(
-                text = friend.lastSeenLabel,
-                color = if (friend.isOnline) Color(0xFF4CAF50) else DeepSea5.copy(alpha = 0.5f),
-                fontSize = 12.sp
-            )
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Box(
+                    modifier = Modifier
+                        .size(8.dp)
+                        .clip(CircleShape)
+                        .background(if (friend.isOnline) Color(0xFF4CAF50) else Color.Gray)
+                )
+                Spacer(modifier = Modifier.width(6.dp))
+                Text(
+                    text = friend.lastSeenLabel,
+                    color = DeepSea5.copy(alpha = 0.5f),
+                    fontSize = 12.sp
+                )
+            }
         }
 
         Box(

@@ -6,7 +6,10 @@ import com.google.firebase.auth.GoogleAuthProvider
 import com.google.firebase.firestore.FieldValue
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.SetOptions
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.suspendCancellableCoroutine
+import kotlinx.coroutines.tasks.await
+import kotlinx.coroutines.withContext
 import kotlin.coroutines.resume
 
 class AuthRepository {
@@ -32,8 +35,10 @@ class AuthRepository {
                     user?.sendEmailVerification()
                     saveUserToFirestore(user?.uid, firstName, lastName, username, email) { success, error ->
                         if (success) {
-                            auth.signOut()
-                            continuation.resume(Result.success("Account created! Please log in."))
+                            markUserOffline(user?.uid) {
+                                auth.signOut()
+                                continuation.resume(Result.success("Account created! Please log in."))
+                            }
                         } else {
                             continuation.resume(Result.failure(Exception(error)))
                         }
@@ -135,8 +140,44 @@ class AuthRepository {
             }
     }
 
-    fun signOut() {
+    suspend fun signOut() {
+        val uid = auth.currentUser?.uid
+        if (uid != null) {
+            try {
+                // Ensure this finishes on a background thread before local session is cleared
+                withContext(Dispatchers.IO) {
+                    db.collection("users").document(uid)
+                        .set(
+                            mapOf(
+                                "isOnline" to false,
+                                "lastSeen" to FieldValue.serverTimestamp()
+                            ),
+                            SetOptions.merge()
+                        )
+                        .await()
+                }
+            } catch (e: Exception) {
+                Log.e(TAG, "Failed to update offline status during logout", e)
+            }
+        }
         auth.signOut()
+    }
+
+    private fun markUserOffline(uid: String?, onComplete: () -> Unit) {
+        if (uid == null) {
+            onComplete()
+            return
+        }
+
+        db.collection("users").document(uid)
+            .set(
+                mapOf(
+                    "isOnline" to false,
+                    "lastSeen" to FieldValue.serverTimestamp()
+                ),
+                SetOptions.merge()
+            )
+            .addOnCompleteListener { onComplete() }
     }
 
     suspend fun signInWithGoogle(idToken: String): Result<String> = suspendCancellableCoroutine { continuation ->

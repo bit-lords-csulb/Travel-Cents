@@ -207,12 +207,13 @@ fun MainScaffold(modifier: Modifier = Modifier, onLogout: () -> Unit = {}) {
                                 it != FirebaseAuth.getInstance().currentUser?.uid
                             }
                             if (otherUid != null) {
-                                socialUserRepository.fetchUserDisplayName(otherUid) { name ->
+                                socialUserRepository.fetchUserFullProfile(otherUid) { name, photo ->
                                     selectedDirectChatId = target.chatId
                                     selectedDM = DirectChatPreview(
                                         id = target.chatId,
                                         otherUid = otherUid,
-                                        otherUserName = name
+                                        otherUserName = name,
+                                        otherPhotoUrl = photo
                                     )
                                 }
                             }
@@ -474,16 +475,21 @@ fun MainScaffold(modifier: Modifier = Modifier, onLogout: () -> Unit = {}) {
                             onBackClick = {
                                 selectedFriend = null
                                 selectedDirectChatId = null
+                                activeTab = 1 // Go back to Direct Messages tab
                             },
                             onTripCardClick = onTripCardClick,
                             onChatResolved = { selectedDirectChatId = it }
                         )
                         selectedDM != null -> DirectChatPage(
-                            friend      = Friend(uid = selectedDM!!.otherUid, displayName = selectedDM!!.otherUserName),
+                            friend      = Friend(
+                                uid = selectedDM!!.otherUid, 
+                                displayName = selectedDM!!.otherUserName,
+                                profileImageUrl = selectedDM!!.otherPhotoUrl
+                            ),
                             onBackClick = {
                                 selectedDM = null
                                 selectedDirectChatId = null
-                                activeTab = 1
+                                activeTab = 1 // Go back to Direct Messages tab
                             },
                             onTripCardClick = onTripCardClick,
                             onChatResolved = { selectedDirectChatId = it }
