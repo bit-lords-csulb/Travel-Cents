@@ -36,6 +36,7 @@ import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.example.travelcents.data.trip.TripKey
 import com.example.travelcents.ui.components.TcButton
 import com.example.travelcents.ui.theme.TravelCentsFonts
 
@@ -61,7 +62,7 @@ private val generationSteps = listOf(
 fun TripGeneratingPage(
     modifier: Modifier = Modifier,
     viewModel: NewTripViewModel,
-    onTripReady: () -> Unit
+    onTripReady: (TripKey) -> Unit
 ) {
     val currentStep by viewModel.generationStep.collectAsState()
     val uiState by viewModel.uiState.collectAsState()
@@ -130,8 +131,13 @@ fun TripGeneratingPage(
         ) {
             TcButton(
                 onClick = {
+                    val success = uiState as? TripUiState.Success ?: return@TcButton
+                    val tripKey = TripKey(
+                        ownerUid = success.itinerary.ownerUid.ifBlank { success.itinerary.userId },
+                        tripId = success.itinerary.itineraryId
+                    )
                     viewModel.resetState()
-                    onTripReady()
+                    onTripReady(tripKey)
                 },
                 modifier = Modifier
                     .fillMaxWidth()

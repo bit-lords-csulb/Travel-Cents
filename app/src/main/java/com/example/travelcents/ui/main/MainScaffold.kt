@@ -277,8 +277,8 @@ fun MainScaffold(modifier: Modifier = Modifier, onLogout: () -> Unit = {}) {
                     TripGeneratingPage(
                         modifier = Modifier.fillMaxSize(),
                         viewModel = newTripViewModel,
-                        onTripReady = {
-                            currentTripViewModel.loadTrip()
+                        onTripReady = { tripKey ->
+                            currentTripViewModel.loadTrip(tripKey)
                             navController.navigate(MainRoutes.CURRENT_ITINERARY) {
                                 popUpTo(MainRoutes.HOME) { inclusive = false }
                             }
