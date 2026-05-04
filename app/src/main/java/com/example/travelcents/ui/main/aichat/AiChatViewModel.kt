@@ -1021,6 +1021,18 @@ class AiChatViewModel(application: Application) : AndroidViewModel(application) 
             ?.title
             .orEmpty()
 
+        // Promote the question into the last AI bubble so it sits above the user's answer,
+        // not in the following AI response.
+        if (answeredQuestionTitle.isNotBlank()) {
+            val lastIndex = conversationItems.indexOfLast { it.sender == AiChatSender.ASSISTANT }
+            if (lastIndex >= 0) {
+                val prev = conversationItems[lastIndex]
+                conversationItems[lastIndex] = prev.copy(
+                    text = "${prev.text}\n\n$answeredQuestionTitle"
+                )
+            }
+        }
+
         val submittedMessage = AiChatItem.TextMessage(
             text = trimmedVisibleMessage,
             sender = AiChatSender.USER,
@@ -1163,7 +1175,6 @@ class AiChatViewModel(application: Application) : AndroidViewModel(application) 
                 ticketmasterGrounding = toolDispatch.singleEventResolution?.groundingContext,
                 viabilityWarning = toolDispatch.viabilityWarning,
                 placeRecommendationRow = toolDispatch.placeRecommendationRow,
-                answeredQuestionTitle = answeredQuestionTitle,
                 intakeDeadEnd = intakeDeadEnd
             )
 
@@ -1208,18 +1219,10 @@ class AiChatViewModel(application: Application) : AndroidViewModel(application) 
         ticketmasterGrounding: String?,
         viabilityWarning: String,
         placeRecommendationRow: AiPlaceRecommendationRow?,
-        answeredQuestionTitle: String,
         intakeDeadEnd: Boolean
     ): String {
         val structuredAck = intakeResult?.assistantMessage
             ?.takeIf { message -> message.isNotBlank() }
-        // When the user just answered a card, restate the question alongside the ack so they
-        // retain context after the card is dismissed.
-        val structuredResponse = when {
-            structuredAck == null -> null
-            answeredQuestionTitle.isNotBlank() -> "$structuredAck $answeredQuestionTitle"
-            else -> structuredAck
-        }
         val baseResponse = when {
             !ticketmasterGrounding.isNullOrBlank() -> fallbackAssistantMessage(
                 profile = profile,
@@ -1235,7 +1238,7 @@ class AiChatViewModel(application: Application) : AndroidViewModel(application) 
                 planningObjective = planningObjective,
                 groundingContext = DEAD_END_RECOVERY_GROUNDING
             )
-            structuredResponse != null -> structuredResponse
+            structuredAck != null -> structuredAck
             else -> fallbackAssistantMessage(
                 profile = profile,
                 intakeProfile = intakeProfile,
