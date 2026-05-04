@@ -28,6 +28,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextField
 import androidx.compose.material3.TextFieldDefaults
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
@@ -38,15 +39,18 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
+import coil.compose.AsyncImage
 import com.example.travelcents.data.social.model.DirectChatPreview
 import com.example.travelcents.data.social.model.Friend
 import com.example.travelcents.data.social.model.Group
 import com.example.travelcents.data.trip.model.Event
+import com.example.travelcents.ui.components.ProfileAvatar
 import com.example.travelcents.ui.main.chats.friends.AddFriendPage
 import com.example.travelcents.ui.main.chats.friends.FriendRequestsPage
 import com.example.travelcents.ui.main.chats.friends.FriendsPage
@@ -90,6 +94,11 @@ fun ChatsPage(
     val filteredDMs       by viewModel.filteredDirectChats.collectAsState()
     var selectedTab       by remember { mutableIntStateOf(startTab) }
     val tabs               = listOf("Groups", "Direct Messages")
+
+    // Update selectedTab if startTab changes (e.g., coming back from a DM)
+    LaunchedEffect(startTab) {
+        selectedTab = startTab
+    }
 
     Column(modifier = modifier.fillMaxSize().background(DeepSea1)) {
         // Header
@@ -223,17 +232,38 @@ fun GroupChatRow(group: Group, onClick: () -> Unit) {
             .padding(horizontal = 16.dp, vertical = 14.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
+        val isEmoji = group.groupImageUrl.length <= 4 // Simple check for emoji
+        
         Box(
             modifier = Modifier.size(52.dp).clip(CircleShape).background(DeepSea3),
             contentAlignment = Alignment.Center
         ) {
-            Text(group.name.take(2).uppercase(), color = DeepSea5, fontWeight = FontWeight.Bold, fontSize = 16.sp)
+            if (group.groupImageUrl.isNotBlank() && !isEmoji) {
+                AsyncImage(
+                    model = group.groupImageUrl,
+                    contentDescription = group.name,
+                    contentScale = ContentScale.Crop,
+                    modifier = Modifier.fillMaxSize().clip(CircleShape)
+                )
+            } else {
+                Text(
+                    text = group.groupImageUrl.ifBlank { group.name.take(1).uppercase() },
+                    color = DeepSea5,
+                    fontWeight = FontWeight.Bold,
+                    fontSize = if (isEmoji) 24.sp else 18.sp
+                )
+            }
         }
         Spacer(modifier = Modifier.width(14.dp))
         Column(modifier = Modifier.weight(1f)) {
             Text(group.name, color = DeepSea5, fontWeight = FontWeight.SemiBold, fontSize = 15.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
             Spacer(modifier = Modifier.height(3.dp))
-            Text(group.lastMessage, color = DeepSea5.copy(alpha = 0.55f), fontSize = 13.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            val lastMsgText = if (group.lastSenderName.isNotBlank() && group.lastMessage.isNotBlank()) {
+                "${group.lastSenderName}: ${group.lastMessage}"
+            } else {
+                group.lastMessage
+            }
+            Text(lastMsgText, color = DeepSea5.copy(alpha = 0.55f), fontSize = 13.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
         }
         Spacer(modifier = Modifier.width(8.dp))
         Text(formatTimestamp(group.lastMessageTime), color = DeepSea5.copy(alpha = 0.4f), fontSize = 11.sp)
@@ -248,12 +278,15 @@ fun DirectChatRow(dm: DirectChatPreview, onClick: () -> Unit) {
             .padding(horizontal = 16.dp, vertical = 14.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        Box(
-            modifier = Modifier.size(52.dp).clip(CircleShape).background(DeepSea3),
-            contentAlignment = Alignment.Center
-        ) {
-            Text(dm.otherUserName.take(2).uppercase(), color = DeepSea5, fontWeight = FontWeight.Bold, fontSize = 16.sp)
-        }
+        ProfileAvatar(
+            photoUrl = dm.otherPhotoUrl,
+            contentDescription = dm.otherUserName,
+            modifier = Modifier.size(52.dp),
+            borderColor = DeepSea3,
+            backgroundColor = DeepSea3,
+            placeholderTint = DeepSea5,
+            borderWidth = 0.dp
+        )
         Spacer(modifier = Modifier.width(14.dp))
         Column(modifier = Modifier.weight(1f)) {
             Text(dm.otherUserName, color = DeepSea5, fontWeight = FontWeight.SemiBold, fontSize = 15.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)

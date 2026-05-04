@@ -1346,7 +1346,9 @@ class CurrentTripViewModel(application: Application) : AndroidViewModel(applicat
                         chatRef,
                         mapOf(
                             "lastMessage" to "Shared a trip",
-                            "lastMessageTime" to FieldValue.serverTimestamp()
+                            "lastMessageTime" to FieldValue.serverTimestamp(),
+                            "lastSenderId" to uid,
+                            "lastSenderName" to senderName
                         )
                     )
                 }.await()
@@ -1953,4 +1955,3 @@ class CurrentTripViewModel(application: Application) : AndroidViewModel(applicat
         super.onCleared()
     }
 }
-

@@ -40,6 +40,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.travelcents.data.social.model.Friend
+import com.example.travelcents.ui.components.ProfileAvatar
 import com.example.travelcents.ui.theme.DeepSea1
 import com.example.travelcents.ui.theme.DeepSea2
 import com.example.travelcents.ui.theme.DeepSea3
@@ -60,12 +61,21 @@ fun DirectChatPage(
         key = friend.uid,
         factory = DirectChatViewModel.Factory(friend)
     ),
-    onTripCardClick: ((tripId: String, ownerUid: String) -> Unit)? = null
+    onTripCardClick: ((tripId: String, ownerUid: String) -> Unit)? = null,
+    onChatResolved: (String) -> Unit = {}
 ) {
     val messages     by viewModel.messages.collectAsState()
     val messageText  by viewModel.messageText.collectAsState()
+    val chatId       by viewModel.chatId.collectAsState()
+    val isOnline     by viewModel.isOnline.collectAsState()
     val currentUid    = viewModel.currentUid
     val listState     = rememberLazyListState()
+
+    LaunchedEffect(chatId) {
+        if (chatId.isNotBlank()) {
+            onChatResolved(chatId)
+        }
+    }
 
     LaunchedEffect(messages.size) {
         if (messages.isNotEmpty()) listState.animateScrollToItem(messages.size - 1)
@@ -93,20 +103,15 @@ fun DirectChatPage(
                     Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back", tint = DeepSea5)
                 }
 
-                Box(
-                    modifier = Modifier
-                        .size(42.dp)
-                        .clip(CircleShape)
-                        .background(DeepSea3),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Text(
-                        text = friend.displayName.take(2).uppercase(),
-                        color = DeepSea5,
-                        fontWeight = FontWeight.Bold,
-                        fontSize = 14.sp
-                    )
-                }
+                ProfileAvatar(
+                    photoUrl = friend.profileImageUrl,
+                    contentDescription = friend.displayName,
+                    modifier = Modifier.size(42.dp),
+                    borderColor = DeepSea3,
+                    backgroundColor = DeepSea3,
+                    placeholderTint = DeepSea5,
+                    borderWidth = 0.dp
+                )
 
                 Spacer(modifier = Modifier.width(10.dp))
 
@@ -117,11 +122,20 @@ fun DirectChatPage(
                         fontWeight = FontWeight.Bold,
                         fontSize = 16.sp
                     )
-                    Text(
-                        text = friend.lastSeenLabel,
-                        color = if (friend.isOnline) Color(0xFF4CAF50) else DeepSea5.copy(alpha = 0.5f),
-                        fontSize = 12.sp
-                    )
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Box(
+                            modifier = Modifier
+                                .size(8.dp)
+                                .clip(CircleShape)
+                                .background(if (isOnline) Color(0xFF4CAF50) else Color.Gray)
+                        )
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Text(
+                            text = if (isOnline) "online" else "offline",
+                            color = DeepSea5.copy(alpha = 0.5f),
+                            fontSize = 12.sp
+                        )
+                    }
                 }
             }
         }
@@ -190,4 +204,3 @@ fun DirectChatPage(
         }
     }
 }
-

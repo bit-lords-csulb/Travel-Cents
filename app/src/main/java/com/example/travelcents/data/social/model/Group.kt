@@ -13,6 +13,8 @@ data class Group(
     val lastMessageTime: Timestamp? = null,
     val groupImageUrl: String = "",
     val linkedTripId: String = "",
-    val linkedTripOwnerId: String = ""
+    val linkedTripOwnerId: String = "",
+    val lastSenderId: String = "",
+    val lastSenderName: String = ""
 )
 

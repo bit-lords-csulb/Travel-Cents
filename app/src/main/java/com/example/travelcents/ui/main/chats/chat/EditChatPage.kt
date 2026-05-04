@@ -21,6 +21,7 @@ import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Search
 import kotlinx.coroutines.flow.combine
 import com.example.travelcents.data.social.model.Friend
+import com.example.travelcents.ui.components.ProfileAvatar
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -56,7 +57,7 @@ fun EditChatPage(
     val description by viewModel.description.collectAsState()
     val selectedImageUri by viewModel.selectedImageUri.collectAsState()
     val members by viewModel.members.collectAsState()
-    val memberNames by viewModel.memberNames.collectAsState()
+    val memberProfiles by viewModel.memberProfiles.collectAsState()
     val isLoading by viewModel.isLoading.collectAsState()
     val availableTrips by viewModel.availableTrips.collectAsState()
     val selectedTrip by viewModel.selectedTrip.collectAsState()
@@ -217,12 +218,19 @@ fun EditChatPage(
                         LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                             lazyRowItems(stagedFriends) { friend ->
                                 Row(
-                                    modifier = Modifier.clip(RoundedCornerShape(48.dp)).background(DeepSea3).padding(start = 10.dp, end = 6.dp, top = 6.dp, bottom = 6.dp),
+                                    modifier = Modifier.clip(RoundedCornerShape(48.dp)).background(DeepSea3).padding(start = 6.dp, end = 6.dp, top = 6.dp, bottom = 6.dp),
                                     verticalAlignment = Alignment.CenterVertically
                                 ) {
-                                    Box(modifier = Modifier.size(22.dp).clip(CircleShape).background(DeepSea2), contentAlignment = Alignment.Center) {
-                                        Text(friend.displayName.take(1).uppercase(), color = DeepSea5, fontSize = 10.sp, fontWeight = FontWeight.Bold)
-                                    }
+                                    ProfileAvatar(
+                                        photoUrl = friend.profileImageUrl,
+                                        contentDescription = friend.displayName,
+                                        modifier = Modifier.size(22.dp),
+                                        borderColor = DeepSea3,
+                                        backgroundColor = DeepSea2,
+                                        placeholderTint = DeepSea5,
+                                        borderWidth = 0.dp,
+                                        iconSize = 12.dp
+                                    )
                                     Spacer(modifier = Modifier.width(6.dp))
                                     Text(friend.displayName.split(" ").first(), color = DeepSea5, fontSize = 13.sp)
                                     Spacer(modifier = Modifier.width(4.dp))
@@ -243,9 +251,15 @@ fun EditChatPage(
                                 .padding(horizontal = 14.dp, vertical = 10.dp),
                             verticalAlignment = Alignment.CenterVertically
                         ) {
-                            Box(modifier = Modifier.size(36.dp).clip(CircleShape).background(DeepSea3), contentAlignment = Alignment.Center) {
-                                Text(friend.displayName.take(2).uppercase(), color = DeepSea5, fontWeight = FontWeight.Bold, fontSize = 13.sp)
-                            }
+                            ProfileAvatar(
+                                photoUrl = friend.profileImageUrl,
+                                contentDescription = friend.displayName,
+                                modifier = Modifier.size(36.dp),
+                                borderColor = DeepSea2,
+                                backgroundColor = DeepSea3,
+                                placeholderTint = DeepSea5,
+                                borderWidth = 0.dp
+                            )
                             Spacer(modifier = Modifier.width(12.dp))
                             Text(friend.displayName, color = DeepSea5, fontWeight = FontWeight.SemiBold, fontSize = 14.sp)
                         }
@@ -268,23 +282,24 @@ fun EditChatPage(
                     ) {
                         sortedMembers.forEach { memberId ->
                             val isMe = memberId == currentUid
-                            val displayName = if (isMe) "You" else (memberNames[memberId] ?: "Loading...")
+                            val profile = memberProfiles[memberId]
+                            val displayName = if (isMe) "You" else (profile?.first ?: "Loading...")
+                            val photoUrl = profile?.second ?: ""
                             val isGroupOwner = memberId == group.ownerId
 
                             Row(
                                 modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp),
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
-                                Box(
-                                    modifier = Modifier.size(40.dp).clip(CircleShape).background(DeepSea4),
-                                    contentAlignment = Alignment.Center
-                                ) {
-                                    Text(
-                                        text = if (isMe) "Y" else displayName.take(1).uppercase(),
-                                        color = DeepSea1,
-                                        fontWeight = FontWeight.Bold
-                                    )
-                                }
+                                ProfileAvatar(
+                                    photoUrl = photoUrl,
+                                    contentDescription = displayName,
+                                    modifier = Modifier.size(40.dp),
+                                    borderColor = DeepSea3,
+                                    backgroundColor = DeepSea4,
+                                    placeholderTint = DeepSea1,
+                                    borderWidth = 0.dp
+                                )
                                 Spacer(modifier = Modifier.width(12.dp))
                                 Column(modifier = Modifier.weight(1f)) {
                                     Text(text = displayName, color = DeepSea5, fontSize = 16.sp, fontWeight = FontWeight.Medium)
