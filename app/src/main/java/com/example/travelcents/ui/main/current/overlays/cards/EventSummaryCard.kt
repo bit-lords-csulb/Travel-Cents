@@ -439,7 +439,7 @@ private fun FlightSummaryVariant(
                 onOpenGallery = onOpenGallery,
                 modifier = Modifier
                     .weight(0.42f)
-                    .aspectRatio(0.92f),
+                    .aspectRatio(1f),
                 shape = RoundedCornerShape(24.dp)
             )
 

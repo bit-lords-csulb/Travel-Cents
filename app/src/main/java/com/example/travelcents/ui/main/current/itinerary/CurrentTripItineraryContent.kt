@@ -349,7 +349,7 @@ private fun CurrentTripItineraryCard(
                             photoCount = 0,
                             onOpenGallery = null,
                             modifier = Modifier
-                                .width(92.dp)
+                                .width(96.dp)
                                 .fillMaxHeight(),
                             shape = RoundedCornerShape(topStart = 16.dp, bottomStart = 16.dp)
                         )

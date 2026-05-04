@@ -332,6 +332,11 @@ fun MainScaffold(modifier: Modifier = Modifier, onLogout: () -> Unit = {}) {
                                 launchSingleTop = true
                             }
                         },
+                        onOpenPreviewTrip = {
+                            navController.navigate(MainRoutes.CURRENT_TRIP_PREVIEW) {
+                                launchSingleTop = true
+                            }
+                        },
                         onCreateDraftTrip = { starter, intakeProfile ->
                             val source = PreviewSource.CuratedStarter(
                                 starter = starter,

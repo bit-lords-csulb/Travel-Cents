@@ -511,7 +511,29 @@ class CurrentTripViewModel(application: Application) : AndroidViewModel(applicat
 
         viewModelScope.launch {
             try {
-                val enrichedCandidates = enrichFlightHeroImages(candidates, flightHeroImages)
+                var enrichedCandidates = enrichFlightHeroImages(candidates, flightHeroImages)
+                val heroUrls = enrichedCandidates
+                    .map { it.imageUrl }
+                    .filter { it.isNotBlank() }
+                    .distinct()
+                if (heroUrls.isNotEmpty()) {
+                    val localPaths = runCatching {
+                        TripMediaCacheStore.cacheTripMedia(
+                            context = getApplication(),
+                            tripKey = tripKey,
+                            urls = heroUrls
+                        )
+                    }.onFailure { error ->
+                        Log.w("CurrentTripViewModel", "Failed to cache flight hero media", error)
+                    }.getOrDefault(emptyMap())
+                    if (localPaths.isNotEmpty()) {
+                        enrichedCandidates = enrichedCandidates.map { event ->
+                            localPaths[event.imageUrl]
+                                ?.let { localPath -> event.copy(localImagePath = localPath) }
+                                ?: event
+                        }
+                    }
+                }
                 val changedById = enrichedCandidates
                     .zip(candidates)
                     .mapNotNull { (updated, original) ->

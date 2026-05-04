@@ -1,5 +1,6 @@
 package com.example.travelcents.data.trip.remote
 
+import com.example.travelcents.data.media.UnsplashImageRepository
 import com.example.travelcents.data.trip.model.ATTR_AIRLINE_LOGO_URL
 import com.example.travelcents.data.trip.model.ATTR_DESTINATION_CITY
 import com.example.travelcents.data.trip.model.ATTR_HERO_IMAGE_ATTRIBUTION
@@ -30,7 +31,8 @@ fun buildFlightHeroImageRepository(): FlightHeroImageRepository {
         .build()
         .create(WikipediaApiService::class.java)
     return FlightHeroImageRepository(
-        destinationImages = DestinationImageRepository(wikipedia)
+        destinationImages = DestinationImageRepository(wikipedia),
+        unsplashImages = UnsplashImageRepository()
     )
 }
 
