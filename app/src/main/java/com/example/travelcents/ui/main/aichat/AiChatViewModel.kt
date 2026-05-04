@@ -44,23 +44,20 @@ import com.example.travelcents.data.ai.chat.toDestinationRecommendationRow
 import com.example.travelcents.data.ai.chat.withDestinationRecommendations
 import com.example.travelcents.data.ai.chat.toModel
 import com.example.travelcents.data.ai.chat.toPersisted
-import com.example.travelcents.BuildConfig
 import com.example.travelcents.data.ai.model.LlmMessage
+import com.example.travelcents.data.media.ImageCacheManager
+import com.example.travelcents.data.media.UnsplashImageRepository
+import com.example.travelcents.data.media.UnsplashSearchParams
 import com.example.travelcents.data.ai.remote.LlmClient
 import com.example.travelcents.data.social.repository.BookmarksRepository
 import com.example.travelcents.data.sync.TripSyncRemoteDataSource
 import com.example.travelcents.data.trip.TripKey
-import com.example.travelcents.data.trip.remote.DestinationImageRepository
-import com.example.travelcents.data.trip.remote.WikipediaApiService
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FirebaseFirestore
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
-import okhttp3.OkHttpClient
-import retrofit2.Retrofit
-import retrofit2.converter.gson.GsonConverterFactory
 import java.util.Locale
 import java.util.UUID
 
@@ -81,23 +78,7 @@ class AiChatViewModel(application: Application) : AndroidViewModel(application) 
     private var pendingAddToTripEvent: AiSingleEventSuggestion? = null
     private var availableTripsForAdd: List<AiChatTripOption> = emptyList()
 
-    private val wikipediaClient = OkHttpClient.Builder()
-        .addInterceptor { chain ->
-            val request = chain.request().newBuilder()
-                .header("User-Agent", WIKIMEDIA_USER_AGENT)
-                .header("Api-User-Agent", WIKIMEDIA_USER_AGENT)
-                .build()
-            chain.proceed(request)
-        }
-        .build()
-
-    private val wikipedia: WikipediaApiService = Retrofit.Builder()
-        .baseUrl("https://en.wikipedia.org/")
-        .client(wikipediaClient)
-        .addConverterFactory(GsonConverterFactory.create())
-        .build()
-        .create(WikipediaApiService::class.java)
-    private val destinationImages = DestinationImageRepository(wikipedia)
+    private val destinationImages = UnsplashImageRepository()
     private val heroImageCache = mutableMapOf<String, String>()
 
     private var sessionState = AiChatSessionState()
@@ -193,6 +174,12 @@ class AiChatViewModel(application: Application) : AndroidViewModel(application) 
         val destination = recommendation.destination.trim()
         if (destination.isBlank()) return
 
+        sessionState = sessionState.copy(
+            lockedDestination = destination,
+            lockedDestinationImageUrl = recommendation.imageUrl
+        )
+        publishUiState()
+
         submitUserTurn(
             visibleMessage = "Let's plan around $destination",
             llmUserMessage = buildDestinationRecommendationPrompt(recommendation)
@@ -276,7 +263,10 @@ class AiChatViewModel(application: Application) : AndroidViewModel(application) 
         restoreSnapshot(snapshot)
         processSnapshot = snapshot
         publishUiState()
-        launchHeroImageEnrichment(sessionState.activeCuratedTripRow?.id)
+        launchHeroImageEnrichment(
+            curatedRowId = sessionState.activeCuratedTripRow?.id,
+            destinationRowId = sessionState.activeDestinationRecommendationRow?.id
+        )
     }
 
     fun deleteSession(sessionId: String) {
@@ -596,7 +586,9 @@ class AiChatViewModel(application: Application) : AndroidViewModel(application) 
             pendingAddToTripEvent = pendingAddToTripEvent,
             availableTrips = availableTripsForAdd,
             bookmarkedPlaceIds = _bookmarkedPlaceIds.value,
-            isLoading = isLoading
+            isLoading = isLoading,
+            lockedDestination = sessionState.lockedDestination,
+            lockedDestinationImageUrl = sessionState.lockedDestinationImageUrl
         )
     }
 
@@ -687,7 +679,9 @@ class AiChatViewModel(application: Application) : AndroidViewModel(application) 
             activeDestinationRecommendationRow = snapshot.activeDestinationRecommendationRow?.toModel(),
             activeCuratedTripRow = snapshot.activeCuratedTripRow?.toModel(),
             activePlaceRecommendationRow = snapshot.activePlaceRecommendationRow?.toModel(),
-            anchorMessageId = snapshot.anchorMessageId
+            anchorMessageId = snapshot.anchorMessageId,
+            lockedDestination = snapshot.lockedDestination,
+            lockedDestinationImageUrl = snapshot.lockedDestinationImageUrl
         )
         isLoading = false
     }
@@ -730,7 +724,9 @@ class AiChatViewModel(application: Application) : AndroidViewModel(application) 
             activeDestinationRecommendationRow = sessionState.activeDestinationRecommendationRow?.toPersisted(),
             activeCuratedTripRow = sessionState.activeCuratedTripRow?.toPersisted(),
             activePlaceRecommendationRow = sessionState.activePlaceRecommendationRow?.toPersisted(),
-            anchorMessageId = sessionState.anchorMessageId
+            anchorMessageId = sessionState.anchorMessageId,
+            lockedDestination = sessionState.lockedDestination,
+            lockedDestinationImageUrl = sessionState.lockedDestinationImageUrl
         )
 
         processSnapshot = snapshot
@@ -1372,14 +1368,16 @@ class AiChatViewModel(application: Application) : AndroidViewModel(application) 
                 needsLookup.map { it.destination }
                     .distinct()
                     .forEach { destination ->
-                        val key = heroImageCacheKey(destination)
+                        val query = "$destination skyline"
+                        val params = UnsplashSearchParams(orientation = "landscape")
+                        val key = heroImageCacheKey(query, params)
                         val cached = heroImageCache[key]
                         if (cached != null) {
                             resolved[destination] = cached
                             return@forEach
                         }
                         val resolvedUrl = runCatching {
-                            destinationImages.resolveDestinationImage(destination).imageUrl
+                            destinationImages.resolve(query = query, params = params)
                         }.onFailure { error ->
                             Log.w(TAG, "Hero image lookup failed for '$destination': ${error.message}")
                         }.getOrNull()
@@ -1391,12 +1389,25 @@ class AiChatViewModel(application: Application) : AndroidViewModel(application) 
 
                 if (resolved.isEmpty()) return@launch
 
+                val context = getApplication<Application>()
+                val cachedMedia = runCatching {
+                    ImageCacheManager.cacheMedia(
+                        context = context,
+                        bucketName = AI_CHAT_IMAGE_CACHE_BUCKET,
+                        urls = resolved.values.toList()
+                    )
+                }.onFailure { error ->
+                    Log.w(TAG, "Curated trip image cache write failed: ${error.message}")
+                }.getOrDefault(emptyMap())
+
                 val current = sessionState.activeCuratedTripRow ?: return@launch
                 if (current.id != curatedRowId) return@launch
 
                 val updatedTrips = current.trips.map { starter ->
                     if (!starter.heroImageUrl.isNullOrBlank()) starter
-                    else resolved[starter.destination]?.let { url -> starter.copy(heroImageUrl = url) }
+                    else resolved[starter.destination]?.let { url ->
+                        starter.copy(heroImageUrl = cachedMedia[url] ?: url)
+                    }
                         ?: starter
                 }
                 if (updatedTrips == current.trips) return@launch
@@ -1421,14 +1432,16 @@ class AiChatViewModel(application: Application) : AndroidViewModel(application) 
                 needsLookup.map { it.destination }
                     .distinct()
                     .forEach { destination ->
-                        val key = heroImageCacheKey(destination)
+                        val query = "$destination travel"
+                        val params = UnsplashSearchParams()
+                        val key = heroImageCacheKey(query, params)
                         val cached = heroImageCache[key]
                         if (cached != null) {
                             resolved[destination] = cached
                             return@forEach
                         }
                         val resolvedUrl = runCatching {
-                            destinationImages.resolveDestinationImage(destination).imageUrl
+                            destinationImages.resolve(query = query, params = params)
                         }.onFailure { error ->
                             Log.w(TAG, "Destination image lookup failed for '$destination': ${error.message}")
                         }.getOrNull()
@@ -1440,12 +1453,25 @@ class AiChatViewModel(application: Application) : AndroidViewModel(application) 
 
                 if (resolved.isEmpty()) return@launch
 
+                val context = getApplication<Application>()
+                val cachedMedia = runCatching {
+                    ImageCacheManager.cacheMedia(
+                        context = context,
+                        bucketName = AI_CHAT_IMAGE_CACHE_BUCKET,
+                        urls = resolved.values.toList()
+                    )
+                }.onFailure { error ->
+                    Log.w(TAG, "Destination image cache write failed: ${error.message}")
+                }.getOrDefault(emptyMap())
+
                 val current = sessionState.activeDestinationRecommendationRow ?: return@launch
                 if (current.id != destinationRowId) return@launch
 
                 val updatedRecs = current.recommendations.map { rec ->
                     if (!rec.imageUrl.isNullOrBlank()) rec
-                    else resolved[rec.destination]?.let { url -> rec.copy(imageUrl = url) }
+                    else resolved[rec.destination]?.let { url ->
+                        rec.copy(imageUrl = cachedMedia[url] ?: url)
+                    }
                         ?: rec
                 }
                 if (updatedRecs == current.recommendations) return@launch
@@ -1457,13 +1483,23 @@ class AiChatViewModel(application: Application) : AndroidViewModel(application) 
         }
     }
 
-    private fun heroImageCacheKey(destination: String): String {
-        return destination.substringBefore(",").trim().lowercase(Locale.US)
+    private fun heroImageCacheKey(query: String, params: UnsplashSearchParams): String {
+        val sanitizedParams = params.sanitized()
+        return listOf(
+            query.trim().lowercase(Locale.US),
+            sanitizedParams.orientation.orEmpty().lowercase(Locale.US),
+            sanitizedParams.color.orEmpty().lowercase(Locale.US),
+            sanitizedParams.orderBy.lowercase(Locale.US),
+            sanitizedParams.contentFilter.lowercase(Locale.US),
+            sanitizedParams.perPage.toString(),
+            sanitizedParams.pageIndex.toString()
+        ).joinToString("|")
     }
 
     private companion object {
         private const val STARTER_CARD_GROUP_ID = "starter_grid"
         private const val TAG = "AiChatViewModel"
+        private const val AI_CHAT_IMAGE_CACHE_BUCKET = "ai_chat_destination_images"
         private const val BASE_SYSTEM_PROMPT =
             "You are TravelCents AI, a trip-planning copilot inside the TravelCents app. " +
                 "Be concise, helpful, and practical. Keep replies to short acknowledgment paragraphs. " +
@@ -1474,9 +1510,6 @@ class AiChatViewModel(application: Application) : AndroidViewModel(application) 
                 "Briefly summarize what you already know about the user's trip in 1 to 2 sentences, " +
                 "then say the app is showing next-step options below to suggest destinations, build a starter trip, or keep refining. " +
                 "Do not ask another question — the user will pick from the buttons."
-        private const val WIKIMEDIA_CONTACT_URL = "https://github.com/bit-lords-csulb/Travel-Cents"
-        private val WIKIMEDIA_USER_AGENT =
-            "TravelCents/${BuildConfig.VERSION_NAME} (Android app; $WIKIMEDIA_CONTACT_URL)"
 
         private var processSnapshot: PersistedAiChatSnapshot? = null
     }

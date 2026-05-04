@@ -61,6 +61,7 @@ import com.example.travelcents.data.ai.chat.AiCuratedTripStarter
 import com.example.travelcents.data.ai.chat.AiTripIntakeProfile
 import com.example.travelcents.data.trip.TripKey
 import com.example.travelcents.ui.main.aichat.components.AddToTripBottomSheet
+import com.example.travelcents.ui.main.aichat.components.AiChatLockedDestinationBanner
 import com.example.travelcents.ui.main.aichat.components.AiChatBubble
 import com.example.travelcents.ui.main.aichat.components.AiChatComposer
 import com.example.travelcents.ui.main.aichat.components.AiChatHistoryScreen
@@ -81,6 +82,7 @@ fun AiTripChatPage(
     modifier: Modifier = Modifier,
     onBackClick: () -> Unit = {},
     onOpenTrip: (TripKey) -> Unit = {},
+    onOpenPreviewTrip: () -> Unit = {},
     onCreateDraftTrip: (AiCuratedTripStarter, AiTripIntakeProfile) -> Unit = { _, _ -> },
     viewModel: AiChatViewModel = viewModel()
 ) {
@@ -218,6 +220,12 @@ fun AiTripChatPage(
                     onBackClick = onBackClick,
                     onHistoryClick = { showHistory = true },
                     onNewChatClick = { viewModel.startNewChat() }
+                )
+
+                AiChatLockedDestinationBanner(
+                    destination = uiState.lockedDestination,
+                    imageUrl = uiState.lockedDestinationImageUrl,
+                    onOpenTrip = onOpenPreviewTrip
                 )
 
                 LazyColumn(

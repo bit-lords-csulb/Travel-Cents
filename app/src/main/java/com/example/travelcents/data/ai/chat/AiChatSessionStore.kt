@@ -22,7 +22,9 @@ data class PersistedAiChatSnapshot(
     val activeDestinationRecommendationRow: PersistedAiDestinationRecommendationRow? = null,
     val activeCuratedTripRow: PersistedAiCuratedTripRow? = null,
     val activePlaceRecommendationRow: PersistedAiPlaceRecommendationRow? = null,
-    val anchorMessageId: String? = null
+    val anchorMessageId: String? = null,
+    val lockedDestination: String? = null,
+    val lockedDestinationImageUrl: String? = null
 )
 
 data class PersistedAiChatMessage(

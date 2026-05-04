@@ -35,8 +35,8 @@ abstract class TravelCentsDatabase : RoomDatabase() {
 
     companion object {
         private val MIGRATION_5_6 = object : Migration(5, 6) {
-            override fun migrate(database: SupportSQLiteDatabase) {
-                database.execSQL(
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL(
                     "ALTER TABLE trip_summary ADD COLUMN timeZoneId TEXT NOT NULL DEFAULT ''"
                 )
             }
@@ -53,7 +53,7 @@ abstract class TravelCentsDatabase : RoomDatabase() {
                     "travel_cents.db"
                 )
                     .addMigrations(MIGRATION_5_6)
-                    .fallbackToDestructiveMigration()
+                    .fallbackToDestructiveMigration(true)
                     .build()
                     .also { built -> instance = built }
             }

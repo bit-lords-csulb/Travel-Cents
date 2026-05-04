@@ -19,7 +19,9 @@ data class AiChatSessionState(
     val activeCuratedTripRow: AiCuratedTripRow? = null,
     val activePlaceRecommendationRow: AiPlaceRecommendationRow? = null,
     val activeSingleEventCard: AiSingleEventSuggestion? = null,
-    val anchorMessageId: String? = null
+    val anchorMessageId: String? = null,
+    val lockedDestination: String? = null,
+    val lockedDestinationImageUrl: String? = null
 )
 
 data class AiChatUiState(
@@ -39,7 +41,9 @@ data class AiChatUiState(
     val pendingAddToTripEvent: AiSingleEventSuggestion? = null,
     val availableTrips: List<AiChatTripOption> = emptyList(),
     val bookmarkedPlaceIds: Set<String> = emptySet(),
-    val isLoading: Boolean = false
+    val isLoading: Boolean = false,
+    val lockedDestination: String? = null,
+    val lockedDestinationImageUrl: String? = null
 )
 
 data class AiChatTripOption(

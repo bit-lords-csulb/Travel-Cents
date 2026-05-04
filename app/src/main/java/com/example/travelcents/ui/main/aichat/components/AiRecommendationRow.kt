@@ -27,9 +27,12 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImage
+import coil.request.CachePolicy
+import coil.request.ImageRequest
 import com.example.travelcents.ui.main.newTrip.TripWizardColors
 import com.example.travelcents.ui.theme.DeepSea4
 import com.example.travelcents.ui.theme.DeepSea5
@@ -98,6 +101,7 @@ private fun RecommendationCard(
     recommendation: AiRecommendationCardModel,
     onClick: () -> Unit
 ) {
+    val context = LocalContext.current
     Surface(
         modifier = Modifier
             .width(244.dp)
@@ -120,7 +124,13 @@ private fun RecommendationCard(
                         .background(TripWizardColors.ContainerHighest)
                 ) {
                     AsyncImage(
-                        model = recommendation.imageUrl,
+                        model = ImageRequest.Builder(context)
+                            .data(recommendation.imageUrl)
+                            .crossfade(true)
+                            .diskCachePolicy(CachePolicy.ENABLED)
+                            .memoryCachePolicy(CachePolicy.ENABLED)
+                            .networkCachePolicy(CachePolicy.ENABLED)
+                            .build(),
                         contentDescription = recommendation.headline,
                         contentScale = ContentScale.Crop,
                         modifier = Modifier.fillMaxSize()
