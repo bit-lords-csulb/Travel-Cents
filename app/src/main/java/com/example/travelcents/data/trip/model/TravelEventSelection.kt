@@ -34,12 +34,23 @@ fun TravelEvent.withSelectedOption(option: EventOption): TravelEvent {
     val nextImageUrl = option.imageUrl.ifBlank { imageUrl }
     val nextLocalImagePath = option.localImagePath.ifBlank { localImagePath }
     val nextPhotoUrls = option.photoUrls.ifEmpty { photoUrls }
+    val optionNativeBookable = option.detailValue("isNativeBookable", "nativeBookable")
+    val optionBookingUrl = option.detailValue("booking_url", "bookingUrl", ATTR_BOOKING_URL)
+        ?.takeIf { it.isNotBlank() }
+    val selectedNativeBookable = optionNativeBookable ?: isNativeBookable
+    val selectedBookingUrl = when {
+        optionNativeBookable != null -> optionBookingUrl
+        optionBookingUrl != null -> optionBookingUrl
+        else -> bookingUrl
+    }
 
     return copy(
         imageUrl = nextImageUrl,
         localImagePath = nextLocalImagePath,
         photoUrls = nextPhotoUrls,
         selectedOptionId = option.optionId,
+        isNativeBookable = selectedNativeBookable,
+        bookingUrl = selectedBookingUrl,
         details = mergedDetails
     )
 }

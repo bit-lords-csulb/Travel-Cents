@@ -25,6 +25,35 @@ VIATOR_PAGE_SIZE = 50
 PINECONE_BATCH_SIZE = 100
 
 
+def extract_viator_image_urls(product):
+    images = product.get("images") or []
+    if not isinstance(images, list):
+        return []
+
+    ordered_images = sorted(
+        images,
+        key=lambda image: 0 if image.get("isCover") else 1
+    )
+
+    urls = []
+    for image in ordered_images:
+        variants = image.get("variants") or []
+        if not isinstance(variants, list):
+            continue
+
+        sorted_variants = sorted(
+            variants,
+            key=lambda variant: (variant.get("width") or 0) * (variant.get("height") or 0),
+            reverse=True
+        )
+        for variant in sorted_variants:
+            url = variant.get("url")
+            if url and url not in urls:
+                urls.append(url)
+
+    return urls
+
+
 def step_one_fetch_and_filter(api_key):
     print("Connecting to Viator PRODUCTION API...")
     headers = {
@@ -71,13 +100,16 @@ def step_one_fetch_and_filter(api_key):
                 activity_id = item.get('productCode')
                 if not activity_id:
                     continue
+                image_urls = extract_viator_image_urls(item)
 
                 all_activities.append({
                     "activity_id": activity_id,
                     "title": item.get('title') or '',
                     "description": item.get('description', ''),
                     "city": city_name,
-                    "booking_url": item.get('productUrl', '')
+                    "booking_url": item.get('productUrl', ''),
+                    "image_url": image_urls[0] if image_urls else '',
+                    "photo_urls": image_urls[:5]
                 })
                 city_activity_count += 1
 
@@ -132,6 +164,12 @@ def step_two_embed_and_upload(df, pinecone_key):
     # IMPORTANT: Update this string if you named your index something else!
     index = pc.Index("travel-cents-inventory")
 
+    print("Clearing existing activity records for demo cities...")
+    for city_name in DEMO_CITIES.keys():
+        print(f"  Deleting existing Pinecone records for {city_name}...")
+        index.delete(filter={"city": {"$eq": city_name}})
+    print(f"Cleared existing records for {len(DEMO_CITIES)} demo cities.")
+
     # 5. Upload in Batches
     print("Uploading vectors to the cloud...")
     total_seeded = 0
@@ -148,11 +186,14 @@ def step_two_embed_and_upload(df, pinecone_key):
                     "activity_id": str(row['activity_id']),
                     "title": row['title'],
                     "booking_url": row['booking_url'],
+                    "image_url": row['image_url'],
+                    "photo_urls": row['photo_urls'],
                     "city": row['city']
                 }
             })
         index.upsert(vectors=vectors_to_upsert)
         total_seeded += len(vectors_to_upsert)
+        print(f"  Uploaded batch {i // PINECONE_BATCH_SIZE + 1}: {len(vectors_to_upsert)} activities")
 
     print("\nSUCCESS: Database fully seeded and ready for the cloud!")
     return total_seeded

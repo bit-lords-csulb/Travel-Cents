@@ -502,8 +502,10 @@ private fun buildCurrentTripItineraryItems(events: List<TravelEvent>): List<Curr
     val sorted = events.sortedWith(
         compareBy(
             { it.date.ifBlank { "9999-12-31" } },
-            { it.details["sortOrder"]?.toIntOrNull() ?: 0 },
-            { normalizeTime(it.startTime) }
+            { normalizeTime(it.startTime) },
+            { itineraryEventTypePriority(it) },
+            { it.details["sortOrder"]?.toIntOrNull() ?: Int.MAX_VALUE },
+            { it.eventId }
         )
     )
     val grouped = sorted.groupBy { it.date.ifBlank { UndatedGroupKey } }
@@ -518,6 +520,15 @@ private fun buildCurrentTripItineraryItems(events: List<TravelEvent>): List<Curr
             }
             add(CurrentTripItineraryItem.DaySpacer(date))
         }
+    }
+}
+
+private fun itineraryEventTypePriority(event: TravelEvent): Int {
+    return when (event.type.lowercase(Locale.US)) {
+        "flight" -> 0
+        "hotel" -> 1
+        "restaurant", "dining", "food" -> 2
+        else -> 3
     }
 }
 

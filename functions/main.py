@@ -59,6 +59,83 @@ CITY_ALIASES = {
     "nrt": "Tokyo",
 }
 
+MATCH_SCORE_THRESHOLD = 0.5
+PINECONE_OPTION_COUNT = 6
+VIATOR_PRODUCT_DETAIL_URL = "https://api.viator.com/partner/products/{product_code}"
+
+
+def normalize_string_list(value):
+    if isinstance(value, list):
+        return [str(item) for item in value if str(item or "").strip()]
+    if isinstance(value, str) and value.strip():
+        return [value.strip()]
+    return []
+
+
+def extract_viator_image_urls(product):
+    images = product.get("images") or []
+    if not isinstance(images, list):
+        return []
+
+    ordered_images = sorted(
+        images,
+        key=lambda image: 0 if image.get("isCover") else 1
+    )
+
+    urls = []
+    for image in ordered_images:
+        variants = image.get("variants") or []
+        if not isinstance(variants, list):
+            continue
+
+        sorted_variants = sorted(
+            variants,
+            key=lambda variant: (variant.get("width") or 0) * (variant.get("height") or 0),
+            reverse=True
+        )
+        for variant in sorted_variants:
+            url = variant.get("url")
+            if url and url not in urls:
+                urls.append(url)
+
+    return urls
+
+
+def fetch_viator_product_images(product_code, api_key):
+    if not product_code or not api_key:
+        return []
+
+    headers = {
+        "exp-api-key": api_key,
+        "Accept-Language": "en-US",
+        "Accept": "application/json;version=2.0"
+    }
+
+    try:
+        response = requests.get(
+            VIATOR_PRODUCT_DETAIL_URL.format(product_code=product_code),
+            headers=headers,
+            timeout=8
+        )
+        if response.status_code != 200:
+            print(f"Viator image lookup failed for {product_code}: {response.status_code}", flush=True)
+            return []
+        return extract_viator_image_urls(response.json())
+    except Exception as error:
+        print(f"Viator image lookup failed for {product_code}: {error}", flush=True)
+        return []
+
+
+def hydrate_option_images(option, viator_key):
+    if option.get("image_url") or option.get("photo_urls"):
+        return option
+
+    image_urls = fetch_viator_product_images(option.get("activity_id"), viator_key)
+    if image_urls:
+        option["image_url"] = image_urls[0]
+        option["photo_urls"] = image_urls[:5]
+    return option
+
 
 def normalize_city_key(value):
     normalized = unicodedata.normalize("NFKD", str(value or ""))
@@ -96,6 +173,39 @@ def resolve_inventory_city(destination):
     return fallback_city_name(destination)
 
 
+def match_field(match, key, default=None):
+    if isinstance(match, dict):
+        return match.get(key, default)
+    return getattr(match, key, default)
+
+
+def match_to_activity_option(match):
+    score = match_field(match, "score", 0.0) or 0.0
+    metadata = match_field(match, "metadata", {}) or {}
+    activity_id = str(metadata.get("activity_id") or "")
+    title = metadata.get("title") or ""
+    booking_url = metadata.get("booking_url") or ""
+    image_url = metadata.get("image_url") or metadata.get("imageUrl") or ""
+    photo_urls = normalize_string_list(metadata.get("photo_urls") or metadata.get("photoUrls"))
+    if image_url and image_url not in photo_urls:
+        photo_urls.insert(0, image_url)
+    option_id = match_field(match, "id", "") or (
+        f"{metadata.get('city', '')}::{activity_id}" if activity_id else title
+    )
+
+    return {
+        "option_id": option_id,
+        "activity_id": activity_id,
+        "title": title,
+        "real_title": title,
+        "booking_url": booking_url,
+        "image_url": image_url,
+        "photo_urls": photo_urls[:5],
+        "isNativeBookable": "true" if booking_url else "false",
+        "score": score
+    }
+
+
 @https_fn.on_call()
 def generate_itinerary(req: https_fn.CallableRequest):
     # 1. Extract all the travel details sent from the Android app's TravelRequest model
@@ -128,6 +238,7 @@ def generate_itinerary(req: https_fn.CallableRequest):
     groq_key = os.getenv("GROQ_API_KEY")
     hf_token = os.getenv("HF_TOKEN")
     pinecone_key = os.getenv("PINECONE_API_KEY")
+    viator_key = os.getenv("VIATOR_API_KEY")
 
     client = Groq(api_key=groq_key)
 
@@ -227,35 +338,58 @@ def generate_itinerary(req: https_fn.CallableRequest):
                 # Query Pinecone with the cleaned target_city
                 search_result = index.query(
                     vector=vector,
-                    top_k=1,
+                    top_k=PINECONE_OPTION_COUNT,
                     include_metadata=True,
                     filter={"city": {"$eq": target_city}}
                 )
 
-                if search_result['matches']:
-                    match = search_result['matches'][0]
-                    score = match['score']
-                    best_match_meta = match['metadata']
+                matches = search_result['matches']
+                if matches:
+                    viable_options = [
+                        match_to_activity_option(match)
+                        for match in matches
+                        if (match_field(match, "score", 0.0) or 0.0) > MATCH_SCORE_THRESHOLD
+                    ]
+                    match = matches[0]
+                    score = match_field(match, "score", 0.0) or 0.0
+                    best_match_meta = match_field(match, "metadata", {}) or {}
 
                     print(f"   ✅ Best Match: {best_match_meta.get('title')} (Score: {score:.4f})", flush=True)
 
-                    if score > 0.5:
-                        activity['booking_url'] = best_match_meta.get('booking_url', "")
-                        activity['real_title'] = best_match_meta.get('title', "")
+                    if viable_options:
+                        selected_option = viable_options[0]
+                        hydrate_option_images(selected_option, viator_key)
+                        activity['option_id'] = selected_option.get('option_id', "")
+                        activity['activity_id'] = selected_option.get('activity_id', "")
+                        activity['booking_url'] = selected_option.get('booking_url', "")
+                        activity['image_url'] = selected_option.get('image_url', "")
+                        activity['photo_urls'] = selected_option.get('photo_urls', [])
+                        activity['real_title'] = selected_option.get('title', "")
                         activity['isNativeBookable'] = "true"
+                        activity['options'] = [
+                            {
+                                **option,
+                                "selected": option.get("option_id") == selected_option.get("option_id")
+                            }
+                            for option in viable_options
+                        ]
                     else:
                         print(f"   ⚠️ Score too low ({score:.4f}).", flush=True)
                         activity['isNativeBookable'] = "false"
+                        activity['options'] = []
                 else:
                     print(f"   ❌ No database matches for '{activity_title}' in {target_city}.", flush=True)
                     activity['isNativeBookable'] = "false"
+                    activity['options'] = []
             else:
                 print(f"   ❌ HF Error: {hf_response.status_code}", flush=True)
                 activity['isNativeBookable'] = "false"
+                activity['options'] = []
 
         except Exception as e:
             print(f"   🔥 Error: {e}", flush=True)
             activity['isNativeBookable'] = "false"
+            activity['options'] = []
 
         final_itinerary.append(activity)
 

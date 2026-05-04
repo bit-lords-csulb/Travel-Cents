@@ -1,6 +1,7 @@
 package com.example.travelcents.ui.main.newTrip
 
 import android.app.Application
+import android.util.Log
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
@@ -40,6 +41,7 @@ import com.example.travelcents.data.trip.remote.SerpRepository
 import com.example.travelcents.data.trip.model.detailValue
 import com.example.travelcents.data.trip.remote.TicketmasterRepository
 import com.example.travelcents.data.trip.remote.YelpRepository
+import com.example.travelcents.data.trip.model.YELP_POOL_TYPE_ACTIVITIES
 import com.example.travelcents.data.trip.model.YELP_POOL_TYPE_RESTAURANTS
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FirebaseFirestore
@@ -220,7 +222,7 @@ class NewTripViewModel(application: Application) : AndroidViewModel(application)
                 val flightPrice = realFlights.firstOrNull()?.details?.get("total_price")?.toDoubleOrNull() ?: 0.0
                 val hotelPerNight = realHotels.firstOrNull()?.details?.get("rate_per_night")?.toDoubleOrNull() ?: 0.0
                 val hotelTotal = hotelPerNight * itinerary.durationDays
-                val remainingBudget = if (budget > 0) maxOf(0.0, budget - flightPrice - hotelTotal) else 0.0
+                // val remainingBudget = if (budget > 0) maxOf(0.0, budget - flightPrice - hotelTotal) else 0.0
 
                 val outboundFlight = realFlights.firstOrNull { it.details["trip_segment"] == "outbound" }
                 val returnFlight = realFlights.firstOrNull { it.details["trip_segment"] == "return" }
@@ -271,50 +273,99 @@ class NewTripViewModel(application: Application) : AndroidViewModel(application)
                     localEvents = emptyList()
                 } else {
                     val aiActivitiesDeferred = async {
-                        TripPlannerRepository.getAIActivities(
-                            request = request,
-                            itineraryId = itinerary.itineraryId,
-                            dates = tripDates,
-                            flightArrival = firstFlightArrival,
-                            activityWindow = scheduleWindow.toPayloadMap(),
-                            flights = flightContext,
-                            hotel = hotelContext
-                        )
+                        runCatching {
+                            TripPlannerRepository.getAIActivities(
+                                request = request,
+                                itineraryId = itinerary.itineraryId,
+                                dates = tripDates,
+                                flightArrival = firstFlightArrival,
+                                activityWindow = scheduleWindow.toPayloadMap(),
+                                flights = flightContext,
+                                hotel = hotelContext
+                            )
+                        }.getOrElse { error ->
+                            Log.w(TAG, "Local activity emulator unavailable; continuing without AI inventory activities.", error)
+                            emptyList()
+                        }
+                    }
+                    val activityPoolDeferred = async {
+                        runCatching {
+                            YelpRepository.mapBusinessesToPoolItems(
+                                YelpRepository.fetchActivityPool(
+                                    location = itinerary.destination,
+                                    targetCount = sharedYelpPoolTarget(tripDates.size)
+                                )
+                            )
+                        }.getOrElse { error ->
+                            Log.w(TAG, "Yelp activity pool unavailable; continuing without shared activity backups.", error)
+                            emptyList()
+                        }
                     }
                     val yelpEventsDeferred = async {
-                        YelpRepository.searchEvents(
-                            location = itinerary.destination,
-                            startDate = scheduleWindow.startDate,
-                            endDate = scheduleWindow.endDate,
-                            itineraryId = itinerary.itineraryId
-                        )
-                    }
-                    val ticketmasterEventsDeferred = async {
-                        if (BuildConfig.TICKETMASTER_API_KEY.isBlank()) {
-                            emptyList()
-                        } else {
-                            TicketmasterRepository.searchEventsForTrip(
+                        runCatching {
+                            YelpRepository.searchEvents(
                                 location = itinerary.destination,
                                 startDate = scheduleWindow.startDate,
                                 endDate = scheduleWindow.endDate,
-                                itineraryId = itinerary.itineraryId,
-                                classification = interestsToTicketmasterClassification(request.interests)
+                                itineraryId = itinerary.itineraryId
                             )
+                        }.getOrElse { error ->
+                            Log.w(TAG, "Yelp activity fallback unavailable; continuing without Yelp events.", error)
+                            emptyList()
                         }
                     }
-                    activityEvents = applyActivityWindow(
+                    val ticketmasterEventsDeferred = async {
+                        runCatching {
+                            if (BuildConfig.TICKETMASTER_API_KEY.isBlank()) {
+                                emptyList()
+                            } else {
+                                TicketmasterRepository.searchEventsForTrip(
+                                    location = itinerary.destination,
+                                    startDate = scheduleWindow.startDate,
+                                    endDate = scheduleWindow.endDate,
+                                    itineraryId = itinerary.itineraryId,
+                                    classification = interestsToTicketmasterClassification(request.interests)
+                                )
+                            }
+                        }.getOrElse { error ->
+                            Log.w(TAG, "Ticketmaster activity fallback unavailable; continuing without ticketed events.", error)
+                            emptyList()
+                        }
+                    }
+                    val aiCandidate = applyActivityWindow(
                         aiActivitiesDeferred.await(),
                         earliestDate = scheduleWindow.startDate,
                         minimumStartTime = scheduleWindow.minimumStartTime,
                         latestDate = scheduleWindow.endDate,
                         maximumEndTime = scheduleWindow.maximumEndTime
                     )
+                    val activityPool = activityPoolDeferred.await()
+                    if (activityPool.isNotEmpty()) {
+                        yelpOptionPools[YELP_POOL_TYPE_ACTIVITIES] = activityPool
+                    }
+                    val yelpCandidate = applyActivityWindow(
+                        YelpRepository.distributePoolToSelectedEvents(
+                            pool = activityPool,
+                            dates = tripDates,
+                            type = "activity",
+                            itineraryId = itinerary.itineraryId
+                        ),
+                        earliestDate = scheduleWindow.startDate,
+                        minimumStartTime = scheduleWindow.minimumStartTime,
+                        latestDate = scheduleWindow.endDate,
+                        maximumEndTime = scheduleWindow.maximumEndTime
+                    )
+                    activityEvents = when {
+                        aiCandidate.isNotEmpty() -> aiCandidate
+                        yelpCandidate.isNotEmpty() -> yelpCandidate
+                        else -> emptyList()
+                    }
                     val mergedLocalEvents = mergeLocalActivityEvents(
                         yelpEvents = yelpEventsDeferred.await(),
                         ticketmasterEvents = ticketmasterEventsDeferred.await()
                     )
                     localEvents = filterEventsAfterTime(
-                        filterEventsBeforeTime(
+                        filterEventsBeforeWindow(
                             mergedLocalEvents,
                             scheduleWindow.startDate,
                             scheduleWindow.minimumStartTime
@@ -324,7 +375,9 @@ class NewTripViewModel(application: Application) : AndroidViewModel(application)
                     )
                 }
 
-                val allEvents = realFlights + realHotels + restaurantEvents + activityEvents + localEvents
+                val allEvents = normalizeGeneratedEventOrder(
+                    realFlights + realHotels + restaurantEvents + activityEvents + localEvents
+                )
                 val linkedItinerary = itinerary.copy(eventIds = allEvents.map { it.eventId })
 
                 // Step 5: Download selected hero images plus the selected hotel galleries.
@@ -473,7 +526,8 @@ class NewTripViewModel(application: Application) : AndroidViewModel(application)
     }
 
     private fun parseTripDate(rawDate: String): LocalDate? {
-        return runCatching { LocalDate.parse(rawDate, DateTimeFormatter.ISO_LOCAL_DATE) }.getOrNull()
+        val normalized = normalizedTripDate(rawDate) ?: return null
+        return runCatching { LocalDate.parse(normalized, DateTimeFormatter.ISO_LOCAL_DATE) }.getOrNull()
     }
 
     private fun buildActivityScheduleWindow(
@@ -483,7 +537,15 @@ class NewTripViewModel(application: Application) : AndroidViewModel(application)
     ): ActivityScheduleWindow {
         val arrivalDate = flightArrivalDate(outboundFlight) ?: request.dateFrom
         val arrivalTime = flightArrivalTime(outboundFlight)
-        val earliestDateTime = buildDateTime(arrivalDate, arrivalTime)?.plusHours(2)
+        val earliestDateTime = buildDateTime(arrivalDate, arrivalTime)
+            ?.plusHours(ACTIVITY_BUFFER_AFTER_ARRIVAL_HOURS)
+            ?.let { candidate ->
+                if (candidate.toLocalTime().isAfter(LATEST_FIRST_DAY_ACTIVITY_START)) {
+                    LocalDateTime.of(candidate.toLocalDate().plusDays(1), DEFAULT_ACTIVITY_START_TIME)
+                } else {
+                    candidate
+                }
+            }
         val rawStartDate = earliestDateTime?.toLocalDate()?.format(DateTimeFormatter.ISO_LOCAL_DATE)
             ?: arrivalDate
         val parsedStartDate = parseTripDate(rawStartDate)
@@ -559,9 +621,10 @@ class NewTripViewModel(application: Application) : AndroidViewModel(application)
     }
 
     private fun flightArrivalDate(flight: TravelEvent?): String? {
-        return flight?.details?.get("arrival_date")
-            ?.takeIf { it.isNotBlank() }
-            ?: flight?.date?.takeIf { it.isNotBlank() }
+        return normalizedTripDate(flight?.details?.get("arrival_date"))
+            ?: normalizedTripDate(flight?.details?.get("arrival_time"))
+            ?: normalizedTripDate(flight?.details?.get("leg_0_arrival"))
+            ?: normalizedTripDate(flight?.date)
     }
 
     private fun flightArrivalTime(flight: TravelEvent?): String? {
@@ -572,8 +635,8 @@ class NewTripViewModel(application: Application) : AndroidViewModel(application)
     }
 
     private fun flightDepartureDate(flight: TravelEvent?): String? {
-        return flight?.date?.takeIf { it.isNotBlank() }
-            ?: flight?.details?.get("departure_time")?.substringBefore(" ")?.takeIf { it.isNotBlank() }
+        return normalizedTripDate(flight?.details?.get("departure_time"))
+            ?: normalizedTripDate(flight?.date)
     }
 
     private fun flightDepartureTime(flight: TravelEvent?): String? {
@@ -602,6 +665,43 @@ class NewTripViewModel(application: Application) : AndroidViewModel(application)
         }
     }
 
+    private fun normalizedTripDate(rawDate: String?): String? {
+        val value = rawDate?.trim()?.takeIf { it.isNotBlank() } ?: return null
+        return ISO_DATE_REGEX.find(value)?.value
+    }
+
+    private fun normalizeGeneratedEventOrder(events: List<TravelEvent>): List<TravelEvent> {
+        return events
+            .groupBy { normalizedTripDate(it.date).orEmpty().ifBlank { it.date } }
+            .toSortedMap(compareBy<String> { if (it.isBlank()) "9999-12-31" else it })
+            .values
+            .flatMap { dayEvents ->
+                dayEvents
+                    .sortedWith(
+                        compareBy<TravelEvent>(
+                            { parseTripTime(it.startTime) ?: LocalTime.MAX },
+                            { generatedEventTypePriority(it) },
+                            { it.eventId }
+                        )
+                    )
+                    .mapIndexed { index, event ->
+                        event.copy(
+                            date = normalizedTripDate(event.date) ?: event.date,
+                            details = event.details + ("sortOrder" to index.toString())
+                        )
+                    }
+            }
+    }
+
+    private fun generatedEventTypePriority(event: TravelEvent): Int {
+        return when (event.type.lowercase(Locale.US)) {
+            "flight" -> 0
+            "hotel" -> 1
+            "restaurant", "dining", "food" -> 2
+            else -> 3
+        }
+    }
+
     private fun applyActivityWindow(
         events: List<TravelEvent>,
         earliestDate: String,
@@ -610,46 +710,66 @@ class NewTripViewModel(application: Application) : AndroidViewModel(application)
         maximumEndTime: String?
     ): List<TravelEvent> {
         return filterEventsAfterTime(
-            deferSyntheticEvents(events, earliestDate, minimumStartTime),
+            deferSyntheticEventsBeforeWindow(events, earliestDate, minimumStartTime),
             latestDate,
             maximumEndTime
         )
     }
 
-    private fun deferSyntheticEvents(
+    private fun deferSyntheticEventsBeforeWindow(
         events: List<TravelEvent>,
-        targetDate: String,
+        earliestDate: String,
         minimumStartTime: String?
     ): List<TravelEvent> {
-        val minTime = parseTripTime(minimumStartTime) ?: return events
+        val minDate = parseTripDate(earliestDate) ?: return events
+        val minTime = parseTripTime(minimumStartTime)
         return events.map { event ->
-            if (event.date != targetDate) return@map event
+            val eventDate = parseTripDate(event.date) ?: return@map event
+            val start = parseTripTime(event.startTime)
 
-            val start = parseTripTime(event.startTime) ?: return@map event
-            if (!start.isBefore(minTime)) return@map event
-
-            val end = parseTripTime(event.endTime)
-            val durationMinutes = if (end != null && end.isAfter(start)) {
-                Duration.between(start, end).toMinutes()
-            } else {
-                120L
+            if (eventDate.isBefore(minDate)) {
+                return@map event.copy(
+                    date = earliestDate,
+                    startTime = (minTime ?: start ?: DEFAULT_ACTIVITY_START_TIME).format(TRIP_TIME_FORMATTER),
+                    endTime = shiftedEndTime(start, parseTripTime(event.endTime), minTime ?: start ?: DEFAULT_ACTIVITY_START_TIME)
+                )
             }
+
+            if (eventDate.isAfter(minDate) || minTime == null) return@map event
+            if (start != null && !start.isBefore(minTime)) return@map event
+
             event.copy(
                 startTime = minTime.format(TRIP_TIME_FORMATTER),
-                endTime = minTime.plusMinutes(durationMinutes).format(TRIP_TIME_FORMATTER)
+                endTime = shiftedEndTime(start, parseTripTime(event.endTime), minTime)
             )
         }
     }
 
-    private fun filterEventsBeforeTime(
+    private fun filterEventsBeforeWindow(
         events: List<TravelEvent>,
-        targetDate: String,
+        earliestDate: String,
         minimumStartTime: String?
     ): List<TravelEvent> {
-        val minTime = parseTripTime(minimumStartTime) ?: return events
-        return events.filterNot { event ->
-            event.date == targetDate && (parseTripTime(event.startTime)?.isBefore(minTime) == true)
+        val minDate = parseTripDate(earliestDate) ?: return events
+        val minTime = parseTripTime(minimumStartTime)
+        return events.filter { event ->
+            val eventDate = parseTripDate(event.date) ?: return@filter true
+            when {
+                eventDate.isBefore(minDate) -> false
+                eventDate.isAfter(minDate) -> true
+                minTime == null -> true
+                else -> parseTripTime(event.startTime)?.let { start -> !start.isBefore(minTime) } ?: false
+            }
         }
+    }
+
+    private fun shiftedEndTime(originalStart: LocalTime?, originalEnd: LocalTime?, newStart: LocalTime): String {
+        val durationMinutes = if (originalStart != null && originalEnd != null && originalEnd.isAfter(originalStart)) {
+            Duration.between(originalStart, originalEnd).toMinutes()
+        } else {
+            DEFAULT_ACTIVITY_DURATION_MINUTES
+        }
+        return newStart.plusMinutes(durationMinutes).format(TRIP_TIME_FORMATTER)
     }
 
     private fun filterEventsAfterTime(
@@ -811,7 +931,13 @@ class NewTripViewModel(application: Application) : AndroidViewModel(application)
     }
 
     companion object {
+        private const val TAG = "NewTripViewModel"
+        private const val ACTIVITY_BUFFER_AFTER_ARRIVAL_HOURS = 2L
+        private const val DEFAULT_ACTIVITY_DURATION_MINUTES = 120L
+        private val ISO_DATE_REGEX = Regex("\\d{4}-\\d{2}-\\d{2}")
         private val TRIP_TIME_FORMATTER = DateTimeFormatter.ofPattern("HH:mm")
+        private val DEFAULT_ACTIVITY_START_TIME = LocalTime.of(10, 0)
+        private val LATEST_FIRST_DAY_ACTIVITY_START = LocalTime.of(20, 0)
         private val TRIP_INPUT_TIME_FORMATTERS = listOf(
             TRIP_TIME_FORMATTER,
             DateTimeFormatter.ISO_LOCAL_TIME,
