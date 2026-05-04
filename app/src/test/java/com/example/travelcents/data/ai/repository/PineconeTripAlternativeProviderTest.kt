@@ -40,8 +40,29 @@ class PineconeTripAlternativeProviderTest {
         assertEquals("Safari Drive", request.currentActivityTitle)
         assertEquals(AdvisoryReason.RAIN_OUTDOOR_ACTIVITY.name, request.reason)
         assertEquals(12, request.limit)
-        assertTrue(request.query.contains("indoor rainy day activity"))
-        assertTrue(request.query.contains("Safari Drive"))
+        assertTrue(request.query.contains("rain safe indoor covered"))
+        assertFalse(request.query.contains("Safari Drive"))
+    }
+
+    @Test
+    fun alternativesFor_buildsWindSafeQueryWithoutOriginalActivityFamily() = runBlocking {
+        var capturedRequest: ActivityAlternativeSearchRequest? = null
+        val provider = PineconeTripAlternativeProvider { request ->
+            capturedRequest = request
+            emptyList()
+        }
+
+        provider.alternativesFor(
+            trip = trip(destination = "Sydney"),
+            event = activity(title = "Sydney Sunrise Kayak Tour"),
+            reason = AdvisoryReason.HIGH_WIND
+        )
+
+        val request = checkNotNull(capturedRequest)
+        assertEquals("Sydney", request.destination)
+        assertEquals("Sydney Sunrise Kayak Tour", request.currentActivityTitle)
+        assertTrue(request.query.contains("wind safe indoor protected"))
+        assertFalse(request.query.contains("Kayak"))
     }
 
     @Test
@@ -82,7 +103,7 @@ class PineconeTripAlternativeProviderTest {
         )
     }
 
-    private fun activity(): TravelEvent {
+    private fun activity(title: String = "Safari Drive"): TravelEvent {
         return TravelEvent(
             eventId = "safari",
             type = "activity",
@@ -91,9 +112,9 @@ class PineconeTripAlternativeProviderTest {
             startTime = "14:00",
             endTime = "16:00",
             details = mapOf(
-                "title" to "Safari Drive",
-                "activity_name" to "Safari Drive",
-                ATTR_BUSINESS_NAME to "Safari Drive",
+                "title" to title,
+                "activity_name" to title,
+                ATTR_BUSINESS_NAME to title,
                 "description" to "Outdoor wildlife drive"
             )
         )

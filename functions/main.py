@@ -65,6 +65,53 @@ PINECONE_INDEX_NAME = "travel-cents-inventory"
 HF_EMBEDDING_URL = "https://router.huggingface.co/hf-inference/models/BAAI/bge-base-en-v1.5/pipeline/feature-extraction"
 ADVISORY_MATCH_SCORE_THRESHOLD = 0.35
 VIATOR_PRODUCT_DETAIL_URL = "https://api.viator.com/partner/products/{product_code}"
+WEATHER_SAFE_ACTIVITY_QUERIES = {
+    "rain": "rain safe indoor covered museum gallery theater aquarium market activity in {city}",
+    "wind": "wind safe indoor protected museum gallery theater aquarium market activity in {city}",
+    "heat": "air-conditioned indoor museum gallery theater aquarium market activity in {city}",
+}
+WEATHER_SAFE_TERMS = (
+    "indoor",
+    "covered",
+    "museum",
+    "gallery",
+    "theater",
+    "theatre",
+    "aquarium",
+    "market",
+    "food hall",
+    "mall",
+    "arcade",
+    "studio",
+    "workshop",
+    "library",
+    "exhibition",
+    "opera house",
+)
+WEATHER_UNSAFE_TERMS = (
+    "kayak",
+    "kayaking",
+    "paddle",
+    "boat",
+    "boating",
+    "sailing",
+    "cruise",
+    "ferry",
+    "surf",
+    "snorkel",
+    "swim",
+    "beach",
+    "hike",
+    "hiking",
+    "walking tour",
+    "bike tour",
+    "bicycle",
+    "outdoor",
+    "rooftop",
+    "bridge climb",
+    "harbour tour",
+    "harbor tour",
+)
 
 
 def normalize_string_list(value):
@@ -246,23 +293,70 @@ def metadata_text(metadata, *keys):
     return ""
 
 
+def advisory_reason_key(reason):
+    key = normalize_city_key(reason)
+    if "rain" in key:
+        return "rain"
+    if "wind" in key:
+        return "wind"
+    if "heat" in key:
+        return "heat"
+    return ""
+
+
+def normalized_contains_any(text, terms):
+    normalized_text = normalize_city_key(text)
+    return any(normalize_city_key(term) in normalized_text for term in terms)
+
+
+def advisory_match_text(metadata):
+    fields = (
+        "title",
+        "name",
+        "activity_name",
+        "description",
+        "summary",
+        "categories",
+        "category",
+        "activity_environment",
+        "environment",
+        "weather_sensitivity",
+    )
+    return " ".join(metadata_text(metadata, field) for field in fields)
+
+
 def advisory_alternative_query(req_data, target_city):
+    reason_key = advisory_reason_key(req_data.get("reason", ""))
+    safe_query = WEATHER_SAFE_ACTIVITY_QUERIES.get(reason_key)
+    if safe_query:
+        return safe_query.format(city=target_city)
+
     explicit_query = req_data.get("query")
     if explicit_query:
         return str(explicit_query)
 
-    title = req_data.get("currentActivityTitle", "")
-    description = req_data.get("currentActivityDescription", "")
-    reason = str(req_data.get("reason", "")).lower()
-    if "rain" in reason:
-        activity_type = "indoor rainy day activity"
-    elif "heat" in reason:
-        activity_type = "air-conditioned indoor activity"
-    elif "wind" in reason:
-        activity_type = "indoor activity"
-    else:
-        activity_type = "nearby indoor activity"
-    return f"{activity_type} in {target_city} alternative to {title}: {description}"
+    return f"nearby indoor activity in {target_city}"
+
+
+def is_weather_safe_advisory_match(match, reason):
+    reason_key = advisory_reason_key(reason)
+    if reason_key not in WEATHER_SAFE_ACTIVITY_QUERIES:
+        return True
+
+    metadata = match_field(match, "metadata", {}) or {}
+    text = advisory_match_text(metadata)
+    environment = normalize_city_key(metadata_text(metadata, "activity_environment", "environment"))
+    sensitivity = normalize_city_key(metadata_text(metadata, "weather_sensitivity"))
+
+    if normalized_contains_any(text, WEATHER_UNSAFE_TERMS):
+        return False
+    if environment in ("indoor", "covered") or sensitivity in ("none", "low"):
+        return True
+    if normalized_contains_any(text, WEATHER_SAFE_TERMS):
+        return True
+    if environment in ("outdoor", "mixed") or sensitivity in ("rain", "wind", "heat"):
+        return False
+    return False
 
 
 def match_to_advisory_alternative(match, reason):
@@ -518,6 +612,8 @@ def search_activity_alternatives(req: https_fn.CallableRequest):
         for match in matches:
             score = float(match_field(match, "score", 0.0) or 0.0)
             if score < ADVISORY_MATCH_SCORE_THRESHOLD:
+                continue
+            if not is_weather_safe_advisory_match(match, reason):
                 continue
             alternative = match_to_advisory_alternative(match, reason)
             title_key = normalize_city_key(alternative.get("title", ""))

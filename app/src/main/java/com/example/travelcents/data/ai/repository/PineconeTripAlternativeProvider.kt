@@ -30,7 +30,7 @@ class PineconeTripAlternativeProvider(
             currentActivityTitle = currentTitle,
             currentActivityDescription = description,
             reason = reason.name,
-            query = alternativeQuery(destination, currentTitle, description, reason),
+            query = alternativeQuery(destination, reason),
             limit = ACTIVITY_ALTERNATIVE_LIMIT
         )
 
@@ -40,19 +40,17 @@ class PineconeTripAlternativeProvider(
 
     private fun alternativeQuery(
         destination: String,
-        currentTitle: String,
-        description: String,
         reason: AdvisoryReason
     ): String {
         val activityType = when (reason) {
-            AdvisoryReason.RAIN_OUTDOOR_ACTIVITY -> "indoor rainy day activity"
-            AdvisoryReason.EXTREME_HEAT -> "air-conditioned indoor activity"
-            AdvisoryReason.HIGH_WIND -> "indoor activity protected from wind"
+            AdvisoryReason.RAIN_OUTDOOR_ACTIVITY -> "rain safe indoor covered museum gallery theater aquarium market activity"
+            AdvisoryReason.EXTREME_HEAT -> "air-conditioned indoor museum gallery theater aquarium market activity"
+            AdvisoryReason.HIGH_WIND -> "wind safe indoor protected museum gallery theater aquarium market activity"
             AdvisoryReason.TRANSIT_DELAY,
             AdvisoryReason.WALKING_TIME_TOO_LONG,
             AdvisoryReason.RIDESHARE_COST_SPIKE -> "nearby indoor activity"
         }
-        return "$activityType in $destination alternative to $currentTitle: $description"
+        return "$activityType in $destination"
     }
 
     private companion object {
