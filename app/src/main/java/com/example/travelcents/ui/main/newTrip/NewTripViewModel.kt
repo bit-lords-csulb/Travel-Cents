@@ -108,6 +108,8 @@ class NewTripViewModel(application: Application) : AndroidViewModel(application)
     var budgetTotal by mutableStateOf("")
     var interests by mutableStateOf(emptyList<String>())
     var specialRequests by mutableStateOf("")
+    var searchFlights by mutableStateOf(true)
+    var searchHotels by mutableStateOf(true)
 
     // Autocomplete
     private val allDestinations = listOf(
@@ -157,6 +159,8 @@ class NewTripViewModel(application: Application) : AndroidViewModel(application)
     val uiState: StateFlow<TripUiState> = _uiState.asStateFlow()
     private val _generationStep = MutableStateFlow(GenerationStep.IDLE)
     val generationStep: StateFlow<GenerationStep> = _generationStep.asStateFlow()
+    private val _skippedSteps = MutableStateFlow<Set<GenerationStep>>(emptySet())
+    val skippedSteps: StateFlow<Set<GenerationStep>> = _skippedSteps.asStateFlow()
 
     private val flightHeroImages: FlightHeroImageRepository by lazy {
         val wikipediaClient = okhttp3.OkHttpClient.Builder()
@@ -201,6 +205,12 @@ class NewTripViewModel(application: Application) : AndroidViewModel(application)
             specialRequests = specialRequests
         )
 
+        val skippedOnEntry = buildSet<GenerationStep> {
+            if (!searchFlights) add(GenerationStep.SEARCHING_FLIGHTS)
+            if (!searchHotels) add(GenerationStep.FINDING_HOTELS)
+        }
+        _skippedSteps.value = skippedOnEntry
+
         viewModelScope.launch {
             try {
                 // Step 1: AI planner generates itinerary metadata + IATA codes
@@ -208,15 +218,21 @@ class NewTripViewModel(application: Application) : AndroidViewModel(application)
                 _uiState.value = TripUiState.Loading(LLM_ITINERARY_MESSAGES.random())
                 val itinerary = TripPlannerRepository.generateItinerary(request)
 
-                // Step 2: Flights + hotels in parallel
+                // Step 2: Flights + hotels (skipped when user opts out)
                 _generationStep.value = GenerationStep.SEARCHING_FLIGHTS
-                _uiState.value = TripUiState.Loading(SERP_FLIGHTS_MESSAGES.random())
-                val flightsDeferred = async { SerpRepository.searchFlights(request, itinerary) }
+                val flightsDeferred = if (searchFlights) {
+                    _uiState.value = TripUiState.Loading(SERP_FLIGHTS_MESSAGES.random())
+                    async { SerpRepository.searchFlights(request, itinerary) }
+                } else null
+
                 _generationStep.value = GenerationStep.FINDING_HOTELS
-                _uiState.value = TripUiState.Loading(SERP_HOTELS_MESSAGES.random())
-                val hotelsDeferred = async { SerpRepository.searchHotels(request, itinerary) }
-                val realFlights = enrichFlightsWithHeroImages(flightsDeferred.await())
-                val realHotels = hotelsDeferred.await()
+                val hotelsDeferred = if (searchHotels) {
+                    _uiState.value = TripUiState.Loading(SERP_HOTELS_MESSAGES.random())
+                    async { SerpRepository.searchHotels(request, itinerary) }
+                } else null
+
+                val realFlights = enrichFlightsWithHeroImages(flightsDeferred?.await() ?: emptyList())
+                val realHotels = hotelsDeferred?.await() ?: emptyList()
 
                 // Remaining budget for activity guidance
                 val flightPrice = realFlights.firstOrNull()?.details?.get("total_price")?.toDoubleOrNull() ?: 0.0
@@ -442,6 +458,7 @@ class NewTripViewModel(application: Application) : AndroidViewModel(application)
     fun resetState() {
         _uiState.value = TripUiState.Idle
         _generationStep.value = GenerationStep.IDLE
+        _skippedSteps.value = emptySet()
     }
 
     fun createDraftTripFromAiStarter(

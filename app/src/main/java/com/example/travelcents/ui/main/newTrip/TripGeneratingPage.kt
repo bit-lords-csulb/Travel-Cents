@@ -66,6 +66,7 @@ fun TripGeneratingPage(
 ) {
     val currentStep by viewModel.generationStep.collectAsState()
     val uiState by viewModel.uiState.collectAsState()
+    val skippedSteps by viewModel.skippedSteps.collectAsState()
 
     ProvideTextStyle(value = TextStyle(fontFamily = TravelCentsFonts.Body)) {
         Column(
@@ -98,13 +99,14 @@ fun TripGeneratingPage(
             verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
             generationSteps.forEach { (step, label) ->
-                val isDone = currentStep.ordinal > step.ordinal || currentStep == GenerationStep.COMPLETE
-                val isActive = currentStep == step
+                val isSkipped = step in skippedSteps
+                val isDone = !isSkipped && (currentStep.ordinal > step.ordinal || currentStep == GenerationStep.COMPLETE)
+                val isActive = !isSkipped && currentStep == step
                 AnimatedVisibility(
-                    visible = currentStep.ordinal >= step.ordinal,
+                    visible = isSkipped || currentStep.ordinal >= step.ordinal,
                     enter = fadeIn() + expandVertically()
                 ) {
-                    StepCard(label = label, isDone = isDone, isActive = isActive)
+                    StepCard(label = label, isDone = isDone, isActive = isActive, isSkipped = isSkipped)
                 }
             }
         }
@@ -155,7 +157,7 @@ fun TripGeneratingPage(
 }
 
 @Composable
-private fun StepCard(label: String, isDone: Boolean, isActive: Boolean) {
+private fun StepCard(label: String, isDone: Boolean, isActive: Boolean, isSkipped: Boolean = false) {
     Box(
         modifier = Modifier
             .fillMaxWidth()
@@ -175,6 +177,7 @@ private fun StepCard(label: String, isDone: Boolean, isActive: Boolean) {
                         .clip(CircleShape)
                         .background(
                             when {
+                                isSkipped -> GenPending.copy(alpha = 0.15f)
                                 isDone -> GenGreen.copy(alpha = 0.2f)
                                 isActive -> GenBlue.copy(alpha = 0.2f)
                                 else -> GenPending.copy(alpha = 0.3f)
@@ -183,6 +186,13 @@ private fun StepCard(label: String, isDone: Boolean, isActive: Boolean) {
                     contentAlignment = Alignment.Center
                 ) {
                     when {
+                        isSkipped -> Text(
+                            text = "–",
+                            color = GenOnSurfaceVariant.copy(alpha = 0.5f),
+                            fontSize = 18.sp,
+                            fontWeight = FontWeight.Bold
+                        )
+
                         isDone -> Icon(
                             imageVector = Icons.Default.CheckCircle,
                             contentDescription = null,
@@ -210,6 +220,7 @@ private fun StepCard(label: String, isDone: Boolean, isActive: Boolean) {
                     fontSize = 14.sp,
                     fontWeight = if (isActive) FontWeight.SemiBold else FontWeight.Normal,
                     color = when {
+                        isSkipped -> GenOnSurfaceVariant.copy(alpha = 0.5f)
                         isDone -> GenOnSurface
                         isActive -> GenOnSurface
                         else -> GenOnSurfaceVariant
@@ -218,6 +229,12 @@ private fun StepCard(label: String, isDone: Boolean, isActive: Boolean) {
             }
 
             when {
+                isSkipped -> Text(
+                    text = "skipped",
+                    color = GenOnSurfaceVariant.copy(alpha = 0.4f),
+                    fontSize = 11.sp
+                )
+
                 isDone -> Text(
                     text = "✓",
                     color = GenGreen,

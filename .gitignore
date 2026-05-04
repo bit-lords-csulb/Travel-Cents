@@ -25,3 +25,5 @@ analytics.settings
 __pycache__/
 .codex_tmp_signin_assets.zip
 /credentials.json
+/firebase-debug.log
+/firestore-debug.log
