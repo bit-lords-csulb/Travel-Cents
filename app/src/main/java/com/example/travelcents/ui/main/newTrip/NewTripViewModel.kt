@@ -41,6 +41,7 @@ import com.example.travelcents.data.trip.remote.SerpRepository
 import com.example.travelcents.data.trip.model.detailValue
 import com.example.travelcents.data.trip.remote.TicketmasterRepository
 import com.example.travelcents.data.trip.remote.YelpRepository
+import com.example.travelcents.data.trip.model.YELP_POOL_TYPE_ACTIVITIES
 import com.example.travelcents.data.trip.model.YELP_POOL_TYPE_RESTAURANTS
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FirebaseFirestore
@@ -221,7 +222,7 @@ class NewTripViewModel(application: Application) : AndroidViewModel(application)
                 val flightPrice = realFlights.firstOrNull()?.details?.get("total_price")?.toDoubleOrNull() ?: 0.0
                 val hotelPerNight = realHotels.firstOrNull()?.details?.get("rate_per_night")?.toDoubleOrNull() ?: 0.0
                 val hotelTotal = hotelPerNight * itinerary.durationDays
-                val remainingBudget = if (budget > 0) maxOf(0.0, budget - flightPrice - hotelTotal) else 0.0
+                // val remainingBudget = if (budget > 0) maxOf(0.0, budget - flightPrice - hotelTotal) else 0.0
 
                 val outboundFlight = realFlights.firstOrNull { it.details["trip_segment"] == "outbound" }
                 val returnFlight = realFlights.firstOrNull { it.details["trip_segment"] == "return" }
@@ -287,6 +288,19 @@ class NewTripViewModel(application: Application) : AndroidViewModel(application)
                             emptyList()
                         }
                     }
+                    val activityPoolDeferred = async {
+                        runCatching {
+                            YelpRepository.mapBusinessesToPoolItems(
+                                YelpRepository.fetchActivityPool(
+                                    location = itinerary.destination,
+                                    targetCount = sharedYelpPoolTarget(tripDates.size)
+                                )
+                            )
+                        }.getOrElse { error ->
+                            Log.w(TAG, "Yelp activity pool unavailable; continuing without shared activity backups.", error)
+                            emptyList()
+                        }
+                    }
                     val yelpEventsDeferred = async {
                         runCatching {
                             YelpRepository.searchEvents(
@@ -318,13 +332,34 @@ class NewTripViewModel(application: Application) : AndroidViewModel(application)
                             emptyList()
                         }
                     }
-                    activityEvents = applyActivityWindow(
+                    val aiCandidate = applyActivityWindow(
                         aiActivitiesDeferred.await(),
                         earliestDate = scheduleWindow.startDate,
                         minimumStartTime = scheduleWindow.minimumStartTime,
                         latestDate = scheduleWindow.endDate,
                         maximumEndTime = scheduleWindow.maximumEndTime
                     )
+                    val activityPool = activityPoolDeferred.await()
+                    if (activityPool.isNotEmpty()) {
+                        yelpOptionPools[YELP_POOL_TYPE_ACTIVITIES] = activityPool
+                    }
+                    val yelpCandidate = applyActivityWindow(
+                        YelpRepository.distributePoolToSelectedEvents(
+                            pool = activityPool,
+                            dates = tripDates,
+                            type = "activity",
+                            itineraryId = itinerary.itineraryId
+                        ),
+                        earliestDate = scheduleWindow.startDate,
+                        minimumStartTime = scheduleWindow.minimumStartTime,
+                        latestDate = scheduleWindow.endDate,
+                        maximumEndTime = scheduleWindow.maximumEndTime
+                    )
+                    activityEvents = when {
+                        aiCandidate.isNotEmpty() -> aiCandidate
+                        yelpCandidate.isNotEmpty() -> yelpCandidate
+                        else -> emptyList()
+                    }
                     val mergedLocalEvents = mergeLocalActivityEvents(
                         yelpEvents = yelpEventsDeferred.await(),
                         ticketmasterEvents = ticketmasterEventsDeferred.await()

@@ -1168,9 +1168,6 @@ class CurrentTripViewModel(application: Application) : AndroidViewModel(applicat
     }
 
     private fun yelpPoolTypeForEvent(event: TravelEvent): String? {
-        val yelpBusinessId = event.detailValue(DETAIL_YELP_ID)?.takeIf { it.isNotBlank() } ?: return null
-        if (yelpBusinessId.isBlank()) return null
-
         return when (event.type.lowercase(Locale.US)) {
             "restaurant", "dining", "food" -> YELP_POOL_TYPE_RESTAURANTS
             "activity" -> YELP_POOL_TYPE_ACTIVITIES
