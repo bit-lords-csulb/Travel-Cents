@@ -59,6 +59,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImage
+import com.example.travelcents.data.trip.advisory.TripAdvisory
 import com.example.travelcents.data.trip.model.EventOption
 import com.example.travelcents.data.trip.model.TravelEvent
 import com.example.travelcents.ui.main.current.overlays.cards.CompactFlightSummaryContent
@@ -98,6 +99,7 @@ private sealed interface CurrentTripItineraryItem {
 @Composable
 fun CurrentTripItineraryContent(
     events: List<TravelEvent>,
+    advisories: List<TripAdvisory> = emptyList(),
     eventOptions: Map<String, List<EventOption>>,
     rejectedOptions: Map<String, Set<String>>,
     canEditTrip: Boolean,
@@ -105,6 +107,8 @@ fun CurrentTripItineraryContent(
     onEventClick: (TravelEvent) -> Unit,
     onDeleteClick: (TravelEvent) -> Unit,
     onOpenAlternatives: (String) -> Unit,
+    onReviewAdvisory: (TripAdvisory) -> Unit = {},
+    onDismissAdvisory: (String) -> Unit = {},
     onMoveEvent: (eventId: String, fromDate: String, toDate: String, toIndex: Int) -> Unit,
     onPersistEventPlacements: (Set<String>) -> Unit,
     onVisibleDateChange: (String) -> Unit = {}
@@ -127,6 +131,9 @@ fun CurrentTripItineraryContent(
             }
 
             val itineraryItems = remember(events) { buildCurrentTripItineraryItems(events) }
+            val advisoriesByEvent = remember(advisories) {
+                advisories.groupBy(TripAdvisory::eventId)
+            }
             val lazyListState = rememberLazyListState()
             var affectedDragDates by remember { mutableStateOf<Set<String>>(emptySet()) }
 
@@ -212,6 +219,14 @@ fun CurrentTripItineraryContent(
                     when (item) {
                         is CurrentTripItineraryItem.Header -> ItineraryDateHeader(item.label)
                         is CurrentTripItineraryItem.EventCard -> {
+                            advisoriesByEvent[item.event.eventId]?.firstOrNull()?.let { advisory ->
+                                CurrentTripAdvisoryStrip(
+                                    advisory = advisory,
+                                    canEditTrip = canEditTrip,
+                                    onReview = { onReviewAdvisory(advisory) },
+                                    onDismiss = { onDismissAdvisory(advisory.advisoryId) }
+                                )
+                            }
                             val options = eventOptions[item.event.eventId].orEmpty()
                             val rejected = rejectedOptions[item.event.eventId].orEmpty()
                             val activeOptionCount = options.count { it.optionId !in rejected }

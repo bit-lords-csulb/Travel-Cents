@@ -105,6 +105,7 @@ object AirportTimeZones {
         // Western and Central Europe
         "AMS" to "Europe/Amsterdam",
         "BCN" to "Europe/Madrid",
+        "BER" to "Europe/Berlin",
         "BRU" to "Europe/Brussels",
         "CDG" to "Europe/Paris",
         "CIA" to "Europe/Rome",
