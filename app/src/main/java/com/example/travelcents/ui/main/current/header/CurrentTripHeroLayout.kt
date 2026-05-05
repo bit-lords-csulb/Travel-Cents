@@ -28,17 +28,15 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.example.travelcents.ui.theme.DeepSea2
-import com.example.travelcents.ui.theme.DeepSea3
+import com.example.travelcents.ui.main.newTrip.TripWizardColors
 import com.example.travelcents.ui.theme.DeepSea4
 import com.example.travelcents.ui.theme.DeepSea5
 import com.example.travelcents.ui.theme.TravelCentsFonts
 
-internal val CurrentTripHeroAccent = Color(0xFFCEBDFF)
+internal val CurrentTripHeroAccent: Color
+    get() = TripWizardColors.Blue
 
 private val HeroControlShape = RoundedCornerShape(12.dp)
-private val HeroControlBackground = DeepSea2.copy(alpha = 0.95f)
-private val HeroControlBorder = DeepSea3.copy(alpha = 0.7f)
 private val HeroNavSlotWidth = 40.dp
 private val HeroNavButtonSize = 32.dp
 
@@ -99,10 +97,10 @@ private fun HeroNavigationSlot(
                     .size(HeroNavButtonSize)
                     .clip(HeroControlShape)
                     .background(
-                        if (action.enabled) HeroControlBackground else HeroControlBackground.copy(alpha = 0.55f),
+                        heroControlBackground(action.enabled),
                         HeroControlShape
                     )
-                    .border(1.dp, HeroControlBorder, HeroControlShape)
+                    .border(1.dp, heroControlBorder(), HeroControlShape)
                     .clickable(enabled = action.enabled, onClick = action.onClick),
                 contentAlignment = Alignment.Center
             ) {
@@ -116,3 +114,10 @@ private fun HeroNavigationSlot(
         }
     }
 }
+
+private fun heroControlBackground(enabled: Boolean): Color {
+    val base = TripWizardColors.ContainerHigh.copy(alpha = 0.96f)
+    return if (enabled) base else base.copy(alpha = 0.55f)
+}
+
+private fun heroControlBorder(): Color = TripWizardColors.OnSurfaceVariant.copy(alpha = 0.22f)

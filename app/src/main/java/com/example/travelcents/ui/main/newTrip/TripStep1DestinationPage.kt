@@ -122,7 +122,7 @@ fun TripStep1DestinationPage(
         Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .background(Color(0xFF010E24))
+                .background(TripWizardColors.ContainerLow)
                 .statusBarsPadding()
         ) {
             Row(
@@ -518,7 +518,7 @@ private fun ProgressSummaryWidget() {
             .fillMaxWidth()
             .clip(RoundedCornerShape(16.dp))
             .background(TripWizardColors.ContainerHigh.copy(alpha = 0.5f))
-            .border(1.dp, Color.White.copy(alpha = 0.05f), RoundedCornerShape(16.dp))
+            .border(1.dp, TripWizardColors.OnSurfaceVariant.copy(alpha = 0.14f), RoundedCornerShape(16.dp))
             .padding(16.dp)
     ) {
         Column {

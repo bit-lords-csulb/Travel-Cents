@@ -106,7 +106,7 @@ private fun RecommendationCard(
         color = TripWizardColors.ContainerLow,
         border = BorderStroke(
             width = 1.dp,
-            color = Color.White.copy(alpha = 0.08f)
+            color = TripWizardColors.OnSurfaceVariant.copy(alpha = 0.16f)
         )
     ) {
         Column(
@@ -194,7 +194,7 @@ private fun RecommendationCard(
                                 color = TripWizardColors.ContainerHighest.copy(alpha = 0.72f),
                                 border = BorderStroke(
                                     width = 1.dp,
-                                    color = Color.White.copy(alpha = 0.08f)
+                                    color = TripWizardColors.OnSurfaceVariant.copy(alpha = 0.14f)
                                 )
                             ) {
                                 Text(

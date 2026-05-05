@@ -71,6 +71,7 @@ import com.example.travelcents.data.trip.model.Itinerary
 import com.example.travelcents.notification.ChatNotificationTarget
 import com.example.travelcents.notification.NotificationHelper
 import com.example.travelcents.ui.components.ProfileAvatar
+import com.example.travelcents.ui.main.newTrip.TripWizardColors
 import com.example.travelcents.ui.theme.DeepSea1
 import com.example.travelcents.ui.theme.DeepSea2
 import com.example.travelcents.ui.theme.DeepSea3
@@ -80,9 +81,14 @@ import java.time.LocalDate
 import java.time.format.DateTimeFormatter
 import java.time.temporal.ChronoUnit
 
-private val Primary = Color(0xFF64B5F6)
-private val PrimaryDim = Color(0xFF54A7E7)
-private val SurfaceBright = Color(0xFF243447)
+private val Primary: Color
+    get() = TripWizardColors.Blue
+
+private val PrimaryDim: Color
+    get() = TripWizardColors.PrimaryContainer
+
+private val SurfaceBright: Color
+    get() = TripWizardColors.SurfaceBright
 private const val TEST_GROUP_CHAT_ID = "EL4UgmxgFgVPLwkxudK4"
 
 // ─────────────────────────────────────────────────────────────
@@ -840,13 +846,13 @@ private fun DocumentsWidget() {
                 Column {
                     Text(
                         text = "Your Documents",
-                        color = Color(0xFF00253D),
+                        color = DeepSea5,
                         fontSize = 18.sp,
                         fontWeight = FontWeight.Bold
                     )
                     Text(
                         text = "Tickets, Passports & Visas",
-                        color = Color(0xFF00253D).copy(alpha = 0.75f),
+                        color = DeepSea5.copy(alpha = 0.75f),
                         fontSize = 12.sp,
                         fontWeight = FontWeight.Medium
                     )

@@ -12,9 +12,15 @@ import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.viewModels
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.SideEffect
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalView
 import androidx.core.content.ContextCompat
+import androidx.core.view.WindowCompat
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.example.travelcents.notification.ChatNotificationTarget
+import com.example.travelcents.data.preferences.ThemePreferencesRepository
 import com.example.travelcents.ui.TravelCentsNavigation
 import com.example.travelcents.ui.auth.AuthViewModel
 import com.example.travelcents.ui.theme.TravelCentsTheme
@@ -66,8 +72,16 @@ class MainActivity : ComponentActivity() {
         auth.addAuthStateListener(authStateListener)
 
         val authViewModel : AuthViewModel by viewModels()
+        val themePreferences = ThemePreferencesRepository.getInstance(applicationContext)
         setContent {
-            TravelCentsTheme {
+            val darkModeEnabled by themePreferences.darkModeEnabled.collectAsStateWithLifecycle()
+            val view = LocalView.current
+            SideEffect {
+                val controller = WindowCompat.getInsetsController(window, view)
+                controller.isAppearanceLightStatusBars = !darkModeEnabled
+                controller.isAppearanceLightNavigationBars = !darkModeEnabled
+            }
+            TravelCentsTheme(darkTheme = darkModeEnabled, dynamicColor = false) {
                 TravelCentsNavigation(
                     modifier = Modifier.fillMaxSize(),
                     authViewModel = authViewModel

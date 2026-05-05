@@ -50,7 +50,6 @@ import androidx.navigation.NavController
 import com.example.travelcents.ui.components.TcTextField
 import com.example.travelcents.ui.main.newTrip.TripWizardColors
 import com.example.travelcents.ui.theme.DeepSea1
-import com.example.travelcents.ui.theme.DeepSea2
 import com.example.travelcents.ui.theme.DeepSea4
 import com.example.travelcents.ui.theme.DeepSea5
 import com.example.travelcents.ui.theme.TravelCentsFonts
@@ -287,18 +286,21 @@ fun SignUpPage(
                 .fillMaxWidth()
                 .height(48.dp),
             shape = RoundedCornerShape(12.dp),
-            colors = ButtonDefaults.buttonColors(containerColor = DeepSea2)
+            colors = ButtonDefaults.buttonColors(
+                containerColor = TripWizardColors.ContainerHigh,
+                contentColor = DeepSea5
+            )
         ) {
             if (isLoading) {
                 CircularProgressIndicator(
                     modifier = Modifier.requiredSize(22.dp),
-                    color = Color.White,
+                    color = DeepSea5,
                     strokeWidth = 2.dp
                 )
             } else {
                 Text(
                     text = "Sign Up",
-                    color = Color.White,
+                    color = DeepSea5,
                     fontSize = 18.sp,
                     fontFamily = TravelCentsFonts.Body
                 )

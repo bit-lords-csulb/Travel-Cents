@@ -121,7 +121,7 @@ private fun StarterPromptCard(
             color = if (selected) {
                 meta.tint.copy(alpha = 0.5f)
             } else {
-                Color.White.copy(alpha = 0.08f)
+                TripWizardColors.OnSurfaceVariant.copy(alpha = 0.16f)
             }
         )
     ) {

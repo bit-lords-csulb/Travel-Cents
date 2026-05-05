@@ -96,7 +96,7 @@ fun TripStep4BudgetPage(
         Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .background(Color(0xFF010E24))
+                .background(TripWizardColors.ContainerLow)
                 .statusBarsPadding()
         ) {
             Row(
@@ -163,10 +163,10 @@ fun TripStep4BudgetPage(
                     .clip(RoundedCornerShape(24.dp))
                     .background(
                         Brush.verticalGradient(
-                            listOf(TripWizardColors.ContainerHigh.copy(alpha = 0.6f), Color(0xFF02132B).copy(alpha = 0.4f))
+                            listOf(TripWizardColors.ContainerHigh.copy(alpha = 0.6f), TripWizardColors.ContainerLow.copy(alpha = 0.4f))
                         )
                     )
-                    .border(1.dp, Color.White.copy(alpha = 0.1f), RoundedCornerShape(24.dp))
+                    .border(1.dp, TripWizardColors.OnSurfaceVariant.copy(alpha = 0.18f), RoundedCornerShape(24.dp))
                     .padding(28.dp),
                 contentAlignment = Alignment.Center
             ) {
@@ -259,7 +259,7 @@ fun TripStep4BudgetPage(
                         steps = 389,
                         modifier = Modifier.fillMaxWidth(),
                         colors = SliderDefaults.colors(
-                            thumbColor = Color.White,
+                            thumbColor = DeepSea5,
                             activeTrackColor = TripWizardColors.Blue,
                             inactiveTrackColor = TripWizardColors.ContainerHighest
                         )
@@ -281,7 +281,7 @@ fun TripStep4BudgetPage(
                     .fillMaxWidth()
                     .clip(RoundedCornerShape(16.dp))
                     .background(TripWizardColors.ContainerHigh.copy(alpha = 0.3f))
-                    .border(1.dp, Color.White.copy(alpha = 0.05f), RoundedCornerShape(16.dp))
+                    .border(1.dp, TripWizardColors.OnSurfaceVariant.copy(alpha = 0.14f), RoundedCornerShape(16.dp))
                     .padding(16.dp),
                 horizontalArrangement = Arrangement.spacedBy(14.dp),
                 verticalAlignment = Alignment.CenterVertically
@@ -334,7 +334,7 @@ private fun S4ProgressWidget(stepsComplete: Int) {
             .fillMaxWidth()
             .clip(RoundedCornerShape(16.dp))
             .background(TripWizardColors.ContainerHigh.copy(alpha = 0.5f))
-            .border(1.dp, Color.White.copy(alpha = 0.05f), RoundedCornerShape(16.dp))
+            .border(1.dp, TripWizardColors.OnSurfaceVariant.copy(alpha = 0.14f), RoundedCornerShape(16.dp))
             .padding(16.dp)
     ) {
         Column {

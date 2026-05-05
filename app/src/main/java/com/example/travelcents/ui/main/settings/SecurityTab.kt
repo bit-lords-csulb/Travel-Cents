@@ -193,11 +193,11 @@ private fun ChangePasswordSection() {
                 }
             },
             modifier = Modifier
-                .fillMaxWidth()
-                .height(48.dp),
+            .fillMaxWidth()
+            .height(48.dp),
             colors = ButtonDefaults.buttonColors(
                 containerColor = TripWizardColors.Blue,
-                contentColor = Color(0xFF001627)
+                contentColor = DeepSea5
             ),
             shape = RoundedCornerShape(12.dp)
         ) {

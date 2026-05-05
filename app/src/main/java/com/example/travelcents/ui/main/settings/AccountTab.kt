@@ -191,7 +191,7 @@ fun AccountTab(viewModel: SettingsViewModel, onLoggedOut: () -> Unit) {
                         colors = ButtonDefaults.buttonColors(containerColor = TripWizardColors.Blue),
                         shape = RoundedCornerShape(10.dp)
                     ) {
-                        Text("Save", color = Color(0xFF001627), fontWeight = FontWeight.Bold)
+                        Text("Save", color = DeepSea5, fontWeight = FontWeight.Bold)
                     }
                 }
                 Spacer(modifier = Modifier.height(8.dp))

@@ -53,10 +53,9 @@ import com.example.travelcents.ui.main.current.calendar.currentTimeMinutes
 import com.example.travelcents.ui.main.current.calendar.eventsForDate
 import com.example.travelcents.ui.main.current.calendar.preferredDayScrollMinutes
 import com.example.travelcents.ui.main.current.calendar.renderSpanLabel
+import com.example.travelcents.ui.main.newTrip.TripWizardColors
 import com.example.travelcents.ui.modules.hourLabel
 import com.example.travelcents.ui.modules.todayIsoDate
-import com.example.travelcents.ui.theme.DeepSea2
-import com.example.travelcents.ui.theme.DeepSea3
 import com.example.travelcents.ui.theme.DeepSea4
 import com.example.travelcents.ui.theme.DeepSea5
 import kotlin.math.max
@@ -192,10 +191,10 @@ private fun ScheduleDayColumn(
         modifier = modifier
             .fillMaxWidth()
             .height(gridHeight)
-            .background(DeepSea2.copy(alpha = 0.85f), cardShape)
+            .background(TripWizardColors.ContainerLow.copy(alpha = 0.96f), cardShape)
             .border(
                 width = 1.dp,
-                color = DeepSea3,
+                color = TripWizardColors.OnSurfaceVariant.copy(alpha = 0.18f),
                 shape = cardShape
             )
             .drawBehind {
@@ -204,7 +203,7 @@ private fun ScheduleDayColumn(
                 repeat(scheduleWindow.endHour - scheduleWindow.startHour + 1) { index ->
                     val y = index * slotHeight
                     drawLine(
-                        color = DeepSea3.copy(alpha = 0.45f),
+                        color = TripWizardColors.OnSurfaceVariant.copy(alpha = 0.18f),
                         start = Offset(0f, y),
                         end = Offset(size.width, y),
                         strokeWidth = strokeWidth

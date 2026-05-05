@@ -372,7 +372,7 @@ fun AiTripChatPage(
                 Surface(
                     modifier = Modifier
                         .fillMaxWidth(),
-                    color = Color(0xFF041329).copy(alpha = 0.96f)
+                    color = TripWizardColors.ContainerLow
                 ) {
                     AiChatComposer(
                         value = uiState.draftText,
@@ -472,11 +472,11 @@ private fun AiStarterLanding(
             modifier = panelModifier
                 .align(Alignment.Center)
                 .fillMaxWidth(),
-            color = Color(0xE610223C),
+            color = TripWizardColors.ContainerHigh,
             shape = RoundedCornerShape(28.dp),
             border = BorderStroke(
                 width = 1.dp,
-                color = Color.White.copy(alpha = 0.06f)
+                color = TripWizardColors.Blue.copy(alpha = 0.08f)
             )
         ) {
             Column(
@@ -527,7 +527,7 @@ private fun AiChatHeader(
     Column(
         modifier = Modifier
             .fillMaxWidth()
-            .background(Color(0xFF010E24))
+            .background(TripWizardColors.ContainerLow)
     ) {
         Row(
             modifier = Modifier
@@ -630,7 +630,7 @@ private fun AiLoadingCard() {
             ),
             border = BorderStroke(
                 width = 1.dp,
-                color = Color.White.copy(alpha = 0.06f)
+                color = TripWizardColors.Blue.copy(alpha = 0.08f)
             )
         ) {
             Row(
@@ -659,14 +659,14 @@ private fun AiSystemStatusCard(
     title: String,
     detail: String
 ) {
-    Surface(
-        color = TripWizardColors.ContainerLow,
-        shape = RoundedCornerShape(22.dp),
-        border = BorderStroke(
-            width = 1.dp,
-            color = Color.White.copy(alpha = 0.06f)
-        )
-    ) {
+        Surface(
+            color = TripWizardColors.ContainerLow,
+            shape = RoundedCornerShape(22.dp),
+            border = BorderStroke(
+                width = 1.dp,
+                color = TripWizardColors.Blue.copy(alpha = 0.08f)
+            )
+        ) {
         Column(
             modifier = Modifier
                 .fillMaxWidth()
