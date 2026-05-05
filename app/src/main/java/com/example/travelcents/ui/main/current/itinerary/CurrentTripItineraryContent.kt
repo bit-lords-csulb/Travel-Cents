@@ -62,8 +62,10 @@ import coil.compose.AsyncImage
 import com.example.travelcents.data.trip.model.EventOption
 import com.example.travelcents.data.trip.model.TravelEvent
 import com.example.travelcents.ui.main.current.overlays.cards.CompactFlightSummaryContent
-import com.example.travelcents.ui.main.current.overlays.cards.FlightSummaryModel
+import com.example.travelcents.ui.main.current.overlays.cards.EventTypeChip
 import com.example.travelcents.ui.main.current.overlays.cards.FlightHeroMedia
+import com.example.travelcents.ui.main.current.overlays.cards.FlightSummaryModel
+import com.example.travelcents.ui.main.current.overlays.cards.eventTypeIcon
 import com.example.travelcents.ui.main.current.overlays.cards.toFlightSummaryModel
 import com.example.travelcents.ui.modules.formatDisplayTime
 import com.example.travelcents.ui.modules.heroImageModel
@@ -357,18 +359,7 @@ internal fun TripEventCard(
                         CompactFlightCardContent(accent = accent, summary = flightSummary)
                     } else {
                         Row(verticalAlignment = Alignment.CenterVertically) {
-                            Surface(
-                                color = accent.copy(alpha = 0.16f),
-                                shape = RoundedCornerShape(999.dp)
-                            ) {
-                                Text(
-                                    text = event.type.uppercase(Locale.US),
-                                    color = accent,
-                                    fontSize = 9.sp,
-                                    fontWeight = FontWeight.Bold,
-                                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp)
-                                )
-                            }
+                            EventTypeChip(type = event.type, accent = accent)
                             if (event.startTime.isNotBlank()) {
                                 Spacer(modifier = Modifier.width(8.dp))
                                 Text(
@@ -429,20 +420,24 @@ internal fun TripEventCard(
 }
 
 @Composable
-fun CurrentTripItineraryCard(
+internal fun CurrentTripItineraryCard(
     event: TravelEvent,
     isLast: Boolean,
-    canEditTrip: Boolean = false,
-    hasAlternatives: Boolean = false,
-    isDragging: Boolean = false,
-    jiggleMode: Boolean = false,
-    wobbleAngle: Float = 0f,
-    modifier: Modifier = Modifier,
+    canEditTrip: Boolean,
+    hasAlternatives: Boolean,
+    isDragging: Boolean,
+    jiggleMode: Boolean,
+    wobbleAngle: Float,
+    modifier: Modifier,
     onCardClick: () -> Unit,
-    onDeleteClick: () -> Unit = {},
-    onAlternativesClick: () -> Unit = {}
+    onDeleteClick: () -> Unit,
+    onAlternativesClick: () -> Unit
 ) {
+    val context = LocalContext.current
     val accent = eventPalette(event).accent
+    val title = eventTitle(event)
+    val description = eventSubtitle(event).ifBlank { "Tap to edit details" }
+    val heroImage = remember(event, context) { event.heroImageModel(context) }
 
     Row(
         modifier = Modifier
@@ -482,19 +477,117 @@ fun CurrentTripItineraryCard(
             }
         }
 
-        TripEventCard(
-            event = event,
+        Card(
             modifier = Modifier
                 .weight(1f)
                 .padding(bottom = 10.dp)
                 .graphicsLayer { rotationZ = wobbleAngle }
                 .clickable(enabled = !jiggleMode, onClick = onCardClick),
-            isDragging = isDragging,
-            actionIcon = if (canEditTrip && hasAlternatives) Icons.Outlined.Edit else null,
-            actionContentDescription = "Change option",
-            actionIconTint = DeepSea4,
-            onActionClick = if (canEditTrip && hasAlternatives) onAlternativesClick else null,
-            bottomTrailingOverlay = {
+            shape = RoundedCornerShape(16.dp),
+            colors = CardDefaults.cardColors(containerColor = if (isDragging) DeepSea2 else DeepSea1),
+            border = androidx.compose.foundation.BorderStroke(
+                1.dp,
+                if (isDragging) accent.copy(alpha = 0.35f) else DeepSea3.copy(alpha = 0.45f)
+            )
+        ) {
+            Box {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .heightIn(min = 116.dp)
+                ) {
+                    if (heroImage.isNotBlank()) {
+                        Box(
+                            modifier = Modifier
+                                .width(116.dp)
+                                .fillMaxHeight()
+                        ) {
+                            AsyncImage(
+                                model = heroImage,
+                                contentDescription = null,
+                                modifier = Modifier
+                                    .fillMaxSize()
+                                    .clip(RoundedCornerShape(topStart = 16.dp, bottomStart = 16.dp)),
+                                contentScale = ContentScale.Crop
+                            )
+                        }
+                    } else {
+                        Box(
+                            modifier = Modifier
+                                .width(116.dp)
+                                .fillMaxHeight()
+                                .background(DeepSea2, RoundedCornerShape(topStart = 16.dp, bottomStart = 16.dp)),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Icon(
+                                imageVector = eventTypeIcon(event.type),
+                                contentDescription = event.type,
+                                tint = accent,
+                                modifier = Modifier.size(28.dp)
+                            )
+                        }
+                    }
+
+                    Column(
+                        modifier = Modifier
+                            .weight(1f)
+                            .padding(horizontal = 14.dp, vertical = 14.dp)
+                    ) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            EventTypeChip(type = event.type, accent = accent)
+                            if (event.startTime.isNotBlank()) {
+                                Spacer(modifier = Modifier.width(8.dp))
+                                Text(
+                                    text = formatDisplayTime(event.startTime),
+                                    color = DeepSea4,
+                                    fontSize = 10.sp,
+                                    fontWeight = FontWeight.SemiBold
+                                )
+                            }
+                        }
+
+                        Spacer(modifier = Modifier.height(8.dp))
+
+                        Text(
+                            text = title,
+                            color = DeepSea5,
+                            fontSize = 16.sp,
+                            fontWeight = FontWeight.Bold,
+                            maxLines = 2,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                        Spacer(modifier = Modifier.height(4.dp))
+                        Text(
+                            text = description,
+                            color = DeepSea4,
+                            fontSize = 12.sp,
+                            lineHeight = 16.sp,
+                            maxLines = 3,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                    }
+                }
+
+                if (canEditTrip && hasAlternatives) {
+                    Surface(
+                        color = DeepSea2,
+                        shape = CircleShape,
+                        modifier = Modifier
+                            .align(Alignment.TopEnd)
+                            .padding(top = 8.dp, end = 8.dp)
+                            .clickable(enabled = !jiggleMode, onClick = onAlternativesClick)
+                    ) {
+                        Box(modifier = Modifier.size(28.dp), contentAlignment = Alignment.Center) {
+                            Icon(
+                                imageVector = Icons.Outlined.Edit,
+                                contentDescription = "Change",
+                                tint = DeepSea4,
+                                modifier = Modifier.size(14.dp)
+                            )
+                        }
+                    }
+                }
+
                 Box(
                     modifier = Modifier
                         .align(Alignment.BottomEnd)
@@ -513,7 +606,7 @@ fun CurrentTripItineraryCard(
                     }
                 }
             }
-        )
+        }
     }
 }
 
@@ -534,8 +627,10 @@ private fun buildCurrentTripItineraryItems(events: List<TravelEvent>): List<Curr
     val sorted = events.sortedWith(
         compareBy(
             { it.date.ifBlank { "9999-12-31" } },
-            { it.details["sortOrder"]?.toIntOrNull() ?: 0 },
-            { normalizeTime(it.startTime) }
+            { normalizeTime(it.startTime) },
+            { itineraryEventTypePriority(it) },
+            { it.details["sortOrder"]?.toIntOrNull() ?: Int.MAX_VALUE },
+            { it.eventId }
         )
     )
     val grouped = sorted.groupBy { it.date.ifBlank { UndatedGroupKey } }
@@ -550,6 +645,15 @@ private fun buildCurrentTripItineraryItems(events: List<TravelEvent>): List<Curr
             }
             add(CurrentTripItineraryItem.DaySpacer(date))
         }
+    }
+}
+
+private fun itineraryEventTypePriority(event: TravelEvent): Int {
+    return when (event.type.lowercase(Locale.US)) {
+        "flight" -> 0
+        "hotel" -> 1
+        "restaurant", "dining", "food" -> 2
+        else -> 3
     }
 }
 

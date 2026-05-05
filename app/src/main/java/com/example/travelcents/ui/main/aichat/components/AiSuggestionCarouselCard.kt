@@ -201,7 +201,15 @@ private fun SuggestionRow(
         CurrentTripItineraryCard(
             event = suggestion.rawEvent,
             isLast = isLast,
-            onCardClick = onOpenDetails
+            canEditTrip = false,
+            hasAlternatives = false,
+            isDragging = false,
+            jiggleMode = false,
+            wobbleAngle = 0f,
+            modifier = Modifier,
+            onCardClick = onOpenDetails,
+            onDeleteClick = {},
+            onAlternativesClick = {}
         )
 
         Row(

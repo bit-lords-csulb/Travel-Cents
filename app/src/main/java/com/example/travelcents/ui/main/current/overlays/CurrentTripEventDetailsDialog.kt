@@ -384,6 +384,7 @@ private fun EventDetailCardStack(
                     onOpenMaps = { uriHandler.openUri(mapsUrl) }
                 )
             }
+            WeatherCard(event)
         }
         "restaurant", "dining", "food" -> {
             val restaurantReviewsUrl = yelpReviews.firstOrNull()?.url?.takeIf { it.isNotBlank() }
@@ -450,10 +451,19 @@ private fun EventDetailCardStack(
         }
         else -> {
             TicketPricingCard(event)
-            if (officialUrl != null) {
+            val isBookable = event.isNativeBookable?.toString() == "true"
+            val bookingUrl = event.bookingUrl
+            if (isBookable && !bookingUrl.isNullOrBlank()) {
                 com.example.travelcents.ui.main.current.overlays.cards.DetailLinkRow(
-                    label = if (isTicketmasterBacked) "Tickets" else "Source",
-                    value = if (isTicketmasterBacked) "Buy tickets" else websiteLabel,
+                    label = "★ INSTANT BOOKING",
+                    value = "Book on Viator",
+                    accent = com.example.travelcents.ui.main.current.overlays.cards.CardMint,
+                    onClick = { uriHandler.openUri(bookingUrl) }
+                )
+            } else if (isTicketmasterBacked && officialUrl != null) {
+                com.example.travelcents.ui.main.current.overlays.cards.DetailLinkRow(
+                    label = "Tickets",
+                    value = "Buy tickets",
                     onClick = { uriHandler.openUri(officialUrl) }
                 )
             }
@@ -464,6 +474,7 @@ private fun EventDetailCardStack(
                     onOpenMaps = { uriHandler.openUri(mapsUrl) }
                 )
             }
+            WeatherCard(event)
             if (showActivityReviews) {
                 ReviewsCard(
                     ratingLabel = ratingLabel,

@@ -2,6 +2,7 @@ package com.example.travelcents.ui.main.settings
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.example.travelcents.data.auth.AuthRepository
 import com.example.travelcents.data.user.UserProfileRepository
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FirebaseFirestore
@@ -25,6 +26,7 @@ data class SettingsUserState(
 class SettingsViewModel : ViewModel() {
     private val auth = FirebaseAuth.getInstance()
     private val db = FirebaseFirestore.getInstance()
+    private val authRepository = AuthRepository()
     private val userProfileRepository = UserProfileRepository(auth = auth, db = db)
 
     private val _userState = MutableStateFlow(SettingsUserState())
@@ -81,9 +83,11 @@ class SettingsViewModel : ViewModel() {
     }
 
     fun signOut(onComplete: () -> Unit) {
-        auth.signOut()
-        _userState.value = SettingsUserState(firstName = "Guest", isLoading = false)
-        onComplete()
+        viewModelScope.launch {
+            authRepository.signOut()
+            _userState.value = SettingsUserState(firstName = "Guest", isLoading = false)
+            onComplete()
+        }
     }
 
     fun deleteAccount(onComplete: () -> Unit, onError: (String) -> Unit) {
@@ -97,4 +101,3 @@ class SettingsViewModel : ViewModel() {
             .addOnFailureListener { e -> onError(e.message ?: "Delete failed") }
     }
 }
-

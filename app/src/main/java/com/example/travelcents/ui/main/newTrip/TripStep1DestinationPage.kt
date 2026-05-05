@@ -529,4 +529,3 @@ private fun DestinationCard(
         }
     }
 }
-

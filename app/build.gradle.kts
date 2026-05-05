@@ -116,6 +116,8 @@ dependencies {
     implementation(libs.googleid)
     implementation(libs.ads.mobile.sdk)
     implementation(libs.androidx.navigation.compose)
+    implementation(libs.firebase.storage)
+    implementation(libs.identity.jvm)
     coreLibraryDesugaring("com.android.tools:desugar_jdk_libs:2.0.4")
 
     // Coroutines support for Firebase Tasks (.await())

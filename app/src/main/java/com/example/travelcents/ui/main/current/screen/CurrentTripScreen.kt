@@ -351,4 +351,3 @@ fun CurrentTripScreen(
         }
     }
 }
-

@@ -25,6 +25,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImage
+import com.example.travelcents.data.trip.model.ATTR_AIRLINE_LOGO_URL
 import com.example.travelcents.data.trip.model.ATTR_TICKETMASTER_EVENT_ID
 import com.example.travelcents.data.trip.model.ATTR_BUSINESS_ADDRESS
 import com.example.travelcents.data.trip.model.TravelEvent
@@ -33,6 +34,11 @@ import com.example.travelcents.data.trip.model.detailValue
 import com.example.travelcents.ui.main.current.eventSubtitle
 import com.example.travelcents.ui.main.current.eventTitle
 import com.example.travelcents.ui.modules.PhotoGalleryButton
+import com.example.travelcents.ui.modules.formatDisplayTimeRange
+import com.example.travelcents.ui.modules.formatLongDuration
+import com.example.travelcents.ui.modules.formatLongTripDateWithYear
+import com.example.travelcents.ui.modules.parseFlexibleTime
+import java.time.Duration
 import java.util.Locale
 
 @Composable
@@ -134,6 +140,14 @@ fun EventSummaryCard(
                     )
                 }
 
+                EventTypeChip(
+                    type = event.type,
+                    accent = accent,
+                    modifier = Modifier
+                        .align(Alignment.TopStart)
+                        .padding(10.dp)
+                )
+
                 if (photoCount > 1 && onOpenGallery != null) {
                     PhotoGalleryButton(
                         photoCount = photoCount,
@@ -141,23 +155,6 @@ fun EventSummaryCard(
                         modifier = Modifier
                             .align(Alignment.TopEnd)
                             .padding(10.dp)
-                    )
-                }
-
-                Surface(
-                    color = CardBackground.copy(alpha = 0.62f),
-                    shape = RoundedCornerShape(999.dp),
-                    modifier = Modifier
-                        .align(Alignment.BottomStart)
-                        .padding(10.dp)
-                ) {
-                    Text(
-                        text = event.type.uppercase(Locale.US),
-                        color = accent,
-                        fontSize = 9.sp,
-                        fontWeight = FontWeight.Bold,
-                        letterSpacing = 1.3.sp,
-                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp)
                     )
                 }
             }
@@ -360,7 +357,15 @@ private fun HotelSummaryCard(
                     )
                 }
 
-                if (photoCount > 1 && onOpenGallery != null) {
+                EventTypeChip(
+                    type = event.type,
+                    accent = CardLavender,
+                    modifier = Modifier
+                        .align(Alignment.TopStart)
+                        .padding(10.dp)
+                )
+
+                if (photoCount > 0 && onOpenGallery != null) {
                     PhotoGalleryButton(
                         photoCount = photoCount,
                         onClick = onOpenGallery,
@@ -470,6 +475,14 @@ private fun RestaurantSummaryVariant(
                     )
                 }
 
+                EventTypeChip(
+                    type = event.type,
+                    accent = CardCoral,
+                    modifier = Modifier
+                        .align(Alignment.TopStart)
+                        .padding(10.dp)
+                )
+
                 if (photoCount > 1 && onOpenGallery != null) {
                     PhotoGalleryButton(
                         photoCount = photoCount,
@@ -535,6 +548,8 @@ private fun FlightSummaryVariant(
     onOpenGallery: (() -> Unit)?
 ) {
     val summary = event.toFlightSummaryModel()
+    val airlineLogo = event.details.firstNonBlank(ATTR_AIRLINE_LOGO_URL, "airline_logo")
+        ?.takeIf { it.isNotBlank() }
 
     DetailCardFrame(accent = CardSky) {
         Row(
@@ -542,17 +557,79 @@ private fun FlightSummaryVariant(
             horizontalArrangement = Arrangement.spacedBy(16.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            FlightHeroMedia(
-                heroImage = heroImage,
-                title = title,
-                airlineLogoUrl = summary?.airlineLogoUrl,
-                photoCount = photoCount,
-                onOpenGallery = onOpenGallery,
+            Box(
                 modifier = Modifier
                     .weight(0.42f)
-                    .aspectRatio(1f),
-                shape = RoundedCornerShape(24.dp)
-            )
+                    .aspectRatio(0.92f)
+                    .clip(RoundedCornerShape(24.dp))
+                    .background(CardSurfaceHighest)
+                    .then(if (onOpenGallery != null) Modifier.clickable(onClick = onOpenGallery) else Modifier)
+            ) {
+                if (!heroImage.isNullOrBlank()) {
+                    AsyncImage(
+                        model = heroImage,
+                        contentDescription = title,
+                        modifier = Modifier.matchParentSize(),
+                        contentScale = ContentScale.Crop
+                    )
+                    Box(
+                        modifier = Modifier
+                            .matchParentSize()
+                            .background(
+                                Brush.verticalGradient(
+                                    colors = listOf(
+                                        androidx.compose.ui.graphics.Color.Transparent,
+                                        CardBackground.copy(alpha = 0.18f),
+                                        CardBackground.copy(alpha = 0.72f)
+                                    )
+                                )
+                            )
+                    )
+                } else {
+                    Box(
+                        modifier = Modifier
+                            .matchParentSize()
+                            .background(accentGradientForType(event.type))
+                    )
+                }
+
+                EventTypeChip(
+                    type = event.type,
+                    accent = CardSky,
+                    modifier = Modifier
+                        .align(Alignment.TopStart)
+                        .padding(10.dp)
+                )
+
+                if (photoCount > 1 && onOpenGallery != null) {
+                    PhotoGalleryButton(
+                        photoCount = photoCount,
+                        onClick = onOpenGallery,
+                        modifier = Modifier
+                            .align(Alignment.TopEnd)
+                            .padding(10.dp)
+                    )
+                }
+
+                if (airlineLogo != null) {
+                    Surface(
+                        color = androidx.compose.ui.graphics.Color.White,
+                        shape = RoundedCornerShape(999.dp),
+                        modifier = Modifier
+                            .align(Alignment.BottomStart)
+                            .padding(10.dp)
+                            .size(36.dp)
+                    ) {
+                        AsyncImage(
+                            model = airlineLogo,
+                            contentDescription = null,
+                            modifier = Modifier
+                                .padding(6.dp),
+                            contentScale = ContentScale.Fit
+                        )
+                    }
+                }
+            }
 
             Column(
                 modifier = Modifier.weight(0.58f),

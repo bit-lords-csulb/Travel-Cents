@@ -8,7 +8,6 @@ import com.example.travelcents.data.ai.chat.AiCuratedTripStarter
 import com.example.travelcents.data.ai.chat.AiCuratedTripToItineraryMapper
 import com.example.travelcents.data.ai.chat.AiDestinationLockMapper
 import com.example.travelcents.data.ai.chat.AiTripIntakeProfile
-import com.example.travelcents.data.ai.chat.PREVIEW_TRIP_STATUS
 import com.example.travelcents.data.media.TripMediaCacheStore
 import com.example.travelcents.data.local.trip.TravelCentsDatabase
 import com.example.travelcents.data.local.trip.TripLocalDataSource
@@ -95,6 +94,11 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.tasks.await
+import java.time.Duration
+import java.time.LocalDate
+import java.time.LocalDateTime
+import java.time.LocalTime
+import java.time.format.DateTimeFormatter
 import java.util.Currency
 import java.util.Locale
 import java.util.UUID
@@ -169,6 +173,27 @@ class CurrentTripViewModel(application: Application) : AndroidViewModel(applicat
         private const val NO_TRIP_MESSAGE = "No trip found yet. Create one from the New Trip tab."
         private const val SHARED_YELP_VISIBLE_OPTIONS = 5
         private const val SHARED_YELP_POOL_EXPANSION_SIZE = 10
+        private const val ACTIVITY_BUFFER_AFTER_ARRIVAL_HOURS = 2L
+        private const val DEFAULT_ACTIVITY_DURATION_MINUTES = 120L
+        private val ISO_DATE_REGEX = Regex("\\d{4}-\\d{2}-\\d{2}")
+        private val TRIP_TIME_FORMATTER = DateTimeFormatter.ofPattern("HH:mm")
+        private val DEFAULT_ACTIVITY_START_TIME = LocalTime.of(10, 0)
+        private val LATEST_FIRST_DAY_ACTIVITY_START = LocalTime.of(20, 0)
+        private val TRIP_INPUT_TIME_FORMATTERS = listOf(
+            TRIP_TIME_FORMATTER,
+            DateTimeFormatter.ISO_LOCAL_TIME,
+            DateTimeFormatter.ofPattern("H:mm"),
+            DateTimeFormatter.ofPattern("h:mm a", Locale.US),
+            DateTimeFormatter.ofPattern("hh:mm a", Locale.US)
+        )
+        private val MERIDIEM_REGEX = Regex("\\b[AP]M\\b", RegexOption.IGNORE_CASE)
+        private val WEATHER_DETAIL_KEYS = setOf(
+            ATTR_WEATHER_TEMP_C,
+            ATTR_WEATHER_CONDITION,
+            ATTR_WEATHER_PRECIP_PCT,
+            ATTR_WEATHER_WIND_KPH,
+            ATTR_WEATHER_SUMMARY
+        )
     }
 
     private val _events = MutableStateFlow<List<TravelEvent>>(emptyList())
@@ -198,7 +223,7 @@ class CurrentTripViewModel(application: Application) : AndroidViewModel(applicat
     private val _reviewsLoading = MutableStateFlow<Set<String>>(emptySet())
     val reviewsLoading: StateFlow<Set<String>> = _reviewsLoading.asStateFlow()
     private val _yelpEnrichmentInFlight = MutableStateFlow<Set<String>>(emptySet())
-    private val _restaurantLiveContextInFlight = MutableStateFlow<Set<String>>(emptySet())
+    private val _eventLiveContextInFlight = MutableStateFlow<Set<String>>(emptySet())
 
     private val _shareTargets = MutableStateFlow<List<ShareTarget>>(emptyList())
     val shareTargets: StateFlow<List<ShareTarget>> = _shareTargets.asStateFlow()
@@ -271,7 +296,7 @@ class CurrentTripViewModel(application: Application) : AndroidViewModel(applicat
         _yelpReviews.value = emptyMap()
         _reviewsLoading.value = emptySet()
         _yelpEnrichmentInFlight.value = emptySet()
-        _restaurantLiveContextInFlight.value = emptySet()
+        _eventLiveContextInFlight.value = emptySet()
         _shareTargets.value = emptyList()
         _tripMembers.value = emptyList()
         liveEventDetailOverrides = emptyMap()
@@ -418,15 +443,19 @@ class CurrentTripViewModel(application: Application) : AndroidViewModel(applicat
             optionsByEvent = alignedOptionsByEvent,
             sortEvents = ::sortPlanEvents
         )
-        val visibleEvents = enrichedEvents.map { event ->
-            val eventWithTripTimeZone = applyTripTimeZone(event)
-            val overrides = liveEventDetailOverrides[event.eventId].orEmpty()
-            if (overrides.isEmpty()) {
-                eventWithTripTimeZone
-            } else {
-                eventWithTripTimeZone.copy(details = eventWithTripTimeZone.details + overrides)
-            }
-        }
+        val visibleEvents = sortPlanEvents(
+            applyOutboundArrivalDisplayGuard(
+                enrichedEvents.map { event ->
+                    val eventWithTripTimeZone = applyTripTimeZone(event)
+                    val overrides = liveEventDetailOverrides[event.eventId].orEmpty()
+                    if (overrides.isEmpty()) {
+                        eventWithTripTimeZone
+                    } else {
+                        eventWithTripTimeZone.copy(details = eventWithTripTimeZone.details + overrides)
+                    }
+                }
+            )
+        )
         _events.value = visibleEvents
         _uiState.update {
             it.copy(
@@ -569,6 +598,40 @@ class CurrentTripViewModel(application: Application) : AndroidViewModel(applicat
                 }
             } finally {
                 flightHeroBackfillInFlight.removeAll(candidateIds)
+            }
+        }
+    }
+
+    private suspend fun persistWeatherDetailOverrides(
+        event: TravelEvent,
+        weatherOverrides: Map<String, String>
+    ) {
+        if (weatherOverrides.isEmpty()) return
+
+        val tripKey = currentTripKey ?: return
+        val baseEvent = localEventsSnapshot.firstOrNull { it.eventId == event.eventId } ?: event
+        val updatedEvent = baseEvent.copy(details = baseEvent.details + weatherOverrides)
+        if (baseEvent.details.filterKeys { it in WEATHER_DETAIL_KEYS } == weatherOverrides) return
+
+        localEventsSnapshot = sortPlanEvents(
+            localEventsSnapshot.map { existing ->
+                if (existing.eventId == event.eventId) updatedEvent else existing
+            }
+        )
+        publishCurrentEvents(localEventsSnapshot, _eventOptions.value)
+        persistLocalTripSnapshot(
+            tripKey = tripKey,
+            events = localEventsSnapshot
+        )
+
+        currentTripWriteKeyIfContributor()?.let { writeKey ->
+            runCatching {
+                tripSyncRemoteDataSource.upsertEvent(
+                    tripKey = writeKey,
+                    event = event.copy(details = event.details + weatherOverrides)
+                )
+            }.onFailure { error ->
+                Log.w("CurrentTripViewModel", "Failed to persist event weather details", error)
             }
         }
     }
@@ -875,44 +938,51 @@ class CurrentTripViewModel(application: Application) : AndroidViewModel(applicat
         val event = _uiState.value.events.firstOrNull { it.eventId == eventId } ?: return
         val isRestaurant = isRestaurantEvent(event)
         val isTicketmasterBacked = isTicketmasterBackedEvent(event)
-        if ((!isRestaurant && !isTicketmasterBacked) || eventId in _restaurantLiveContextInFlight.value) return
-
-        val venueName = event.displayName()?.takeIf { it.isNotBlank() }
-        val venueAddress = event.detailValue(ATTR_BUSINESS_ADDRESS, "address")
-            ?.takeIf { it.isNotBlank() }
-        val transportAnchor = resolveTransportAnchor(event)
-        val transportDestination = resolveTransportDestination(event)
+        if (eventId in _eventLiveContextInFlight.value) return
         val latitude = event.detailValue(ATTR_LATITUDE)?.toDoubleOrNull()
         val longitude = event.detailValue(ATTR_LONGITUDE)?.toDoubleOrNull()
-        val hasOutdoorSeating = event.detailValue(ATTR_HAS_OUTDOOR_SEATING)
-            ?.equals("true", ignoreCase = true) == true
-        val tripCurrency = currentTripSummary?.currency
+        val canFetchWeather = isWeatherEligiblePlaceEvent(event) && latitude != null && longitude != null
+        val venueName = if (isRestaurant) event.displayName()?.takeIf { it.isNotBlank() } else null
+        val venueAddress = if (isRestaurant) {
+            event.detailValue(ATTR_BUSINESS_ADDRESS, "address")
+                ?.takeIf { it.isNotBlank() }
+        } else {
+            null
+        }
+        val transportAnchor = if (isRestaurant) resolveTransportAnchor(event) else null
+        val transportDestination = if (isRestaurant) resolveTransportDestination(event) else null
+        val tripCurrency = (if (isRestaurant) currentTripSummary?.currency else null)
             ?.takeIf { it.isNotBlank() }
             ?.uppercase(Locale.US)
         val homeCurrency = resolvedHomeCurrencyCode()
-        val usdAnchorAmount = restaurantUsdAnchorAmount(event)
-        val walkScoreAddress = venueAddress
-            ?: transportDestination?.address
-            ?: event.details["location"]?.takeIf { it.isNotBlank() }
+        val usdAnchorAmount = if (isRestaurant) restaurantUsdAnchorAmount(event) else null
+        val walkScoreAddress = if (isRestaurant) {
+            venueAddress
+                ?: transportDestination?.address
+                ?: event.details["location"]?.takeIf { it.isNotBlank() }
+        } else {
+            null
+        }
 
         val lacksRestaurantInputs =
             venueAddress == null &&
                 (transportAnchor == null || transportDestination == null) &&
-                (!hasOutdoorSeating || latitude == null || longitude == null) &&
+                !canFetchWeather &&
                 (latitude == null || longitude == null || walkScoreAddress == null) &&
                 (tripCurrency == null || usdAnchorAmount == null)
         val lacksTicketmasterTransport = transportAnchor == null || transportDestination == null
 
         if (
             (isRestaurant && lacksRestaurantInputs) ||
-            (isTicketmasterBacked && !isRestaurant && lacksTicketmasterTransport)
+            (isTicketmasterBacked && !isRestaurant && lacksTicketmasterTransport && !canFetchWeather) ||
+            (!isRestaurant && !isTicketmasterBacked && !canFetchWeather)
         ) return
 
         viewModelScope.launch {
-            _restaurantLiveContextInFlight.update { it + eventId }
+            _eventLiveContextInFlight.update { it + eventId }
             try {
                 val overrides = buildMap {
-                    if (isRestaurant && venueName != null && venueAddress != null) {
+                    if (venueName != null && venueAddress != null) {
                         PopularTimesRepository.fetchSnapshot(
                             venueName = venueName,
                             venueAddress = venueAddress,
@@ -955,7 +1025,10 @@ class CurrentTripViewModel(application: Application) : AndroidViewModel(applicat
                         }
                     }
 
-                    if (isRestaurant && hasOutdoorSeating && latitude != null && longitude != null) {
+                    val isFlight = event.type.equals("flight", ignoreCase = true)
+                    val hasOutdoorSeating = event.detailValue(ATTR_HAS_OUTDOOR_SEATING)?.toBoolean() ?: false
+
+                    if ((hasOutdoorSeating || isFlight) && latitude != null && longitude != null) {
                         WeatherRepository.fetchSnapshot(
                             latitude = latitude,
                             longitude = longitude,
@@ -1025,11 +1098,13 @@ class CurrentTripViewModel(application: Application) : AndroidViewModel(applicat
                     }
                 }
 
+                val weatherOverrides = overrides.filterKeys { it in WEATHER_DETAIL_KEYS }
+                persistWeatherDetailOverrides(event, weatherOverrides)
                 replaceLiveDetailOverrides(eventId, overrides)
             } catch (e: Exception) {
                 Log.w("CurrentTripViewModel", "Failed to refresh event live context", e)
             } finally {
-                _restaurantLiveContextInFlight.update { it - eventId }
+                _eventLiveContextInFlight.update { it - eventId }
             }
         }
     }
@@ -1245,9 +1320,6 @@ class CurrentTripViewModel(application: Application) : AndroidViewModel(applicat
     }
 
     private fun yelpPoolTypeForEvent(event: TravelEvent): String? {
-        val yelpBusinessId = event.detailValue(DETAIL_YELP_ID)?.takeIf { it.isNotBlank() } ?: return null
-        if (yelpBusinessId.isBlank()) return null
-
         return when (event.type.lowercase(Locale.US)) {
             "restaurant", "dining", "food" -> YELP_POOL_TYPE_RESTAURANTS
             "activity" -> YELP_POOL_TYPE_ACTIVITIES
@@ -1446,7 +1518,9 @@ class CurrentTripViewModel(application: Application) : AndroidViewModel(applicat
                         chatRef,
                         mapOf(
                             "lastMessage" to "Shared a trip",
-                            "lastMessageTime" to FieldValue.serverTimestamp()
+                            "lastMessageTime" to FieldValue.serverTimestamp(),
+                            "lastSenderId" to uid,
+                            "lastSenderName" to senderName
                         )
                     )
                 }.await()
@@ -2037,11 +2111,103 @@ class CurrentTripViewModel(application: Application) : AndroidViewModel(applicat
         return events.sortedWith(
             compareBy<TravelEvent>(
                 { normalizeDate(it.date) },
-                { it.details["sortOrder"]?.toIntOrNull() ?: Int.MAX_VALUE },
                 { normalizeTime(it.startTime) },
+                { planEventTypePriority(it) },
+                { it.details["sortOrder"]?.toIntOrNull() ?: Int.MAX_VALUE },
                 { it.eventId }
             )
         )
+    }
+
+    private fun applyOutboundArrivalDisplayGuard(events: List<TravelEvent>): List<TravelEvent> {
+        val outboundFlight = events.firstOrNull { event ->
+            event.type.equals("flight", ignoreCase = true) &&
+                event.details["trip_segment"].equals("outbound", ignoreCase = true)
+        } ?: return events
+
+        val arrivalDate = normalizedIsoDate(
+            outboundFlight.details["arrival_date"]
+                ?: outboundFlight.details["arrival_time"]
+                ?: outboundFlight.date
+        ) ?: return events
+        val arrivalTime = parsePlanTime(
+            outboundFlight.details["arrival_time"]
+                ?: outboundFlight.endTime
+        ) ?: return events
+
+        val earliestCandidate = LocalDateTime.of(arrivalDate, arrivalTime)
+            .plusHours(ACTIVITY_BUFFER_AFTER_ARRIVAL_HOURS)
+        val earliestActivity = if (earliestCandidate.toLocalTime().isAfter(LATEST_FIRST_DAY_ACTIVITY_START)) {
+            LocalDateTime.of(earliestCandidate.toLocalDate().plusDays(1), DEFAULT_ACTIVITY_START_TIME)
+        } else {
+            earliestCandidate
+        }
+
+        return events.map { event ->
+            if (!event.isFlexibleDestinationEvent()) return@map event
+
+            val eventDate = normalizedIsoDate(event.date) ?: return@map event
+            val eventStart = parsePlanTime(event.startTime)
+            val eventDateTime = LocalDateTime.of(eventDate, eventStart ?: DEFAULT_ACTIVITY_START_TIME)
+            if (!eventDateTime.isBefore(earliestActivity)) return@map event
+
+            val originalEnd = parsePlanTime(event.endTime)
+            val durationMinutes = if (eventStart != null && originalEnd != null && originalEnd.isAfter(eventStart)) {
+                Duration.between(eventStart, originalEnd).toMinutes()
+            } else {
+                DEFAULT_ACTIVITY_DURATION_MINUTES
+            }
+            event.copy(
+                date = earliestActivity.toLocalDate().format(DateTimeFormatter.ISO_LOCAL_DATE),
+                startTime = earliestActivity.toLocalTime().format(TRIP_TIME_FORMATTER),
+                endTime = earliestActivity.toLocalTime().plusMinutes(durationMinutes).format(TRIP_TIME_FORMATTER)
+            )
+        }
+    }
+
+    private fun TravelEvent.isFlexibleDestinationEvent(): Boolean {
+        return when (type.lowercase(Locale.US)) {
+            "flight", "hotel" -> false
+            else -> true
+        }
+    }
+
+    private fun normalizedIsoDate(rawDate: String?): LocalDate? {
+        val value = rawDate?.trim()?.takeIf { it.isNotBlank() } ?: return null
+        val dateText = ISO_DATE_REGEX.find(value)?.value ?: return null
+        return runCatching { LocalDate.parse(dateText, DateTimeFormatter.ISO_LOCAL_DATE) }.getOrNull()
+    }
+
+    private fun parsePlanTime(rawTime: String?): LocalTime? {
+        val value = rawTime?.trim()?.takeIf { it.isNotBlank() } ?: return null
+        val normalized = value.replace(Regex("\\s+"), " ")
+        val clockCandidate = if (MERIDIEM_REGEX.containsMatchIn(normalized)) {
+            normalized.split(" ").takeLast(2).joinToString(" ")
+        } else {
+            normalized
+                .substringAfterLast("T")
+                .substringAfterLast(" ")
+                .substringBefore("+")
+                .substringBefore("-")
+                .removeSuffix("Z")
+        }
+        return sequenceOf(clockCandidate, normalized)
+            .distinct()
+            .mapNotNull { candidate ->
+                TRIP_INPUT_TIME_FORMATTERS.firstNotNullOfOrNull { formatter ->
+                    runCatching { LocalTime.parse(candidate, formatter) }.getOrNull()
+                }
+            }
+            .firstOrNull()
+    }
+
+    private fun planEventTypePriority(event: TravelEvent): Int {
+        return when (event.type.lowercase(Locale.US)) {
+            "flight" -> 0
+            "hotel" -> 1
+            "restaurant", "dining", "food" -> 2
+            else -> 3
+        }
     }
 
     private fun isRestaurantEvent(event: TravelEvent): Boolean {
@@ -2053,6 +2219,10 @@ class CurrentTripViewModel(application: Application) : AndroidViewModel(applicat
 
     private fun isTicketmasterBackedEvent(event: TravelEvent): Boolean {
         return !event.detailValue(ATTR_TICKETMASTER_EVENT_ID).isNullOrBlank()
+    }
+
+    private fun isWeatherEligiblePlaceEvent(event: TravelEvent): Boolean {
+        return true
     }
 
     private data class TicketmasterConflictResolution(
