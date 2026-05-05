@@ -19,7 +19,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.example.travelcents.ui.theme.DeepSea3
+import com.example.travelcents.ui.main.newTrip.TripWizardColors
 import com.example.travelcents.ui.theme.DeepSea4
 import com.example.travelcents.ui.theme.DeepSea5
 import com.example.travelcents.ui.theme.TravelCentsFonts
@@ -57,7 +57,7 @@ fun CurrentTripModeSwitcher(
                         .weight(1f)
                         .height(42.dp)
                         .clip(RoundedCornerShape(12.dp))
-                        .background(if (isSelected) DeepSea3.copy(alpha = 0.92f) else Color.Transparent)
+                        .background(if (isSelected) TripWizardColors.ContainerHighest else Color.Transparent)
                         .clickable(enabled = !isSelected) { onModeSelected(tab.mode) },
                     contentAlignment = Alignment.Center
                 ) {

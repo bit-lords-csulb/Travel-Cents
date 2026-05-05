@@ -74,6 +74,7 @@ import com.example.travelcents.data.trip.model.DETAIL_YELP_ID
 import com.example.travelcents.data.trip.model.EventOption
 import com.example.travelcents.data.trip.model.YelpReview
 import com.example.travelcents.data.trip.model.firstNonBlank
+import com.example.travelcents.ui.main.newTrip.TripWizardColors
 import com.example.travelcents.ui.modules.defaultPlanTimeZoneId
 import com.example.travelcents.ui.modules.formatDisplayTime
 import com.example.travelcents.ui.modules.formatTimeZoneLabel
@@ -82,19 +83,35 @@ import com.example.travelcents.ui.modules.parseFlexibleTime
 import com.example.travelcents.ui.modules.parseIsoDate
 import com.example.travelcents.ui.modules.plusMinutes
 import com.example.travelcents.ui.modules.todayIsoDate
-import com.example.travelcents.ui.theme.DeepSea4
+import com.example.travelcents.ui.theme.DeepSea1
+import com.example.travelcents.ui.theme.DeepSea5
 import java.util.Calendar
 import java.util.Locale
 
-// Design tokens matching the HTML spec
-private val EditorBg = Color(0xFF0B1326)
-private val SurfaceLowest = Color(0xFF060E20)
-private val SurfaceContainerHigh = Color(0xFF222A3D)
-private val SurfaceContainerHighest = Color(0xFF2D3449)
-private val PrimaryAccent = Color(0xFFCEBDFF)
-private val PrimaryContainer = Color(0xFFA78BFA)
-private val OnSurface = Color(0xFFDAE2FD)
-private val OnSurfaceVariant = Color(0xFFCAC4D4)
+private val EditorBg: Color
+    get() = DeepSea1
+
+private val SurfaceLowest: Color
+    get() = TripWizardColors.SurfaceBright
+
+private val SurfaceContainerHigh: Color
+    get() = TripWizardColors.ContainerHigh
+
+private val SurfaceContainerHighest: Color
+    get() = TripWizardColors.ContainerHighest
+
+private val PrimaryAccent: Color
+    get() = TripWizardColors.Blue
+
+private val PrimaryContainer: Color
+    get() = TripWizardColors.PrimaryContainer
+
+private val OnSurface: Color
+    get() = DeepSea5
+
+private val OnSurfaceVariant: Color
+    get() = TripWizardColors.OnSurfaceVariant
+
 private val ErrorContainer = Color(0xFF93000A)
 private val OnErrorContainer = Color(0xFFFFDAD6)
 
@@ -581,7 +598,7 @@ fun CurrentPlanEditorDialog(
                     ) {
                         Text(
                             text = if (initialPlan.eventId == null) "SAVE" else "UPDATE EVENT",
-                            color = Color(0xFF21005E),
+                            color = DeepSea5,
                             fontSize = 11.sp,
                             fontWeight = FontWeight.Bold,
                             letterSpacing = 2.sp
@@ -639,11 +656,11 @@ private fun EditorYelpReviews(
                     horizontalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
                     CircularProgressIndicator(modifier = Modifier.size(14.dp), color = PrimaryAccent, strokeWidth = 2.dp)
-                    Text("Loading reviews…", color = DeepSea4, fontSize = 12.sp)
+                    Text("Loading reviews…", color = OnSurfaceVariant, fontSize = 12.sp)
                 }
             }
             reviews.isEmpty() -> {
-                Text("No reviews available.", color = DeepSea4, fontSize = 13.sp)
+                Text("No reviews available.", color = OnSurfaceVariant, fontSize = 13.sp)
             }
             else -> reviews.forEach { review ->
                 EditorReviewCard(review)

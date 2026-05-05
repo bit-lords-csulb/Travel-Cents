@@ -139,7 +139,7 @@ fun TripStep2DatesPage(
         Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .background(Color(0xFF010E24))
+                .background(TripWizardColors.ContainerLow)
                 .statusBarsPadding()
         ) {
             Row(
@@ -420,7 +420,7 @@ private fun S2ProgressWidget(stepsComplete: Int) {
             .fillMaxWidth()
             .clip(RoundedCornerShape(16.dp))
             .background(TripWizardColors.ContainerHigh.copy(alpha = 0.5f))
-            .border(1.dp, Color.White.copy(alpha = 0.05f), RoundedCornerShape(16.dp))
+            .border(1.dp, TripWizardColors.OnSurfaceVariant.copy(alpha = 0.14f), RoundedCornerShape(16.dp))
             .padding(16.dp)
     ) {
         Column {
@@ -512,7 +512,7 @@ private fun S2DayCell(
                 fontSize = 13.sp,
                 fontWeight = if (isStart || isEnd) FontWeight.Bold else FontWeight.Normal,
                 color = when {
-                    isStart || isEnd -> Color(0xFF001627)
+                    isStart || isEnd -> DeepSea5
                     isInRange -> DeepSea5
                     else -> DeepSea5.copy(alpha = 0.85f)
                 },
@@ -534,7 +534,7 @@ private fun S2MonthYearPickerDialog(
 
     AlertDialog(
         onDismissRequest = onDismiss,
-        containerColor = Color(0xFF0B203D),
+        containerColor = TripWizardColors.ContainerHigh,
         shape = RoundedCornerShape(20.dp),
         title = {
             // Year selector row
@@ -550,7 +550,7 @@ private fun S2MonthYearPickerDialog(
                     pickerYear.toString(),
                     fontSize = 20.sp,
                     fontWeight = FontWeight.Bold,
-                    color = Color.White
+                    color = DeepSea5
                 )
                 IconButton(onClick = { pickerYear++ }) {
                     Icon(Icons.Default.ChevronRight, null, tint = TripWizardColors.Blue)
@@ -570,7 +570,7 @@ private fun S2MonthYearPickerDialog(
                     Box(
                         modifier = Modifier
                             .clip(RoundedCornerShape(10.dp))
-                            .background(if (selected) TripWizardColors.Blue else Color(0xFF152C4E))
+                            .background(if (selected) TripWizardColors.Blue else TripWizardColors.SurfaceBright)
                             .clickable { pickerMonth = index }
                             .padding(vertical = 10.dp),
                         contentAlignment = Alignment.Center
@@ -579,7 +579,7 @@ private fun S2MonthYearPickerDialog(
                             name,
                             fontSize = 13.sp,
                             fontWeight = if (selected) FontWeight.Bold else FontWeight.Normal,
-                            color = if (selected) Color(0xFF001627) else Color(0xFF9EABC8)
+                            color = if (selected) DeepSea5 else TripWizardColors.OnSurfaceVariant
                         )
                     }
                 }
@@ -592,7 +592,7 @@ private fun S2MonthYearPickerDialog(
         },
         dismissButton = {
             TextButton(onClick = onDismiss) {
-                Text("Cancel", color = Color(0xFF9EABC8))
+                Text("Cancel", color = TripWizardColors.OnSurfaceVariant)
             }
         }
     )

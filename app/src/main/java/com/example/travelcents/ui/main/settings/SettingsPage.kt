@@ -22,6 +22,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -31,6 +32,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
+import com.example.travelcents.data.preferences.ThemePreferencesRepository
 import com.example.travelcents.ui.components.ProfileAvatar
 import com.example.travelcents.ui.main.newTrip.TripWizardColors
 import com.example.travelcents.ui.theme.DeepSea1
@@ -48,6 +50,11 @@ fun SettingsPage(
 ) {
     val viewModel: SettingsViewModel = viewModel()
     val userState by viewModel.userState.collectAsStateWithLifecycle()
+    val context = LocalContext.current
+    val themePreferences = remember(context.applicationContext) {
+        ThemePreferencesRepository.getInstance(context.applicationContext)
+    }
+    val darkModeEnabled by themePreferences.darkModeEnabled.collectAsStateWithLifecycle()
     // Start on Account (leftmost / primary tab)
     var selectedTab by remember { mutableStateOf("Account") }
 
@@ -87,7 +94,10 @@ fun SettingsPage(
         when (selectedTab) {
             "Account" -> AccountTab(viewModel = viewModel, onLoggedOut = onLoggedOut)
             "Security" -> SecurityTab(viewModel = viewModel)
-            "Preferences" -> PreferencesTab()
+            "Preferences" -> PreferencesTab(
+                darkModeEnabled = darkModeEnabled,
+                onDarkModeChanged = themePreferences::setDarkModeEnabled
+            )
         }
 
         Spacer(modifier = Modifier.height(24.dp))

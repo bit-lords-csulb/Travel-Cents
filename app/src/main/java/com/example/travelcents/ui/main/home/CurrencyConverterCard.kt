@@ -55,13 +55,17 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.travelcents.ui.components.TcCompactTextField
+import com.example.travelcents.ui.main.newTrip.TripWizardColors
 import com.example.travelcents.ui.theme.DeepSea2
 import com.example.travelcents.ui.theme.DeepSea4
 import com.example.travelcents.ui.theme.DeepSea5
 import java.util.Locale
 
-private val Primary = Color(0xFF64B5F6)
-private val SurfaceBright = Color(0xFF243447)
+private val Primary: Color
+    get() = TripWizardColors.Blue
+
+private val SurfaceBright: Color
+    get() = TripWizardColors.SurfaceBright
 
 private fun formatConvertedAmount(value: Double): String =
     String.format(Locale.US, "%.2f", value)

@@ -42,7 +42,7 @@ fun AiOptionCard(
             width = 1.dp,
             color = when {
                 selected -> TripWizardColors.Blue.copy(alpha = 0.55f)
-                enabled -> androidx.compose.ui.graphics.Color.White.copy(alpha = 0.08f)
+                enabled -> TripWizardColors.OnSurfaceVariant.copy(alpha = 0.16f)
                 else -> TripWizardColors.SurfaceBright.copy(alpha = 0.45f)
             }
         )

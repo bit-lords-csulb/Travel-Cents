@@ -51,6 +51,7 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import coil.compose.AsyncImage
 import com.example.travelcents.data.social.model.Group
 import com.example.travelcents.data.social.model.Message
+import com.example.travelcents.ui.main.newTrip.TripWizardColors
 import com.example.travelcents.ui.theme.DeepSea1
 import com.example.travelcents.ui.theme.DeepSea2
 import com.example.travelcents.ui.theme.DeepSea3
@@ -361,7 +362,7 @@ private fun TripCardBubble(
                     modifier = Modifier
                         .fillMaxWidth()
                         .height(64.dp)
-                        .background(Color(0xFF0B203D)),
+                        .background(TripWizardColors.ContainerHigh),
                     contentAlignment = Alignment.Center
                 ) {
                     Text("✈", fontSize = 28.sp)
@@ -399,7 +400,7 @@ private fun TripCardBubble(
                 Spacer(modifier = Modifier.height(8.dp))
                 Text(
                     text = "Tap to view trip →",
-                    color = Color(0xFF64B5F6),
+                    color = TripWizardColors.Blue,
                     fontSize = 11.sp,
                     fontWeight = FontWeight.SemiBold
                 )

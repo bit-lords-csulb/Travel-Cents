@@ -75,7 +75,7 @@ fun TripStep3TravelersPage(
         Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .background(Color(0xFF010E24))
+                .background(TripWizardColors.ContainerLow)
                 .statusBarsPadding()
         ) {
             Row(
@@ -197,7 +197,7 @@ fun TripStep3TravelersPage(
                             .clickable { viewModel.adults++ },
                         contentAlignment = Alignment.Center
                     ) {
-                        Icon(Icons.Default.Add, null, tint = Color(0xFF001627), modifier = Modifier.size(24.dp))
+                        Icon(Icons.Default.Add, null, tint = DeepSea5, modifier = Modifier.size(24.dp))
                     }
                 }
             }
@@ -281,7 +281,7 @@ private fun S3ProgressWidget(stepsComplete: Int) {
             .fillMaxWidth()
             .clip(RoundedCornerShape(16.dp))
             .background(TripWizardColors.ContainerHigh.copy(alpha = 0.5f))
-            .border(1.dp, Color.White.copy(alpha = 0.05f), RoundedCornerShape(16.dp))
+            .border(1.dp, TripWizardColors.OnSurfaceVariant.copy(alpha = 0.14f), RoundedCornerShape(16.dp))
             .padding(16.dp)
     ) {
         Column {
@@ -368,7 +368,7 @@ private fun S3InlineStepper(
                     .clickable { onIncrement() },
                 contentAlignment = Alignment.Center
             ) {
-                Icon(Icons.Default.Add, null, tint = Color(0xFF001627), modifier = Modifier.size(18.dp))
+                Icon(Icons.Default.Add, null, tint = DeepSea5, modifier = Modifier.size(18.dp))
             }
         }
     }
@@ -412,7 +412,7 @@ private fun S3ToggleRow(
             checked = checked,
             onCheckedChange = onCheckedChange,
             colors = SwitchDefaults.colors(
-                checkedThumbColor = Color(0xFF001627),
+                checkedThumbColor = DeepSea5,
                 checkedTrackColor = TripWizardColors.Blue,
                 uncheckedThumbColor = TripWizardColors.OnSurfaceVariant,
                 uncheckedTrackColor = TripWizardColors.ContainerHighest

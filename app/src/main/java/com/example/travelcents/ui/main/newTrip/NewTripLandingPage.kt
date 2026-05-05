@@ -51,7 +51,7 @@ fun NewTripLandingPage(
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .background(Color(0xFF010E24))
+                    .background(TripWizardColors.ContainerLow)
                     .statusBarsPadding()
                     .padding(horizontal = 8.dp, vertical = 12.dp),
                 contentAlignment = Alignment.Center

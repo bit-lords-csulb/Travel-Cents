@@ -59,6 +59,7 @@ import com.example.travelcents.ui.components.TcButton
 import com.example.travelcents.ui.components.TcTextField
 import com.example.travelcents.ui.theme.DeepSea1
 import com.example.travelcents.ui.theme.DeepSea4
+import com.example.travelcents.ui.theme.DeepSea5
 import com.example.travelcents.ui.theme.TravelCentsFonts
 
 private const val LOGIN_PREFS = "login_preferences"
@@ -134,7 +135,7 @@ fun LoginPage(modifier: Modifier = Modifier, navController: NavController, authV
             text = "Log In",
             fontSize = 32.sp,
             fontWeight = FontWeight.Bold,
-            color = Color.White,
+            color = DeepSea5,
             fontFamily = TravelCentsFonts.Headline
         )
 
@@ -257,7 +258,7 @@ fun LoginPage(modifier: Modifier = Modifier, navController: NavController, authV
 
                 Text(
                     text = "Remember Me",
-                    color = Color.White,
+                    color = DeepSea5,
                     fontSize = 12.sp,
                     fontWeight = FontWeight.Medium,
                     fontFamily = TravelCentsFonts.Body
@@ -279,12 +280,12 @@ fun LoginPage(modifier: Modifier = Modifier, navController: NavController, authV
 
         statusMessage?.let { message ->
             Text(
-                text = message,
-                color = Color.Green,
-                fontSize = 12.sp,
-                modifier = Modifier.padding(vertical = 8.dp),
-                fontFamily = TravelCentsFonts.Body
-            )
+            text = message,
+            color = Color(0xFF2E7D32),
+            fontSize = 12.sp,
+            modifier = Modifier.padding(vertical = 8.dp),
+            fontFamily = TravelCentsFonts.Body
+        )
         }
 
         errorMessage?.let { message ->
@@ -307,11 +308,11 @@ fun LoginPage(modifier: Modifier = Modifier, navController: NavController, authV
                 .height(48.dp)
         ) {
             if (isLoading) {
-                CircularProgressIndicator(color = Color.White, modifier = Modifier.requiredSize(24.dp))
+                CircularProgressIndicator(color = DeepSea5, modifier = Modifier.requiredSize(24.dp))
             } else {
                 Text(
                     text = "Login",
-                    color = Color.White,
+                    color = DeepSea5,
                     fontSize = 18.sp,
                     fontFamily = TravelCentsFonts.Body
                 )
@@ -336,7 +337,7 @@ fun LoginPage(modifier: Modifier = Modifier, navController: NavController, authV
         ) {
             Text(
                 text = "Don't have an Account? ",
-                color = Color.White,
+                color = DeepSea5,
                 fontSize = 12.sp,
                 fontFamily = TravelCentsFonts.Body
             )

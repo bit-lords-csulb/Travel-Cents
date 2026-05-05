@@ -34,7 +34,7 @@ fun AiResponseCardGroup(
         shape = RoundedCornerShape(24.dp),
         border = androidx.compose.foundation.BorderStroke(
             width = 1.dp,
-            color = Color.White.copy(alpha = 0.08f)
+            color = TripWizardColors.OnSurfaceVariant.copy(alpha = 0.16f)
         )
     ) {
         Column(

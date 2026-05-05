@@ -58,7 +58,7 @@ fun AiChatComposer(
         color = TripWizardColors.ContainerHigh,
         border = BorderStroke(
             width = 1.dp,
-            color = Color.White.copy(alpha = 0.08f)
+            color = TripWizardColors.OnSurfaceVariant.copy(alpha = 0.16f)
         )
     ) {
         Column(modifier = Modifier.fillMaxWidth()) {
