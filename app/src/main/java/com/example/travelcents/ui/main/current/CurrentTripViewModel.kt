@@ -206,7 +206,7 @@ class CurrentTripViewModel(application: Application) : AndroidViewModel(applicat
     private val _reviewsLoading = MutableStateFlow<Set<String>>(emptySet())
     val reviewsLoading: StateFlow<Set<String>> = _reviewsLoading.asStateFlow()
     private val _yelpEnrichmentInFlight = MutableStateFlow<Set<String>>(emptySet())
-    private val _restaurantLiveContextInFlight = MutableStateFlow<Set<String>>(emptySet())
+    private val _eventLiveContextInFlight = MutableStateFlow<Set<String>>(emptySet())
 
     private val _advisories = MutableStateFlow<List<TripAdvisory>>(emptyList())
     val advisories: StateFlow<List<TripAdvisory>> = _advisories.asStateFlow()
@@ -297,7 +297,7 @@ class CurrentTripViewModel(application: Application) : AndroidViewModel(applicat
         _yelpReviews.value = emptyMap()
         _reviewsLoading.value = emptySet()
         _yelpEnrichmentInFlight.value = emptySet()
-        _restaurantLiveContextInFlight.value = emptySet()
+        _eventLiveContextInFlight.value = emptySet()
         _advisories.value = emptyList()
         _advisoryEvaluationInProgress.value = false
         dismissedAdvisoryKeys.clear()
@@ -1009,9 +1009,9 @@ class CurrentTripViewModel(application: Application) : AndroidViewModel(applicat
         refreshCurrentTripInBackground(tripKey)
     }
 
-    fun refreshRestaurantLiveContext(eventId: String) {
+    fun refreshEventLiveContext(eventId: String) {
         val event = _uiState.value.events.firstOrNull { it.eventId == eventId } ?: return
-        if (!isRestaurantEvent(event) || eventId in _restaurantLiveContextInFlight.value) return
+        if (!isRestaurantEvent(event) || eventId in _eventLiveContextInFlight.value) return
 
         val venueName = event.displayName()?.takeIf { it.isNotBlank() } ?: return
         val venueAddress = event.detailValue(ATTR_BUSINESS_ADDRESS, "address")
@@ -1040,7 +1040,7 @@ class CurrentTripViewModel(application: Application) : AndroidViewModel(applicat
         ) return
 
         viewModelScope.launch {
-            _restaurantLiveContextInFlight.update { it + eventId }
+            _eventLiveContextInFlight.update { it + eventId }
             try {
                 val overrides = buildMap {
                     if (venueAddress != null) {
@@ -1160,7 +1160,7 @@ class CurrentTripViewModel(application: Application) : AndroidViewModel(applicat
             } catch (e: Exception) {
                 Log.w("CurrentTripViewModel", "Failed to refresh restaurant live context", e)
             } finally {
-                _restaurantLiveContextInFlight.update { it - eventId }
+                _eventLiveContextInFlight.update { it - eventId }
             }
         }
     }
