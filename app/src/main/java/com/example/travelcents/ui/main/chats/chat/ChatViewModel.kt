@@ -2,6 +2,7 @@ package com.example.travelcents.ui.main.chats.chat
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
+import androidx.lifecycle.viewModelScope
 import com.example.travelcents.data.social.model.Group
 import com.example.travelcents.data.social.model.Message
 import com.example.travelcents.data.social.repository.GroupsRepository
@@ -10,14 +11,23 @@ import com.google.firebase.Firebase
 import com.google.firebase.auth.auth
 import com.google.firebase.firestore.ListenerRegistration
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.stateIn
 
 class ChatViewModel(
     private val group: Group,
     private val userRepository: SocialUserRepository = SocialUserRepository(),
     private val groupsRepository: GroupsRepository = GroupsRepository()
 ) : ViewModel() {
+
+    val groupState: StateFlow<Group?> = groupsRepository.observeGroup(group.id)
+        .stateIn(
+            scope = viewModelScope,
+            started = SharingStarted.WhileSubscribed(5000),
+            initialValue = group
+        )
 
     private val auth = Firebase.auth
     val currentUid: String get() = auth.currentUser?.uid ?: ""

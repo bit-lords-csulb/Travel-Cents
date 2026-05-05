@@ -30,17 +30,30 @@ class DirectChatViewModel(
 
     private val _currentName  = MutableStateFlow("")
     private val _chatId       = MutableStateFlow("")
+    val chatId: StateFlow<String> = _chatId.asStateFlow()
+
+    private val _isOnline = MutableStateFlow(friend.isOnline)
+    val isOnline: StateFlow<Boolean> = _isOnline.asStateFlow()
 
     private var messagesListener: ListenerRegistration? = null
+    private var presenceListener: ListenerRegistration? = null
 
     init {
         fetchCurrentUserName()
         resolveDirectChat()
+        startListeningToPresence()
     }
 
     private fun fetchCurrentUserName() {
         if (currentUid.isEmpty()) return
         userRepository.fetchUserDisplayName(currentUid) { name -> _currentName.value = name }
+    }
+
+    private fun startListeningToPresence() {
+        presenceListener?.remove()
+        presenceListener = userRepository.observeUserPresence(friend.uid) { online ->
+            _isOnline.value = online
+        }
     }
 
     // Find existing direct chat or create a new one, then start listening
@@ -81,6 +94,7 @@ class DirectChatViewModel(
     override fun onCleared() {
         super.onCleared()
         messagesListener?.remove()
+        presenceListener?.remove()
     }
 
     class Factory(private val friend: Friend) : ViewModelProvider.Factory {

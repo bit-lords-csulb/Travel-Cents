@@ -34,6 +34,8 @@ import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.ProvideTextStyle
+import androidx.compose.material3.Switch
+import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextField
 import androidx.compose.material3.TextFieldDefaults
@@ -169,6 +171,33 @@ fun TripStep5InterestsPage(
             // Progress widget
             item(span = { GridItemSpan(2) }) {
                 S5ProgressWidget()
+            }
+            // Search toggles
+            item(span = { GridItemSpan(2) }) {
+                Spacer(Modifier.height(4.dp))
+            }
+            item(span = { GridItemSpan(2) }) {
+                Text(
+                    "SEARCH OPTIONS",
+                    fontSize = 10.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = TripWizardColors.OnSurfaceVariant,
+                    letterSpacing = 1.5.sp
+                )
+            }
+            item(span = { GridItemSpan(2) }) {
+                S5SearchToggle(
+                    label = "Look for flights",
+                    checked = viewModel.searchFlights,
+                    onCheckedChange = { viewModel.searchFlights = it }
+                )
+            }
+            item(span = { GridItemSpan(2) }) {
+                S5SearchToggle(
+                    label = "Look for hotels",
+                    checked = viewModel.searchHotels,
+                    onCheckedChange = { viewModel.searchHotels = it }
+                )
             }
 
             // Hero
@@ -393,6 +422,37 @@ private fun S5ProgressWidget() {
                     )
                 }
             }
+        }
+    }
+}
+
+@Composable
+private fun S5SearchToggle(
+    label: String,
+    checked: Boolean,
+    onCheckedChange: (Boolean) -> Unit
+) {
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(12.dp))
+            .background(TripWizardColors.ContainerHigh)
+            .padding(horizontal = 16.dp, vertical = 10.dp)
+    ) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text(label, color = DeepSea5, fontSize = 14.sp)
+            Switch(
+                checked = checked,
+                onCheckedChange = onCheckedChange,
+                colors = SwitchDefaults.colors(
+                    checkedTrackColor = TripWizardColors.Blue,
+                    checkedThumbColor = DeepSea5
+                )
+            )
         }
     }
 }

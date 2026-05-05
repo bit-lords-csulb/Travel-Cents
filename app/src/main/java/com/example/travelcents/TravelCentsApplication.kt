@@ -8,6 +8,8 @@ import coil.disk.DiskCache
 import coil.memory.MemoryCache
 import com.example.travelcents.data.firebase.FirestoreStartupConfig
 import com.example.travelcents.data.trip.TripPerformanceLogger
+import com.example.travelcents.notification.ChatNotificationManager
+import com.example.travelcents.notification.NotificationHelper
 import com.google.firebase.firestore.FirebaseFirestore
 import okhttp3.OkHttpClient
 import java.util.concurrent.TimeUnit
@@ -18,6 +20,12 @@ class TravelCentsApplication : Application(), ImageLoaderFactory {
         TripPerformanceLogger.markAppStart()
         FirebaseFirestore.getInstance().firestoreSettings = FirestoreStartupConfig.buildSettings()
         Log.d(TAG, "Configured Firestore offline cache settings at app startup.")
+
+        // Initialize Notifications
+        NotificationHelper.initialize(this)
+        NotificationHelper.getInstance().createNotificationChannels()
+        ChatNotificationManager.initialize(this)
+        ChatNotificationManager.getInstance().startListening()
     }
 
     override fun newImageLoader(): ImageLoader {

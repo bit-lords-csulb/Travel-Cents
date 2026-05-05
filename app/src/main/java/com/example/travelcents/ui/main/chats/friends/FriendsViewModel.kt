@@ -5,6 +5,8 @@ import androidx.lifecycle.viewModelScope
 import com.example.travelcents.data.social.model.Friend
 import com.example.travelcents.data.social.repository.DirectMessagesRepository
 import com.example.travelcents.data.social.repository.FriendsRepository
+import com.example.travelcents.data.social.repository.isOnlineNow
+import com.example.travelcents.data.social.repository.presenceLabel
 import com.google.firebase.Firebase
 import com.google.firebase.auth.auth
 import com.google.firebase.firestore.DocumentSnapshot
@@ -45,6 +47,7 @@ class FriendsViewModel(
     private val userDocListeners          = mutableMapOf<String, ListenerRegistration>()
     private var friendsCollectionListener: ListenerRegistration? = null
     private var pendingRequestsListener:   ListenerRegistration? = null
+    private var activeFriendIds: Set<String> = emptySet()
 
     init {
         viewModelScope.launch {
@@ -56,8 +59,8 @@ class FriendsViewModel(
     private fun buildFriend(fUid: String, snap: DocumentSnapshot): Friend {
         val first         = snap.getString("firstName") ?: ""
         val last          = snap.getString("lastName")  ?: ""
-        val isOnline      = snap.getBoolean("isOnline") ?: false
-        val lastSeenLabel = buildLastSeenLabel(isOnline, snap)
+        val isOnline      = snap.isOnlineNow()
+        val lastSeenLabel = snap.presenceLabel(isOnline)
         return Friend(
             uid             = fUid,
             displayName     = "$first $last".trim().ifBlank { "Unknown" },
@@ -68,17 +71,6 @@ class FriendsViewModel(
         )
     }
 
-    private fun buildLastSeenLabel(isOnline: Boolean, snap: DocumentSnapshot): String {
-        if (isOnline) return "Online"
-        val lastSeen = snap.getTimestamp("lastSeen") ?: return "Offline"
-        val diffMin  = (System.currentTimeMillis() - lastSeen.toDate().time) / 60_000
-        return when {
-            diffMin < 60   -> "Last seen ${diffMin}m ago"
-            diffMin < 1440 -> "Last seen ${diffMin / 60}h ago"
-            else           -> "Last seen yesterday"
-        }
-    }
-
     private fun startListening() {
         if (currentUid.isEmpty()) return
         friendsCollectionListener = db
@@ -86,28 +78,31 @@ class FriendsViewModel(
             .whereEqualTo("status", "accepted")
             .addSnapshotListener { snapshot, error ->
                 if (error != null || snapshot == null) return@addSnapshotListener
-                val activeFriendIds = snapshot.documents.map { it.id }.toSet()
+                activeFriendIds = snapshot.documents.map { it.id }.toSet()
 
                 // Remove listeners for removed friends
                 val staleIds = userDocListeners.keys - activeFriendIds
                 staleIds.forEach { id -> userDocListeners[id]?.remove(); userDocListeners.remove(id) }
+                _friends.value = _friends.value.filter { it.uid in activeFriendIds }
 
                 if (activeFriendIds.isEmpty()) { _friends.value = emptyList(); return@addSnapshotListener }
 
-                // Batch-fetch all friend user docs in one whereIn query instead of N individual listeners
-                activeFriendIds.chunked(30).forEach { batch ->
-                    db.collection("users")
-                        .whereIn(com.google.firebase.firestore.FieldPath.documentId(), batch)
-                        .get()
-                        .addOnSuccessListener { userDocs ->
-                            val fetched = userDocs.documents.mapNotNull { snap ->
-                                if (!snap.exists()) null else buildFriend(snap.id, snap)
+                activeFriendIds.forEach { friendUid ->
+                    if (friendUid in userDocListeners) return@forEach
+
+                    userDocListeners[friendUid] = db.collection("users")
+                        .document(friendUid)
+                        .addSnapshotListener { userSnap, userError ->
+                            if (userError != null) return@addSnapshotListener
+                            if (userSnap == null || !userSnap.exists()) {
+                                _friends.value = _friends.value.filterNot { it.uid == friendUid }
+                                return@addSnapshotListener
                             }
+
+                            val updated = buildFriend(friendUid, userSnap)
                             val current = _friends.value.toMutableList()
-                            fetched.forEach { updated ->
-                                val idx = current.indexOfFirst { it.uid == updated.uid }
-                                if (idx >= 0) current[idx] = updated else current.add(updated)
-                            }
+                            val idx = current.indexOfFirst { it.uid == friendUid }
+                            if (idx >= 0) current[idx] = updated else current.add(updated)
                             _friends.value = current
                                 .filter { it.uid in activeFriendIds }
                                 .sortedBy { it.displayName }

@@ -61,6 +61,8 @@ import coil.compose.AsyncImage
 import com.example.travelcents.data.trip.advisory.TripAdvisory
 import com.example.travelcents.data.trip.model.EventOption
 import com.example.travelcents.data.trip.model.TravelEvent
+import com.example.travelcents.ui.main.current.overlays.cards.EventTypeChip
+import com.example.travelcents.ui.main.current.overlays.cards.eventTypeIcon
 import com.example.travelcents.ui.modules.formatDisplayTime
 import com.example.travelcents.ui.modules.heroImageModel
 import com.example.travelcents.ui.modules.normalizeTime
@@ -374,11 +376,11 @@ private fun CurrentTripItineraryCard(
                                 .background(DeepSea2, RoundedCornerShape(topStart = 16.dp, bottomStart = 16.dp)),
                             contentAlignment = Alignment.Center
                         ) {
-                            Text(
-                                text = event.type.take(1).uppercase(Locale.US),
-                                color = accent,
-                                fontSize = 28.sp,
-                                fontWeight = FontWeight.ExtraBold
+                            Icon(
+                                imageVector = eventTypeIcon(event.type),
+                                contentDescription = event.type,
+                                tint = accent,
+                                modifier = Modifier.size(28.dp)
                             )
                         }
                     }
@@ -389,18 +391,7 @@ private fun CurrentTripItineraryCard(
                             .padding(horizontal = 14.dp, vertical = 14.dp)
                     ) {
                         Row(verticalAlignment = Alignment.CenterVertically) {
-                            Surface(
-                                color = accent.copy(alpha = 0.16f),
-                                shape = RoundedCornerShape(999.dp)
-                            ) {
-                                Text(
-                                    text = event.type.uppercase(Locale.US),
-                                    color = accent,
-                                    fontSize = 9.sp,
-                                    fontWeight = FontWeight.Bold,
-                                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp)
-                                )
-                            }
+                            EventTypeChip(type = event.type, accent = accent)
                             if (event.startTime.isNotBlank()) {
                                 Spacer(modifier = Modifier.width(8.dp))
                                 Text(

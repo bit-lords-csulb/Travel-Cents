@@ -17,6 +17,8 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Scaffold
+import androidx.compose.runtime.*
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
@@ -24,6 +26,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -35,12 +38,20 @@ import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
-import com.example.travelcents.data.ai.chat.AiCuratedTripStarter
-import com.example.travelcents.data.ai.chat.AiTripIntakeProfile
+import com.example.travelcents.MainActivity
 import com.example.travelcents.data.trip.TripKey
+import com.example.travelcents.data.social.model.DirectChatPreview
+import com.example.travelcents.data.social.model.Friend
+import com.example.travelcents.data.social.model.Group
+import com.example.travelcents.data.trip.model.Event
+import com.example.travelcents.notification.ChatNotificationTarget
+import com.example.travelcents.notification.NotificationHelper
 import com.example.travelcents.ui.components.MainBottomNavBar
 import com.example.travelcents.ui.main.aichat.AiTripChatPage
-import com.example.travelcents.ui.main.chats.chat.ChatsScreen
+import com.example.travelcents.ui.main.chats.chat.*
+import com.example.travelcents.ui.main.chats.friends.*
+import com.google.firebase.auth.FirebaseAuth
+import com.example.travelcents.ui.main.chats.groups.*
 import com.example.travelcents.ui.main.current.CurrentDisplayMode
 import com.example.travelcents.ui.main.current.CurrentTripRoutes
 import com.example.travelcents.ui.main.current.CurrentTripScreen
@@ -60,6 +71,7 @@ import com.example.travelcents.ui.main.newTrip.TripStep4BudgetPage
 import com.example.travelcents.ui.main.newTrip.TripStep5InterestsPage
 import com.example.travelcents.ui.main.settings.SettingsPage
 import com.example.travelcents.ui.theme.DeepSea1
+import com.google.firebase.firestore.FirebaseFirestore
 
 object MainRoutes {
     const val CURRENT = CurrentTripRoutes.ROOT
@@ -102,8 +114,8 @@ private val bottomNavRoutes = setOf(
 
 private fun shouldShowBottomNav(route: String): Boolean {
     return route in bottomNavRoutes ||
-        route.startsWith("${MainRoutes.CURRENT}/") ||
-        route.startsWith(MainRoutes.NEW_TRIP)
+            route.startsWith("${MainRoutes.CURRENT}/") ||
+            route.startsWith(MainRoutes.NEW_TRIP)
 }
 
 private fun selectedBottomRoute(route: String): String {
@@ -121,11 +133,115 @@ fun MainScaffold(modifier: Modifier = Modifier, onLogout: () -> Unit = {}) {
     val newTripViewModel: NewTripViewModel = viewModel()
     val currentTripViewModel: CurrentTripViewModel = viewModel()
     val navController = rememberNavController()
+    val context = LocalContext.current
+    val activity = context as? MainActivity
+
+    val groupsRepository = remember { com.example.travelcents.data.social.repository.GroupsRepository() }
+    val socialUserRepository = remember { com.example.travelcents.data.social.repository.SocialUserRepository() }
+
     var pendingPreview by remember { mutableStateOf<PreviewSource.CuratedStarter?>(null) }
+
+    // Chat navigation states
+    var selectedGroup   by remember { mutableStateOf<Group?>(null) }
+    var showNewTrip     by remember { mutableStateOf(false) }
+    var showFriends     by remember { mutableStateOf(false) }
+    var selectedFriend  by remember { mutableStateOf<Friend?>(null) }
+    var showAddFriend   by remember { mutableStateOf(false) }
+    var showRequests    by remember { mutableStateOf(false) }
+    var selectedDM      by remember { mutableStateOf<DirectChatPreview?>(null) }
+    var selectedDirectChatId by remember { mutableStateOf<String?>(null) }
+    var activeTab       by remember { mutableIntStateOf(0) }
+    var showEvents      by remember { mutableStateOf(false) }
+    var showCreateEvent by remember { mutableStateOf(false) }
+    var selectedEvent   by remember { mutableStateOf<Event?>(null) }
+    var showEditChat    by remember { mutableStateOf(false) }
+
+    fun resetChatDrillIn() {
+        selectedGroup = null
+        selectedFriend = null
+        selectedDM = null
+        selectedDirectChatId = null
+        showNewTrip = false
+        showFriends = false
+        showAddFriend = false
+        showRequests = false
+        showEvents = false
+        showCreateEvent = false
+        selectedEvent = null
+        showEditChat = false
+    }
+
+    // Observe navigation requests from notifications
+    val pendingChatTarget by activity?.pendingChatTarget?.collectAsState() ?: remember { mutableStateOf(null) }
+
+    LaunchedEffect(pendingChatTarget) {
+        val target = pendingChatTarget ?: return@LaunchedEffect
+        activity?.clearPendingChatTarget()
+        resetChatDrillIn()
+
+        navController.navigate(MainRoutes.CHATS) {
+            launchSingleTop = true
+        }
+
+        when (target.chatType) {
+            ChatNotificationTarget.TYPE_GROUP -> {
+                activeTab = 0
+                groupsRepository.fetchGroup(target.chatId) { group ->
+                    if (group != null) {
+                        selectedGroup = group
+                    }
+                }
+            }
+            ChatNotificationTarget.TYPE_DIRECT -> {
+                activeTab = 1
+                FirebaseFirestore.getInstance()
+                    .collection("directChats")
+                    .document(target.chatId)
+                    .get()
+                    .addOnSuccessListener { doc ->
+                        if (doc.exists()) {
+                            val members = (doc.get("members") as? List<*>)
+                                ?.filterIsInstance<String>()
+                                .orEmpty()
+                            val otherUid = members.firstOrNull {
+                                it != FirebaseAuth.getInstance().currentUser?.uid
+                            }
+                            if (otherUid != null) {
+                                socialUserRepository.fetchUserFullProfile(otherUid) { name, photo ->
+                                    selectedDirectChatId = target.chatId
+                                    selectedDM = DirectChatPreview(
+                                        id = target.chatId,
+                                        otherUid = otherUid,
+                                        otherUserName = name,
+                                        otherPhotoUrl = photo
+                                    )
+                                }
+                            }
+                        }
+                    }
+            }
+        }
+    }
 
     val navBackStackEntry by navController.currentBackStackEntryAsState()
     val currentRoute = navBackStackEntry?.destination?.route ?: MainRoutes.HOME
     val currentTopLevelRoute = selectedBottomRoute(currentRoute)
+
+    LaunchedEffect(currentRoute, selectedGroup?.id, selectedFriend?.uid, selectedDM?.id, selectedDirectChatId) {
+        NotificationHelper.activeChatTarget = when {
+            currentRoute != MainRoutes.CHATS -> null
+            selectedGroup != null -> ChatNotificationTarget(
+                chatType = ChatNotificationTarget.TYPE_GROUP,
+                chatId = selectedGroup!!.id
+            )
+            (selectedFriend != null || selectedDM != null) && !selectedDirectChatId.isNullOrBlank() ->
+                ChatNotificationTarget(
+                    chatType = ChatNotificationTarget.TYPE_DIRECT,
+                    chatId = selectedDirectChatId!!
+                )
+            else -> null
+        }
+    }
 
     Scaffold(
         modifier = modifier
@@ -306,15 +422,115 @@ fun MainScaffold(modifier: Modifier = Modifier, onLogout: () -> Unit = {}) {
                     SavedPlacesPage(onBack = { navController.popBackStack() })
                 }
                 composable(MainRoutes.CHATS) {
-                    ChatsScreen(
-                        modifier = Modifier.fillMaxSize(),
-                        onTripCardClick = { tripId, ownerUid ->
-                            currentTripViewModel.loadTrip(TripKey(ownerUid = ownerUid, tripId = tripId))
-                            navController.navigate(MainRoutes.CURRENT_ITINERARY) {
-                                launchSingleTop = true
-                            }
+                    val onTripCardClick: (String, String) -> Unit = { tripId, ownerUid ->
+                        currentTripViewModel.loadTrip(TripKey(ownerUid = ownerUid, tripId = tripId))
+                        navController.navigate(MainRoutes.CURRENT_ITINERARY) {
+                            launchSingleTop = true
                         }
-                    )
+                    }
+
+                    when {
+                        selectedGroup != null && selectedEvent != null ->
+                            com.example.travelcents.ui.main.chats.voting.EventCommentsPage(
+                                event       = selectedEvent!!,
+                                groupId     = selectedGroup!!.id,
+                                onBackClick = { selectedEvent = null }
+                            )
+
+                        selectedGroup != null && showCreateEvent ->
+                            com.example.travelcents.ui.main.chats.voting.CreateEventPage(
+                                group          = selectedGroup!!,
+                                onBackClick    = { showCreateEvent = false },
+                                onEventCreated = { showCreateEvent = false }
+                            )
+
+                        selectedGroup != null && showEvents ->
+                            com.example.travelcents.ui.main.chats.voting.EventsPage(
+                                group        = selectedGroup!!,
+                                onBackClick  = { showEvents = false },
+                                onNewEvent   = { showCreateEvent = true },
+                                onEventClick = { event -> selectedEvent = event }
+                            )
+
+                        selectedGroup != null && showEditChat ->
+                            EditChatPage(
+                                group             = selectedGroup!!,
+                                onBackClick       = { showEditChat = false },
+                                onNavigateToChats = {
+                                    showEditChat = false
+                                    selectedGroup = null
+                                }
+                            )
+
+                        selectedGroup != null -> ChatPage(
+                            group           = selectedGroup!!,
+                            onBackClick     = { selectedGroup = null },
+                            onEventsClick   = { showEvents = true },
+                            onEditClick     = { showEditChat = true },
+                            onTripCardClick = onTripCardClick
+                        )
+
+                        selectedFriend != null -> DirectChatPage(
+                            friend      = selectedFriend!!,
+                            onBackClick = {
+                                selectedFriend = null
+                                selectedDirectChatId = null
+                                activeTab = 1 // Go back to Direct Messages tab
+                            },
+                            onTripCardClick = onTripCardClick,
+                            onChatResolved = { selectedDirectChatId = it }
+                        )
+                        selectedDM != null -> DirectChatPage(
+                            friend      = Friend(
+                                uid = selectedDM!!.otherUid, 
+                                displayName = selectedDM!!.otherUserName,
+                                profileImageUrl = selectedDM!!.otherPhotoUrl
+                            ),
+                            onBackClick = {
+                                selectedDM = null
+                                selectedDirectChatId = null
+                                activeTab = 1 // Go back to Direct Messages tab
+                            },
+                            onTripCardClick = onTripCardClick,
+                            onChatResolved = { selectedDirectChatId = it }
+                        )
+                        showAddFriend -> AddFriendPage(onBackClick = { showAddFriend = false })
+                        showRequests  -> FriendRequestsPage(onBackClick = { showRequests = false })
+                        showNewTrip   -> NewTripChatPage(
+                            onBackClick   = { showNewTrip = false },
+                            onTripCreated = { newGroup ->
+                                showNewTrip = false
+                                selectedDirectChatId = null
+                                selectedGroup = newGroup
+                            }
+                        )
+                        showFriends -> FriendsPage(
+                            onBackClick          = { showFriends = false },
+                            onMessageFriendClick = { friend ->
+                                showFriends = false
+                                selectedDirectChatId = null
+                                selectedFriend = friend
+                            },
+                            onAddFriendClick     = { showAddFriend = true },
+                            onRequestsClick      = { showRequests = true }
+                        )
+                        else -> ChatsPage(
+                            modifier          = Modifier.fillMaxSize(),
+                            startTab          = activeTab,
+                            onNewChatClick    = { showNewTrip = true },
+                            onFriendsClick    = { showFriends = true },
+                            onGroupClick      = { group ->
+                                selectedDirectChatId = null
+                                selectedGroup = group
+                                activeTab = 0
+                            },
+                            onDirectChatClick = { dm ->
+                                selectedDirectChatId = dm.id
+                                selectedDM = dm
+                                activeTab = 1
+                            }
+                        )
+                    }
                 }
                 composable(MainRoutes.SETTINGS) {
                     SettingsPage(
@@ -438,4 +654,3 @@ private fun PreviewActionBar(
         }
     }
 }
-

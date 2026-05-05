@@ -35,8 +35,8 @@ import androidx.compose.material.icons.filled.Description
 import androidx.compose.material.icons.filled.Flight
 import androidx.compose.material.icons.filled.FlightTakeoff
 import androidx.compose.material.icons.filled.Hotel
-import androidx.compose.material.icons.filled.MoreHoriz
 import androidx.compose.material.icons.filled.Notifications
+import androidx.compose.material.icons.filled.WbSunny
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
@@ -46,7 +46,9 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
@@ -56,6 +58,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -63,10 +66,13 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import coil.compose.AsyncImage
 import coil.request.ImageRequest
 import com.example.travelcents.BuildConfig
+import com.example.travelcents.MainActivity
 import com.example.travelcents.data.social.model.BookmarkedPlace
 import com.example.travelcents.data.trip.TripKey
 import com.example.travelcents.data.trip.TripPerformanceLogger
 import com.example.travelcents.data.trip.model.Itinerary
+import com.example.travelcents.notification.ChatNotificationTarget
+import com.example.travelcents.notification.NotificationHelper
 import com.example.travelcents.ui.components.ProfileAvatar
 import com.example.travelcents.ui.theme.DeepSea1
 import com.example.travelcents.ui.theme.DeepSea2
@@ -80,6 +86,7 @@ import java.time.temporal.ChronoUnit
 private val Primary = Color(0xFF64B5F6)
 private val PrimaryDim = Color(0xFF54A7E7)
 private val SurfaceBright = Color(0xFF243447)
+private const val TEST_GROUP_CHAT_ID = "EL4UgmxgFgVPLwkxudK4"
 
 // ─────────────────────────────────────────────────────────────
 // Entry point
@@ -95,6 +102,29 @@ fun HomePage(
     currencyViewModel: CurrencyViewModel = viewModel()
 ) {
     val homeUiState by homeViewModel.uiState.collectAsStateWithLifecycle()
+    var selectedTripIndex by remember { mutableIntStateOf(0) }
+    val selectedCarouselTrip = homeUiState.trips.getOrNull(selectedTripIndex)
+    val statusTrip = remember(homeUiState.trips, selectedTripIndex) {
+        resolveHomeStatusTrip(
+            trips = homeUiState.trips,
+            selectedTrip = selectedCarouselTrip
+        )
+    }
+    val statusTripKey = statusTrip?.toTripKey()
+    val statusEvents = if (homeUiState.selectedTripKey == statusTripKey) {
+        homeUiState.selectedTripEvents
+    } else {
+        emptyList()
+    }
+    val statusEventsLoading = statusTripKey != null &&
+        (homeUiState.selectedTripKey != statusTripKey || homeUiState.selectedTripEventsLoading)
+    val statusSummary = buildHomeTripStatusSummary(
+        trip = statusTrip,
+        events = statusEvents,
+        isTripLoading = homeUiState.isLoading,
+        isEventDataLoading = statusEventsLoading,
+        destinationWeather = statusTrip?.let { homeUiState.destinationWeather[it.itineraryId] }
+    )
 
     LaunchedEffect(homeUiState.isLoading, homeUiState.trips.size) {
         if (!homeUiState.isLoading) {
@@ -103,6 +133,10 @@ fun HomePage(
                 tripCount = homeUiState.trips.size
             )
         }
+    }
+
+    LaunchedEffect(homeUiState.viewerUid, statusTripKey) {
+        homeViewModel.selectHomeTrip(statusTripKey)
     }
 
     Column(
@@ -124,7 +158,8 @@ fun HomePage(
             viewerUid = homeUiState.viewerUid,
             tripImages = homeUiState.tripImages,
             isLoading = homeUiState.isLoading,
-            onTripClick = onTripClick
+            onTripClick = onTripClick,
+            onVisibleTripChange = { index -> selectedTripIndex = index }
         )
 
         Spacer(modifier = Modifier.height(24.dp))
@@ -145,7 +180,10 @@ fun HomePage(
                 )
             }
 
-            TripStatusWidget(trip = homeUiState.trips.firstOrNull())
+            TripStatusWidget(
+                summary = statusSummary,
+                onTripClick = onTripClick
+            )
 
             DocumentsWidget()
         }
@@ -164,6 +202,8 @@ private fun HomeHeader(
     isProfileLoading: Boolean,
     onProfileClick: () -> Unit
 ) {
+    val context = LocalContext.current
+
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -204,7 +244,29 @@ private fun HomeHeader(
             modifier = Modifier
                 .size(40.dp)
                 .clip(CircleShape)
-                .clickable { },
+                .clickable {
+                    if (TEST_GROUP_CHAT_ID.isBlank()) {
+                        Log.w("HomePage", "Test notification group ID is blank")
+                        return@clickable
+                    }
+
+                    val hasNotificationPermission =
+                        (context as? MainActivity)?.requestNotificationPermissionIfNeeded() ?: true
+
+                    if (!hasNotificationPermission) {
+                        Log.w("HomePage", "Notification permission missing; requested permission before posting test notification")
+                        return@clickable
+                    }
+
+                    NotificationHelper.getInstance().showChatNotification(
+                        target = ChatNotificationTarget(
+                            chatType = ChatNotificationTarget.TYPE_GROUP,
+                            chatId = TEST_GROUP_CHAT_ID
+                        ),
+                        title = "Test group notification",
+                        body = "Tap to open this group chat."
+                    )
+                },
             contentAlignment = Alignment.Center
         ) {
             Icon(
@@ -227,7 +289,8 @@ private fun TripsCarousel(
     viewerUid: String,
     tripImages: Map<String, String>,
     isLoading: Boolean,
-    onTripClick: (TripKey) -> Unit = {}
+    onTripClick: (TripKey) -> Unit = {},
+    onVisibleTripChange: (Int) -> Unit = {}
 ) {
     Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
         when {
@@ -245,6 +308,12 @@ private fun TripsCarousel(
 
             else -> {
                 val pagerState = rememberPagerState(pageCount = { trips.size })
+
+                LaunchedEffect(pagerState.currentPage, trips.size) {
+                    if (trips.isNotEmpty()) {
+                        onVisibleTripChange(pagerState.currentPage.coerceIn(0, trips.lastIndex))
+                    }
+                }
 
                 HorizontalPager(
                     state = pagerState,
@@ -620,15 +689,25 @@ private fun BookmarkPhotoCell(
 // ─────────────────────────────────────────────────────────────
 
 @Composable
-private fun TripStatusWidget(trip: Itinerary?) {
+private fun TripStatusWidget(
+    summary: HomeTripStatusSummary,
+    onTripClick: (TripKey) -> Unit
+) {
+    val trip = summary.trip
+    val accent = statusAccentColor(summary.level)
+
     Card(
-        modifier = Modifier.fillMaxWidth(),
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable(enabled = trip != null) {
+                trip?.let { onTripClick(it.toTripKey()) }
+            },
         shape = RoundedCornerShape(24.dp),
         colors = CardDefaults.cardColors(containerColor = DeepSea2)
     ) {
         Column(
             modifier = Modifier.padding(20.dp),
-            verticalArrangement = Arrangement.spacedBy(20.dp)
+            verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
             Row(
                 modifier = Modifier.fillMaxWidth(),
@@ -642,22 +721,24 @@ private fun TripStatusWidget(trip: Itinerary?) {
                     Box(
                         modifier = Modifier
                             .size(8.dp)
-                            .background(Color(0xFF4ADE80), CircleShape)
+                            .background(accent, CircleShape)
                     )
                     Text(
-                        text = "STATUS: ON TIME",
+                        text = summary.badgeText.uppercase(),
                         color = DeepSea4,
                         fontSize = 9.sp,
                         fontWeight = FontWeight.Bold,
                         letterSpacing = 0.8.sp
                     )
                 }
-                Icon(
-                    imageVector = Icons.Default.MoreHoriz,
-                    contentDescription = null,
-                    tint = DeepSea4,
-                    modifier = Modifier.size(20.dp)
-                )
+                if (trip != null) {
+                    Icon(
+                        imageVector = Icons.Default.ChevronRight,
+                        contentDescription = null,
+                        tint = DeepSea4,
+                        modifier = Modifier.size(20.dp)
+                    )
+                }
             }
 
             if (trip != null) {
@@ -670,17 +751,19 @@ private fun TripStatusWidget(trip: Itinerary?) {
                 ) {
                     Column(horizontalAlignment = Alignment.CenterHorizontally) {
                         Text(
-                            text = trip.originIata.ifBlank { "—" },
+                            text = trip.originCode(),
                             color = DeepSea5,
                             fontSize = 24.sp,
                             fontWeight = FontWeight.ExtraBold
                         )
                         Text(
-                            text = trip.origin.take(12).uppercase(),
+                            text = trip.originLabel(),
                             color = DeepSea4,
                             fontSize = 8.sp,
                             fontWeight = FontWeight.Bold,
-                            letterSpacing = 0.5.sp
+                            letterSpacing = 0.5.sp,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
                         )
                     }
 
@@ -708,19 +791,40 @@ private fun TripStatusWidget(trip: Itinerary?) {
 
                     Column(horizontalAlignment = Alignment.CenterHorizontally) {
                         Text(
-                            text = trip.destinationIata.ifBlank { "—" },
+                            text = trip.destinationCode(),
                             color = DeepSea5,
                             fontSize = 24.sp,
                             fontWeight = FontWeight.ExtraBold
                         )
                         Text(
-                            text = trip.destination.take(12).uppercase(),
+                            text = trip.destinationLabel(),
                             color = DeepSea4,
                             fontSize = 8.sp,
                             fontWeight = FontWeight.Bold,
-                            letterSpacing = 0.5.sp
+                            letterSpacing = 0.5.sp,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
                         )
                     }
+                }
+
+                Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                    Text(
+                        text = trip.tripName.ifBlank { trip.destination.ifBlank { "Upcoming trip" } },
+                        color = DeepSea5,
+                        fontSize = 18.sp,
+                        fontWeight = FontWeight.ExtraBold,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                    Text(
+                        text = summary.dateLine,
+                        color = DeepSea4,
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.SemiBold,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
                 }
 
                 Row(
@@ -734,43 +838,175 @@ private fun TripStatusWidget(trip: Itinerary?) {
                     Box(
                         modifier = Modifier
                             .size(40.dp)
-                            .background(Primary.copy(alpha = 0.2f), RoundedCornerShape(10.dp)),
+                            .background(accent.copy(alpha = 0.18f), RoundedCornerShape(10.dp)),
                         contentAlignment = Alignment.Center
                     ) {
                         Icon(
-                            imageVector = Icons.Default.Hotel,
+                            imageVector = if (summary.nextEventTitle.contains("flight", ignoreCase = true)) {
+                                Icons.Default.FlightTakeoff
+                            } else {
+                                Icons.Default.Hotel
+                            },
                             contentDescription = null,
-                            tint = Primary,
+                            tint = accent,
                             modifier = Modifier.size(20.dp)
                         )
                     }
                     Column(modifier = Modifier.weight(1f)) {
                         Text(
-                            text = "DESTINATION",
+                            text = "NEXT UPDATE",
                             color = DeepSea4,
                             fontSize = 8.sp,
                             fontWeight = FontWeight.Bold,
                             letterSpacing = 0.6.sp
                         )
                         Text(
-                            text = trip.destination,
+                            text = summary.nextEventTitle,
                             color = DeepSea5,
                             fontSize = 13.sp,
-                            fontWeight = FontWeight.Bold
+                            fontWeight = FontWeight.Bold,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                        if (summary.nextEventSubtitle.isNotBlank()) {
+                            Text(
+                                text = summary.nextEventSubtitle,
+                                color = DeepSea4,
+                                fontSize = 11.sp,
+                                fontWeight = FontWeight.Medium,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis
+                            )
+                        }
+                    }
+                }
+
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    summary.infoPills.forEach { pill ->
+                        InfoPill(
+                            pill = pill,
+                            modifier = Modifier.weight(1f)
                         )
                     }
-                    Icon(
-                        imageVector = Icons.Default.ChevronRight,
-                        contentDescription = null,
-                        tint = DeepSea4,
-                        modifier = Modifier.size(20.dp)
-                    )
                 }
             } else {
-                Text(text = "No upcoming trips", color = DeepSea4, fontSize = 13.sp)
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .background(SurfaceBright, RoundedCornerShape(14.dp))
+                        .padding(14.dp),
+                    horizontalArrangement = Arrangement.spacedBy(12.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    if (summary.level == HomeTripStatusLevel.LOADING) {
+                        CircularProgressIndicator(
+                            color = Primary,
+                            strokeWidth = 2.dp,
+                            modifier = Modifier.size(24.dp)
+                        )
+                    } else {
+                        Box(
+                            modifier = Modifier
+                                .size(24.dp)
+                                .background(DeepSea3, CircleShape)
+                        )
+                    }
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                            text = summary.routeLine,
+                            color = DeepSea5,
+                            fontSize = 14.sp,
+                            fontWeight = FontWeight.Bold
+                        )
+                        Text(
+                            text = summary.dateLine,
+                            color = DeepSea4,
+                            fontSize = 12.sp,
+                            fontWeight = FontWeight.Medium
+                        )
+                    }
+                }
             }
         }
     }
+}
+
+@Composable
+private fun InfoPill(
+    pill: HomeTripInfoPill,
+    modifier: Modifier = Modifier
+) {
+    Row(
+        modifier = modifier
+            .height(36.dp)
+            .clip(RoundedCornerShape(999.dp))
+            .background(SurfaceBright, RoundedCornerShape(999.dp))
+            .border(0.5.dp, DeepSea3, RoundedCornerShape(999.dp))
+            .padding(horizontal = 8.dp, vertical = 6.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(4.dp)
+    ) {
+        if (pill.title == "Weather") {
+            Icon(
+                imageVector = Icons.Default.WbSunny,
+                contentDescription = "Weather",
+                tint = DeepSea4,
+                modifier = Modifier.size(13.dp)
+            )
+        } else {
+            Text(
+                text = pill.title.uppercase(),
+                color = DeepSea4,
+                fontSize = 7.sp,
+                fontWeight = FontWeight.Bold,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                softWrap = false
+            )
+        }
+        Text(
+            text = pill.detail,
+            color = DeepSea5,
+            fontSize = 11.sp,
+            fontWeight = FontWeight.ExtraBold,
+            modifier = Modifier.weight(1f),
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+            softWrap = false
+        )
+    }
+}
+
+private fun statusAccentColor(level: HomeTripStatusLevel): Color {
+    return when (level) {
+        HomeTripStatusLevel.LOADING -> Primary
+        HomeTripStatusLevel.EMPTY -> DeepSea4
+        HomeTripStatusLevel.UPCOMING -> Color(0xFFFFC777)
+        HomeTripStatusLevel.READY -> Color(0xFF7BE0A1)
+        HomeTripStatusLevel.IN_PROGRESS -> Color(0xFF7BC5FF)
+        HomeTripStatusLevel.NEEDS_ATTENTION -> Color(0xFFFF8E7A)
+    }
+}
+
+private fun Itinerary.toTripKey(): TripKey = TripKey(ownerUid = ownerUid, tripId = itineraryId)
+
+private fun Itinerary.originCode(): String {
+    return originIata.ifBlank { origin.take(3).uppercase().ifBlank { "--" } }
+}
+
+private fun Itinerary.destinationCode(): String {
+    return destinationIata.ifBlank { destination.take(3).uppercase().ifBlank { "--" } }
+}
+
+private fun Itinerary.originLabel(): String {
+    return origin.ifBlank { "Origin" }.take(12).uppercase()
+}
+
+private fun Itinerary.destinationLabel(): String {
+    return destination.ifBlank { "Destination" }.take(12).uppercase()
 }
 
 // ─────────────────────────────────────────────────────────────
@@ -844,4 +1080,3 @@ private fun DocumentsWidget() {
 private const val WIKIMEDIA_CONTACT_URL = "https://github.com/bit-lords-csulb/Travel-Cents"
 private val WIKIMEDIA_IMAGE_USER_AGENT =
     "TravelCents/${BuildConfig.VERSION_NAME} (Android app; $WIKIMEDIA_CONTACT_URL)"
-

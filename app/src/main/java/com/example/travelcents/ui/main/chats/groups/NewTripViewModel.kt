@@ -139,6 +139,7 @@ class NewTripViewModel(
         groupsRepository.createGroup(
             name = finalGroupName,
             members = members,
+            ownerId = currentUid,
             destinationEmoji = emoji,
             linkedTripId = linkedTripId,           // Passes the specific trip ID
             linkedTripOwnerId = linkedTripOwnerId, // Passes the owner's UID

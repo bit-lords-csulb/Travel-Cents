@@ -1,3 +1,5 @@
 <resources>
     <string name="app_name">Travel Cents</string>
+    <string name="channel_received_messages_name">Received Messages</string>
+    <string name="channel_received_messages_description">Notifications for new messages from friends and groups</string>
 </resources>
