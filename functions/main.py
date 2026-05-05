@@ -112,6 +112,52 @@ WEATHER_UNSAFE_TERMS = (
     "harbour tour",
     "harbor tour",
 )
+ADVISORY_DIVERSITY_TERMS = (
+    "aquarium",
+    "museum",
+    "gallery",
+    "theater",
+    "theatre",
+    "market",
+    "food hall",
+    "mall",
+    "arcade",
+    "studio",
+    "workshop",
+    "library",
+    "exhibition",
+    "opera house",
+    "temple",
+    "shrine",
+    "spa",
+    "cooking class",
+    "class",
+    "tour",
+)
+ADVISORY_COMMON_TOKENS = {
+    "a",
+    "an",
+    "and",
+    "at",
+    "by",
+    "for",
+    "from",
+    "in",
+    "inside",
+    "into",
+    "near",
+    "of",
+    "on",
+    "the",
+    "to",
+    "tokyo",
+    "sydney",
+    "london",
+    "paris",
+    "new",
+    "york",
+    "city",
+}
 
 
 def normalize_string_list(value):
@@ -425,6 +471,56 @@ def advisory_match_text(metadata):
         "weather_sensitivity",
     )
     return " ".join(metadata_text(metadata, field) for field in fields)
+
+
+def advisory_diversity_signature(alternative):
+    text = " ".join(
+        str(alternative.get(field, ""))
+        for field in ("title", "description", "address")
+    )
+    normalized_text = normalize_city_key(text)
+    matched_terms = [
+        normalize_city_key(term)
+        for term in ADVISORY_DIVERSITY_TERMS
+        if normalize_city_key(term) in normalized_text
+    ]
+    if matched_terms:
+        return sorted(matched_terms, key=len, reverse=True)[0]
+
+    tokens = advisory_diversity_tokens(alternative)
+    return next(iter(tokens), "")
+
+
+def advisory_diversity_tokens(alternative):
+    text = " ".join(
+        str(alternative.get(field, ""))
+        for field in ("title", "description")
+    )
+    return {
+        token
+        for token in normalize_city_key(text).split()
+        if len(token) >= 4 and token not in ADVISORY_COMMON_TOKENS
+    }
+
+
+def is_distinct_advisory_alternative(alternative, selected_alternatives):
+    signature = advisory_diversity_signature(alternative)
+    tokens = advisory_diversity_tokens(alternative)
+    if not tokens:
+        return False
+
+    for selected in selected_alternatives:
+        selected_signature = advisory_diversity_signature(selected)
+        if signature and signature == selected_signature:
+            return False
+
+        selected_tokens = advisory_diversity_tokens(selected)
+        overlap = len(tokens & selected_tokens)
+        smaller_size = max(1, min(len(tokens), len(selected_tokens)))
+        if overlap / smaller_size >= 0.45:
+            return False
+
+    return True
 
 
 def advisory_alternative_query(req_data, target_city):
@@ -743,6 +839,7 @@ def search_activity_alternatives(req: https_fn.CallableRequest):
         matches = search_result.get("matches", []) if hasattr(search_result, "get") else search_result["matches"]
         alternatives = []
         seen_titles = set()
+        overflow_alternatives = []
         for match in matches:
             score = float(match_field(match, "score", 0.0) or 0.0)
             if score < ADVISORY_MATCH_SCORE_THRESHOLD:
@@ -754,9 +851,16 @@ def search_activity_alternatives(req: https_fn.CallableRequest):
             if not title_key or title_key == current_title_key or title_key in seen_titles:
                 continue
             seen_titles.add(title_key)
-            alternatives.append(alternative)
+            if is_distinct_advisory_alternative(alternative, alternatives):
+                alternatives.append(alternative)
+            else:
+                overflow_alternatives.append(alternative)
             if len(alternatives) >= limit:
                 break
+
+        if len(alternatives) < min(limit, 3):
+            needed = min(limit, 3) - len(alternatives)
+            alternatives.extend(overflow_alternatives[:needed])
 
         print(f"Found {len(alternatives)} advisory alternatives for {target_city}.", flush=True)
         return {"alternatives": alternatives}

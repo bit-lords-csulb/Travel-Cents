@@ -2731,3 +2731,596 @@ specVersion: v1alpha1
 [debug] [2026-05-05T05:54:37.944Z] Finishing up request with event=finish {"metadata":{"emulator":{"name":"functions"},"function":{"name":"us-central1-search_activity_alternatives"},"extension":{},"message":"Finishing up request with event=finish"}}
 [debug] [2026-05-05T05:54:37.944Z] Finishing up request with event=close {"metadata":{"emulator":{"name":"functions"},"function":{"name":"us-central1-search_activity_alternatives"},"extension":{},"message":"Finishing up request with event=close"}}
 [debug] [2026-05-05T05:54:37.944Z] [work-queue] {"queuedWork":[],"queueLength":0,"runningWork":[],"workRunningCount":0}
+[debug] [2026-05-05T05:59:01.737Z] File C:\Users\spike\Documents\GitHub\Travel-Cents\functions\main.py changed, reloading triggers {"metadata":{"emulator":{"name":"functions"},"message":"File C:\\Users\\spike\\Documents\\GitHub\\Travel-Cents\\functions\\main.py changed, reloading triggers"}}
+[debug] [2026-05-05T05:59:02.766Z] Customer code is not Node
+[debug] [2026-05-05T05:59:02.767Z] Validating python source
+[debug] [2026-05-05T05:59:02.767Z] Building python source
+[info] i  functions: Loaded environment variables from .env. 
+[debug] [2026-05-05T05:59:02.769Z] Could not find functions.yaml. Must use http discovery
+[debug] [2026-05-05T05:59:02.796Z] Running command with virtualenv: command="C:\Users\spike\Documents\GitHub\Travel-Cents\functions\venv\Scripts\activate.bat", args=["","&&","python.exe","-c","\"import firebase_functions; import os; print(os.path.dirname(firebase_functions.__file__))\""]
+[debug] [2026-05-05T05:59:02.938Z] stdout: C:\Users\spike\Documents\GitHub\Travel-Cents\functions\venv\Lib\site-packages\firebase_functions
+
+[debug] [2026-05-05T05:59:02.949Z] Running admin server with args: ["python.exe","\"C:\\Users\\spike\\Documents\\GitHub\\Travel-Cents\\functions\\venv\\Lib\\site-packages\\firebase_functions\\private\\serving.py\""] and env: {"GCLOUD_PROJECT":"travel-cents-3e2d9","K_REVISION":"1","PORT":"80","GOOGLE_CLOUD_QUOTA_PROJECT":"travel-cents-3e2d9","FUNCTIONS_EMULATOR":"true","TZ":"UTC","FIREBASE_DEBUG_MODE":"true","FIREBASE_DEBUG_FEATURES":"{\"skipTokenVerification\":true,\"enableCors\":true}","FIREBASE_EMULATOR_HUB":"127.0.0.1:4400","CLOUD_EVENTARC_EMULATOR_HOST":"http://127.0.0.1:9299","CLOUD_TASKS_EMULATOR_HOST":"127.0.0.1:9499","FIREBASE_CONFIG":"{\"storageBucket\":\"travel-cents-3e2d9.firebasestorage.app\",\"projectId\":\"travel-cents-3e2d9\"}","GOOGLE_APPLICATION_CREDENTIALS":"C:\\Users\\spike\\AppData\\Roaming\\firebase\\danthecalfman32_gmail_com_application_default_credentials.json","ADMIN_PORT":"8081"} in C:\Users\spike\Documents\GitHub\Travel-Cents\functions
+[debug] [2026-05-05T05:59:02.949Z] Running command with virtualenv: command="C:\Users\spike\Documents\GitHub\Travel-Cents\functions\venv\Scripts\activate.bat", args=["","&&","python.exe","\"C:\\Users\\spike\\Documents\\GitHub\\Travel-Cents\\functions\\venv\\Lib\\site-packages\\firebase_functions\\private\\serving.py\""]
+[info]  * Serving Flask app 'serving'
+ * Debug mode: off
+
+[error] WARNING: This is a development server. Do not use it in a production deployment. Use a production WSGI server instead.
+ * Running on http://127.0.0.1:8081
+
+[error] Press CTRL+C to quit
+
+[debug] [2026-05-05T05:59:03.959Z] File C:\Users\spike\Documents\GitHub\Travel-Cents\functions\__pycache__\main.cpython-312.pyc changed, reloading triggers {"metadata":{"emulator":{"name":"functions"},"message":"File C:\\Users\\spike\\Documents\\GitHub\\Travel-Cents\\functions\\__pycache__\\main.cpython-312.pyc changed, reloading triggers"}}
+[error] 127.0.0.1 - - [05/May/2026 05:59:04] "GET /__/functions.yaml HTTP/1.1" 200 -
+
+[debug] [2026-05-05T05:59:04.194Z] Got response from /__/functions.yaml endpoints:
+  generate_itinerary:
+    availableMemoryMb: null
+    callableTrigger: {}
+    concurrency: null
+    entryPoint: generate_itinerary
+    ingressSettings: null
+    labels:
+      deployment-callable: 'true'
+    maxInstances: null
+    minInstances: null
+    platform: gcfv2
+    secretEnvironmentVariables: []
+    serviceAccountEmail: null
+    timeoutSeconds: null
+  search_activity_alternatives:
+    availableMemoryMb: null
+    callableTrigger: {}
+    concurrency: null
+    entryPoint: search_activity_alternatives
+    ingressSettings: null
+    labels:
+      deployment-callable: 'true'
+    maxInstances: null
+    minInstances: null
+    platform: gcfv2
+    secretEnvironmentVariables: []
+    serviceAccountEmail: null
+    timeoutSeconds: null
+params: []
+requiredAPIs: []
+specVersion: v1alpha1
+
+[error] 127.0.0.1 - - [05/May/2026 05:59:04] "GET /__/quitquitquit HTTP/1.1" 200 -
+
+[info] +  functions: Loaded functions definitions from source: generate_itinerary, search_activity_alternatives. {"metadata":{"emulator":{"name":"functions"},"message":"Loaded functions definitions from source: generate_itinerary, search_activity_alternatives."}}
+[debug] [2026-05-05T05:59:04.230Z] [worker-pool] Shutting down IDLE worker (us-central1-search_activity_alternatives) {"metadata":{"emulator":{"name":"functions"},"message":"[worker-pool] Shutting down IDLE worker (us-central1-search_activity_alternatives)"}}
+[debug] [2026-05-05T05:59:04.230Z] [worker-us-central1-search_activity_alternatives-8f19cc63-b700-4918-b4b3-4fd91e65dcdc]: FINISHING {"metadata":{"emulator":{"name":"functions"},"function":{"name":"us-central1-search_activity_alternatives"},"extension":{},"message":"[worker-us-central1-search_activity_alternatives-8f19cc63-b700-4918-b4b3-4fd91e65dcdc]: FINISHING"}}
+[debug] [2026-05-05T05:59:04.231Z] [worker-pool] Shutting down IDLE worker (us-central1-search_activity_alternatives) {"metadata":{"emulator":{"name":"functions"},"message":"[worker-pool] Shutting down IDLE worker (us-central1-search_activity_alternatives)"}}
+[debug] [2026-05-05T05:59:04.231Z] [worker-us-central1-search_activity_alternatives-fcf2c8e1-f144-4d15-82d5-e8a332e0f2b9]: FINISHING {"metadata":{"emulator":{"name":"functions"},"function":{"name":"us-central1-search_activity_alternatives"},"extension":{},"message":"[worker-us-central1-search_activity_alternatives-fcf2c8e1-f144-4d15-82d5-e8a332e0f2b9]: FINISHING"}}
+[debug] [2026-05-05T05:59:04.233Z] [worker-us-central1-search_activity_alternatives-8f19cc63-b700-4918-b4b3-4fd91e65dcdc]: exited {"metadata":{"emulator":{"name":"functions"},"function":{"name":"us-central1-search_activity_alternatives"},"extension":{},"message":"[worker-us-central1-search_activity_alternatives-8f19cc63-b700-4918-b4b3-4fd91e65dcdc]: exited"}}
+[debug] [2026-05-05T05:59:04.233Z] [worker-us-central1-search_activity_alternatives-8f19cc63-b700-4918-b4b3-4fd91e65dcdc]: FINISHED {"metadata":{"emulator":{"name":"functions"},"function":{"name":"us-central1-search_activity_alternatives"},"extension":{},"message":"[worker-us-central1-search_activity_alternatives-8f19cc63-b700-4918-b4b3-4fd91e65dcdc]: FINISHED"}}
+[debug] [2026-05-05T05:59:04.233Z] [worker-us-central1-search_activity_alternatives-fcf2c8e1-f144-4d15-82d5-e8a332e0f2b9]: exited {"metadata":{"emulator":{"name":"functions"},"function":{"name":"us-central1-search_activity_alternatives"},"extension":{},"message":"[worker-us-central1-search_activity_alternatives-fcf2c8e1-f144-4d15-82d5-e8a332e0f2b9]: exited"}}
+[debug] [2026-05-05T05:59:04.233Z] [worker-us-central1-search_activity_alternatives-fcf2c8e1-f144-4d15-82d5-e8a332e0f2b9]: FINISHED {"metadata":{"emulator":{"name":"functions"},"function":{"name":"us-central1-search_activity_alternatives"},"extension":{},"message":"[worker-us-central1-search_activity_alternatives-fcf2c8e1-f144-4d15-82d5-e8a332e0f2b9]: FINISHED"}}
+[debug] [2026-05-05T05:59:04.961Z] Customer code is not Node
+[debug] [2026-05-05T05:59:04.961Z] Validating python source
+[debug] [2026-05-05T05:59:04.961Z] Building python source
+[info] i  functions: Loaded environment variables from .env. 
+[debug] [2026-05-05T05:59:04.962Z] Could not find functions.yaml. Must use http discovery
+[debug] [2026-05-05T05:59:04.985Z] Running command with virtualenv: command="C:\Users\spike\Documents\GitHub\Travel-Cents\functions\venv\Scripts\activate.bat", args=["","&&","python.exe","-c","\"import firebase_functions; import os; print(os.path.dirname(firebase_functions.__file__))\""]
+[debug] [2026-05-05T05:59:05.102Z] stdout: C:\Users\spike\Documents\GitHub\Travel-Cents\functions\venv\Lib\site-packages\firebase_functions
+
+[debug] [2026-05-05T05:59:05.112Z] Running admin server with args: ["python.exe","\"C:\\Users\\spike\\Documents\\GitHub\\Travel-Cents\\functions\\venv\\Lib\\site-packages\\firebase_functions\\private\\serving.py\""] and env: {"GCLOUD_PROJECT":"travel-cents-3e2d9","K_REVISION":"1","PORT":"80","GOOGLE_CLOUD_QUOTA_PROJECT":"travel-cents-3e2d9","FUNCTIONS_EMULATOR":"true","TZ":"UTC","FIREBASE_DEBUG_MODE":"true","FIREBASE_DEBUG_FEATURES":"{\"skipTokenVerification\":true,\"enableCors\":true}","FIREBASE_EMULATOR_HUB":"127.0.0.1:4400","CLOUD_EVENTARC_EMULATOR_HOST":"http://127.0.0.1:9299","CLOUD_TASKS_EMULATOR_HOST":"127.0.0.1:9499","FIREBASE_CONFIG":"{\"storageBucket\":\"travel-cents-3e2d9.firebasestorage.app\",\"projectId\":\"travel-cents-3e2d9\"}","GOOGLE_APPLICATION_CREDENTIALS":"C:\\Users\\spike\\AppData\\Roaming\\firebase\\danthecalfman32_gmail_com_application_default_credentials.json","ADMIN_PORT":"8081"} in C:\Users\spike\Documents\GitHub\Travel-Cents\functions
+[debug] [2026-05-05T05:59:05.112Z] Running command with virtualenv: command="C:\Users\spike\Documents\GitHub\Travel-Cents\functions\venv\Scripts\activate.bat", args=["","&&","python.exe","\"C:\\Users\\spike\\Documents\\GitHub\\Travel-Cents\\functions\\venv\\Lib\\site-packages\\firebase_functions\\private\\serving.py\""]
+[info]  * Serving Flask app 'serving'
+ * Debug mode: off
+
+[error] WARNING: This is a development server. Do not use it in a production deployment. Use a production WSGI server instead.
+ * Running on http://127.0.0.1:8081
+
+[error] Press CTRL+C to quit
+
+[error] 127.0.0.1 - - [05/May/2026 05:59:06] "GET /__/functions.yaml HTTP/1.1" 200 -
+
+[debug] [2026-05-05T05:59:06.303Z] Got response from /__/functions.yaml endpoints:
+  generate_itinerary:
+    availableMemoryMb: null
+    callableTrigger: {}
+    concurrency: null
+    entryPoint: generate_itinerary
+    ingressSettings: null
+    labels:
+      deployment-callable: 'true'
+    maxInstances: null
+    minInstances: null
+    platform: gcfv2
+    secretEnvironmentVariables: []
+    serviceAccountEmail: null
+    timeoutSeconds: null
+  search_activity_alternatives:
+    availableMemoryMb: null
+    callableTrigger: {}
+    concurrency: null
+    entryPoint: search_activity_alternatives
+    ingressSettings: null
+    labels:
+      deployment-callable: 'true'
+    maxInstances: null
+    minInstances: null
+    platform: gcfv2
+    secretEnvironmentVariables: []
+    serviceAccountEmail: null
+    timeoutSeconds: null
+params: []
+requiredAPIs: []
+specVersion: v1alpha1
+
+[error] 127.0.0.1 - - [05/May/2026 05:59:06] "GET /__/quitquitquit HTTP/1.1" 200 -
+
+[info] +  functions: Loaded functions definitions from source: generate_itinerary, search_activity_alternatives. {"metadata":{"emulator":{"name":"functions"},"message":"Loaded functions definitions from source: generate_itinerary, search_activity_alternatives."}}
+[debug] [2026-05-05T05:59:13.607Z] File C:\Users\spike\Documents\GitHub\Travel-Cents\functions\main.py changed, reloading triggers {"metadata":{"emulator":{"name":"functions"},"message":"File C:\\Users\\spike\\Documents\\GitHub\\Travel-Cents\\functions\\main.py changed, reloading triggers"}}
+[debug] [2026-05-05T05:59:14.614Z] Customer code is not Node
+[debug] [2026-05-05T05:59:14.615Z] Validating python source
+[debug] [2026-05-05T05:59:14.615Z] Building python source
+[info] i  functions: Loaded environment variables from .env. 
+[debug] [2026-05-05T05:59:14.616Z] Could not find functions.yaml. Must use http discovery
+[debug] [2026-05-05T05:59:14.640Z] Running command with virtualenv: command="C:\Users\spike\Documents\GitHub\Travel-Cents\functions\venv\Scripts\activate.bat", args=["","&&","python.exe","-c","\"import firebase_functions; import os; print(os.path.dirname(firebase_functions.__file__))\""]
+[debug] [2026-05-05T05:59:14.837Z] stdout: C:\Users\spike\Documents\GitHub\Travel-Cents\functions\venv\Lib\site-packages\firebase_functions
+
+[debug] [2026-05-05T05:59:14.860Z] Running admin server with args: ["python.exe","\"C:\\Users\\spike\\Documents\\GitHub\\Travel-Cents\\functions\\venv\\Lib\\site-packages\\firebase_functions\\private\\serving.py\""] and env: {"GCLOUD_PROJECT":"travel-cents-3e2d9","K_REVISION":"1","PORT":"80","GOOGLE_CLOUD_QUOTA_PROJECT":"travel-cents-3e2d9","FUNCTIONS_EMULATOR":"true","TZ":"UTC","FIREBASE_DEBUG_MODE":"true","FIREBASE_DEBUG_FEATURES":"{\"skipTokenVerification\":true,\"enableCors\":true}","FIREBASE_EMULATOR_HUB":"127.0.0.1:4400","CLOUD_EVENTARC_EMULATOR_HOST":"http://127.0.0.1:9299","CLOUD_TASKS_EMULATOR_HOST":"127.0.0.1:9499","FIREBASE_CONFIG":"{\"storageBucket\":\"travel-cents-3e2d9.firebasestorage.app\",\"projectId\":\"travel-cents-3e2d9\"}","GOOGLE_APPLICATION_CREDENTIALS":"C:\\Users\\spike\\AppData\\Roaming\\firebase\\danthecalfman32_gmail_com_application_default_credentials.json","ADMIN_PORT":"8081"} in C:\Users\spike\Documents\GitHub\Travel-Cents\functions
+[debug] [2026-05-05T05:59:14.860Z] Running command with virtualenv: command="C:\Users\spike\Documents\GitHub\Travel-Cents\functions\venv\Scripts\activate.bat", args=["","&&","python.exe","\"C:\\Users\\spike\\Documents\\GitHub\\Travel-Cents\\functions\\venv\\Lib\\site-packages\\firebase_functions\\private\\serving.py\""]
+[info]  * Serving Flask app 'serving'
+ * Debug mode: off
+
+[error] WARNING: This is a development server. Do not use it in a production deployment. Use a production WSGI server instead.
+ * Running on http://127.0.0.1:8081
+
+[error] Press CTRL+C to quit
+
+[debug] [2026-05-05T05:59:16.035Z] File C:\Users\spike\Documents\GitHub\Travel-Cents\functions\__pycache__\main.cpython-312.pyc changed, reloading triggers {"metadata":{"emulator":{"name":"functions"},"message":"File C:\\Users\\spike\\Documents\\GitHub\\Travel-Cents\\functions\\__pycache__\\main.cpython-312.pyc changed, reloading triggers"}}
+[error] 127.0.0.1 - - [05/May/2026 05:59:16] "GET /__/functions.yaml HTTP/1.1" 200 -
+
+[debug] [2026-05-05T05:59:16.274Z] Got response from /__/functions.yaml endpoints:
+  generate_itinerary:
+    availableMemoryMb: null
+    callableTrigger: {}
+    concurrency: null
+    entryPoint: generate_itinerary
+    ingressSettings: null
+    labels:
+      deployment-callable: 'true'
+    maxInstances: null
+    minInstances: null
+    platform: gcfv2
+    secretEnvironmentVariables: []
+    serviceAccountEmail: null
+    timeoutSeconds: null
+  search_activity_alternatives:
+    availableMemoryMb: null
+    callableTrigger: {}
+    concurrency: null
+    entryPoint: search_activity_alternatives
+    ingressSettings: null
+    labels:
+      deployment-callable: 'true'
+    maxInstances: null
+    minInstances: null
+    platform: gcfv2
+    secretEnvironmentVariables: []
+    serviceAccountEmail: null
+    timeoutSeconds: null
+params: []
+requiredAPIs: []
+specVersion: v1alpha1
+
+[error] 127.0.0.1 - - [05/May/2026 05:59:16] "GET /__/quitquitquit HTTP/1.1" 200 -
+
+[info] +  functions: Loaded functions definitions from source: generate_itinerary, search_activity_alternatives. {"metadata":{"emulator":{"name":"functions"},"message":"Loaded functions definitions from source: generate_itinerary, search_activity_alternatives."}}
+[debug] [2026-05-05T05:59:17.040Z] Customer code is not Node
+[debug] [2026-05-05T05:59:17.041Z] Validating python source
+[debug] [2026-05-05T05:59:17.041Z] Building python source
+[info] i  functions: Loaded environment variables from .env. 
+[debug] [2026-05-05T05:59:17.042Z] Could not find functions.yaml. Must use http discovery
+[debug] [2026-05-05T05:59:17.066Z] Running command with virtualenv: command="C:\Users\spike\Documents\GitHub\Travel-Cents\functions\venv\Scripts\activate.bat", args=["","&&","python.exe","-c","\"import firebase_functions; import os; print(os.path.dirname(firebase_functions.__file__))\""]
+[debug] [2026-05-05T05:59:17.191Z] stdout: C:\Users\spike\Documents\GitHub\Travel-Cents\functions\venv\Lib\site-packages\firebase_functions
+
+[debug] [2026-05-05T05:59:17.201Z] Running admin server with args: ["python.exe","\"C:\\Users\\spike\\Documents\\GitHub\\Travel-Cents\\functions\\venv\\Lib\\site-packages\\firebase_functions\\private\\serving.py\""] and env: {"GCLOUD_PROJECT":"travel-cents-3e2d9","K_REVISION":"1","PORT":"80","GOOGLE_CLOUD_QUOTA_PROJECT":"travel-cents-3e2d9","FUNCTIONS_EMULATOR":"true","TZ":"UTC","FIREBASE_DEBUG_MODE":"true","FIREBASE_DEBUG_FEATURES":"{\"skipTokenVerification\":true,\"enableCors\":true}","FIREBASE_EMULATOR_HUB":"127.0.0.1:4400","CLOUD_EVENTARC_EMULATOR_HOST":"http://127.0.0.1:9299","CLOUD_TASKS_EMULATOR_HOST":"127.0.0.1:9499","FIREBASE_CONFIG":"{\"storageBucket\":\"travel-cents-3e2d9.firebasestorage.app\",\"projectId\":\"travel-cents-3e2d9\"}","GOOGLE_APPLICATION_CREDENTIALS":"C:\\Users\\spike\\AppData\\Roaming\\firebase\\danthecalfman32_gmail_com_application_default_credentials.json","ADMIN_PORT":"8081"} in C:\Users\spike\Documents\GitHub\Travel-Cents\functions
+[debug] [2026-05-05T05:59:17.201Z] Running command with virtualenv: command="C:\Users\spike\Documents\GitHub\Travel-Cents\functions\venv\Scripts\activate.bat", args=["","&&","python.exe","\"C:\\Users\\spike\\Documents\\GitHub\\Travel-Cents\\functions\\venv\\Lib\\site-packages\\firebase_functions\\private\\serving.py\""]
+[info]  * Serving Flask app 'serving'
+ * Debug mode: off
+
+[error] WARNING: This is a development server. Do not use it in a production deployment. Use a production WSGI server instead.
+ * Running on http://127.0.0.1:8081
+
+[error] Press CTRL+C to quit
+
+[error] 127.0.0.1 - - [05/May/2026 05:59:18] "GET /__/functions.yaml HTTP/1.1" 200 -
+
+[debug] [2026-05-05T05:59:18.288Z] Got response from /__/functions.yaml endpoints:
+  generate_itinerary:
+    availableMemoryMb: null
+    callableTrigger: {}
+    concurrency: null
+    entryPoint: generate_itinerary
+    ingressSettings: null
+    labels:
+      deployment-callable: 'true'
+    maxInstances: null
+    minInstances: null
+    platform: gcfv2
+    secretEnvironmentVariables: []
+    serviceAccountEmail: null
+    timeoutSeconds: null
+  search_activity_alternatives:
+    availableMemoryMb: null
+    callableTrigger: {}
+    concurrency: null
+    entryPoint: search_activity_alternatives
+    ingressSettings: null
+    labels:
+      deployment-callable: 'true'
+    maxInstances: null
+    minInstances: null
+    platform: gcfv2
+    secretEnvironmentVariables: []
+    serviceAccountEmail: null
+    timeoutSeconds: null
+params: []
+requiredAPIs: []
+specVersion: v1alpha1
+
+[error] 127.0.0.1 - - [05/May/2026 05:59:18] "GET /__/quitquitquit HTTP/1.1" 200 -
+
+[info] +  functions: Loaded functions definitions from source: generate_itinerary, search_activity_alternatives. {"metadata":{"emulator":{"name":"functions"},"message":"Loaded functions definitions from source: generate_itinerary, search_activity_alternatives."}}
+[debug] [2026-05-05T05:59:26.554Z] File C:\Users\spike\Documents\GitHub\Travel-Cents\functions\__pycache__\main.cpython-312.pyc changed, reloading triggers {"metadata":{"emulator":{"name":"functions"},"message":"File C:\\Users\\spike\\Documents\\GitHub\\Travel-Cents\\functions\\__pycache__\\main.cpython-312.pyc changed, reloading triggers"}}
+[debug] [2026-05-05T05:59:27.559Z] Customer code is not Node
+[debug] [2026-05-05T05:59:27.559Z] Validating python source
+[debug] [2026-05-05T05:59:27.559Z] Building python source
+[info] i  functions: Loaded environment variables from .env. 
+[debug] [2026-05-05T05:59:27.560Z] Could not find functions.yaml. Must use http discovery
+[debug] [2026-05-05T05:59:27.585Z] Running command with virtualenv: command="C:\Users\spike\Documents\GitHub\Travel-Cents\functions\venv\Scripts\activate.bat", args=["","&&","python.exe","-c","\"import firebase_functions; import os; print(os.path.dirname(firebase_functions.__file__))\""]
+[debug] [2026-05-05T05:59:27.724Z] stdout: C:\Users\spike\Documents\GitHub\Travel-Cents\functions\venv\Lib\site-packages\firebase_functions
+
+[debug] [2026-05-05T05:59:27.735Z] Running admin server with args: ["python.exe","\"C:\\Users\\spike\\Documents\\GitHub\\Travel-Cents\\functions\\venv\\Lib\\site-packages\\firebase_functions\\private\\serving.py\""] and env: {"GCLOUD_PROJECT":"travel-cents-3e2d9","K_REVISION":"1","PORT":"80","GOOGLE_CLOUD_QUOTA_PROJECT":"travel-cents-3e2d9","FUNCTIONS_EMULATOR":"true","TZ":"UTC","FIREBASE_DEBUG_MODE":"true","FIREBASE_DEBUG_FEATURES":"{\"skipTokenVerification\":true,\"enableCors\":true}","FIREBASE_EMULATOR_HUB":"127.0.0.1:4400","CLOUD_EVENTARC_EMULATOR_HOST":"http://127.0.0.1:9299","CLOUD_TASKS_EMULATOR_HOST":"127.0.0.1:9499","FIREBASE_CONFIG":"{\"storageBucket\":\"travel-cents-3e2d9.firebasestorage.app\",\"projectId\":\"travel-cents-3e2d9\"}","GOOGLE_APPLICATION_CREDENTIALS":"C:\\Users\\spike\\AppData\\Roaming\\firebase\\danthecalfman32_gmail_com_application_default_credentials.json","ADMIN_PORT":"8081"} in C:\Users\spike\Documents\GitHub\Travel-Cents\functions
+[debug] [2026-05-05T05:59:27.735Z] Running command with virtualenv: command="C:\Users\spike\Documents\GitHub\Travel-Cents\functions\venv\Scripts\activate.bat", args=["","&&","python.exe","\"C:\\Users\\spike\\Documents\\GitHub\\Travel-Cents\\functions\\venv\\Lib\\site-packages\\firebase_functions\\private\\serving.py\""]
+[info]  * Serving Flask app 'serving'
+ * Debug mode: off
+
+[error] WARNING: This is a development server. Do not use it in a production deployment. Use a production WSGI server instead.
+ * Running on http://127.0.0.1:8081
+
+[error] Press CTRL+C to quit
+
+[error] 127.0.0.1 - - [05/May/2026 05:59:29] "GET /__/functions.yaml HTTP/1.1" 200 -
+
+[debug] [2026-05-05T05:59:29.082Z] Got response from /__/functions.yaml endpoints:
+  generate_itinerary:
+    availableMemoryMb: null
+    callableTrigger: {}
+    concurrency: null
+    entryPoint: generate_itinerary
+    ingressSettings: null
+    labels:
+      deployment-callable: 'true'
+    maxInstances: null
+    minInstances: null
+    platform: gcfv2
+    secretEnvironmentVariables: []
+    serviceAccountEmail: null
+    timeoutSeconds: null
+  search_activity_alternatives:
+    availableMemoryMb: null
+    callableTrigger: {}
+    concurrency: null
+    entryPoint: search_activity_alternatives
+    ingressSettings: null
+    labels:
+      deployment-callable: 'true'
+    maxInstances: null
+    minInstances: null
+    platform: gcfv2
+    secretEnvironmentVariables: []
+    serviceAccountEmail: null
+    timeoutSeconds: null
+params: []
+requiredAPIs: []
+specVersion: v1alpha1
+
+[error] 127.0.0.1 - - [05/May/2026 05:59:29] "GET /__/quitquitquit HTTP/1.1" 200 -
+
+[info] +  functions: Loaded functions definitions from source: generate_itinerary, search_activity_alternatives. {"metadata":{"emulator":{"name":"functions"},"message":"Loaded functions definitions from source: generate_itinerary, search_activity_alternatives."}}
+[debug] [2026-05-05T06:00:19.859Z] [work-queue] {"queuedWork":["/travel-cents-3e2d9/us-central1/search_activity_alternatives-2026-05-05T06:00:19.859Z"],"queueLength":1,"runningWork":[],"workRunningCount":0}
+[debug] [2026-05-05T06:00:19.859Z] [work-queue] {"queuedWork":[],"queueLength":0,"runningWork":["/travel-cents-3e2d9/us-central1/search_activity_alternatives-2026-05-05T06:00:19.859Z"],"workRunningCount":1}
+[debug] [2026-05-05T06:00:19.859Z] Accepted request POST /travel-cents-3e2d9/us-central1/search_activity_alternatives --> us-central1-search_activity_alternatives
+[debug] [2026-05-05T06:00:19.860Z] [functions] Runtime ready! Sending request! {"metadata":{"emulator":{"name":"functions"},"message":"[functions] Runtime ready! Sending request!"}}
+[debug] [2026-05-05T06:00:19.860Z] [functions] Got req.url=/travel-cents-3e2d9/us-central1/search_activity_alternatives, mapping to path=/ {"metadata":{"emulator":{"name":"functions"},"message":"[functions] Got req.url=/travel-cents-3e2d9/us-central1/search_activity_alternatives, mapping to path=/"}}
+[debug] [2026-05-05T06:00:19.860Z] [worker-pool] Cleaned up workers for us-central1-search_activity_alternatives: 2 --> 0 {"metadata":{"emulator":{"name":"functions"},"message":"[worker-pool] Cleaned up workers for us-central1-search_activity_alternatives: 2 --> 0"}}
+[info] i  functions: Loaded environment variables from .env. 
+[debug] [2026-05-05T06:00:19.890Z] Running command with virtualenv: command="C:\Users\spike\Documents\GitHub\Travel-Cents\functions\venv\Scripts\activate.bat", args=["","&&","functions-framework"]
+[debug] [2026-05-05T06:00:19.895Z] [worker-pool] addWorker(us-central1-search_activity_alternatives) {"metadata":{"emulator":{"name":"functions"},"message":"[worker-pool] addWorker(us-central1-search_activity_alternatives)"}}
+[debug] [2026-05-05T06:00:19.895Z] [worker-pool] Adding worker with key us-central1-search_activity_alternatives, total=1 {"metadata":{"emulator":{"name":"functions"},"message":"[worker-pool] Adding worker with key us-central1-search_activity_alternatives, total=1"}}
+[info] >   * Serving Flask app 'search_activity_alternatives' {"user":" * Serving Flask app 'search_activity_alternatives'\r","metadata":{"emulator":{"name":"functions"},"function":{"name":"us-central1-search_activity_alternatives"},"extension":{},"message":"\u001b[90m> \u001b[39m  * Serving Flask app 'search_activity_alternatives'\r"}}
+[info] >   * Debug mode: off {"user":" * Debug mode: off\r","metadata":{"emulator":{"name":"functions"},"function":{"name":"us-central1-search_activity_alternatives"},"extension":{},"message":"\u001b[90m> \u001b[39m  * Debug mode: off\r"}}
+[info] >  WARNING: This is a development server. Do not use it in a production deployment. Use a production WSGI server instead. {"user":"WARNING: This is a development server. Do not use it in a production deployment. Use a production WSGI server instead.\r","metadata":{"emulator":{"name":"functions"},"function":{"name":"us-central1-search_activity_alternatives"},"extension":{},"message":"\u001b[90m> \u001b[39m WARNING: This is a development server. Do not use it in a production deployment. Use a production WSGI server instead.\r"}}
+[info] >   * Running on http://127.0.0.1:8931 {"user":" * Running on http://127.0.0.1:8931\r","metadata":{"emulator":{"name":"functions"},"function":{"name":"us-central1-search_activity_alternatives"},"extension":{},"message":"\u001b[90m> \u001b[39m  * Running on http://127.0.0.1:8931\r"}}
+[info] >  Press CTRL+C to quit {"user":"Press CTRL+C to quit\r","metadata":{"emulator":{"name":"functions"},"function":{"name":"us-central1-search_activity_alternatives"},"extension":{},"message":"\u001b[90m> \u001b[39m Press CTRL+C to quit\r"}}
+[info] >  WARNING:root:Request has invalid method. GET {"user":"WARNING:root:Request has invalid method. GET\r","metadata":{"emulator":{"name":"functions"},"function":{"name":"us-central1-search_activity_alternatives"},"extension":{},"message":"\u001b[90m> \u001b[39m WARNING:root:Request has invalid method. GET\r"}}
+[info] >  ERROR:root:Invalid request, unable to process. {"user":"ERROR:root:Invalid request, unable to process.\r","metadata":{"emulator":{"name":"functions"},"function":{"name":"us-central1-search_activity_alternatives"},"extension":{},"message":"\u001b[90m> \u001b[39m ERROR:root:Invalid request, unable to process.\r"}}
+[debug] [2026-05-05T06:00:21.326Z] [worker-us-central1-search_activity_alternatives-b0f6371f-c6a2-4631-a708-22dd502856e2]: IDLE {"metadata":{"emulator":{"name":"functions"},"function":{"name":"us-central1-search_activity_alternatives"},"extension":{},"message":"[worker-us-central1-search_activity_alternatives-b0f6371f-c6a2-4631-a708-22dd502856e2]: IDLE"}}
+[debug] [2026-05-05T06:00:21.326Z] [worker-pool] submitRequest(triggerId=us-central1-search_activity_alternatives) {"metadata":{"emulator":{"name":"functions"},"message":"[worker-pool] submitRequest(triggerId=us-central1-search_activity_alternatives)"}}
+[info] i  functions: Beginning execution of "us-central1-search_activity_alternatives" {"metadata":{"emulator":{"name":"functions"},"function":{"name":"us-central1-search_activity_alternatives"},"extension":{},"message":"Beginning execution of \"us-central1-search_activity_alternatives\""}}
+[debug] [2026-05-05T06:00:21.327Z] [worker-us-central1-search_activity_alternatives-b0f6371f-c6a2-4631-a708-22dd502856e2]: BUSY {"metadata":{"emulator":{"name":"functions"},"function":{"name":"us-central1-search_activity_alternatives"},"extension":{},"message":"[worker-us-central1-search_activity_alternatives-b0f6371f-c6a2-4631-a708-22dd502856e2]: BUSY"}}
+[info] >  127.0.0.1 - - [05/May/2026 06:00:21] "GET /__/health HTTP/1.1" 400 - {"user":"127.0.0.1 - - [05/May/2026 06:00:21] \"GET /__/health HTTP/1.1\" 400 -\r","metadata":{"emulator":{"name":"functions"},"function":{"name":"us-central1-search_activity_alternatives"},"extension":{},"message":"\u001b[90m> \u001b[39m 127.0.0.1 - - [05/May/2026 06:00:21] \"GET /__/health HTTP/1.1\" 400 -\r"}}
+[info] >  INFO:werkzeug:127.0.0.1 - - [05/May/2026 06:00:21] "GET /__/health HTTP/1.1" 400 - {"user":"INFO:werkzeug:127.0.0.1 - - [05/May/2026 06:00:21] \"\u001b[31m\u001b[1mGET /__/health HTTP/1.1\u001b[0m\" 400 -\r","metadata":{"emulator":{"name":"functions"},"function":{"name":"us-central1-search_activity_alternatives"},"extension":{},"message":"\u001b[90m> \u001b[39m INFO:werkzeug:127.0.0.1 - - [05/May/2026 06:00:21] \"\u001b[31m\u001b[1mGET /__/health HTTP/1.1\u001b[0m\" 400 -\r"}}
+[debug] [2026-05-05T06:00:21.540Z] [work-queue] {"queuedWork":["/travel-cents-3e2d9/us-central1/search_activity_alternatives-2026-05-05T06:00:21.540Z"],"queueLength":1,"runningWork":["/travel-cents-3e2d9/us-central1/search_activity_alternatives-2026-05-05T06:00:19.859Z"],"workRunningCount":1}
+[debug] [2026-05-05T06:00:21.541Z] [work-queue] {"queuedWork":[],"queueLength":0,"runningWork":["/travel-cents-3e2d9/us-central1/search_activity_alternatives-2026-05-05T06:00:19.859Z","/travel-cents-3e2d9/us-central1/search_activity_alternatives-2026-05-05T06:00:21.540Z"],"workRunningCount":2}
+[debug] [2026-05-05T06:00:21.541Z] Accepted request POST /travel-cents-3e2d9/us-central1/search_activity_alternatives --> us-central1-search_activity_alternatives
+[debug] [2026-05-05T06:00:21.541Z] [functions] Runtime ready! Sending request! {"metadata":{"emulator":{"name":"functions"},"message":"[functions] Runtime ready! Sending request!"}}
+[debug] [2026-05-05T06:00:21.542Z] [functions] Got req.url=/travel-cents-3e2d9/us-central1/search_activity_alternatives, mapping to path=/ {"metadata":{"emulator":{"name":"functions"},"message":"[functions] Got req.url=/travel-cents-3e2d9/us-central1/search_activity_alternatives, mapping to path=/"}}
+[info] i  functions: Loaded environment variables from .env. 
+[debug] [2026-05-05T06:00:21.567Z] Running command with virtualenv: command="C:\Users\spike\Documents\GitHub\Travel-Cents\functions\venv\Scripts\activate.bat", args=["","&&","functions-framework"]
+[debug] [2026-05-05T06:00:21.573Z] [worker-pool] addWorker(us-central1-search_activity_alternatives) {"metadata":{"emulator":{"name":"functions"},"message":"[worker-pool] addWorker(us-central1-search_activity_alternatives)"}}
+[debug] [2026-05-05T06:00:21.573Z] [worker-pool] Adding worker with key us-central1-search_activity_alternatives, total=2 {"metadata":{"emulator":{"name":"functions"},"message":"[worker-pool] Adding worker with key us-central1-search_activity_alternatives, total=2"}}
+[info] >   * Serving Flask app 'search_activity_alternatives' {"user":" * Serving Flask app 'search_activity_alternatives'\r","metadata":{"emulator":{"name":"functions"},"function":{"name":"us-central1-search_activity_alternatives"},"extension":{},"message":"\u001b[90m> \u001b[39m  * Serving Flask app 'search_activity_alternatives'\r"}}
+[info] >   * Debug mode: off {"user":" * Debug mode: off\r","metadata":{"emulator":{"name":"functions"},"function":{"name":"us-central1-search_activity_alternatives"},"extension":{},"message":"\u001b[90m> \u001b[39m  * Debug mode: off\r"}}
+[info] >  WARNING: This is a development server. Do not use it in a production deployment. Use a production WSGI server instead. {"user":"WARNING: This is a development server. Do not use it in a production deployment. Use a production WSGI server instead.\r","metadata":{"emulator":{"name":"functions"},"function":{"name":"us-central1-search_activity_alternatives"},"extension":{},"message":"\u001b[90m> \u001b[39m WARNING: This is a development server. Do not use it in a production deployment. Use a production WSGI server instead.\r"}}
+[info] >   * Running on http://127.0.0.1:8131 {"user":" * Running on http://127.0.0.1:8131\r","metadata":{"emulator":{"name":"functions"},"function":{"name":"us-central1-search_activity_alternatives"},"extension":{},"message":"\u001b[90m> \u001b[39m  * Running on http://127.0.0.1:8131\r"}}
+[info] >  Press CTRL+C to quit {"user":"Press CTRL+C to quit\r","metadata":{"emulator":{"name":"functions"},"function":{"name":"us-central1-search_activity_alternatives"},"extension":{},"message":"\u001b[90m> \u001b[39m Press CTRL+C to quit\r"}}
+[info] >  WARNING:root:Request has invalid method. GET {"user":"WARNING:root:Request has invalid method. GET\r","metadata":{"emulator":{"name":"functions"},"function":{"name":"us-central1-search_activity_alternatives"},"extension":{},"message":"\u001b[90m> \u001b[39m WARNING:root:Request has invalid method. GET\r"}}
+[info] >  ERROR:root:Invalid request, unable to process. {"user":"ERROR:root:Invalid request, unable to process.\r","metadata":{"emulator":{"name":"functions"},"function":{"name":"us-central1-search_activity_alternatives"},"extension":{},"message":"\u001b[90m> \u001b[39m ERROR:root:Invalid request, unable to process.\r"}}
+[info] >  127.0.0.1 - - [05/May/2026 06:00:22] "GET /__/health HTTP/1.1" 400 - {"user":"127.0.0.1 - - [05/May/2026 06:00:22] \"GET /__/health HTTP/1.1\" 400 -\r","metadata":{"emulator":{"name":"functions"},"function":{"name":"us-central1-search_activity_alternatives"},"extension":{},"message":"\u001b[90m> \u001b[39m 127.0.0.1 - - [05/May/2026 06:00:22] \"GET /__/health HTTP/1.1\" 400 -\r"}}
+[info] >  INFO:werkzeug:127.0.0.1 - - [05/May/2026 06:00:22] "GET /__/health HTTP/1.1" 400 - {"user":"INFO:werkzeug:127.0.0.1 - - [05/May/2026 06:00:22] \"\u001b[31m\u001b[1mGET /__/health HTTP/1.1\u001b[0m\" 400 -\r","metadata":{"emulator":{"name":"functions"},"function":{"name":"us-central1-search_activity_alternatives"},"extension":{},"message":"\u001b[90m> \u001b[39m INFO:werkzeug:127.0.0.1 - - [05/May/2026 06:00:22] \"\u001b[31m\u001b[1mGET /__/health HTTP/1.1\u001b[0m\" 400 -\r"}}
+[debug] [2026-05-05T06:00:22.890Z] [worker-us-central1-search_activity_alternatives-218cecf7-940e-4e62-b766-d33dbee2bcc1]: IDLE {"metadata":{"emulator":{"name":"functions"},"function":{"name":"us-central1-search_activity_alternatives"},"extension":{},"message":"[worker-us-central1-search_activity_alternatives-218cecf7-940e-4e62-b766-d33dbee2bcc1]: IDLE"}}
+[debug] [2026-05-05T06:00:22.890Z] [worker-pool] submitRequest(triggerId=us-central1-search_activity_alternatives) {"metadata":{"emulator":{"name":"functions"},"message":"[worker-pool] submitRequest(triggerId=us-central1-search_activity_alternatives)"}}
+[info] i  functions: Beginning execution of "us-central1-search_activity_alternatives" {"metadata":{"emulator":{"name":"functions"},"function":{"name":"us-central1-search_activity_alternatives"},"extension":{},"message":"Beginning execution of \"us-central1-search_activity_alternatives\""}}
+[debug] [2026-05-05T06:00:22.891Z] [worker-us-central1-search_activity_alternatives-218cecf7-940e-4e62-b766-d33dbee2bcc1]: BUSY {"metadata":{"emulator":{"name":"functions"},"function":{"name":"us-central1-search_activity_alternatives"},"extension":{},"message":"[worker-us-central1-search_activity_alternatives-218cecf7-940e-4e62-b766-d33dbee2bcc1]: BUSY"}}
+[info] >  Found 12 advisory alternatives for Tokyo. {"user":"Found 12 advisory alternatives for Tokyo.\r","metadata":{"emulator":{"name":"functions"},"function":{"name":"us-central1-search_activity_alternatives"},"extension":{},"message":"\u001b[90m> \u001b[39m Found 12 advisory alternatives for Tokyo.\r"}}
+[info] >  127.0.0.1 - - [05/May/2026 06:00:28] "POST / HTTP/1.1" 200 - {"user":"127.0.0.1 - - [05/May/2026 06:00:28] \"POST / HTTP/1.1\" 200 -\r","metadata":{"emulator":{"name":"functions"},"function":{"name":"us-central1-search_activity_alternatives"},"extension":{},"message":"\u001b[90m> \u001b[39m 127.0.0.1 - - [05/May/2026 06:00:28] \"POST / HTTP/1.1\" 200 -\r"}}
+[info] >  INFO:werkzeug:127.0.0.1 - - [05/May/2026 06:00:28] "POST / HTTP/1.1" 200 - {"user":"INFO:werkzeug:127.0.0.1 - - [05/May/2026 06:00:28] \"POST / HTTP/1.1\" 200 -\r","metadata":{"emulator":{"name":"functions"},"function":{"name":"us-central1-search_activity_alternatives"},"extension":{},"message":"\u001b[90m> \u001b[39m INFO:werkzeug:127.0.0.1 - - [05/May/2026 06:00:28] \"POST / HTTP/1.1\" 200 -\r"}}
+[debug] [2026-05-05T06:00:28.456Z] Finishing up request with event=pause {"metadata":{"emulator":{"name":"functions"},"function":{"name":"us-central1-search_activity_alternatives"},"extension":{},"message":"Finishing up request with event=pause"}}
+[info] i  functions: Finished "us-central1-search_activity_alternatives" in 5565.8446ms {"metadata":{"emulator":{"name":"functions"},"function":{"name":"us-central1-search_activity_alternatives"},"extension":{},"message":"Finished \"us-central1-search_activity_alternatives\" in 5565.8446ms"}}
+[debug] [2026-05-05T06:00:28.457Z] [worker-us-central1-search_activity_alternatives-218cecf7-940e-4e62-b766-d33dbee2bcc1]: IDLE {"metadata":{"emulator":{"name":"functions"},"function":{"name":"us-central1-search_activity_alternatives"},"extension":{},"message":"[worker-us-central1-search_activity_alternatives-218cecf7-940e-4e62-b766-d33dbee2bcc1]: IDLE"}}
+[debug] [2026-05-05T06:00:28.457Z] Finishing up request with event=finish {"metadata":{"emulator":{"name":"functions"},"function":{"name":"us-central1-search_activity_alternatives"},"extension":{},"message":"Finishing up request with event=finish"}}
+[debug] [2026-05-05T06:00:28.457Z] Finishing up request with event=close {"metadata":{"emulator":{"name":"functions"},"function":{"name":"us-central1-search_activity_alternatives"},"extension":{},"message":"Finishing up request with event=close"}}
+[debug] [2026-05-05T06:00:28.457Z] [work-queue] {"queuedWork":[],"queueLength":0,"runningWork":["/travel-cents-3e2d9/us-central1/search_activity_alternatives-2026-05-05T06:00:19.859Z"],"workRunningCount":1}
+[info] >  Found 12 advisory alternatives for Tokyo. {"user":"Found 12 advisory alternatives for Tokyo.\r","metadata":{"emulator":{"name":"functions"},"function":{"name":"us-central1-search_activity_alternatives"},"extension":{},"message":"\u001b[90m> \u001b[39m Found 12 advisory alternatives for Tokyo.\r"}}
+[info] >  127.0.0.1 - - [05/May/2026 06:00:28] "POST / HTTP/1.1" 200 - {"user":"127.0.0.1 - - [05/May/2026 06:00:28] \"POST / HTTP/1.1\" 200 -\r","metadata":{"emulator":{"name":"functions"},"function":{"name":"us-central1-search_activity_alternatives"},"extension":{},"message":"\u001b[90m> \u001b[39m 127.0.0.1 - - [05/May/2026 06:00:28] \"POST / HTTP/1.1\" 200 -\r"}}
+[info] >  INFO:werkzeug:127.0.0.1 - - [05/May/2026 06:00:28] "POST / HTTP/1.1" 200 - {"user":"INFO:werkzeug:127.0.0.1 - - [05/May/2026 06:00:28] \"POST / HTTP/1.1\" 200 -\r","metadata":{"emulator":{"name":"functions"},"function":{"name":"us-central1-search_activity_alternatives"},"extension":{},"message":"\u001b[90m> \u001b[39m INFO:werkzeug:127.0.0.1 - - [05/May/2026 06:00:28] \"POST / HTTP/1.1\" 200 -\r"}}
+[debug] [2026-05-05T06:00:28.591Z] Finishing up request with event=pause {"metadata":{"emulator":{"name":"functions"},"function":{"name":"us-central1-search_activity_alternatives"},"extension":{},"message":"Finishing up request with event=pause"}}
+[info] i  functions: Finished "us-central1-search_activity_alternatives" in 7264.302ms {"metadata":{"emulator":{"name":"functions"},"function":{"name":"us-central1-search_activity_alternatives"},"extension":{},"message":"Finished \"us-central1-search_activity_alternatives\" in 7264.302ms"}}
+[debug] [2026-05-05T06:00:28.591Z] [worker-us-central1-search_activity_alternatives-b0f6371f-c6a2-4631-a708-22dd502856e2]: IDLE {"metadata":{"emulator":{"name":"functions"},"function":{"name":"us-central1-search_activity_alternatives"},"extension":{},"message":"[worker-us-central1-search_activity_alternatives-b0f6371f-c6a2-4631-a708-22dd502856e2]: IDLE"}}
+[debug] [2026-05-05T06:00:28.591Z] Finishing up request with event=close {"metadata":{"emulator":{"name":"functions"},"function":{"name":"us-central1-search_activity_alternatives"},"extension":{},"message":"Finishing up request with event=close"}}
+[debug] [2026-05-05T06:00:28.591Z] [work-queue] {"queuedWork":[],"queueLength":0,"runningWork":[],"workRunningCount":0}
+[debug] [2026-05-05T06:00:28.963Z] [work-queue] {"queuedWork":["/travel-cents-3e2d9/us-central1/search_activity_alternatives-2026-05-05T06:00:28.963Z"],"queueLength":1,"runningWork":[],"workRunningCount":0}
+[debug] [2026-05-05T06:00:28.963Z] [work-queue] {"queuedWork":[],"queueLength":0,"runningWork":["/travel-cents-3e2d9/us-central1/search_activity_alternatives-2026-05-05T06:00:28.963Z"],"workRunningCount":1}
+[debug] [2026-05-05T06:00:28.963Z] Accepted request POST /travel-cents-3e2d9/us-central1/search_activity_alternatives --> us-central1-search_activity_alternatives
+[debug] [2026-05-05T06:00:28.963Z] [functions] Runtime ready! Sending request! {"metadata":{"emulator":{"name":"functions"},"message":"[functions] Runtime ready! Sending request!"}}
+[debug] [2026-05-05T06:00:28.964Z] [functions] Got req.url=/travel-cents-3e2d9/us-central1/search_activity_alternatives, mapping to path=/ {"metadata":{"emulator":{"name":"functions"},"message":"[functions] Got req.url=/travel-cents-3e2d9/us-central1/search_activity_alternatives, mapping to path=/"}}
+[debug] [2026-05-05T06:00:28.964Z] [worker-pool] submitRequest(triggerId=us-central1-search_activity_alternatives) {"metadata":{"emulator":{"name":"functions"},"message":"[worker-pool] submitRequest(triggerId=us-central1-search_activity_alternatives)"}}
+[info] i  functions: Beginning execution of "us-central1-search_activity_alternatives" {"metadata":{"emulator":{"name":"functions"},"function":{"name":"us-central1-search_activity_alternatives"},"extension":{},"message":"Beginning execution of \"us-central1-search_activity_alternatives\""}}
+[debug] [2026-05-05T06:00:28.964Z] [worker-us-central1-search_activity_alternatives-b0f6371f-c6a2-4631-a708-22dd502856e2]: BUSY {"metadata":{"emulator":{"name":"functions"},"function":{"name":"us-central1-search_activity_alternatives"},"extension":{},"message":"[worker-us-central1-search_activity_alternatives-b0f6371f-c6a2-4631-a708-22dd502856e2]: BUSY"}}
+[info] >  Found 5 advisory alternatives for Tokyo. {"user":"Found 5 advisory alternatives for Tokyo.\r","metadata":{"emulator":{"name":"functions"},"function":{"name":"us-central1-search_activity_alternatives"},"extension":{},"message":"\u001b[90m> \u001b[39m Found 5 advisory alternatives for Tokyo.\r"}}
+[info] >  127.0.0.1 - - [05/May/2026 06:00:31] "POST / HTTP/1.1" 200 - {"user":"127.0.0.1 - - [05/May/2026 06:00:31] \"POST / HTTP/1.1\" 200 -\r","metadata":{"emulator":{"name":"functions"},"function":{"name":"us-central1-search_activity_alternatives"},"extension":{},"message":"\u001b[90m> \u001b[39m 127.0.0.1 - - [05/May/2026 06:00:31] \"POST / HTTP/1.1\" 200 -\r"}}
+[info] >  INFO:werkzeug:127.0.0.1 - - [05/May/2026 06:00:31] "POST / HTTP/1.1" 200 - {"user":"INFO:werkzeug:127.0.0.1 - - [05/May/2026 06:00:31] \"POST / HTTP/1.1\" 200 -\r","metadata":{"emulator":{"name":"functions"},"function":{"name":"us-central1-search_activity_alternatives"},"extension":{},"message":"\u001b[90m> \u001b[39m INFO:werkzeug:127.0.0.1 - - [05/May/2026 06:00:31] \"POST / HTTP/1.1\" 200 -\r"}}
+[debug] [2026-05-05T06:00:31.504Z] Finishing up request with event=pause {"metadata":{"emulator":{"name":"functions"},"function":{"name":"us-central1-search_activity_alternatives"},"extension":{},"message":"Finishing up request with event=pause"}}
+[info] i  functions: Finished "us-central1-search_activity_alternatives" in 2539.9293ms {"metadata":{"emulator":{"name":"functions"},"function":{"name":"us-central1-search_activity_alternatives"},"extension":{},"message":"Finished \"us-central1-search_activity_alternatives\" in 2539.9293ms"}}
+[debug] [2026-05-05T06:00:31.504Z] [worker-us-central1-search_activity_alternatives-b0f6371f-c6a2-4631-a708-22dd502856e2]: IDLE {"metadata":{"emulator":{"name":"functions"},"function":{"name":"us-central1-search_activity_alternatives"},"extension":{},"message":"[worker-us-central1-search_activity_alternatives-b0f6371f-c6a2-4631-a708-22dd502856e2]: IDLE"}}
+[debug] [2026-05-05T06:00:31.504Z] Finishing up request with event=finish {"metadata":{"emulator":{"name":"functions"},"function":{"name":"us-central1-search_activity_alternatives"},"extension":{},"message":"Finishing up request with event=finish"}}
+[debug] [2026-05-05T06:00:31.504Z] Finishing up request with event=close {"metadata":{"emulator":{"name":"functions"},"function":{"name":"us-central1-search_activity_alternatives"},"extension":{},"message":"Finishing up request with event=close"}}
+[debug] [2026-05-05T06:00:31.504Z] [work-queue] {"queuedWork":[],"queueLength":0,"runningWork":[],"workRunningCount":0}
+[debug] [2026-05-05T06:00:32.022Z] [work-queue] {"queuedWork":["/travel-cents-3e2d9/us-central1/search_activity_alternatives-2026-05-05T06:00:32.022Z"],"queueLength":1,"runningWork":[],"workRunningCount":0}
+[debug] [2026-05-05T06:00:32.022Z] [work-queue] {"queuedWork":[],"queueLength":0,"runningWork":["/travel-cents-3e2d9/us-central1/search_activity_alternatives-2026-05-05T06:00:32.022Z"],"workRunningCount":1}
+[debug] [2026-05-05T06:00:32.022Z] Accepted request POST /travel-cents-3e2d9/us-central1/search_activity_alternatives --> us-central1-search_activity_alternatives
+[debug] [2026-05-05T06:00:32.023Z] [functions] Runtime ready! Sending request! {"metadata":{"emulator":{"name":"functions"},"message":"[functions] Runtime ready! Sending request!"}}
+[debug] [2026-05-05T06:00:32.023Z] [functions] Got req.url=/travel-cents-3e2d9/us-central1/search_activity_alternatives, mapping to path=/ {"metadata":{"emulator":{"name":"functions"},"message":"[functions] Got req.url=/travel-cents-3e2d9/us-central1/search_activity_alternatives, mapping to path=/"}}
+[debug] [2026-05-05T06:00:32.023Z] [worker-pool] submitRequest(triggerId=us-central1-search_activity_alternatives) {"metadata":{"emulator":{"name":"functions"},"message":"[worker-pool] submitRequest(triggerId=us-central1-search_activity_alternatives)"}}
+[info] i  functions: Beginning execution of "us-central1-search_activity_alternatives" {"metadata":{"emulator":{"name":"functions"},"function":{"name":"us-central1-search_activity_alternatives"},"extension":{},"message":"Beginning execution of \"us-central1-search_activity_alternatives\""}}
+[debug] [2026-05-05T06:00:32.023Z] [worker-us-central1-search_activity_alternatives-b0f6371f-c6a2-4631-a708-22dd502856e2]: BUSY {"metadata":{"emulator":{"name":"functions"},"function":{"name":"us-central1-search_activity_alternatives"},"extension":{},"message":"[worker-us-central1-search_activity_alternatives-b0f6371f-c6a2-4631-a708-22dd502856e2]: BUSY"}}
+[info] >  Found 5 advisory alternatives for Tokyo. {"user":"Found 5 advisory alternatives for Tokyo.\r","metadata":{"emulator":{"name":"functions"},"function":{"name":"us-central1-search_activity_alternatives"},"extension":{},"message":"\u001b[90m> \u001b[39m Found 5 advisory alternatives for Tokyo.\r"}}
+[info] >  127.0.0.1 - - [05/May/2026 06:00:34] "POST / HTTP/1.1" 200 - {"user":"127.0.0.1 - - [05/May/2026 06:00:34] \"POST / HTTP/1.1\" 200 -\r","metadata":{"emulator":{"name":"functions"},"function":{"name":"us-central1-search_activity_alternatives"},"extension":{},"message":"\u001b[90m> \u001b[39m 127.0.0.1 - - [05/May/2026 06:00:34] \"POST / HTTP/1.1\" 200 -\r"}}
+[info] >  INFO:werkzeug:127.0.0.1 - - [05/May/2026 06:00:34] "POST / HTTP/1.1" 200 - {"user":"INFO:werkzeug:127.0.0.1 - - [05/May/2026 06:00:34] \"POST / HTTP/1.1\" 200 -\r","metadata":{"emulator":{"name":"functions"},"function":{"name":"us-central1-search_activity_alternatives"},"extension":{},"message":"\u001b[90m> \u001b[39m INFO:werkzeug:127.0.0.1 - - [05/May/2026 06:00:34] \"POST / HTTP/1.1\" 200 -\r"}}
+[debug] [2026-05-05T06:00:34.019Z] Finishing up request with event=pause {"metadata":{"emulator":{"name":"functions"},"function":{"name":"us-central1-search_activity_alternatives"},"extension":{},"message":"Finishing up request with event=pause"}}
+[info] i  functions: Finished "us-central1-search_activity_alternatives" in 1996.2546ms {"metadata":{"emulator":{"name":"functions"},"function":{"name":"us-central1-search_activity_alternatives"},"extension":{},"message":"Finished \"us-central1-search_activity_alternatives\" in 1996.2546ms"}}
+[debug] [2026-05-05T06:00:34.020Z] [worker-us-central1-search_activity_alternatives-b0f6371f-c6a2-4631-a708-22dd502856e2]: IDLE {"metadata":{"emulator":{"name":"functions"},"function":{"name":"us-central1-search_activity_alternatives"},"extension":{},"message":"[worker-us-central1-search_activity_alternatives-b0f6371f-c6a2-4631-a708-22dd502856e2]: IDLE"}}
+[debug] [2026-05-05T06:00:34.020Z] Finishing up request with event=finish {"metadata":{"emulator":{"name":"functions"},"function":{"name":"us-central1-search_activity_alternatives"},"extension":{},"message":"Finishing up request with event=finish"}}
+[debug] [2026-05-05T06:00:34.020Z] Finishing up request with event=close {"metadata":{"emulator":{"name":"functions"},"function":{"name":"us-central1-search_activity_alternatives"},"extension":{},"message":"Finishing up request with event=close"}}
+[debug] [2026-05-05T06:00:34.020Z] [work-queue] {"queuedWork":[],"queueLength":0,"runningWork":[],"workRunningCount":0}
+[debug] [2026-05-05T06:00:34.529Z] [work-queue] {"queuedWork":["/travel-cents-3e2d9/us-central1/search_activity_alternatives-2026-05-05T06:00:34.529Z"],"queueLength":1,"runningWork":[],"workRunningCount":0}
+[debug] [2026-05-05T06:00:34.530Z] [work-queue] {"queuedWork":[],"queueLength":0,"runningWork":["/travel-cents-3e2d9/us-central1/search_activity_alternatives-2026-05-05T06:00:34.529Z"],"workRunningCount":1}
+[debug] [2026-05-05T06:00:34.530Z] Accepted request POST /travel-cents-3e2d9/us-central1/search_activity_alternatives --> us-central1-search_activity_alternatives
+[debug] [2026-05-05T06:00:34.530Z] [functions] Runtime ready! Sending request! {"metadata":{"emulator":{"name":"functions"},"message":"[functions] Runtime ready! Sending request!"}}
+[debug] [2026-05-05T06:00:34.530Z] [functions] Got req.url=/travel-cents-3e2d9/us-central1/search_activity_alternatives, mapping to path=/ {"metadata":{"emulator":{"name":"functions"},"message":"[functions] Got req.url=/travel-cents-3e2d9/us-central1/search_activity_alternatives, mapping to path=/"}}
+[debug] [2026-05-05T06:00:34.530Z] [worker-pool] submitRequest(triggerId=us-central1-search_activity_alternatives) {"metadata":{"emulator":{"name":"functions"},"message":"[worker-pool] submitRequest(triggerId=us-central1-search_activity_alternatives)"}}
+[info] i  functions: Beginning execution of "us-central1-search_activity_alternatives" {"metadata":{"emulator":{"name":"functions"},"function":{"name":"us-central1-search_activity_alternatives"},"extension":{},"message":"Beginning execution of \"us-central1-search_activity_alternatives\""}}
+[debug] [2026-05-05T06:00:34.530Z] [worker-us-central1-search_activity_alternatives-b0f6371f-c6a2-4631-a708-22dd502856e2]: BUSY {"metadata":{"emulator":{"name":"functions"},"function":{"name":"us-central1-search_activity_alternatives"},"extension":{},"message":"[worker-us-central1-search_activity_alternatives-b0f6371f-c6a2-4631-a708-22dd502856e2]: BUSY"}}
+[info] >  Found 12 advisory alternatives for Tokyo. {"user":"Found 12 advisory alternatives for Tokyo.\r","metadata":{"emulator":{"name":"functions"},"function":{"name":"us-central1-search_activity_alternatives"},"extension":{},"message":"\u001b[90m> \u001b[39m Found 12 advisory alternatives for Tokyo.\r"}}
+[info] >  127.0.0.1 - - [05/May/2026 06:00:38] "POST / HTTP/1.1" 200 - {"user":"127.0.0.1 - - [05/May/2026 06:00:38] \"POST / HTTP/1.1\" 200 -\r","metadata":{"emulator":{"name":"functions"},"function":{"name":"us-central1-search_activity_alternatives"},"extension":{},"message":"\u001b[90m> \u001b[39m 127.0.0.1 - - [05/May/2026 06:00:38] \"POST / HTTP/1.1\" 200 -\r"}}
+[info] >  INFO:werkzeug:127.0.0.1 - - [05/May/2026 06:00:38] "POST / HTTP/1.1" 200 - {"user":"INFO:werkzeug:127.0.0.1 - - [05/May/2026 06:00:38] \"POST / HTTP/1.1\" 200 -\r","metadata":{"emulator":{"name":"functions"},"function":{"name":"us-central1-search_activity_alternatives"},"extension":{},"message":"\u001b[90m> \u001b[39m INFO:werkzeug:127.0.0.1 - - [05/May/2026 06:00:38] \"POST / HTTP/1.1\" 200 -\r"}}
+[debug] [2026-05-05T06:00:38.171Z] Finishing up request with event=pause {"metadata":{"emulator":{"name":"functions"},"function":{"name":"us-central1-search_activity_alternatives"},"extension":{},"message":"Finishing up request with event=pause"}}
+[info] i  functions: Finished "us-central1-search_activity_alternatives" in 3640.4152ms {"metadata":{"emulator":{"name":"functions"},"function":{"name":"us-central1-search_activity_alternatives"},"extension":{},"message":"Finished \"us-central1-search_activity_alternatives\" in 3640.4152ms"}}
+[debug] [2026-05-05T06:00:38.171Z] [worker-us-central1-search_activity_alternatives-b0f6371f-c6a2-4631-a708-22dd502856e2]: IDLE {"metadata":{"emulator":{"name":"functions"},"function":{"name":"us-central1-search_activity_alternatives"},"extension":{},"message":"[worker-us-central1-search_activity_alternatives-b0f6371f-c6a2-4631-a708-22dd502856e2]: IDLE"}}
+[debug] [2026-05-05T06:00:38.171Z] Finishing up request with event=finish {"metadata":{"emulator":{"name":"functions"},"function":{"name":"us-central1-search_activity_alternatives"},"extension":{},"message":"Finishing up request with event=finish"}}
+[debug] [2026-05-05T06:00:38.171Z] Finishing up request with event=close {"metadata":{"emulator":{"name":"functions"},"function":{"name":"us-central1-search_activity_alternatives"},"extension":{},"message":"Finishing up request with event=close"}}
+[debug] [2026-05-05T06:00:38.171Z] [work-queue] {"queuedWork":[],"queueLength":0,"runningWork":[],"workRunningCount":0}
+[debug] [2026-05-05T06:00:38.681Z] [work-queue] {"queuedWork":["/travel-cents-3e2d9/us-central1/search_activity_alternatives-2026-05-05T06:00:38.681Z"],"queueLength":1,"runningWork":[],"workRunningCount":0}
+[debug] [2026-05-05T06:00:38.681Z] [work-queue] {"queuedWork":[],"queueLength":0,"runningWork":["/travel-cents-3e2d9/us-central1/search_activity_alternatives-2026-05-05T06:00:38.681Z"],"workRunningCount":1}
+[debug] [2026-05-05T06:00:38.681Z] Accepted request POST /travel-cents-3e2d9/us-central1/search_activity_alternatives --> us-central1-search_activity_alternatives
+[debug] [2026-05-05T06:00:38.682Z] [functions] Runtime ready! Sending request! {"metadata":{"emulator":{"name":"functions"},"message":"[functions] Runtime ready! Sending request!"}}
+[debug] [2026-05-05T06:00:38.682Z] [functions] Got req.url=/travel-cents-3e2d9/us-central1/search_activity_alternatives, mapping to path=/ {"metadata":{"emulator":{"name":"functions"},"message":"[functions] Got req.url=/travel-cents-3e2d9/us-central1/search_activity_alternatives, mapping to path=/"}}
+[debug] [2026-05-05T06:00:38.682Z] [worker-pool] submitRequest(triggerId=us-central1-search_activity_alternatives) {"metadata":{"emulator":{"name":"functions"},"message":"[worker-pool] submitRequest(triggerId=us-central1-search_activity_alternatives)"}}
+[info] i  functions: Beginning execution of "us-central1-search_activity_alternatives" {"metadata":{"emulator":{"name":"functions"},"function":{"name":"us-central1-search_activity_alternatives"},"extension":{},"message":"Beginning execution of \"us-central1-search_activity_alternatives\""}}
+[debug] [2026-05-05T06:00:38.682Z] [worker-us-central1-search_activity_alternatives-b0f6371f-c6a2-4631-a708-22dd502856e2]: BUSY {"metadata":{"emulator":{"name":"functions"},"function":{"name":"us-central1-search_activity_alternatives"},"extension":{},"message":"[worker-us-central1-search_activity_alternatives-b0f6371f-c6a2-4631-a708-22dd502856e2]: BUSY"}}
+[info] >  Found 12 advisory alternatives for Tokyo. {"user":"Found 12 advisory alternatives for Tokyo.\r","metadata":{"emulator":{"name":"functions"},"function":{"name":"us-central1-search_activity_alternatives"},"extension":{},"message":"\u001b[90m> \u001b[39m Found 12 advisory alternatives for Tokyo.\r"}}
+[info] >  127.0.0.1 - - [05/May/2026 06:00:40] "POST / HTTP/1.1" 200 - {"user":"127.0.0.1 - - [05/May/2026 06:00:40] \"POST / HTTP/1.1\" 200 -\r","metadata":{"emulator":{"name":"functions"},"function":{"name":"us-central1-search_activity_alternatives"},"extension":{},"message":"\u001b[90m> \u001b[39m 127.0.0.1 - - [05/May/2026 06:00:40] \"POST / HTTP/1.1\" 200 -\r"}}
+[info] >  INFO:werkzeug:127.0.0.1 - - [05/May/2026 06:00:40] "POST / HTTP/1.1" 200 - {"user":"INFO:werkzeug:127.0.0.1 - - [05/May/2026 06:00:40] \"POST / HTTP/1.1\" 200 -\r","metadata":{"emulator":{"name":"functions"},"function":{"name":"us-central1-search_activity_alternatives"},"extension":{},"message":"\u001b[90m> \u001b[39m INFO:werkzeug:127.0.0.1 - - [05/May/2026 06:00:40] \"POST / HTTP/1.1\" 200 -\r"}}
+[debug] [2026-05-05T06:00:40.539Z] Finishing up request with event=pause {"metadata":{"emulator":{"name":"functions"},"function":{"name":"us-central1-search_activity_alternatives"},"extension":{},"message":"Finishing up request with event=pause"}}
+[info] i  functions: Finished "us-central1-search_activity_alternatives" in 1856.4951999999998ms {"metadata":{"emulator":{"name":"functions"},"function":{"name":"us-central1-search_activity_alternatives"},"extension":{},"message":"Finished \"us-central1-search_activity_alternatives\" in 1856.4951999999998ms"}}
+[debug] [2026-05-05T06:00:40.539Z] [worker-us-central1-search_activity_alternatives-b0f6371f-c6a2-4631-a708-22dd502856e2]: IDLE {"metadata":{"emulator":{"name":"functions"},"function":{"name":"us-central1-search_activity_alternatives"},"extension":{},"message":"[worker-us-central1-search_activity_alternatives-b0f6371f-c6a2-4631-a708-22dd502856e2]: IDLE"}}
+[debug] [2026-05-05T06:00:40.539Z] Finishing up request with event=finish {"metadata":{"emulator":{"name":"functions"},"function":{"name":"us-central1-search_activity_alternatives"},"extension":{},"message":"Finishing up request with event=finish"}}
+[debug] [2026-05-05T06:00:40.539Z] Finishing up request with event=close {"metadata":{"emulator":{"name":"functions"},"function":{"name":"us-central1-search_activity_alternatives"},"extension":{},"message":"Finishing up request with event=close"}}
+[debug] [2026-05-05T06:00:40.539Z] [work-queue] {"queuedWork":[],"queueLength":0,"runningWork":[],"workRunningCount":0}
+[debug] [2026-05-05T06:00:41.049Z] [work-queue] {"queuedWork":["/travel-cents-3e2d9/us-central1/search_activity_alternatives-2026-05-05T06:00:41.049Z"],"queueLength":1,"runningWork":[],"workRunningCount":0}
+[debug] [2026-05-05T06:00:41.050Z] [work-queue] {"queuedWork":[],"queueLength":0,"runningWork":["/travel-cents-3e2d9/us-central1/search_activity_alternatives-2026-05-05T06:00:41.049Z"],"workRunningCount":1}
+[debug] [2026-05-05T06:00:41.050Z] Accepted request POST /travel-cents-3e2d9/us-central1/search_activity_alternatives --> us-central1-search_activity_alternatives
+[debug] [2026-05-05T06:00:41.050Z] [functions] Runtime ready! Sending request! {"metadata":{"emulator":{"name":"functions"},"message":"[functions] Runtime ready! Sending request!"}}
+[debug] [2026-05-05T06:00:41.050Z] [functions] Got req.url=/travel-cents-3e2d9/us-central1/search_activity_alternatives, mapping to path=/ {"metadata":{"emulator":{"name":"functions"},"message":"[functions] Got req.url=/travel-cents-3e2d9/us-central1/search_activity_alternatives, mapping to path=/"}}
+[debug] [2026-05-05T06:00:41.050Z] [worker-pool] submitRequest(triggerId=us-central1-search_activity_alternatives) {"metadata":{"emulator":{"name":"functions"},"message":"[worker-pool] submitRequest(triggerId=us-central1-search_activity_alternatives)"}}
+[info] i  functions: Beginning execution of "us-central1-search_activity_alternatives" {"metadata":{"emulator":{"name":"functions"},"function":{"name":"us-central1-search_activity_alternatives"},"extension":{},"message":"Beginning execution of \"us-central1-search_activity_alternatives\""}}
+[debug] [2026-05-05T06:00:41.050Z] [worker-us-central1-search_activity_alternatives-b0f6371f-c6a2-4631-a708-22dd502856e2]: BUSY {"metadata":{"emulator":{"name":"functions"},"function":{"name":"us-central1-search_activity_alternatives"},"extension":{},"message":"[worker-us-central1-search_activity_alternatives-b0f6371f-c6a2-4631-a708-22dd502856e2]: BUSY"}}
+[info] >  Found 12 advisory alternatives for Tokyo. {"user":"Found 12 advisory alternatives for Tokyo.\r","metadata":{"emulator":{"name":"functions"},"function":{"name":"us-central1-search_activity_alternatives"},"extension":{},"message":"\u001b[90m> \u001b[39m Found 12 advisory alternatives for Tokyo.\r"}}
+[info] >  127.0.0.1 - - [05/May/2026 06:00:43] "POST / HTTP/1.1" 200 - {"user":"127.0.0.1 - - [05/May/2026 06:00:43] \"POST / HTTP/1.1\" 200 -\r","metadata":{"emulator":{"name":"functions"},"function":{"name":"us-central1-search_activity_alternatives"},"extension":{},"message":"\u001b[90m> \u001b[39m 127.0.0.1 - - [05/May/2026 06:00:43] \"POST / HTTP/1.1\" 200 -\r"}}
+[info] >  INFO:werkzeug:127.0.0.1 - - [05/May/2026 06:00:43] "POST / HTTP/1.1" 200 - {"user":"INFO:werkzeug:127.0.0.1 - - [05/May/2026 06:00:43] \"POST / HTTP/1.1\" 200 -\r","metadata":{"emulator":{"name":"functions"},"function":{"name":"us-central1-search_activity_alternatives"},"extension":{},"message":"\u001b[90m> \u001b[39m INFO:werkzeug:127.0.0.1 - - [05/May/2026 06:00:43] \"POST / HTTP/1.1\" 200 -\r"}}
+[debug] [2026-05-05T06:00:43.217Z] Finishing up request with event=pause {"metadata":{"emulator":{"name":"functions"},"function":{"name":"us-central1-search_activity_alternatives"},"extension":{},"message":"Finishing up request with event=pause"}}
+[info] i  functions: Finished "us-central1-search_activity_alternatives" in 2166.5617ms {"metadata":{"emulator":{"name":"functions"},"function":{"name":"us-central1-search_activity_alternatives"},"extension":{},"message":"Finished \"us-central1-search_activity_alternatives\" in 2166.5617ms"}}
+[debug] [2026-05-05T06:00:43.217Z] [worker-us-central1-search_activity_alternatives-b0f6371f-c6a2-4631-a708-22dd502856e2]: IDLE {"metadata":{"emulator":{"name":"functions"},"function":{"name":"us-central1-search_activity_alternatives"},"extension":{},"message":"[worker-us-central1-search_activity_alternatives-b0f6371f-c6a2-4631-a708-22dd502856e2]: IDLE"}}
+[debug] [2026-05-05T06:00:43.217Z] Finishing up request with event=finish {"metadata":{"emulator":{"name":"functions"},"function":{"name":"us-central1-search_activity_alternatives"},"extension":{},"message":"Finishing up request with event=finish"}}
+[debug] [2026-05-05T06:00:43.217Z] Finishing up request with event=close {"metadata":{"emulator":{"name":"functions"},"function":{"name":"us-central1-search_activity_alternatives"},"extension":{},"message":"Finishing up request with event=close"}}
+[debug] [2026-05-05T06:00:43.217Z] [work-queue] {"queuedWork":[],"queueLength":0,"runningWork":[],"workRunningCount":0}
+[debug] [2026-05-05T06:00:43.729Z] [work-queue] {"queuedWork":["/travel-cents-3e2d9/us-central1/search_activity_alternatives-2026-05-05T06:00:43.729Z"],"queueLength":1,"runningWork":[],"workRunningCount":0}
+[debug] [2026-05-05T06:00:43.729Z] [work-queue] {"queuedWork":[],"queueLength":0,"runningWork":["/travel-cents-3e2d9/us-central1/search_activity_alternatives-2026-05-05T06:00:43.729Z"],"workRunningCount":1}
+[debug] [2026-05-05T06:00:43.729Z] Accepted request POST /travel-cents-3e2d9/us-central1/search_activity_alternatives --> us-central1-search_activity_alternatives
+[debug] [2026-05-05T06:00:43.730Z] [functions] Runtime ready! Sending request! {"metadata":{"emulator":{"name":"functions"},"message":"[functions] Runtime ready! Sending request!"}}
+[debug] [2026-05-05T06:00:43.730Z] [functions] Got req.url=/travel-cents-3e2d9/us-central1/search_activity_alternatives, mapping to path=/ {"metadata":{"emulator":{"name":"functions"},"message":"[functions] Got req.url=/travel-cents-3e2d9/us-central1/search_activity_alternatives, mapping to path=/"}}
+[debug] [2026-05-05T06:00:43.730Z] [worker-pool] submitRequest(triggerId=us-central1-search_activity_alternatives) {"metadata":{"emulator":{"name":"functions"},"message":"[worker-pool] submitRequest(triggerId=us-central1-search_activity_alternatives)"}}
+[info] i  functions: Beginning execution of "us-central1-search_activity_alternatives" {"metadata":{"emulator":{"name":"functions"},"function":{"name":"us-central1-search_activity_alternatives"},"extension":{},"message":"Beginning execution of \"us-central1-search_activity_alternatives\""}}
+[debug] [2026-05-05T06:00:43.730Z] [worker-us-central1-search_activity_alternatives-b0f6371f-c6a2-4631-a708-22dd502856e2]: BUSY {"metadata":{"emulator":{"name":"functions"},"function":{"name":"us-central1-search_activity_alternatives"},"extension":{},"message":"[worker-us-central1-search_activity_alternatives-b0f6371f-c6a2-4631-a708-22dd502856e2]: BUSY"}}
+[info] >  Found 5 advisory alternatives for Tokyo. {"user":"Found 5 advisory alternatives for Tokyo.\r","metadata":{"emulator":{"name":"functions"},"function":{"name":"us-central1-search_activity_alternatives"},"extension":{},"message":"\u001b[90m> \u001b[39m Found 5 advisory alternatives for Tokyo.\r"}}
+[info] >  127.0.0.1 - - [05/May/2026 06:00:45] "POST / HTTP/1.1" 200 - {"user":"127.0.0.1 - - [05/May/2026 06:00:45] \"POST / HTTP/1.1\" 200 -\r","metadata":{"emulator":{"name":"functions"},"function":{"name":"us-central1-search_activity_alternatives"},"extension":{},"message":"\u001b[90m> \u001b[39m 127.0.0.1 - - [05/May/2026 06:00:45] \"POST / HTTP/1.1\" 200 -\r"}}
+[info] >  INFO:werkzeug:127.0.0.1 - - [05/May/2026 06:00:45] "POST / HTTP/1.1" 200 - {"user":"INFO:werkzeug:127.0.0.1 - - [05/May/2026 06:00:45] \"POST / HTTP/1.1\" 200 -\r","metadata":{"emulator":{"name":"functions"},"function":{"name":"us-central1-search_activity_alternatives"},"extension":{},"message":"\u001b[90m> \u001b[39m INFO:werkzeug:127.0.0.1 - - [05/May/2026 06:00:45] \"POST / HTTP/1.1\" 200 -\r"}}
+[debug] [2026-05-05T06:00:45.567Z] Finishing up request with event=pause {"metadata":{"emulator":{"name":"functions"},"function":{"name":"us-central1-search_activity_alternatives"},"extension":{},"message":"Finishing up request with event=pause"}}
+[info] i  functions: Finished "us-central1-search_activity_alternatives" in 1837.1091000000001ms {"metadata":{"emulator":{"name":"functions"},"function":{"name":"us-central1-search_activity_alternatives"},"extension":{},"message":"Finished \"us-central1-search_activity_alternatives\" in 1837.1091000000001ms"}}
+[debug] [2026-05-05T06:00:45.567Z] [worker-us-central1-search_activity_alternatives-b0f6371f-c6a2-4631-a708-22dd502856e2]: IDLE {"metadata":{"emulator":{"name":"functions"},"function":{"name":"us-central1-search_activity_alternatives"},"extension":{},"message":"[worker-us-central1-search_activity_alternatives-b0f6371f-c6a2-4631-a708-22dd502856e2]: IDLE"}}
+[debug] [2026-05-05T06:00:45.567Z] Finishing up request with event=finish {"metadata":{"emulator":{"name":"functions"},"function":{"name":"us-central1-search_activity_alternatives"},"extension":{},"message":"Finishing up request with event=finish"}}
+[debug] [2026-05-05T06:00:45.567Z] Finishing up request with event=close {"metadata":{"emulator":{"name":"functions"},"function":{"name":"us-central1-search_activity_alternatives"},"extension":{},"message":"Finishing up request with event=close"}}
+[debug] [2026-05-05T06:00:45.568Z] [work-queue] {"queuedWork":[],"queueLength":0,"runningWork":[],"workRunningCount":0}
+[debug] [2026-05-05T06:00:46.085Z] [work-queue] {"queuedWork":["/travel-cents-3e2d9/us-central1/search_activity_alternatives-2026-05-05T06:00:46.085Z"],"queueLength":1,"runningWork":[],"workRunningCount":0}
+[debug] [2026-05-05T06:00:46.085Z] [work-queue] {"queuedWork":[],"queueLength":0,"runningWork":["/travel-cents-3e2d9/us-central1/search_activity_alternatives-2026-05-05T06:00:46.085Z"],"workRunningCount":1}
+[debug] [2026-05-05T06:00:46.085Z] Accepted request POST /travel-cents-3e2d9/us-central1/search_activity_alternatives --> us-central1-search_activity_alternatives
+[debug] [2026-05-05T06:00:46.086Z] [functions] Runtime ready! Sending request! {"metadata":{"emulator":{"name":"functions"},"message":"[functions] Runtime ready! Sending request!"}}
+[debug] [2026-05-05T06:00:46.086Z] [functions] Got req.url=/travel-cents-3e2d9/us-central1/search_activity_alternatives, mapping to path=/ {"metadata":{"emulator":{"name":"functions"},"message":"[functions] Got req.url=/travel-cents-3e2d9/us-central1/search_activity_alternatives, mapping to path=/"}}
+[debug] [2026-05-05T06:00:46.086Z] [worker-pool] submitRequest(triggerId=us-central1-search_activity_alternatives) {"metadata":{"emulator":{"name":"functions"},"message":"[worker-pool] submitRequest(triggerId=us-central1-search_activity_alternatives)"}}
+[info] i  functions: Beginning execution of "us-central1-search_activity_alternatives" {"metadata":{"emulator":{"name":"functions"},"function":{"name":"us-central1-search_activity_alternatives"},"extension":{},"message":"Beginning execution of \"us-central1-search_activity_alternatives\""}}
+[debug] [2026-05-05T06:00:46.086Z] [worker-us-central1-search_activity_alternatives-b0f6371f-c6a2-4631-a708-22dd502856e2]: BUSY {"metadata":{"emulator":{"name":"functions"},"function":{"name":"us-central1-search_activity_alternatives"},"extension":{},"message":"[worker-us-central1-search_activity_alternatives-b0f6371f-c6a2-4631-a708-22dd502856e2]: BUSY"}}
+[info] >  Found 5 advisory alternatives for Tokyo. {"user":"Found 5 advisory alternatives for Tokyo.\r","metadata":{"emulator":{"name":"functions"},"function":{"name":"us-central1-search_activity_alternatives"},"extension":{},"message":"\u001b[90m> \u001b[39m Found 5 advisory alternatives for Tokyo.\r"}}
+[info] >  127.0.0.1 - - [05/May/2026 06:00:48] "POST / HTTP/1.1" 200 - {"user":"127.0.0.1 - - [05/May/2026 06:00:48] \"POST / HTTP/1.1\" 200 -\r","metadata":{"emulator":{"name":"functions"},"function":{"name":"us-central1-search_activity_alternatives"},"extension":{},"message":"\u001b[90m> \u001b[39m 127.0.0.1 - - [05/May/2026 06:00:48] \"POST / HTTP/1.1\" 200 -\r"}}
+[info] >  INFO:werkzeug:127.0.0.1 - - [05/May/2026 06:00:48] "POST / HTTP/1.1" 200 - {"user":"INFO:werkzeug:127.0.0.1 - - [05/May/2026 06:00:48] \"POST / HTTP/1.1\" 200 -\r","metadata":{"emulator":{"name":"functions"},"function":{"name":"us-central1-search_activity_alternatives"},"extension":{},"message":"\u001b[90m> \u001b[39m INFO:werkzeug:127.0.0.1 - - [05/May/2026 06:00:48] \"POST / HTTP/1.1\" 200 -\r"}}
+[debug] [2026-05-05T06:00:48.013Z] Finishing up request with event=pause {"metadata":{"emulator":{"name":"functions"},"function":{"name":"us-central1-search_activity_alternatives"},"extension":{},"message":"Finishing up request with event=pause"}}
+[info] i  functions: Finished "us-central1-search_activity_alternatives" in 1926.5946ms {"metadata":{"emulator":{"name":"functions"},"function":{"name":"us-central1-search_activity_alternatives"},"extension":{},"message":"Finished \"us-central1-search_activity_alternatives\" in 1926.5946ms"}}
+[debug] [2026-05-05T06:00:48.013Z] [worker-us-central1-search_activity_alternatives-b0f6371f-c6a2-4631-a708-22dd502856e2]: IDLE {"metadata":{"emulator":{"name":"functions"},"function":{"name":"us-central1-search_activity_alternatives"},"extension":{},"message":"[worker-us-central1-search_activity_alternatives-b0f6371f-c6a2-4631-a708-22dd502856e2]: IDLE"}}
+[debug] [2026-05-05T06:00:48.013Z] Finishing up request with event=finish {"metadata":{"emulator":{"name":"functions"},"function":{"name":"us-central1-search_activity_alternatives"},"extension":{},"message":"Finishing up request with event=finish"}}
+[debug] [2026-05-05T06:00:48.013Z] Finishing up request with event=close {"metadata":{"emulator":{"name":"functions"},"function":{"name":"us-central1-search_activity_alternatives"},"extension":{},"message":"Finishing up request with event=close"}}
+[debug] [2026-05-05T06:00:48.013Z] [work-queue] {"queuedWork":[],"queueLength":0,"runningWork":[],"workRunningCount":0}
+[debug] [2026-05-05T06:00:48.525Z] [work-queue] {"queuedWork":["/travel-cents-3e2d9/us-central1/search_activity_alternatives-2026-05-05T06:00:48.525Z"],"queueLength":1,"runningWork":[],"workRunningCount":0}
+[debug] [2026-05-05T06:00:48.526Z] [work-queue] {"queuedWork":[],"queueLength":0,"runningWork":["/travel-cents-3e2d9/us-central1/search_activity_alternatives-2026-05-05T06:00:48.525Z"],"workRunningCount":1}
+[debug] [2026-05-05T06:00:48.526Z] Accepted request POST /travel-cents-3e2d9/us-central1/search_activity_alternatives --> us-central1-search_activity_alternatives
+[debug] [2026-05-05T06:00:48.526Z] [functions] Runtime ready! Sending request! {"metadata":{"emulator":{"name":"functions"},"message":"[functions] Runtime ready! Sending request!"}}
+[debug] [2026-05-05T06:00:48.526Z] [functions] Got req.url=/travel-cents-3e2d9/us-central1/search_activity_alternatives, mapping to path=/ {"metadata":{"emulator":{"name":"functions"},"message":"[functions] Got req.url=/travel-cents-3e2d9/us-central1/search_activity_alternatives, mapping to path=/"}}
+[debug] [2026-05-05T06:00:48.526Z] [worker-pool] submitRequest(triggerId=us-central1-search_activity_alternatives) {"metadata":{"emulator":{"name":"functions"},"message":"[worker-pool] submitRequest(triggerId=us-central1-search_activity_alternatives)"}}
+[info] i  functions: Beginning execution of "us-central1-search_activity_alternatives" {"metadata":{"emulator":{"name":"functions"},"function":{"name":"us-central1-search_activity_alternatives"},"extension":{},"message":"Beginning execution of \"us-central1-search_activity_alternatives\""}}
+[debug] [2026-05-05T06:00:48.526Z] [worker-us-central1-search_activity_alternatives-b0f6371f-c6a2-4631-a708-22dd502856e2]: BUSY {"metadata":{"emulator":{"name":"functions"},"function":{"name":"us-central1-search_activity_alternatives"},"extension":{},"message":"[worker-us-central1-search_activity_alternatives-b0f6371f-c6a2-4631-a708-22dd502856e2]: BUSY"}}
+[info] >  Found 12 advisory alternatives for Tokyo. {"user":"Found 12 advisory alternatives for Tokyo.\r","metadata":{"emulator":{"name":"functions"},"function":{"name":"us-central1-search_activity_alternatives"},"extension":{},"message":"\u001b[90m> \u001b[39m Found 12 advisory alternatives for Tokyo.\r"}}
+[info] >  127.0.0.1 - - [05/May/2026 06:00:50] "POST / HTTP/1.1" 200 - {"user":"127.0.0.1 - - [05/May/2026 06:00:50] \"POST / HTTP/1.1\" 200 -\r","metadata":{"emulator":{"name":"functions"},"function":{"name":"us-central1-search_activity_alternatives"},"extension":{},"message":"\u001b[90m> \u001b[39m 127.0.0.1 - - [05/May/2026 06:00:50] \"POST / HTTP/1.1\" 200 -\r"}}
+[debug] [2026-05-05T06:00:50.331Z] Finishing up request with event=pause {"metadata":{"emulator":{"name":"functions"},"function":{"name":"us-central1-search_activity_alternatives"},"extension":{},"message":"Finishing up request with event=pause"}}
+[info] i  functions: Finished "us-central1-search_activity_alternatives" in 1804.7807ms {"metadata":{"emulator":{"name":"functions"},"function":{"name":"us-central1-search_activity_alternatives"},"extension":{},"message":"Finished \"us-central1-search_activity_alternatives\" in 1804.7807ms"}}
+[debug] [2026-05-05T06:00:50.331Z] [worker-us-central1-search_activity_alternatives-b0f6371f-c6a2-4631-a708-22dd502856e2]: IDLE {"metadata":{"emulator":{"name":"functions"},"function":{"name":"us-central1-search_activity_alternatives"},"extension":{},"message":"[worker-us-central1-search_activity_alternatives-b0f6371f-c6a2-4631-a708-22dd502856e2]: IDLE"}}
+[debug] [2026-05-05T06:00:50.332Z] Finishing up request with event=finish {"metadata":{"emulator":{"name":"functions"},"function":{"name":"us-central1-search_activity_alternatives"},"extension":{},"message":"Finishing up request with event=finish"}}
+[debug] [2026-05-05T06:00:50.332Z] Finishing up request with event=close {"metadata":{"emulator":{"name":"functions"},"function":{"name":"us-central1-search_activity_alternatives"},"extension":{},"message":"Finishing up request with event=close"}}
+[debug] [2026-05-05T06:00:50.332Z] [work-queue] {"queuedWork":[],"queueLength":0,"runningWork":[],"workRunningCount":0}
+[info] >  INFO:werkzeug:127.0.0.1 - - [05/May/2026 06:00:50] "POST / HTTP/1.1" 200 - {"user":"INFO:werkzeug:127.0.0.1 - - [05/May/2026 06:00:50] \"POST / HTTP/1.1\" 200 -\r","metadata":{"emulator":{"name":"functions"},"function":{"name":"us-central1-search_activity_alternatives"},"extension":{},"message":"\u001b[90m> \u001b[39m INFO:werkzeug:127.0.0.1 - - [05/May/2026 06:00:50] \"POST / HTTP/1.1\" 200 -\r"}}
+[debug] [2026-05-05T06:00:50.843Z] [work-queue] {"queuedWork":["/travel-cents-3e2d9/us-central1/search_activity_alternatives-2026-05-05T06:00:50.843Z"],"queueLength":1,"runningWork":[],"workRunningCount":0}
+[debug] [2026-05-05T06:00:50.843Z] [work-queue] {"queuedWork":[],"queueLength":0,"runningWork":["/travel-cents-3e2d9/us-central1/search_activity_alternatives-2026-05-05T06:00:50.843Z"],"workRunningCount":1}
+[debug] [2026-05-05T06:00:50.843Z] Accepted request POST /travel-cents-3e2d9/us-central1/search_activity_alternatives --> us-central1-search_activity_alternatives
+[debug] [2026-05-05T06:00:50.844Z] [functions] Runtime ready! Sending request! {"metadata":{"emulator":{"name":"functions"},"message":"[functions] Runtime ready! Sending request!"}}
+[debug] [2026-05-05T06:00:50.844Z] [functions] Got req.url=/travel-cents-3e2d9/us-central1/search_activity_alternatives, mapping to path=/ {"metadata":{"emulator":{"name":"functions"},"message":"[functions] Got req.url=/travel-cents-3e2d9/us-central1/search_activity_alternatives, mapping to path=/"}}
+[debug] [2026-05-05T06:00:50.844Z] [worker-pool] submitRequest(triggerId=us-central1-search_activity_alternatives) {"metadata":{"emulator":{"name":"functions"},"message":"[worker-pool] submitRequest(triggerId=us-central1-search_activity_alternatives)"}}
+[info] i  functions: Beginning execution of "us-central1-search_activity_alternatives" {"metadata":{"emulator":{"name":"functions"},"function":{"name":"us-central1-search_activity_alternatives"},"extension":{},"message":"Beginning execution of \"us-central1-search_activity_alternatives\""}}
+[debug] [2026-05-05T06:00:50.844Z] [worker-us-central1-search_activity_alternatives-b0f6371f-c6a2-4631-a708-22dd502856e2]: BUSY {"metadata":{"emulator":{"name":"functions"},"function":{"name":"us-central1-search_activity_alternatives"},"extension":{},"message":"[worker-us-central1-search_activity_alternatives-b0f6371f-c6a2-4631-a708-22dd502856e2]: BUSY"}}
+[info] >  Found 12 advisory alternatives for Tokyo. {"user":"Found 12 advisory alternatives for Tokyo.\r","metadata":{"emulator":{"name":"functions"},"function":{"name":"us-central1-search_activity_alternatives"},"extension":{},"message":"\u001b[90m> \u001b[39m Found 12 advisory alternatives for Tokyo.\r"}}
+[info] >  127.0.0.1 - - [05/May/2026 06:00:52] "POST / HTTP/1.1" 200 - {"user":"127.0.0.1 - - [05/May/2026 06:00:52] \"POST / HTTP/1.1\" 200 -\r","metadata":{"emulator":{"name":"functions"},"function":{"name":"us-central1-search_activity_alternatives"},"extension":{},"message":"\u001b[90m> \u001b[39m 127.0.0.1 - - [05/May/2026 06:00:52] \"POST / HTTP/1.1\" 200 -\r"}}
+[info] >  INFO:werkzeug:127.0.0.1 - - [05/May/2026 06:00:52] "POST / HTTP/1.1" 200 - {"user":"INFO:werkzeug:127.0.0.1 - - [05/May/2026 06:00:52] \"POST / HTTP/1.1\" 200 -\r","metadata":{"emulator":{"name":"functions"},"function":{"name":"us-central1-search_activity_alternatives"},"extension":{},"message":"\u001b[90m> \u001b[39m INFO:werkzeug:127.0.0.1 - - [05/May/2026 06:00:52] \"POST / HTTP/1.1\" 200 -\r"}}
+[debug] [2026-05-05T06:00:53.001Z] Finishing up request with event=pause {"metadata":{"emulator":{"name":"functions"},"function":{"name":"us-central1-search_activity_alternatives"},"extension":{},"message":"Finishing up request with event=pause"}}
+[info] i  functions: Finished "us-central1-search_activity_alternatives" in 2156.6733ms {"metadata":{"emulator":{"name":"functions"},"function":{"name":"us-central1-search_activity_alternatives"},"extension":{},"message":"Finished \"us-central1-search_activity_alternatives\" in 2156.6733ms"}}
+[debug] [2026-05-05T06:00:53.001Z] [worker-us-central1-search_activity_alternatives-b0f6371f-c6a2-4631-a708-22dd502856e2]: IDLE {"metadata":{"emulator":{"name":"functions"},"function":{"name":"us-central1-search_activity_alternatives"},"extension":{},"message":"[worker-us-central1-search_activity_alternatives-b0f6371f-c6a2-4631-a708-22dd502856e2]: IDLE"}}
+[debug] [2026-05-05T06:00:53.001Z] Finishing up request with event=finish {"metadata":{"emulator":{"name":"functions"},"function":{"name":"us-central1-search_activity_alternatives"},"extension":{},"message":"Finishing up request with event=finish"}}
+[debug] [2026-05-05T06:00:53.001Z] Finishing up request with event=close {"metadata":{"emulator":{"name":"functions"},"function":{"name":"us-central1-search_activity_alternatives"},"extension":{},"message":"Finishing up request with event=close"}}
+[debug] [2026-05-05T06:00:53.001Z] [work-queue] {"queuedWork":[],"queueLength":0,"runningWork":[],"workRunningCount":0}
+[debug] [2026-05-05T06:00:53.505Z] [work-queue] {"queuedWork":["/travel-cents-3e2d9/us-central1/search_activity_alternatives-2026-05-05T06:00:53.505Z"],"queueLength":1,"runningWork":[],"workRunningCount":0}
+[debug] [2026-05-05T06:00:53.505Z] [work-queue] {"queuedWork":[],"queueLength":0,"runningWork":["/travel-cents-3e2d9/us-central1/search_activity_alternatives-2026-05-05T06:00:53.505Z"],"workRunningCount":1}
+[debug] [2026-05-05T06:00:53.505Z] Accepted request POST /travel-cents-3e2d9/us-central1/search_activity_alternatives --> us-central1-search_activity_alternatives
+[debug] [2026-05-05T06:00:53.505Z] [functions] Runtime ready! Sending request! {"metadata":{"emulator":{"name":"functions"},"message":"[functions] Runtime ready! Sending request!"}}
+[debug] [2026-05-05T06:00:53.506Z] [functions] Got req.url=/travel-cents-3e2d9/us-central1/search_activity_alternatives, mapping to path=/ {"metadata":{"emulator":{"name":"functions"},"message":"[functions] Got req.url=/travel-cents-3e2d9/us-central1/search_activity_alternatives, mapping to path=/"}}
+[debug] [2026-05-05T06:00:53.506Z] [worker-pool] submitRequest(triggerId=us-central1-search_activity_alternatives) {"metadata":{"emulator":{"name":"functions"},"message":"[worker-pool] submitRequest(triggerId=us-central1-search_activity_alternatives)"}}
+[info] i  functions: Beginning execution of "us-central1-search_activity_alternatives" {"metadata":{"emulator":{"name":"functions"},"function":{"name":"us-central1-search_activity_alternatives"},"extension":{},"message":"Beginning execution of \"us-central1-search_activity_alternatives\""}}
+[debug] [2026-05-05T06:00:53.506Z] [worker-us-central1-search_activity_alternatives-b0f6371f-c6a2-4631-a708-22dd502856e2]: BUSY {"metadata":{"emulator":{"name":"functions"},"function":{"name":"us-central1-search_activity_alternatives"},"extension":{},"message":"[worker-us-central1-search_activity_alternatives-b0f6371f-c6a2-4631-a708-22dd502856e2]: BUSY"}}
+[info] >  Found 5 advisory alternatives for Tokyo. {"user":"Found 5 advisory alternatives for Tokyo.\r","metadata":{"emulator":{"name":"functions"},"function":{"name":"us-central1-search_activity_alternatives"},"extension":{},"message":"\u001b[90m> \u001b[39m Found 5 advisory alternatives for Tokyo.\r"}}
+[info] >  127.0.0.1 - - [05/May/2026 06:00:55] "POST / HTTP/1.1" 200 - {"user":"127.0.0.1 - - [05/May/2026 06:00:55] \"POST / HTTP/1.1\" 200 -\r","metadata":{"emulator":{"name":"functions"},"function":{"name":"us-central1-search_activity_alternatives"},"extension":{},"message":"\u001b[90m> \u001b[39m 127.0.0.1 - - [05/May/2026 06:00:55] \"POST / HTTP/1.1\" 200 -\r"}}
+[info] >  INFO:werkzeug:127.0.0.1 - - [05/May/2026 06:00:55] "POST / HTTP/1.1" 200 - {"user":"INFO:werkzeug:127.0.0.1 - - [05/May/2026 06:00:55] \"POST / HTTP/1.1\" 200 -\r","metadata":{"emulator":{"name":"functions"},"function":{"name":"us-central1-search_activity_alternatives"},"extension":{},"message":"\u001b[90m> \u001b[39m INFO:werkzeug:127.0.0.1 - - [05/May/2026 06:00:55] \"POST / HTTP/1.1\" 200 -\r"}}
+[debug] [2026-05-05T06:00:55.332Z] Finishing up request with event=pause {"metadata":{"emulator":{"name":"functions"},"function":{"name":"us-central1-search_activity_alternatives"},"extension":{},"message":"Finishing up request with event=pause"}}
+[info] i  functions: Finished "us-central1-search_activity_alternatives" in 1825.8416ms {"metadata":{"emulator":{"name":"functions"},"function":{"name":"us-central1-search_activity_alternatives"},"extension":{},"message":"Finished \"us-central1-search_activity_alternatives\" in 1825.8416ms"}}
+[debug] [2026-05-05T06:00:55.332Z] [worker-us-central1-search_activity_alternatives-b0f6371f-c6a2-4631-a708-22dd502856e2]: IDLE {"metadata":{"emulator":{"name":"functions"},"function":{"name":"us-central1-search_activity_alternatives"},"extension":{},"message":"[worker-us-central1-search_activity_alternatives-b0f6371f-c6a2-4631-a708-22dd502856e2]: IDLE"}}
+[debug] [2026-05-05T06:00:55.332Z] Finishing up request with event=finish {"metadata":{"emulator":{"name":"functions"},"function":{"name":"us-central1-search_activity_alternatives"},"extension":{},"message":"Finishing up request with event=finish"}}
+[debug] [2026-05-05T06:00:55.332Z] Finishing up request with event=close {"metadata":{"emulator":{"name":"functions"},"function":{"name":"us-central1-search_activity_alternatives"},"extension":{},"message":"Finishing up request with event=close"}}
+[debug] [2026-05-05T06:00:55.332Z] [work-queue] {"queuedWork":[],"queueLength":0,"runningWork":[],"workRunningCount":0}
+[debug] [2026-05-05T06:00:55.842Z] [work-queue] {"queuedWork":["/travel-cents-3e2d9/us-central1/search_activity_alternatives-2026-05-05T06:00:55.842Z"],"queueLength":1,"runningWork":[],"workRunningCount":0}
+[debug] [2026-05-05T06:00:55.842Z] [work-queue] {"queuedWork":[],"queueLength":0,"runningWork":["/travel-cents-3e2d9/us-central1/search_activity_alternatives-2026-05-05T06:00:55.842Z"],"workRunningCount":1}
+[debug] [2026-05-05T06:00:55.842Z] Accepted request POST /travel-cents-3e2d9/us-central1/search_activity_alternatives --> us-central1-search_activity_alternatives
+[debug] [2026-05-05T06:00:55.842Z] [functions] Runtime ready! Sending request! {"metadata":{"emulator":{"name":"functions"},"message":"[functions] Runtime ready! Sending request!"}}
+[debug] [2026-05-05T06:00:55.842Z] [functions] Got req.url=/travel-cents-3e2d9/us-central1/search_activity_alternatives, mapping to path=/ {"metadata":{"emulator":{"name":"functions"},"message":"[functions] Got req.url=/travel-cents-3e2d9/us-central1/search_activity_alternatives, mapping to path=/"}}
+[debug] [2026-05-05T06:00:55.842Z] [worker-pool] submitRequest(triggerId=us-central1-search_activity_alternatives) {"metadata":{"emulator":{"name":"functions"},"message":"[worker-pool] submitRequest(triggerId=us-central1-search_activity_alternatives)"}}
+[info] i  functions: Beginning execution of "us-central1-search_activity_alternatives" {"metadata":{"emulator":{"name":"functions"},"function":{"name":"us-central1-search_activity_alternatives"},"extension":{},"message":"Beginning execution of \"us-central1-search_activity_alternatives\""}}
+[debug] [2026-05-05T06:00:55.843Z] [worker-us-central1-search_activity_alternatives-b0f6371f-c6a2-4631-a708-22dd502856e2]: BUSY {"metadata":{"emulator":{"name":"functions"},"function":{"name":"us-central1-search_activity_alternatives"},"extension":{},"message":"[worker-us-central1-search_activity_alternatives-b0f6371f-c6a2-4631-a708-22dd502856e2]: BUSY"}}
+[info] >  Found 12 advisory alternatives for Tokyo. {"user":"Found 12 advisory alternatives for Tokyo.\r","metadata":{"emulator":{"name":"functions"},"function":{"name":"us-central1-search_activity_alternatives"},"extension":{},"message":"\u001b[90m> \u001b[39m Found 12 advisory alternatives for Tokyo.\r"}}
+[info] >  127.0.0.1 - - [05/May/2026 06:00:57] "POST / HTTP/1.1" 200 - {"user":"127.0.0.1 - - [05/May/2026 06:00:57] \"POST / HTTP/1.1\" 200 -\r","metadata":{"emulator":{"name":"functions"},"function":{"name":"us-central1-search_activity_alternatives"},"extension":{},"message":"\u001b[90m> \u001b[39m 127.0.0.1 - - [05/May/2026 06:00:57] \"POST / HTTP/1.1\" 200 -\r"}}
+[debug] [2026-05-05T06:00:57.714Z] Finishing up request with event=pause {"metadata":{"emulator":{"name":"functions"},"function":{"name":"us-central1-search_activity_alternatives"},"extension":{},"message":"Finishing up request with event=pause"}}
+[info] i  functions: Finished "us-central1-search_activity_alternatives" in 1871.1341ms {"metadata":{"emulator":{"name":"functions"},"function":{"name":"us-central1-search_activity_alternatives"},"extension":{},"message":"Finished \"us-central1-search_activity_alternatives\" in 1871.1341ms"}}
+[debug] [2026-05-05T06:00:57.714Z] [worker-us-central1-search_activity_alternatives-b0f6371f-c6a2-4631-a708-22dd502856e2]: IDLE {"metadata":{"emulator":{"name":"functions"},"function":{"name":"us-central1-search_activity_alternatives"},"extension":{},"message":"[worker-us-central1-search_activity_alternatives-b0f6371f-c6a2-4631-a708-22dd502856e2]: IDLE"}}
+[debug] [2026-05-05T06:00:57.714Z] Finishing up request with event=finish {"metadata":{"emulator":{"name":"functions"},"function":{"name":"us-central1-search_activity_alternatives"},"extension":{},"message":"Finishing up request with event=finish"}}
+[debug] [2026-05-05T06:00:57.714Z] Finishing up request with event=close {"metadata":{"emulator":{"name":"functions"},"function":{"name":"us-central1-search_activity_alternatives"},"extension":{},"message":"Finishing up request with event=close"}}
+[debug] [2026-05-05T06:00:57.714Z] [work-queue] {"queuedWork":[],"queueLength":0,"runningWork":[],"workRunningCount":0}
+[info] >  INFO:werkzeug:127.0.0.1 - - [05/May/2026 06:00:57] "POST / HTTP/1.1" 200 - {"user":"INFO:werkzeug:127.0.0.1 - - [05/May/2026 06:00:57] \"POST / HTTP/1.1\" 200 -\r","metadata":{"emulator":{"name":"functions"},"function":{"name":"us-central1-search_activity_alternatives"},"extension":{},"message":"\u001b[90m> \u001b[39m INFO:werkzeug:127.0.0.1 - - [05/May/2026 06:00:57] \"POST / HTTP/1.1\" 200 -\r"}}
+[debug] [2026-05-05T06:00:58.226Z] [work-queue] {"queuedWork":["/travel-cents-3e2d9/us-central1/search_activity_alternatives-2026-05-05T06:00:58.226Z"],"queueLength":1,"runningWork":[],"workRunningCount":0}
+[debug] [2026-05-05T06:00:58.226Z] [work-queue] {"queuedWork":[],"queueLength":0,"runningWork":["/travel-cents-3e2d9/us-central1/search_activity_alternatives-2026-05-05T06:00:58.226Z"],"workRunningCount":1}
+[debug] [2026-05-05T06:00:58.226Z] Accepted request POST /travel-cents-3e2d9/us-central1/search_activity_alternatives --> us-central1-search_activity_alternatives
+[debug] [2026-05-05T06:00:58.227Z] [functions] Runtime ready! Sending request! {"metadata":{"emulator":{"name":"functions"},"message":"[functions] Runtime ready! Sending request!"}}
+[debug] [2026-05-05T06:00:58.227Z] [functions] Got req.url=/travel-cents-3e2d9/us-central1/search_activity_alternatives, mapping to path=/ {"metadata":{"emulator":{"name":"functions"},"message":"[functions] Got req.url=/travel-cents-3e2d9/us-central1/search_activity_alternatives, mapping to path=/"}}
+[debug] [2026-05-05T06:00:58.227Z] [worker-pool] submitRequest(triggerId=us-central1-search_activity_alternatives) {"metadata":{"emulator":{"name":"functions"},"message":"[worker-pool] submitRequest(triggerId=us-central1-search_activity_alternatives)"}}
+[info] i  functions: Beginning execution of "us-central1-search_activity_alternatives" {"metadata":{"emulator":{"name":"functions"},"function":{"name":"us-central1-search_activity_alternatives"},"extension":{},"message":"Beginning execution of \"us-central1-search_activity_alternatives\""}}
+[debug] [2026-05-05T06:00:58.227Z] [worker-us-central1-search_activity_alternatives-b0f6371f-c6a2-4631-a708-22dd502856e2]: BUSY {"metadata":{"emulator":{"name":"functions"},"function":{"name":"us-central1-search_activity_alternatives"},"extension":{},"message":"[worker-us-central1-search_activity_alternatives-b0f6371f-c6a2-4631-a708-22dd502856e2]: BUSY"}}
+[info] >  Found 5 advisory alternatives for Tokyo. {"user":"Found 5 advisory alternatives for Tokyo.\r","metadata":{"emulator":{"name":"functions"},"function":{"name":"us-central1-search_activity_alternatives"},"extension":{},"message":"\u001b[90m> \u001b[39m Found 5 advisory alternatives for Tokyo.\r"}}
+[info] >  127.0.0.1 - - [05/May/2026 06:01:00] "POST / HTTP/1.1" 200 - {"user":"127.0.0.1 - - [05/May/2026 06:01:00] \"POST / HTTP/1.1\" 200 -\r","metadata":{"emulator":{"name":"functions"},"function":{"name":"us-central1-search_activity_alternatives"},"extension":{},"message":"\u001b[90m> \u001b[39m 127.0.0.1 - - [05/May/2026 06:01:00] \"POST / HTTP/1.1\" 200 -\r"}}
+[info] >  INFO:werkzeug:127.0.0.1 - - [05/May/2026 06:01:00] "POST / HTTP/1.1" 200 - {"user":"INFO:werkzeug:127.0.0.1 - - [05/May/2026 06:01:00] \"POST / HTTP/1.1\" 200 -\r","metadata":{"emulator":{"name":"functions"},"function":{"name":"us-central1-search_activity_alternatives"},"extension":{},"message":"\u001b[90m> \u001b[39m INFO:werkzeug:127.0.0.1 - - [05/May/2026 06:01:00] \"POST / HTTP/1.1\" 200 -\r"}}
+[debug] [2026-05-05T06:01:00.095Z] Finishing up request with event=pause {"metadata":{"emulator":{"name":"functions"},"function":{"name":"us-central1-search_activity_alternatives"},"extension":{},"message":"Finishing up request with event=pause"}}
+[info] i  functions: Finished "us-central1-search_activity_alternatives" in 1868.4325ms {"metadata":{"emulator":{"name":"functions"},"function":{"name":"us-central1-search_activity_alternatives"},"extension":{},"message":"Finished \"us-central1-search_activity_alternatives\" in 1868.4325ms"}}
+[debug] [2026-05-05T06:01:00.096Z] [worker-us-central1-search_activity_alternatives-b0f6371f-c6a2-4631-a708-22dd502856e2]: IDLE {"metadata":{"emulator":{"name":"functions"},"function":{"name":"us-central1-search_activity_alternatives"},"extension":{},"message":"[worker-us-central1-search_activity_alternatives-b0f6371f-c6a2-4631-a708-22dd502856e2]: IDLE"}}
+[debug] [2026-05-05T06:01:00.096Z] Finishing up request with event=finish {"metadata":{"emulator":{"name":"functions"},"function":{"name":"us-central1-search_activity_alternatives"},"extension":{},"message":"Finishing up request with event=finish"}}
+[debug] [2026-05-05T06:01:00.096Z] Finishing up request with event=close {"metadata":{"emulator":{"name":"functions"},"function":{"name":"us-central1-search_activity_alternatives"},"extension":{},"message":"Finishing up request with event=close"}}
+[debug] [2026-05-05T06:01:00.096Z] [work-queue] {"queuedWork":[],"queueLength":0,"runningWork":[],"workRunningCount":0}
+[debug] [2026-05-05T06:01:00.612Z] [work-queue] {"queuedWork":["/travel-cents-3e2d9/us-central1/search_activity_alternatives-2026-05-05T06:01:00.612Z"],"queueLength":1,"runningWork":[],"workRunningCount":0}
+[debug] [2026-05-05T06:01:00.612Z] [work-queue] {"queuedWork":[],"queueLength":0,"runningWork":["/travel-cents-3e2d9/us-central1/search_activity_alternatives-2026-05-05T06:01:00.612Z"],"workRunningCount":1}
+[debug] [2026-05-05T06:01:00.612Z] Accepted request POST /travel-cents-3e2d9/us-central1/search_activity_alternatives --> us-central1-search_activity_alternatives
+[debug] [2026-05-05T06:01:00.612Z] [functions] Runtime ready! Sending request! {"metadata":{"emulator":{"name":"functions"},"message":"[functions] Runtime ready! Sending request!"}}
+[debug] [2026-05-05T06:01:00.612Z] [functions] Got req.url=/travel-cents-3e2d9/us-central1/search_activity_alternatives, mapping to path=/ {"metadata":{"emulator":{"name":"functions"},"message":"[functions] Got req.url=/travel-cents-3e2d9/us-central1/search_activity_alternatives, mapping to path=/"}}
+[debug] [2026-05-05T06:01:00.612Z] [worker-pool] submitRequest(triggerId=us-central1-search_activity_alternatives) {"metadata":{"emulator":{"name":"functions"},"message":"[worker-pool] submitRequest(triggerId=us-central1-search_activity_alternatives)"}}
+[info] i  functions: Beginning execution of "us-central1-search_activity_alternatives" {"metadata":{"emulator":{"name":"functions"},"function":{"name":"us-central1-search_activity_alternatives"},"extension":{},"message":"Beginning execution of \"us-central1-search_activity_alternatives\""}}
+[debug] [2026-05-05T06:01:00.613Z] [worker-us-central1-search_activity_alternatives-b0f6371f-c6a2-4631-a708-22dd502856e2]: BUSY {"metadata":{"emulator":{"name":"functions"},"function":{"name":"us-central1-search_activity_alternatives"},"extension":{},"message":"[worker-us-central1-search_activity_alternatives-b0f6371f-c6a2-4631-a708-22dd502856e2]: BUSY"}}
+[info] >  Found 12 advisory alternatives for Tokyo. {"user":"Found 12 advisory alternatives for Tokyo.\r","metadata":{"emulator":{"name":"functions"},"function":{"name":"us-central1-search_activity_alternatives"},"extension":{},"message":"\u001b[90m> \u001b[39m Found 12 advisory alternatives for Tokyo.\r"}}
+[info] >  127.0.0.1 - - [05/May/2026 06:01:02] "POST / HTTP/1.1" 200 - {"user":"127.0.0.1 - - [05/May/2026 06:01:02] \"POST / HTTP/1.1\" 200 -\r","metadata":{"emulator":{"name":"functions"},"function":{"name":"us-central1-search_activity_alternatives"},"extension":{},"message":"\u001b[90m> \u001b[39m 127.0.0.1 - - [05/May/2026 06:01:02] \"POST / HTTP/1.1\" 200 -\r"}}
+[info] >  INFO:werkzeug:127.0.0.1 - - [05/May/2026 06:01:02] "POST / HTTP/1.1" 200 - {"user":"INFO:werkzeug:127.0.0.1 - - [05/May/2026 06:01:02] \"POST / HTTP/1.1\" 200 -\r","metadata":{"emulator":{"name":"functions"},"function":{"name":"us-central1-search_activity_alternatives"},"extension":{},"message":"\u001b[90m> \u001b[39m INFO:werkzeug:127.0.0.1 - - [05/May/2026 06:01:02] \"POST / HTTP/1.1\" 200 -\r"}}
+[debug] [2026-05-05T06:01:02.736Z] Finishing up request with event=pause {"metadata":{"emulator":{"name":"functions"},"function":{"name":"us-central1-search_activity_alternatives"},"extension":{},"message":"Finishing up request with event=pause"}}
+[info] i  functions: Finished "us-central1-search_activity_alternatives" in 2123.7351ms {"metadata":{"emulator":{"name":"functions"},"function":{"name":"us-central1-search_activity_alternatives"},"extension":{},"message":"Finished \"us-central1-search_activity_alternatives\" in 2123.7351ms"}}
+[debug] [2026-05-05T06:01:02.737Z] [worker-us-central1-search_activity_alternatives-b0f6371f-c6a2-4631-a708-22dd502856e2]: IDLE {"metadata":{"emulator":{"name":"functions"},"function":{"name":"us-central1-search_activity_alternatives"},"extension":{},"message":"[worker-us-central1-search_activity_alternatives-b0f6371f-c6a2-4631-a708-22dd502856e2]: IDLE"}}
+[debug] [2026-05-05T06:01:02.737Z] Finishing up request with event=finish {"metadata":{"emulator":{"name":"functions"},"function":{"name":"us-central1-search_activity_alternatives"},"extension":{},"message":"Finishing up request with event=finish"}}
+[debug] [2026-05-05T06:01:02.737Z] Finishing up request with event=close {"metadata":{"emulator":{"name":"functions"},"function":{"name":"us-central1-search_activity_alternatives"},"extension":{},"message":"Finishing up request with event=close"}}
+[debug] [2026-05-05T06:01:02.737Z] [work-queue] {"queuedWork":[],"queueLength":0,"runningWork":[],"workRunningCount":0}
+[debug] [2026-05-05T06:01:03.258Z] [work-queue] {"queuedWork":["/travel-cents-3e2d9/us-central1/search_activity_alternatives-2026-05-05T06:01:03.258Z"],"queueLength":1,"runningWork":[],"workRunningCount":0}
+[debug] [2026-05-05T06:01:03.258Z] [work-queue] {"queuedWork":[],"queueLength":0,"runningWork":["/travel-cents-3e2d9/us-central1/search_activity_alternatives-2026-05-05T06:01:03.258Z"],"workRunningCount":1}
+[debug] [2026-05-05T06:01:03.258Z] Accepted request POST /travel-cents-3e2d9/us-central1/search_activity_alternatives --> us-central1-search_activity_alternatives
+[debug] [2026-05-05T06:01:03.259Z] [functions] Runtime ready! Sending request! {"metadata":{"emulator":{"name":"functions"},"message":"[functions] Runtime ready! Sending request!"}}
+[debug] [2026-05-05T06:01:03.259Z] [functions] Got req.url=/travel-cents-3e2d9/us-central1/search_activity_alternatives, mapping to path=/ {"metadata":{"emulator":{"name":"functions"},"message":"[functions] Got req.url=/travel-cents-3e2d9/us-central1/search_activity_alternatives, mapping to path=/"}}
+[debug] [2026-05-05T06:01:03.259Z] [worker-pool] submitRequest(triggerId=us-central1-search_activity_alternatives) {"metadata":{"emulator":{"name":"functions"},"message":"[worker-pool] submitRequest(triggerId=us-central1-search_activity_alternatives)"}}
+[info] i  functions: Beginning execution of "us-central1-search_activity_alternatives" {"metadata":{"emulator":{"name":"functions"},"function":{"name":"us-central1-search_activity_alternatives"},"extension":{},"message":"Beginning execution of \"us-central1-search_activity_alternatives\""}}
+[debug] [2026-05-05T06:01:03.259Z] [worker-us-central1-search_activity_alternatives-b0f6371f-c6a2-4631-a708-22dd502856e2]: BUSY {"metadata":{"emulator":{"name":"functions"},"function":{"name":"us-central1-search_activity_alternatives"},"extension":{},"message":"[worker-us-central1-search_activity_alternatives-b0f6371f-c6a2-4631-a708-22dd502856e2]: BUSY"}}
+[info] >  Found 5 advisory alternatives for Tokyo. {"user":"Found 5 advisory alternatives for Tokyo.\r","metadata":{"emulator":{"name":"functions"},"function":{"name":"us-central1-search_activity_alternatives"},"extension":{},"message":"\u001b[90m> \u001b[39m Found 5 advisory alternatives for Tokyo.\r"}}
+[info] >  127.0.0.1 - - [05/May/2026 06:01:05] "POST / HTTP/1.1" 200 - {"user":"127.0.0.1 - - [05/May/2026 06:01:05] \"POST / HTTP/1.1\" 200 -\r","metadata":{"emulator":{"name":"functions"},"function":{"name":"us-central1-search_activity_alternatives"},"extension":{},"message":"\u001b[90m> \u001b[39m 127.0.0.1 - - [05/May/2026 06:01:05] \"POST / HTTP/1.1\" 200 -\r"}}
+[info] >  INFO:werkzeug:127.0.0.1 - - [05/May/2026 06:01:05] "POST / HTTP/1.1" 200 - {"user":"INFO:werkzeug:127.0.0.1 - - [05/May/2026 06:01:05] \"POST / HTTP/1.1\" 200 -\r","metadata":{"emulator":{"name":"functions"},"function":{"name":"us-central1-search_activity_alternatives"},"extension":{},"message":"\u001b[90m> \u001b[39m INFO:werkzeug:127.0.0.1 - - [05/May/2026 06:01:05] \"POST / HTTP/1.1\" 200 -\r"}}
+[debug] [2026-05-05T06:01:05.330Z] Finishing up request with event=pause {"metadata":{"emulator":{"name":"functions"},"function":{"name":"us-central1-search_activity_alternatives"},"extension":{},"message":"Finishing up request with event=pause"}}
+[info] i  functions: Finished "us-central1-search_activity_alternatives" in 2071.2277ms {"metadata":{"emulator":{"name":"functions"},"function":{"name":"us-central1-search_activity_alternatives"},"extension":{},"message":"Finished \"us-central1-search_activity_alternatives\" in 2071.2277ms"}}
+[debug] [2026-05-05T06:01:05.331Z] [worker-us-central1-search_activity_alternatives-b0f6371f-c6a2-4631-a708-22dd502856e2]: IDLE {"metadata":{"emulator":{"name":"functions"},"function":{"name":"us-central1-search_activity_alternatives"},"extension":{},"message":"[worker-us-central1-search_activity_alternatives-b0f6371f-c6a2-4631-a708-22dd502856e2]: IDLE"}}
+[debug] [2026-05-05T06:01:05.331Z] Finishing up request with event=finish {"metadata":{"emulator":{"name":"functions"},"function":{"name":"us-central1-search_activity_alternatives"},"extension":{},"message":"Finishing up request with event=finish"}}
+[debug] [2026-05-05T06:01:05.331Z] Finishing up request with event=close {"metadata":{"emulator":{"name":"functions"},"function":{"name":"us-central1-search_activity_alternatives"},"extension":{},"message":"Finishing up request with event=close"}}
+[debug] [2026-05-05T06:01:05.331Z] [work-queue] {"queuedWork":[],"queueLength":0,"runningWork":[],"workRunningCount":0}
