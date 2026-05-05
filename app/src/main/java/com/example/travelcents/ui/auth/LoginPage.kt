@@ -321,7 +321,7 @@ fun LoginPage(modifier: Modifier = Modifier, navController: NavController, authV
         Spacer(modifier = Modifier.height(16.dp))
 
         GoogleAuthButton(
-            text = "Signin with Google",
+            text = "Sign in with Google",
             authViewModel = authViewModel,
             enabled = !isLoading,
             fontFamily = TravelCentsFonts.Body
