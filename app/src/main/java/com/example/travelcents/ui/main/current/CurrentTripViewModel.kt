@@ -143,12 +143,14 @@ data class CurrentTripUiState(
 sealed class PreviewSource {
     data class CuratedStarter(
         val starter: AiCuratedTripStarter,
-        val intakeProfile: AiTripIntakeProfile
+        val intakeProfile: AiTripIntakeProfile,
+        val addedEvents: List<TravelEvent> = emptyList()
     ) : PreviewSource()
 
     data class DestinationLock(
         val destination: String,
-        val intakeProfile: AiTripIntakeProfile
+        val intakeProfile: AiTripIntakeProfile,
+        val addedEvents: List<TravelEvent> = emptyList()
     ) : PreviewSource()
 }
 
@@ -1856,7 +1858,7 @@ class CurrentTripViewModel(application: Application) : AndroidViewModel(applicat
                     intakeProfile = source.intakeProfile,
                     viewerUid = viewerUid
                 )
-                applyPreview(viewerUid = viewerUid, preview = preview)
+                applyPreview(viewerUid = viewerUid, preview = preview.withAddedEvents(source.addedEvents))
             }
 
             is PreviewSource.DestinationLock -> {
@@ -1865,9 +1867,30 @@ class CurrentTripViewModel(application: Application) : AndroidViewModel(applicat
                     intakeProfile = source.intakeProfile,
                     viewerUid = viewerUid
                 )
-                applyPreview(viewerUid = viewerUid, preview = preview)
+                applyPreview(viewerUid = viewerUid, preview = preview.withAddedEvents(source.addedEvents))
             }
         }
+    }
+
+    private fun com.example.travelcents.data.ai.chat.PreviewTrip.withAddedEvents(
+        addedEvents: List<TravelEvent>
+    ): com.example.travelcents.data.ai.chat.PreviewTrip {
+        if (addedEvents.isEmpty()) return this
+        val normalizedAddedEvents = addedEvents.map { event ->
+            event.copy(
+                itineraryId = itinerary.itineraryId,
+                eventId = event.eventId.ifBlank { UUID.randomUUID().toString() }
+            )
+        }
+        val mergedEvents = (events + normalizedAddedEvents).distinctBy { event ->
+            event.detailValue(DETAIL_YELP_ID)?.takeIf(String::isNotBlank)
+                ?: event.selectedOptionId.takeIf(String::isNotBlank)
+                ?: event.eventId
+        }
+        return copy(
+            itinerary = itinerary.copy(eventIds = mergedEvents.map(TravelEvent::eventId)),
+            events = mergedEvents
+        )
     }
 
     private fun applyPreview(
@@ -2185,4 +2208,3 @@ class CurrentTripViewModel(application: Application) : AndroidViewModel(applicat
         super.onCleared()
     }
 }
-

@@ -263,18 +263,18 @@ private fun ItineraryDateHeader(date: String) {
 }
 
 @Composable
-private fun CurrentTripItineraryCard(
+fun CurrentTripItineraryCard(
     event: TravelEvent,
     isLast: Boolean,
-    canEditTrip: Boolean,
-    hasAlternatives: Boolean,
-    isDragging: Boolean,
-    jiggleMode: Boolean,
-    wobbleAngle: Float,
-    modifier: Modifier,
+    canEditTrip: Boolean = false,
+    hasAlternatives: Boolean = false,
+    isDragging: Boolean = false,
+    jiggleMode: Boolean = false,
+    wobbleAngle: Float = 0f,
+    modifier: Modifier = Modifier,
     onCardClick: () -> Unit,
-    onDeleteClick: () -> Unit,
-    onAlternativesClick: () -> Unit
+    onDeleteClick: () -> Unit = {},
+    onAlternativesClick: () -> Unit = {}
 ) {
     val context = LocalContext.current
     val accent = eventPalette(event).accent
@@ -551,4 +551,3 @@ private fun formatItineraryHeaderDate(dateStr: String): String {
         dateStr
     }
 }
-

@@ -57,6 +57,7 @@ import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.travelcents.data.ai.chat.AiChatCardOption
 import com.example.travelcents.data.ai.chat.AiChatItem
+import com.example.travelcents.data.ai.chat.AiChatPreviewDraft
 import com.example.travelcents.data.ai.chat.AiCuratedTripStarter
 import com.example.travelcents.data.ai.chat.AiDestinationRecommendation
 import com.example.travelcents.data.ai.chat.AiTripIntakeProfile
@@ -86,7 +87,8 @@ fun AiTripChatPage(
     modifier: Modifier = Modifier,
     onBackClick: () -> Unit = {},
     onOpenTrip: (TripKey) -> Unit = {},
-    onOpenPreviewTrip: () -> Unit = {},
+    onOpenPreviewTrip: (AiChatPreviewDraft?) -> Unit = {},
+    onPreviewDraftChanged: (AiChatPreviewDraft?) -> Unit = {},
     onStarterSelected: (AiCuratedTripStarter, AiTripIntakeProfile) -> Unit = { _, _ -> },
     onDestinationLocked: (AiDestinationRecommendation, AiTripIntakeProfile) -> Unit = { _, _ -> },
     onAddEventToPreview: (TravelEvent) -> Unit = {},
@@ -108,6 +110,10 @@ fun AiTripChatPage(
         derivedStateOf {
             !uiState.isLoading && uiState.items.none { it is AiChatItem.TextMessage }
         }
+    }
+
+    LaunchedEffect(uiState.previewDraft) {
+        onPreviewDraftChanged(uiState.previewDraft)
     }
 
     LaunchedEffect(
@@ -231,7 +237,7 @@ fun AiTripChatPage(
                 AiChatLockedDestinationBanner(
                     destination = uiState.lockedDestination,
                     imageUrl = uiState.lockedDestinationImageUrl,
-                    onOpenTrip = onOpenPreviewTrip
+                    onOpenTrip = { onOpenPreviewTrip(uiState.previewDraft) }
                 )
 
                 LazyColumn(
@@ -355,7 +361,7 @@ fun AiTripChatPage(
                                     card = item,
                                     enabled = !uiState.isLoading && !item.answered,
                                     onSubmit = { answers ->
-                                        viewModel.submitPreferenceQuestionAnswer(item, answers)
+                                        viewModel.answerPreferenceQuestion(item.id, answers)
                                     }
                                 )
                             }
@@ -373,7 +379,8 @@ fun AiTripChatPage(
                                     },
                                     onBookmark = viewModel::bookmarkSuggestion,
                                     onSkip = viewModel::skipSuggestion,
-                                    onLoadMore = { viewModel.requestMoreSuggestions(item) }
+                                    onLoadMore = { viewModel.requestMoreSuggestions(item) },
+                                    tripDestination = uiState.lockedDestination.orEmpty()
                                 )
                             }
 

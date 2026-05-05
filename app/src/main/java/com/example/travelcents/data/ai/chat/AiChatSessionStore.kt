@@ -16,15 +16,22 @@ data class PersistedAiChatSnapshot(
     val intakeProfile: AiTripIntakeProfile? = null,
     val planningObjective: String = "",
     val stage: AiChatStage = AiChatStage.ONBOARDING,
+    val preferenceProfile: PreferenceProfile? = null,
+    val discoveryTrack: DiscoveryTrack? = null,
+    val discoverySlots: List<DiscoverySlot>? = null,
+    val discoverySuggestionPool: List<SuggestionItem>? = null,
     val llmHistory: List<LlmMessage> = emptyList(),
     val askedFollowUpGroupIds: List<String> = emptyList(),
     val activeResponseCardGroup: PersistedAiChatCardGroup? = null,
     val activeDestinationRecommendationRow: PersistedAiDestinationRecommendationRow? = null,
     val activeCuratedTripRow: PersistedAiCuratedTripRow? = null,
     val activePlaceRecommendationRow: PersistedAiPlaceRecommendationRow? = null,
+    val activePreferenceQuestionCard: AiChatItem.PreferenceQuestionCard? = null,
+    val activeSuggestionCarouselCard: AiChatItem.SuggestionCarouselCard? = null,
     val anchorMessageId: String? = null,
     val lockedDestination: String? = null,
-    val lockedDestinationImageUrl: String? = null
+    val lockedDestinationImageUrl: String? = null,
+    val previewDraft: AiChatPreviewDraft? = null
 )
 
 data class PersistedAiChatMessage(
