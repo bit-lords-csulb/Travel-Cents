@@ -210,11 +210,14 @@ class CurrentTripViewModel(application: Application) : AndroidViewModel(applicat
 
     private val _advisories = MutableStateFlow<List<TripAdvisory>>(emptyList())
     val advisories: StateFlow<List<TripAdvisory>> = _advisories.asStateFlow()
+    private val _advisoryEvaluationInProgress = MutableStateFlow(false)
+    val advisoryEvaluationInProgress: StateFlow<Boolean> = _advisoryEvaluationInProgress.asStateFlow()
 
     private val _isAdvisoryDemoModeEnabled = MutableStateFlow(false)
     val isAdvisoryDemoModeEnabled: StateFlow<Boolean> = _isAdvisoryDemoModeEnabled.asStateFlow()
     private val dismissedAdvisoryKeys = mutableSetOf<String>()
     private val acceptedAdvisoryOptionNames = mutableSetOf<String>()
+    private var advisoryEvaluationRunId = 0
 
     private val _shareTargets = MutableStateFlow<List<ShareTarget>>(emptyList())
     val shareTargets: StateFlow<List<ShareTarget>> = _shareTargets.asStateFlow()
@@ -278,6 +281,7 @@ class CurrentTripViewModel(application: Application) : AndroidViewModel(applicat
         currentTripOptionsJob = null
         advisoryEvaluationJob?.cancel()
         advisoryEvaluationJob = null
+        advisoryEvaluationRunId++
         currentTripKey = null
         currentTripSummary = null
         currentTripDestination = ""
@@ -295,6 +299,7 @@ class CurrentTripViewModel(application: Application) : AndroidViewModel(applicat
         _yelpEnrichmentInFlight.value = emptySet()
         _restaurantLiveContextInFlight.value = emptySet()
         _advisories.value = emptyList()
+        _advisoryEvaluationInProgress.value = false
         dismissedAdvisoryKeys.clear()
         acceptedAdvisoryOptionNames.clear()
         _shareTargets.value = emptyList()
@@ -631,6 +636,8 @@ class CurrentTripViewModel(application: Application) : AndroidViewModel(applicat
         if (!enabled) {
             advisoryEvaluationJob?.cancel()
             advisoryEvaluationJob = null
+            advisoryEvaluationRunId++
+            _advisoryEvaluationInProgress.value = false
             _advisories.value = emptyList()
             dismissedAdvisoryKeys.clear()
             removeUnselectedDemoAdvisoryOptions()
@@ -708,8 +715,10 @@ class CurrentTripViewModel(application: Application) : AndroidViewModel(applicat
             return
         }
 
+        val runId = ++advisoryEvaluationRunId
         advisoryEvaluationJob?.cancel()
         advisoryEvaluationJob = viewModelScope.launch {
+            _advisoryEvaluationInProgress.value = true
             try {
                 val evaluated = demoAdvisoryEngine.evaluate(
                     trip = summary,
@@ -722,6 +731,10 @@ class CurrentTripViewModel(application: Application) : AndroidViewModel(applicat
                 _advisories.value = evaluated
             } catch (e: Exception) {
                 Log.w("CurrentTripViewModel", "Failed to evaluate demo advisories", e)
+            } finally {
+                if (advisoryEvaluationRunId == runId) {
+                    _advisoryEvaluationInProgress.value = false
+                }
             }
         }
     }

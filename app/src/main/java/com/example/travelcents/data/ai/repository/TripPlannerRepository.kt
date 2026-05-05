@@ -4,8 +4,10 @@ import com.example.travelcents.BuildConfig
 import com.example.travelcents.data.media.StaticMapUrlFactory
 import com.example.travelcents.data.ai.model.LlmMessage
 import com.example.travelcents.data.ai.remote.LlmClient
+import com.example.travelcents.data.ai.remote.LlmConfig
 import com.example.travelcents.data.trip.advisory.ActivityEnvironmentClassifier
 import com.example.travelcents.data.trip.advisory.ActivityEnvironmentMetadata
+import com.example.travelcents.data.trip.local.AirportTimeZones
 import com.example.travelcents.data.trip.local.DestinationTimeZones
 import com.example.travelcents.data.trip.model.ATTR_ACTIVITY_ENVIRONMENT
 import com.example.travelcents.data.trip.model.ATTR_ADVISORY_REASON
@@ -37,10 +39,14 @@ import com.google.gson.JsonObject
 import com.google.gson.annotations.SerializedName
 import okhttp3.OkHttpClient
 import okhttp3.logging.HttpLoggingInterceptor
+import retrofit2.HttpException
 import retrofit2.Retrofit
 import retrofit2.converter.gson.GsonConverterFactory
 import retrofit2.http.Body
 import retrofit2.http.POST
+import java.time.Instant
+import java.time.LocalDate
+import java.time.temporal.ChronoUnit
 import java.util.Locale
 import java.util.UUID
 import java.util.concurrent.TimeUnit
@@ -192,15 +198,28 @@ object TripPlannerRepository {
         .create(EmulatorApiService::class.java)
 
     suspend fun generateItinerary(request: TravelRequest): Itinerary {
-        val raw = LlmClient.complete(
-            messages = listOf(
-                LlmMessage(role = "system", content = SYSTEM_PROMPT),
-                LlmMessage(role = "user", content = buildItineraryPrompt(request))
-            ),
-            maxTokens = 4096,
-            responseFormat = mapOf("type" to "json_object")
-        )
-        return parseItinerary(raw, request.userId)
+        if (LlmConfig.apiKey.isBlank()) {
+            return buildLocalItinerary(request)
+        }
+
+        val raw = try {
+            LlmClient.complete(
+                messages = listOf(
+                    LlmMessage(role = "system", content = SYSTEM_PROMPT),
+                    LlmMessage(role = "user", content = buildItineraryPrompt(request))
+                ),
+                model = LlmConfig.intakeModel,
+                temperature = 0.2,
+                maxTokens = 768,
+                responseFormat = mapOf("type" to "json_object")
+            )
+        } catch (error: HttpException) {
+            if (error.code() == 429) return buildLocalItinerary(request)
+            throw error
+        }
+
+        return runCatching { parseItinerary(raw, request.userId) }
+            .getOrElse { buildLocalItinerary(request) }
     }
 
     suspend fun getAIActivities(
@@ -966,4 +985,128 @@ Return a single JSON object with these fields only:
             eventIds = emptyList()
         )
     }
+
+    private fun buildLocalItinerary(request: TravelRequest): Itinerary {
+        val destination = request.destination.trim()
+        val origin = request.origin.trim()
+        val destinationIata = resolveAirportCode(destination)
+        val originIata = resolveAirportCode(origin)
+
+        return Itinerary(
+            itineraryId = UUID.randomUUID().toString(),
+            userId = request.userId,
+            tripName = defaultTripNameForDestination(destination),
+            destination = destination,
+            origin = origin,
+            originIata = originIata,
+            destinationIata = destinationIata,
+            timeZoneId = DestinationTimeZones.resolveTimeZoneId(
+                destination = destination,
+                destinationIata = destinationIata
+            ).orEmpty(),
+            dateFrom = request.dateFrom,
+            dateTo = request.dateTo,
+            durationDays = calculateDurationDays(request.dateFrom, request.dateTo),
+            currency = request.currency.ifBlank { "USD" },
+            travelStyle = request.travelStyle.ifBlank { "comfort" },
+            adults = request.adults,
+            children = request.children,
+            createdAt = Instant.now().toString(),
+            status = "draft",
+            eventIds = emptyList()
+        )
+    }
+
+    private fun calculateDurationDays(dateFrom: String, dateTo: String): Int {
+        return runCatching {
+            val start = LocalDate.parse(dateFrom)
+            val end = LocalDate.parse(dateTo)
+            (ChronoUnit.DAYS.between(start, end).toInt() + 1).coerceAtLeast(1)
+        }.getOrDefault(1)
+    }
+
+    private fun resolveAirportCode(location: String): String {
+        val directCode = location.trim().uppercase(Locale.US)
+        if (directCode.length == 3 && directCode.all(Char::isLetter) &&
+            AirportTimeZones.zoneIdForIataOrNull(directCode) != null
+        ) {
+            return directCode
+        }
+
+        return normalizedLocationKeys(location)
+            .firstNotNullOfOrNull { key -> CITY_AIRPORT_CODES[key] }
+            .orEmpty()
+    }
+
+    private fun normalizedLocationKeys(location: String): List<String> {
+        val normalized = normalizeLocationKey(location)
+        val cityOnly = normalizeLocationKey(location.substringBefore(","))
+        return listOf(
+            normalized,
+            cityOnly,
+            normalized.removeSuffix(" united states"),
+            normalized.removeSuffix(" usa"),
+            normalized.removeSuffix(" united kingdom"),
+            normalized.removeSuffix(" uk"),
+            normalized.removeSuffix(" france"),
+            normalized.removeSuffix(" australia"),
+            normalized.removeSuffix(" japan"),
+            normalized.removeSuffix(" canada"),
+            normalized.removeSuffix(" spain"),
+            normalized.removeSuffix(" italy"),
+            normalized.removeSuffix(" netherlands"),
+            normalized.removeSuffix(" thailand"),
+            normalized.removeSuffix(" singapore"),
+            normalized.removeSuffix(" south korea"),
+            normalized.removeSuffix(" turkey"),
+            normalized.removeSuffix(" portugal"),
+            normalized.removeSuffix(" austria"),
+            normalized.removeSuffix(" germany")
+        ).filter { it.isNotBlank() }.distinct()
+    }
+
+    private fun normalizeLocationKey(value: String): String {
+        return value
+            .lowercase(Locale.US)
+            .replace("&", "and")
+            .replace(".", " ")
+            .replace(",", " ")
+            .replace(Regex("[^a-z0-9\\s]+"), " ")
+            .replace(Regex("\\s+"), " ")
+            .trim()
+    }
+
+    private val CITY_AIRPORT_CODES = mapOf(
+        "anaheim" to "SNA",
+        "orange county" to "SNA",
+        "westminster" to "SNA",
+        "los angeles" to "LAX",
+        "san francisco" to "SFO",
+        "las vegas" to "LAS",
+        "chicago" to "ORD",
+        "miami" to "MIA",
+        "new york" to "JFK",
+        "new york city" to "JFK",
+        "toronto" to "YYZ",
+        "london" to "LHR",
+        "paris" to "CDG",
+        "amsterdam" to "AMS",
+        "rome" to "FCO",
+        "barcelona" to "BCN",
+        "singapore" to "SIN",
+        "bangkok" to "BKK",
+        "seoul" to "ICN",
+        "sydney" to "SYD",
+        "hong kong" to "HKG",
+        "istanbul" to "IST",
+        "prague" to "PRG",
+        "lisbon" to "LIS",
+        "vienna" to "VIE",
+        "berlin" to "BER",
+        "tokyo" to "HND",
+        "cairo" to "CAI",
+        "cancun" to "CUN",
+        "bali" to "DPS",
+        "honolulu" to "HNL"
+    )
 }

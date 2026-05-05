@@ -21,6 +21,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
@@ -201,6 +202,7 @@ fun TripAdvisoryReviewSheet(
     advisory: TripAdvisory,
     event: TravelEvent,
     canEditTrip: Boolean,
+    isLoadingSuggestions: Boolean = false,
     onReplaceOption: (optionId: String) -> Unit,
     onSaveOption: (optionId: String) -> Unit,
     onDismissAdvisory: () -> Unit,
@@ -277,7 +279,27 @@ fun TripAdvisoryReviewSheet(
                 fontWeight = FontWeight.Bold
             )
             Spacer(modifier = Modifier.height(8.dp))
-            if (advisory.suggestedOptions.isEmpty()) {
+            if (isLoadingSuggestions) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(vertical = 10.dp),
+                    horizontalArrangement = Arrangement.spacedBy(10.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    CircularProgressIndicator(
+                        modifier = Modifier.size(18.dp),
+                        color = accent,
+                        strokeWidth = 2.dp
+                    )
+                    Text(
+                        text = "Finding weather-safe alternatives...",
+                        color = DeepSea4,
+                        fontSize = 12.sp,
+                        lineHeight = 16.sp
+                    )
+                }
+            } else if (advisory.suggestedOptions.isEmpty()) {
                 Text(
                     text = "No live inventory alternatives found yet.",
                     color = DeepSea4,

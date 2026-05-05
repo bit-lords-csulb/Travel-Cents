@@ -6,7 +6,7 @@ import re
 import requests
 import json
 import unicodedata
-from groq import Groq
+from groq import APIStatusError, Groq
 from pinecone import Pinecone
 from dotenv import load_dotenv
 
@@ -185,6 +185,108 @@ def hydrate_option_images(option, viator_key):
         option["image_url"] = image_urls[0]
         option["photo_urls"] = image_urls[:5]
     return option
+
+
+def build_fallback_raw_itinerary(req_data, target_city):
+    activity_dates = req_data.get("activityDates") or []
+    day_count = len(activity_dates) if isinstance(activity_dates, list) else 0
+    target_count = max(4, min(8, day_count * 2 if day_count else 5))
+    templates = [
+        (
+            "Covered Market and Food Hall in {city}",
+            "Sample local food stalls and protected market spaces that still work when the weather turns.",
+            "10:00",
+            "12:00",
+            "indoor",
+            "none",
+            "medium",
+        ),
+        (
+            "{city} Museum or Gallery Afternoon",
+            "Spend time inside a highly rated museum or gallery that fits the trip interests.",
+            "13:30",
+            "15:30",
+            "indoor",
+            "none",
+            "medium",
+        ),
+        (
+            "{city} Waterfront Walk",
+            "Take a scenic outdoor walk near the water with flexible timing and easy cancellation if rain arrives.",
+            "16:00",
+            "17:30",
+            "outdoor",
+            "rain",
+            "medium",
+        ),
+        (
+            "{city} Architecture and Local Design Stop",
+            "Visit a design-forward indoor landmark, cultural center, or historic interior.",
+            "11:00",
+            "12:30",
+            "indoor",
+            "none",
+            "medium",
+        ),
+        (
+            "{city} Garden or Viewpoint",
+            "Add a lighter outdoor stop for views, photos, and a change of pace.",
+            "15:00",
+            "16:30",
+            "outdoor",
+            "rain",
+            "medium",
+        ),
+        (
+            "{city} Theater or Performance Night",
+            "End the day with an indoor show, performance, or live cultural event.",
+            "19:00",
+            "21:00",
+            "indoor",
+            "none",
+            "medium",
+        ),
+        (
+            "{city} Neighborhood Street Art Walk",
+            "Explore a walkable neighborhood with cafes and public art, best kept flexible in poor weather.",
+            "10:30",
+            "12:00",
+            "mixed",
+            "rain",
+            "medium",
+        ),
+        (
+            "{city} Workshop or Hands-On Class",
+            "Book a protected class or studio experience for a slower indoor block.",
+            "14:00",
+            "16:00",
+            "indoor",
+            "none",
+            "medium",
+        ),
+    ]
+
+    return {
+        "itinerary": [
+            {
+                "title": title.format(city=target_city),
+                "description": description,
+                "start_time": start_time,
+                "end_time": end_time,
+                "activity_environment": environment,
+                "weather_sensitivity": sensitivity,
+                "environment_confidence": confidence,
+            }
+            for title, description, start_time, end_time, environment, sensitivity, confidence
+            in templates[:target_count]
+        ]
+    }
+
+
+def mark_activity_without_inventory_match(activity):
+    activity["isNativeBookable"] = "false"
+    activity["options"] = []
+    return activity
 
 
 def normalize_city_key(value):
@@ -412,8 +514,6 @@ def generate_itinerary(req: https_fn.CallableRequest):
     pinecone_key = os.getenv("PINECONE_API_KEY")
     viator_key = os.getenv("VIATOR_API_KEY")
 
-    client = Groq(api_key=groq_key)
-
     # Format the interests list into a readable string
     interests_str = ", ".join(interests) if interests else "general exploring"
     activity_dates_str = ", ".join(activity_dates) if activity_dates else f"{date_from} to {date_to}"
@@ -470,19 +570,53 @@ def generate_itinerary(req: https_fn.CallableRequest):
     }}
     """
 
-    chat_completion = client.chat.completions.create(
-        messages=[{"role": "user", "content": prompt}],
-        model="llama-3.1-8b-instant",
-        response_format={"type": "json_object"},
-        temperature=0.85, # Pushed higher for a more imaginative, creative response
-        top_p=0.9         # Wide enough to allow unique vocabulary, but grounded enough to stay coherent
-    )
+    raw_itinerary = None
+    if groq_key:
+        try:
+            client = Groq(api_key=groq_key)
+            chat_completion = client.chat.completions.create(
+                messages=[{"role": "user", "content": prompt}],
+                model="llama-3.1-8b-instant",
+                response_format={"type": "json_object"},
+                temperature=0.85,
+                top_p=0.9,
+                max_tokens=1800
+            )
+            raw_itinerary = json.loads(chat_completion.choices[0].message.content)
+        except APIStatusError as error:
+            if getattr(error, "status_code", None) == 429:
+                print("Groq itinerary generation rate limited; using local fallback activities.", flush=True)
+            else:
+                print(f"Groq itinerary generation failed; using local fallback activities: {error}", flush=True)
+        except Exception as error:
+            print(f"Groq itinerary generation failed; using local fallback activities: {error}", flush=True)
+    else:
+        print("GROQ_API_KEY missing; using local fallback activities.", flush=True)
 
-    raw_itinerary = json.loads(chat_completion.choices[0].message.content)
+    if raw_itinerary is None:
+        raw_itinerary = build_fallback_raw_itinerary(req_data, target_city)
+
+    if not hf_token or not pinecone_key:
+        print("Activity matchmaking unavailable: missing HF_TOKEN or PINECONE_API_KEY.", flush=True)
+        return {
+            "itinerary": [
+                mark_activity_without_inventory_match(activity)
+                for activity in raw_itinerary.get("itinerary", [])
+            ]
+        }
 
     # 4. Setup Pinecone
-    pc = Pinecone(api_key=pinecone_key)
-    index = pc.Index(PINECONE_INDEX_NAME)
+    try:
+        pc = Pinecone(api_key=pinecone_key)
+        index = pc.Index(PINECONE_INDEX_NAME)
+    except Exception as error:
+        print(f"Pinecone setup failed; returning unmatched activities: {error}", flush=True)
+        return {
+            "itinerary": [
+                mark_activity_without_inventory_match(activity)
+                for activity in raw_itinerary.get("itinerary", [])
+            ]
+        }
 
     final_itinerary = []
 
