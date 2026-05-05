@@ -210,6 +210,7 @@ fun CurrentTripScreen(
                         viewModel.loadTrip(tripKey)
                     },
                     onRenameTrip = viewModel::renameTrip,
+                    dateFormat = uiState.dateFormat,
                     controlsContent = {
                         CurrentTripModeSwitcher(
                             selectedMode = displayMode,
@@ -307,7 +308,8 @@ fun CurrentTripScreen(
                                 } else {
                                     viewModel.postError("Shared trips are read-only for now.")
                                 }
-                            }
+                            },
+                            timeFormat = uiState.timeFormat
                         )
                     }
                 }
@@ -351,4 +353,3 @@ fun CurrentTripScreen(
         }
     }
 }
-

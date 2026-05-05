@@ -32,7 +32,7 @@ import java.time.format.DateTimeFormatter
 import java.time.temporal.ChronoUnit
 
 @Composable
-fun HotelPricingCard(event: TravelEvent) {
+fun HotelPricingCard(event: TravelEvent, currencyCode: String = "USD") {
     val nights = computeNights(event)
     val rooms = event.detailValue(ATTR_ROOMS_NEEDED, "rooms_needed")?.toIntOrNull() ?: 1
     val nightlyRate = event.detailValue(ATTR_RATE_PER_NIGHT, "rate_per_night")?.toDoubleOrNull()
@@ -45,12 +45,12 @@ fun HotelPricingCard(event: TravelEvent) {
 
     if (nightlyRate == null && totalStay == null && deal == null) return
 
-    val headerTitle = totalStay?.let { "${formatPrice(it)} total stay" }
-        ?: nightlyRate?.let { "${formatPrice(it)} / night" }
+    val headerTitle = totalStay?.let { "${formatPrice(it, currencyCode)} total stay" }
+        ?: nightlyRate?.let { "${formatPrice(it, currencyCode)} / night" }
         ?: "Booking details"
     val nightlySubtitle = nightlyRate?.let { rate ->
-        if (nights > 0) "$nights nights × ${formatPrice(rate)} / night"
-        else "${formatPrice(rate)} / night"
+        if (nights > 0) "$nights nights × ${formatPrice(rate, currencyCode)} / night"
+        else "${formatPrice(rate, currencyCode)} / night"
     }
 
     DetailCardFrame(accent = CardLavender) {
@@ -76,8 +76,8 @@ fun HotelPricingCard(event: TravelEvent) {
                     fontSize = 13.sp
                 )
                 Text(
-                    text = groupTotal?.let { formatPrice(it) }
-                        ?: groupNightly?.let { "${formatPrice(it)} / night" }
+                    text = groupTotal?.let { formatPrice(it, currencyCode) }
+                        ?: groupNightly?.let { "${formatPrice(it, currencyCode)} / night" }
                         ?: "",
                     color = CardText,
                     fontSize = 14.sp,

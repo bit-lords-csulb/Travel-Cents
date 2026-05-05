@@ -17,7 +17,7 @@ import com.example.travelcents.data.trip.model.TravelEvent
 import com.example.travelcents.data.trip.model.detailValue
 
 @Composable
-fun WeatherCard(event: TravelEvent) {
+fun WeatherCard(event: TravelEvent, usesFahrenheit: Boolean = false) {
     val hasOutdoorSeating = event.detailValue(ATTR_HAS_OUTDOOR_SEATING)
         ?.equals("true", ignoreCase = true) == true
     if (!hasOutdoorSeating) return
@@ -38,10 +38,18 @@ fun WeatherCard(event: TravelEvent) {
             title = condition?.let { "$it around your dining time" } ?: "Patio forecast"
         )
 
+        val tempDisplay = temperatureC?.let {
+            if (usesFahrenheit) "${(it * 9 / 5) + 32}°F" else "${it}°C"
+        }
+
+        val windDisplay = windKph?.let {
+            if (usesFahrenheit) "${(it * 0.621371).toInt()} mph wind" else "$it km/h wind"
+        }
+
         val badges = listOfNotNull(
-            temperatureC?.let { "${it}C" },
+            tempDisplay,
             precipPct?.let { "$it% precip" },
-            windKph?.let { "$it km/h wind" }
+            windDisplay
         )
         if (badges.isNotEmpty()) {
             Spacer(modifier = Modifier.height(12.dp))

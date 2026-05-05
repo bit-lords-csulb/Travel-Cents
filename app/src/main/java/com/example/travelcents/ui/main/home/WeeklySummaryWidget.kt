@@ -33,11 +33,11 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.travelcents.data.trip.model.BudgetStatus
 import com.example.travelcents.data.trip.model.WeeklySummary
+import com.example.travelcents.ui.main.current.overlays.cards.formatPrice
 import com.example.travelcents.ui.theme.DeepSea2
 import com.example.travelcents.ui.theme.DeepSea3
 import com.example.travelcents.ui.theme.DeepSea4
 import com.example.travelcents.ui.theme.DeepSea5
-import java.util.Locale
 
 @Composable
 fun WeeklySummaryWidget(
@@ -101,13 +101,13 @@ fun WeeklySummaryWidget(
                     horizontalArrangement = Arrangement.SpaceBetween
                 ) {
                     Text(
-                        text = "Spending: ${formatCurrency(summary.totalCost, summary.currency)}",
+                        text = "Spending: ${formatPrice(summary.totalCost, summary.currency)}",
                         color = DeepSea5,
                         fontSize = 14.sp,
                         fontWeight = FontWeight.Bold
                     )
                     Text(
-                        text = "Budget: ${formatCurrency(summary.budget, summary.currency)}",
+                        text = "Budget: ${formatPrice(summary.budget, summary.currency)}",
                         color = DeepSea4,
                         fontSize = 12.sp
                     )
@@ -199,7 +199,7 @@ fun WeeklySummaryWidget(
                                 modifier = Modifier.weight(1f)
                             )
                             Text(
-                                text = formatCurrency(event.cost, summary.currency),
+                                text = formatPrice(event.cost, summary.currency),
                                 color = DeepSea4,
                                 fontSize = 13.sp,
                                 fontWeight = FontWeight.Bold
@@ -209,19 +209,5 @@ fun WeeklySummaryWidget(
                 }
             }
         }
-    }
-}
-
-private fun formatCurrency(amount: Double, currencyCode: String): String {
-    val symbol = when (currencyCode.uppercase(Locale.US)) {
-        "USD" -> "$"
-        "EUR" -> "€"
-        "GBP" -> "£"
-        else -> "$currencyCode "
-    }
-    return if (amount % 1.0 == 0.0) {
-        "$symbol${amount.toInt()}"
-    } else {
-        "$symbol${String.format(Locale.US, "%.2f", amount)}"
     }
 }

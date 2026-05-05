@@ -1,14 +1,19 @@
 package com.example.travelcents.ui.main.settings
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.ChevronRight
 import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.Icon
 import androidx.compose.material3.Switch
 import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
@@ -91,6 +96,41 @@ fun SwitchSettingItem(
                     uncheckedBorderColor = Color.Transparent
                 )
             )
+        }
+        if (showDivider) {
+            HorizontalDivider(color = DeepSea3.copy(alpha = 0.3f), thickness = 0.5.dp)
+        }
+    }
+}
+
+// Clickable setting row for selection
+@Composable
+fun ClickableSettingItem(
+    title: String,
+    value: String = "",
+    onClick: () -> Unit,
+    showDivider: Boolean = true
+) {
+    Column(modifier = Modifier.clickable(onClick = onClick)) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(vertical = 14.dp),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text(text = title, color = DeepSea5, fontSize = 15.sp)
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                if (value.isNotEmpty()) {
+                    Text(text = value, color = DeepSea4, fontSize = 14.sp)
+                }
+                Icon(
+                    imageVector = Icons.Default.ChevronRight,
+                    contentDescription = null,
+                    tint = DeepSea4,
+                    modifier = Modifier.size(18.dp).padding(start = 4.dp)
+                )
+            }
         }
         if (showDivider) {
             HorizontalDivider(color = DeepSea3.copy(alpha = 0.3f), thickness = 0.5.dp)

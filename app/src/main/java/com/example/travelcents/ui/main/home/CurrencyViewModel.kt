@@ -8,6 +8,10 @@ import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.travelcents.data.trip.local.CurrencyRateCache
 import com.example.travelcents.data.trip.remote.CurrencyApiService
+import com.example.travelcents.data.user.UserProfileRepository
+import com.example.travelcents.data.user.model.RegionalData
+import com.google.firebase.auth.FirebaseAuth
+import com.google.firebase.firestore.FirebaseFirestore
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
@@ -23,6 +27,7 @@ class CurrencyViewModel(application: Application) : AndroidViewModel(application
         .create(CurrencyApiService::class.java)
 
     private val cache = CurrencyRateCache(application)
+    private val userProfileRepository = UserProfileRepository(FirebaseAuth.getInstance(), FirebaseFirestore.getInstance())
 
     // All currencies supported by frankfurter.app
     val currencies = listOf(
@@ -51,6 +56,8 @@ class CurrencyViewModel(application: Application) : AndroidViewModel(application
     private var convertJob: Job? = null
 
     init {
+        observeUserProfile()
+        
         // Restore last-used pair so the app doesn't always default to USD/EUR
         val savedPair = cache.getSelectedPair()
         if (savedPair != null) {
@@ -59,6 +66,22 @@ class CurrencyViewModel(application: Application) : AndroidViewModel(application
         }
         scheduleConvert()
         refreshRecentRatesAtStartup()
+    }
+
+    private fun observeUserProfile() {
+        viewModelScope.launch {
+            userProfileRepository.observeCurrentUserProfile().collect { profile ->
+                val country = RegionalData.getCountry(profile.country)
+                val regionalCurrency = country?.defaultCurrency ?: "USD"
+                
+                // If the user hasn't manually changed the currency in this session, 
+                // update it to match their region.
+                if (cache.getSelectedPair() == null) {
+                    fromCurrency = regionalCurrency
+                    scheduleConvert()
+                }
+            }
+        }
     }
 
     fun onAmountChange(newAmount: String) {

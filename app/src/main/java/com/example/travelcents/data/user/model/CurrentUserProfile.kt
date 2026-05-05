@@ -10,6 +10,10 @@ data class CurrentUserProfile(
     val profileImageSource: String = "",
     val doNotShareData: Boolean = false,
     val showWeeklySummary: Boolean = true,
+    // Regional Settings
+    val country: String = "United States",
+    val region: String = "California",
+    val city: String = "Long Beach",
     val isLoading: Boolean = true
 ) {
     val displayName: String

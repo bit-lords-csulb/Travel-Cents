@@ -18,6 +18,9 @@ data class SettingsUserState(
     val profileImageUrl: String = "",
     val doNotShareData: Boolean = false,
     val showWeeklySummary: Boolean = true,
+    val country: String = "United States",
+    val region: String = "California",
+    val city: String = "Long Beach",
     val isLoading: Boolean = true
 ) {
     val displayName: String get() = "$firstName $lastName".trim().ifEmpty { "User" }
@@ -46,6 +49,9 @@ class SettingsViewModel : ViewModel() {
                     profileImageUrl = profile.profileImageUrl,
                     doNotShareData = profile.doNotShareData,
                     showWeeklySummary = profile.showWeeklySummary,
+                    country = profile.country,
+                    region = profile.region,
+                    city = profile.city,
                     isLoading = profile.isLoading
                 )
             }
@@ -90,6 +96,29 @@ class SettingsViewModel : ViewModel() {
             .update("showWeeklySummary", enabled)
             .addOnFailureListener {
                 _userState.value = _userState.value.copy(showWeeklySummary = previous)
+            }
+    }
+
+    fun setRegionalSettings(country: String, region: String, city: String) {
+        val uid = auth.currentUser?.uid ?: return
+        val previous = Triple(_userState.value.country, _userState.value.region, _userState.value.city)
+        _userState.value = _userState.value.copy(
+            country = country,
+            region = region,
+            city = city
+        )
+        db.collection("users").document(uid)
+            .update(mapOf(
+                "country" to country,
+                "region" to region,
+                "city" to city
+            ))
+            .addOnFailureListener {
+                _userState.value = _userState.value.copy(
+                    country = previous.first,
+                    region = previous.second,
+                    city = previous.third
+                )
             }
     }
 

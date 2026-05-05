@@ -56,7 +56,8 @@ fun CurrentTripWeekView(
     onDateSelected: (String) -> Unit,
     onEventClick: (TravelEvent) -> Unit,
     onDeleteClick: (TravelEvent) -> Unit,
-    onCreatePlan: (String, Int) -> Unit
+    onCreatePlan: (String, Int) -> Unit,
+    timeFormat: String = "h:mm a"
 ) {
     if (sortedDates.isEmpty()) {
         CurrentTripEmptyState(
@@ -94,7 +95,8 @@ fun CurrentTripWeekView(
                         canEditTrip = canEditTrip,
                         onEventClick = onEventClick,
                         onDeleteClick = onDeleteClick,
-                        onAddClick = { onCreatePlan(date, defaultStartMinutesForDate(events, date)) }
+                        onAddClick = { onCreatePlan(date, defaultStartMinutesForDate(events, date)) },
+                        timeFormat = timeFormat
                     )
                 }
             }
@@ -111,7 +113,8 @@ private fun WeekOverviewDayRow(
     canEditTrip: Boolean,
     onEventClick: (TravelEvent) -> Unit,
     onDeleteClick: (TravelEvent) -> Unit,
-    onAddClick: () -> Unit
+    onAddClick: () -> Unit,
+    timeFormat: String
 ) {
     Row(
         modifier = Modifier
@@ -172,7 +175,8 @@ private fun WeekOverviewDayRow(
                         date = date,
                         canEditTrip = canEditTrip,
                         onClick = { onEventClick(event) },
-                        onDeleteClick = { onDeleteClick(event) }
+                        onDeleteClick = { onDeleteClick(event) },
+                        timeFormat = timeFormat
                     )
                 }
             }
@@ -201,7 +205,8 @@ private fun WeekOverviewEventRow(
     date: String,
     canEditTrip: Boolean,
     onClick: () -> Unit,
-    onDeleteClick: () -> Unit
+    onDeleteClick: () -> Unit,
+    timeFormat: String
 ) {
     val span = remember(event, date) { eventSpanForDate(event, date) }
     val palette = eventPalette(event)
@@ -222,7 +227,7 @@ private fun WeekOverviewEventRow(
         )
 
         Text(
-            text = span?.let(::renderSpanLabel) ?: formatDisplayTimeRange(event.startTime, event.endTime),
+            text = span?.let { renderSpanLabel(it, timeFormat) } ?: formatDisplayTimeRange(event.startTime, event.endTime, timeFormat),
             color = DeepSea4,
             fontSize = 10.sp,
             maxLines = 1,
@@ -257,4 +262,3 @@ private fun WeekOverviewEventRow(
         }
     }
 }
-

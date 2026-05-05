@@ -71,7 +71,8 @@ fun CurrentTripDayView(
     onDateSelected: (String) -> Unit,
     onEventClick: (TravelEvent) -> Unit,
     onDeleteClick: (TravelEvent) -> Unit,
-    onCreatePlan: (String, Int) -> Unit
+    onCreatePlan: (String, Int) -> Unit,
+    timeFormat: String = "h:mm a"
 ) {
     if (sortedDates.isEmpty()) {
         CurrentTripEmptyState(
@@ -118,7 +119,8 @@ fun CurrentTripDayView(
                 Row(modifier = Modifier.fillMaxWidth()) {
                     TimeAxis(
                         scheduleWindow = scheduleWindow,
-                        hourHeight = hourHeight
+                        hourHeight = hourHeight,
+                        timeFormat = timeFormat
                     )
 
                     Spacer(modifier = Modifier.width(8.dp))
@@ -133,7 +135,8 @@ fun CurrentTripDayView(
                         onEventClick = onEventClick,
                         onDeleteClick = onDeleteClick,
                         onEmptySlotClick = { startMinutes -> onCreatePlan(activeDate, startMinutes) },
-                        showCurrentTimeIndicator = activeDate == todayIsoDate()
+                        showCurrentTimeIndicator = activeDate == todayIsoDate(),
+                        timeFormat = timeFormat
                     )
                 }
             }
@@ -144,7 +147,8 @@ fun CurrentTripDayView(
 @Composable
 private fun TimeAxis(
     scheduleWindow: ScheduleWindow,
-    hourHeight: Dp
+    hourHeight: Dp,
+    timeFormat: String
 ) {
     Column(modifier = Modifier.width(50.dp)) {
         Spacer(modifier = Modifier.height(56.dp))
@@ -156,7 +160,7 @@ private fun TimeAxis(
                 contentAlignment = Alignment.TopStart
             ) {
                 Text(
-                    text = hourLabel(hour),
+                    text = hourLabel(hour, timeFormat),
                     color = DeepSea4.copy(alpha = 0.8f),
                     fontSize = 11.sp
                 )
@@ -176,7 +180,8 @@ private fun ScheduleDayColumn(
     onEventClick: (TravelEvent) -> Unit,
     onDeleteClick: (TravelEvent) -> Unit,
     onEmptySlotClick: (Int) -> Unit,
-    showCurrentTimeIndicator: Boolean = false
+    showCurrentTimeIndicator: Boolean = false,
+    timeFormat: String
 ) {
     val gridHeight = hourHeight * (scheduleWindow.endHour - scheduleWindow.startHour).toFloat()
     val cardShape = CurrentTripInnerShape
@@ -238,7 +243,8 @@ private fun ScheduleDayColumn(
                 scheduleWindow = scheduleWindow,
                 hourHeight = hourHeight,
                 onClick = { onEventClick(layout.span.event) },
-                onDeleteClick = { onDeleteClick(layout.span.event) }
+                onDeleteClick = { onDeleteClick(layout.span.event) },
+                timeFormat = timeFormat
             )
         }
     }
@@ -304,7 +310,8 @@ private fun BoxScope.ScheduleEventCard(
     scheduleWindow: ScheduleWindow,
     hourHeight: Dp,
     onClick: () -> Unit,
-    onDeleteClick: () -> Unit
+    onDeleteClick: () -> Unit,
+    timeFormat: String
 ) {
     val span = layout.span
     val startMinutes = span.startMinutes
@@ -348,7 +355,7 @@ private fun BoxScope.ScheduleEventCard(
                     verticalAlignment = Alignment.Top
                 ) {
                     Text(
-                        text = renderSpanLabel(span),
+                        text = renderSpanLabel(span, timeFormat),
                         color = DeepSea4,
                         fontSize = 10.sp,
                         modifier = Modifier.weight(1f)
@@ -390,4 +397,3 @@ private fun BoxScope.ScheduleEventCard(
         }
     }
 }
-

@@ -64,6 +64,8 @@ fun CurrentTripOverlayHost(
                 yelpReviews = yelpReviews[yelpId].orEmpty(),
                 reviewsLoading = reviewsLoading.contains(yelpId),
                 canEditTrip = canEditTrip,
+                usesFahrenheit = uiState.usesFahrenheit,
+                homeCurrencyCode = uiState.homeCurrencyCode,
                 canShowAlternatives = canShowAlternatives,
                 onDismiss = { onSelectedEventIdChange(null) },
                 onEdit = {
@@ -196,4 +198,3 @@ fun CurrentTripOverlayHost(
         }
     }
 }
-
