@@ -140,6 +140,17 @@ class AuthRepository {
             }
     }
 
+    suspend fun sendPasswordResetEmail(email: String): Result<String> = suspendCancellableCoroutine { continuation ->
+        auth.sendPasswordResetEmail(email.trim())
+            .addOnCompleteListener { task ->
+                if (task.isSuccessful) {
+                    continuation.resume(Result.success("Password reset email sent. Check your inbox."))
+                } else {
+                    continuation.resume(Result.failure(task.exception ?: Exception("Password reset failed")))
+                }
+            }
+    }
+
     suspend fun signOut() {
         val uid = auth.currentUser?.uid
         if (uid != null) {

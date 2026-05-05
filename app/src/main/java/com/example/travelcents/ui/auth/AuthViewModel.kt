@@ -35,6 +35,10 @@ class AuthViewModel : ViewModel() {
     private val _isLoggedIn = MutableStateFlow(false)
     val isLoggedIn: StateFlow<Boolean> = _isLoggedIn.asStateFlow()
 
+    // State to track forgot password success
+    private val _isPasswordResetEmailSent = MutableStateFlow(false)
+    val isPasswordResetEmailSent: StateFlow<Boolean> = _isPasswordResetEmailSent.asStateFlow()
+
     // Error messages (failures only)
     private val _errorMessage = MutableStateFlow<String?>(null)
     val errorMessage: StateFlow<String?> = _errorMessage.asStateFlow()
@@ -89,12 +93,37 @@ class AuthViewModel : ViewModel() {
         }
     }
 
+    fun sendPasswordResetEmail(email: String) {
+        if (!validatePasswordResetInput(email)) return
+
+        viewModelScope.launch {
+            _isLoading.value = true
+            _errorMessage.value = null
+            _statusMessage.value = null
+
+            val result = authRepository.sendPasswordResetEmail(email)
+
+            _isLoading.value = false
+            result.fold(
+                onSuccess = { message ->
+                    _isPasswordResetEmailSent.value = true
+                    _statusMessage.value = message
+                },
+                onFailure = { error ->
+                    Log.e("AuthViewModel", "Password reset failed", error)
+                    _errorMessage.value = mapPasswordResetError(error)
+                }
+            )
+        }
+    }
+
     // Log out and reset all state
     fun signOut() {
         viewModelScope.launch {
             authRepository.signOut()
             _isLoggedIn.value = false
             _isAccountCreated.value = false
+            _isPasswordResetEmailSent.value = false
             _errorMessage.value = null
             _statusMessage.value = null
         }
@@ -103,6 +132,12 @@ class AuthViewModel : ViewModel() {
     // Reset sign-up flow state (e.g. after navigating away)
     fun resetSignUpState() {
         _isAccountCreated.value = false
+        _errorMessage.value = null
+        _statusMessage.value = null
+    }
+
+    fun resetForgotPasswordState() {
+        _isPasswordResetEmailSent.value = false
         _errorMessage.value = null
         _statusMessage.value = null
     }
@@ -167,6 +202,19 @@ class AuthViewModel : ViewModel() {
         }
         return true
     }
+
+    private fun validatePasswordResetInput(email: String): Boolean {
+        val normalizedEmail = email.trim()
+        if (normalizedEmail.isBlank()) {
+            _errorMessage.value = "Email cannot be empty"
+            return false
+        }
+        if (!android.util.Patterns.EMAIL_ADDRESS.matcher(normalizedEmail).matches()) {
+            _errorMessage.value = "Please enter a valid email address."
+            return false
+        }
+        return true
+    }
     // Log in user with Google ID Token
     fun logInWithGoogle(idToken: String) {
         viewModelScope.launch {
@@ -189,6 +237,13 @@ class AuthViewModel : ViewModel() {
                 }
             )
         }
+    }
+
+    private fun mapPasswordResetError(error: Throwable): String = when (error) {
+        is FirebaseAuthInvalidCredentialsException -> "Please enter a valid email address."
+        is FirebaseNetworkException -> "Password reset needs a network connection."
+        is FirebaseTooManyRequestsException -> "Too many attempts. Please try again later."
+        else -> error.message ?: "Could not send password reset email. Please try again."
     }
 
     private fun mapSignUpError(error: Throwable): String = when (error) {
