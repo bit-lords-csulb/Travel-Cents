@@ -131,13 +131,7 @@ internal fun buildHomeTripStatusSummary(
         else -> HomeTripStatusLevel.UPCOMING
     }
 
-    val outboundFlight = visibleEvents.firstOrNull { it.type.equals("flight", ignoreCase = true) && it.details["trip_segment"].equals("outbound", ignoreCase = true) }
-    val outboundDate = outboundFlight?.let { parseTripDate(it.date) }
-    val landsAt = outboundFlight?.let { parseTripTime(it.endTime) ?: parseTripTime(it.startTime) }
-    val now = LocalDateTime.of(today, LocalTime.now())
-    val hasLanded = if (outboundDate != null && landsAt != null) {
-        LocalDateTime.of(outboundDate, landsAt).isBefore(now)
-    } else false
+    val hasLanded = hasOutboundLanded(visibleEvents, today)
 
     return HomeTripStatusSummary(
         trip = trip,
@@ -271,14 +265,8 @@ private fun flightPill(events: List<TravelEvent>, today: LocalDate): HomeTripInf
         it.details["trip_segment"].equals("return", ignoreCase = true) 
     }
 
-    val outboundDate = parseTripDate(outbound.date)
-    val landsAt = parseTripTime(outbound.endTime) ?: parseTripTime(outbound.startTime)
-    val now = LocalDateTime.of(today, LocalTime.now())
-
     // If outbound has already landed (or it's past departure time if no land time), show return flight
-    val showReturn = if (outboundDate != null && landsAt != null) {
-        LocalDateTime.of(outboundDate, landsAt).isBefore(now)
-    } else false
+    val showReturn = hasOutboundLanded(events, today)
 
     val targetFlight = if (showReturn && returnFlight != null) returnFlight else outbound
     val title = if (showReturn && returnFlight != null) "Return" else "Flight"
@@ -321,6 +309,18 @@ private fun hotelPill(events: List<TravelEvent>, today: LocalDate): HomeTripInfo
             ?.let(::compactDisplayTime)
         HomeTripInfoPill("Check-in", checkIn ?: "--")
     }
+}
+
+private fun hasOutboundLanded(events: List<TravelEvent>, today: LocalDate): Boolean {
+    val outboundFlight = events.firstOrNull {
+        it.type.equals("flight", ignoreCase = true) && it.details["trip_segment"].equals("outbound", ignoreCase = true)
+    } ?: events.firstOrNull { it.type.equals("flight", ignoreCase = true) } ?: return false
+
+    val outboundDate = parseTripDate(outboundFlight.date) ?: return false
+    val landsAt = parseTripTime(outboundFlight.endTime) ?: parseTripTime(outboundFlight.startTime) ?: return false
+    val now = LocalDateTime.of(today, LocalTime.now())
+
+    return LocalDateTime.of(outboundDate, landsAt).isBefore(now)
 }
 
 private fun compactDisplayTime(value: String): String {
