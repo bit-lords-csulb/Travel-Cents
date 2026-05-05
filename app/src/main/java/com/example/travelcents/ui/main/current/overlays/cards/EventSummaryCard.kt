@@ -35,7 +35,6 @@ import com.example.travelcents.ui.modules.formatLongDuration
 import com.example.travelcents.ui.modules.formatLongTripDateWithYear
 import com.example.travelcents.ui.modules.parseFlexibleTime
 import java.time.Duration
-import java.util.Locale
 
 @Composable
 fun EventSummaryCard(
@@ -126,6 +125,14 @@ fun EventSummaryCard(
                     )
                 }
 
+                EventTypeChip(
+                    type = event.type,
+                    accent = accent,
+                    modifier = Modifier
+                        .align(Alignment.TopStart)
+                        .padding(10.dp)
+                )
+
                 if (photoCount > 1 && onOpenGallery != null) {
                     PhotoGalleryButton(
                         photoCount = photoCount,
@@ -133,23 +140,6 @@ fun EventSummaryCard(
                         modifier = Modifier
                             .align(Alignment.TopEnd)
                             .padding(10.dp)
-                    )
-                }
-
-                Surface(
-                    color = CardBackground.copy(alpha = 0.62f),
-                    shape = RoundedCornerShape(999.dp),
-                    modifier = Modifier
-                        .align(Alignment.BottomStart)
-                        .padding(10.dp)
-                ) {
-                    Text(
-                        text = event.type.uppercase(Locale.US),
-                        color = accent,
-                        fontSize = 9.sp,
-                        fontWeight = FontWeight.Bold,
-                        letterSpacing = 1.3.sp,
-                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp)
                     )
                 }
             }
@@ -248,6 +238,14 @@ private fun HotelSummaryCard(
                             .background(accentGradientForType(event.type))
                     )
                 }
+
+                EventTypeChip(
+                    type = event.type,
+                    accent = CardLavender,
+                    modifier = Modifier
+                        .align(Alignment.TopStart)
+                        .padding(10.dp)
+                )
 
                 if (photoCount > 0) {
                     Surface(
@@ -360,6 +358,14 @@ private fun RestaurantSummaryVariant(
                             .background(accentGradientForType(event.type))
                     )
                 }
+
+                EventTypeChip(
+                    type = event.type,
+                    accent = CardCoral,
+                    modifier = Modifier
+                        .align(Alignment.TopStart)
+                        .padding(10.dp)
+                )
 
                 if (photoCount > 1) {
                     Surface(
@@ -478,6 +484,14 @@ private fun FlightSummaryVariant(
                     )
                 }
 
+                EventTypeChip(
+                    type = event.type,
+                    accent = CardSky,
+                    modifier = Modifier
+                        .align(Alignment.TopStart)
+                        .padding(10.dp)
+                )
+
                 if (photoCount > 1 && onOpenGallery != null) {
                     PhotoGalleryButton(
                         photoCount = photoCount,
@@ -505,24 +519,8 @@ private fun FlightSummaryVariant(
                             contentScale = ContentScale.Fit
                         )
                     }
-                } else {
-                    Surface(
-                        color = CardBackground.copy(alpha = 0.62f),
-                        shape = RoundedCornerShape(999.dp),
-                        modifier = Modifier
-                            .align(Alignment.BottomStart)
-                            .padding(10.dp)
-                    ) {
-                        Text(
-                            text = event.type.uppercase(Locale.US),
-                            color = CardSky,
-                            fontSize = 9.sp,
-                            fontWeight = FontWeight.Bold,
-                            letterSpacing = 1.3.sp,
-                            modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp)
-                        )
-                    }
                 }
+
             }
 
             Column(
