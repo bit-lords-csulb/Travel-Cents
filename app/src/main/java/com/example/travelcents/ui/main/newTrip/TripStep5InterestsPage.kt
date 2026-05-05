@@ -34,6 +34,8 @@ import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.ProvideTextStyle
+import androidx.compose.material3.Switch
+import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextField
 import androidx.compose.material3.TextFieldDefaults
@@ -123,34 +125,12 @@ fun TripStep5InterestsPage(
                 .fillMaxSize()
                 .background(DeepSea1)
         ) {
-        // Top bar
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .background(Color(0xFF010E24))
-                .statusBarsPadding()
-        ) {
-            Row(
-                modifier = Modifier.fillMaxWidth().padding(horizontal = 8.dp, vertical = 4.dp),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    IconButton(onClick = onBackClick) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, "Back", tint = TripWizardColors.Blue)
-                    }
-                    Text("Step 5 of 5", fontSize = 17.sp, fontWeight = FontWeight.Bold, color = DeepSea5)
-                }
-                IconButton(onClick = onCloseClick) {
-                    Icon(Icons.Default.Close, "Close", tint = TripWizardColors.Blue)
-                }
-            }
-            // Full progress bar (100%)
-            Box(
-                modifier = Modifier.fillMaxWidth().height(3.dp)
-                    .background(Brush.horizontalGradient(listOf(TripWizardColors.Blue, TripWizardColors.PrimaryContainer)))
-            )
-        }
+        WizardHeader(
+            currentStep = 5,
+            title = "What interests you?",
+            onBack = onBackClick,
+            onClose = onCloseClick
+        )
 
         // Grid content
         val filteredItems = if (searchQuery.length >= 2) {
@@ -166,10 +146,34 @@ fun TripStep5InterestsPage(
             verticalArrangement = Arrangement.spacedBy(12.dp),
             horizontalArrangement = Arrangement.spacedBy(12.dp)
         ) {
-            // Progress widget
+            // Search toggles
             item(span = { GridItemSpan(2) }) {
-                S5ProgressWidget()
+                Spacer(Modifier.height(4.dp))
             }
+            item(span = { GridItemSpan(2) }) {
+                Text(
+                    "SEARCH OPTIONS",
+                    fontSize = 10.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = TripWizardColors.OnSurfaceVariant,
+                    letterSpacing = 1.5.sp
+                )
+            }
+            item(span = { GridItemSpan(2) }) {
+                S5SearchToggle(
+                    label = "Look for flights",
+                    checked = viewModel.searchFlights,
+                    onCheckedChange = { viewModel.searchFlights = it }
+                )
+            }
+            item(span = { GridItemSpan(2) }) {
+                S5SearchToggle(
+                    label = "Look for hotels",
+                    checked = viewModel.searchHotels,
+                    onCheckedChange = { viewModel.searchHotels = it }
+                )
+            }
+
 
             // Hero
             item(span = { GridItemSpan(2) }) {
@@ -182,15 +186,6 @@ fun TripStep5InterestsPage(
                         letterSpacing = 1.5.sp
                     )
                     Spacer(Modifier.height(6.dp))
-                    Text(
-                        "What interests you?",
-                        fontSize = 28.sp,
-                        fontWeight = FontWeight.ExtraBold,
-                        color = DeepSea5,
-                        letterSpacing = (-1).sp,
-                        fontFamily = TravelCentsFonts.Headline
-                    )
-                    Spacer(Modifier.height(4.dp))
                     Row(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.SpaceBetween,
@@ -356,43 +351,32 @@ fun TripStep5InterestsPage(
 }
 
 @Composable
-private fun S5ProgressWidget() {
+private fun S5SearchToggle(
+    label: String,
+    checked: Boolean,
+    onCheckedChange: (Boolean) -> Unit
+) {
     Box(
         modifier = Modifier
             .fillMaxWidth()
-            .clip(RoundedCornerShape(16.dp))
-            .background(TripWizardColors.ContainerHigh.copy(alpha = 0.5f))
-            .border(1.dp, Color.White.copy(alpha = 0.05f), RoundedCornerShape(16.dp))
-            .padding(12.dp)
+            .clip(RoundedCornerShape(12.dp))
+            .background(TripWizardColors.ContainerHigh)
+            .padding(horizontal = 16.dp, vertical = 10.dp)
     ) {
-        Column {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Text("YOUR PROGRESS", fontSize = 10.sp, fontWeight = FontWeight.Bold, color = TripWizardColors.OnSurfaceVariant, letterSpacing = 1.5.sp)
-                Box(
-                    modifier = Modifier
-                        .background(TripWizardColors.Blue.copy(alpha = 0.2f), RoundedCornerShape(12.dp))
-                        .border(1.dp, TripWizardColors.Blue.copy(alpha = 0.2f), RoundedCornerShape(12.dp))
-                        .padding(horizontal = 12.dp, vertical = 4.dp)
-                ) {
-                    Text("100%", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = TripWizardColors.Blue)
-                }
-            }
-            Spacer(Modifier.height(10.dp))
-            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                repeat(5) {
-                    Box(
-                        modifier = Modifier
-                            .weight(1f)
-                            .height(4.dp)
-                            .clip(RoundedCornerShape(2.dp))
-                            .background(TripWizardColors.Blue)
-                    )
-                }
-            }
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text(label, color = DeepSea5, fontSize = 14.sp)
+            Switch(
+                checked = checked,
+                onCheckedChange = onCheckedChange,
+                colors = SwitchDefaults.colors(
+                    checkedTrackColor = TripWizardColors.Blue,
+                    checkedThumbColor = DeepSea5
+                )
+            )
         }
     }
 }
@@ -466,4 +450,3 @@ private fun S5InterestCard(
         }
     }
 }
-

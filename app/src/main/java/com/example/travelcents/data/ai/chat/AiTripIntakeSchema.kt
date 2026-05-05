@@ -52,8 +52,7 @@ enum class AiTripIntakeNextAction {
 
 enum class AiTripIntakeQuestionKind {
     NONE,
-    CARDS,
-    TEXT
+    CARDS
 }
 
 data class AiTripIntakeProfile(
@@ -69,6 +68,10 @@ data class AiTripIntakeProfile(
     val destinationStyle: List<String> = emptyList(),
     @SerializedName("origin")
     val origin: String = "",
+    @SerializedName("date_from")
+    val dateFrom: String = "",
+    @SerializedName("date_to")
+    val dateTo: String = "",
     @SerializedName("date_window")
     val dateWindow: String = "",
     @SerializedName("duration_days")
@@ -110,6 +113,8 @@ data class AiTripIntakeProfile(
                 "destination" to destination,
                 "destination_style" to destinationStyle.map { style -> style.lowercase(Locale.US) },
                 "origin" to origin,
+                "date_from" to dateFrom,
+                "date_to" to dateTo,
                 "date_window" to dateWindow,
                 "budget_level" to budgetLevel.promptValue(),
                 "pace" to pace.promptValue(),
@@ -240,37 +245,19 @@ data class AiTripIntakeTurnResult(
 
     private val effectiveQuestionKind: AiTripIntakeQuestionKind
         get() = when {
-            questionKind == AiTripIntakeQuestionKind.TEXT -> AiTripIntakeQuestionKind.TEXT
+            nextAction != AiTripIntakeNextAction.ASK_MORE -> AiTripIntakeQuestionKind.NONE
             questionKind == AiTripIntakeQuestionKind.CARDS || hasValidCardPayload -> AiTripIntakeQuestionKind.CARDS
             else -> AiTripIntakeQuestionKind.NONE
         }
 
     val assistantMessage: String
-        get() = buildList {
-            add(ackKey.displayText())
-            when (effectiveQuestionKind) {
-                AiTripIntakeQuestionKind.CARDS -> {
-                    questionTitle.takeIf { it.isNotBlank() }?.let(::add)
-                }
-
-                AiTripIntakeQuestionKind.TEXT -> {
-                    textPrompt.ifBlank { questionTitle }
-                        .takeIf { prompt -> prompt.isNotBlank() }
-                        ?.let(::add)
-                }
-
-                AiTripIntakeQuestionKind.NONE -> Unit
-            }
-        }.joinToString(" ").trim()
+        get() = ackKey.displayText()
 
     val planningObjective: String
         get() = when (nextAction) {
             AiTripIntakeNextAction.SUGGEST_DESTINATIONS -> "Review destination ideas"
             AiTripIntakeNextAction.BUILD_TRIP -> "Build the trip"
-            AiTripIntakeNextAction.ASK_MORE -> {
-                questionTitle.ifBlank { textPrompt }
-                    .ifBlank { "Refine the plan" }
-            }
+            AiTripIntakeNextAction.ASK_MORE -> questionTitle.ifBlank { "Refine the plan" }
         }
 
     val followUpQuestion: AiTripIntakeFollowUpQuestion?
@@ -300,6 +287,8 @@ fun AiTravelerProfile.toIntakeProfile(): AiTripIntakeProfile {
         destination = destination,
         destinationStyle = inferDestinationStyle(),
         origin = origin,
+        dateFrom = "",
+        dateTo = "",
         dateWindow = dateWindow,
         budgetLevel = inferBudgetLevel(),
         budgetTotal = inferBudgetTotal(),
@@ -321,6 +310,8 @@ fun AiTripIntakeProfile.mergePatch(patch: AiTripIntakeProfile?): AiTripIntakePro
         destination = patch.destination.ifBlank { destination },
         destinationStyle = (destinationStyle + patch.destinationStyle).distinct(),
         origin = patch.origin.ifBlank { origin },
+        dateFrom = patch.dateFrom.ifBlank { dateFrom },
+        dateTo = patch.dateTo.ifBlank { dateTo },
         dateWindow = patch.dateWindow.ifBlank { dateWindow },
         durationDays = patch.durationDays ?: durationDays,
         budgetLevel = patch.budgetLevel.takeUnless { it == AiBudgetLevel.UNKNOWN } ?: budgetLevel,
@@ -580,10 +571,10 @@ private fun AiTripIntakeProfile.toPaceSummary(): String {
 
 private fun AiTripIntakeAckKey.displayText(): String {
     return when (this) {
-        AiTripIntakeAckKey.GOT_IT -> "Got it!"
-        AiTripIntakeAckKey.SOUNDS_GOOD -> "Sounds good!"
-        AiTripIntakeAckKey.UNDERSTOOD -> "Understood."
-        AiTripIntakeAckKey.PERFECT -> "Perfect."
+        AiTripIntakeAckKey.GOT_IT -> listOf("Got it!", "Noted!", "Makes sense!").random()
+        AiTripIntakeAckKey.SOUNDS_GOOD -> listOf("Sounds good!", "Love it!", "Nice choice!").random()
+        AiTripIntakeAckKey.UNDERSTOOD -> listOf("Got it!", "Understood.", "Makes sense!").random()
+        AiTripIntakeAckKey.PERFECT -> listOf("Perfect!", "Great choice!", "Awesome!").random()
     }
 }
 

@@ -15,11 +15,19 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.AutoAwesome
 import androidx.compose.material.icons.outlined.BeachAccess
+import androidx.compose.material.icons.outlined.Celebration
+import androidx.compose.material.icons.outlined.Coffee
+import androidx.compose.material.icons.outlined.DirectionsCar
 import androidx.compose.material.icons.outlined.FamilyRestroom
 import androidx.compose.material.icons.outlined.FavoriteBorder
 import androidx.compose.material.icons.outlined.FlightTakeoff
 import androidx.compose.material.icons.outlined.Forest
+import androidx.compose.material.icons.outlined.Palette
+import androidx.compose.material.icons.outlined.Pets
 import androidx.compose.material.icons.outlined.Restaurant
+import androidx.compose.material.icons.outlined.SelfImprovement
+import androidx.compose.material.icons.outlined.ShoppingBag
+import androidx.compose.material.icons.outlined.WbSunny
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -189,6 +197,17 @@ private fun starterCardMeta(option: AiChatCardOption): StarterCardMeta {
         option.id.contains("food_trip") -> StarterCardMeta(Icons.Outlined.Restaurant, Color(0xFF00B0D6))
         option.id.contains("romantic_trip") -> StarterCardMeta(Icons.Outlined.FavoriteBorder, Color(0xFFFFA0B8))
         option.id.contains("family_trip") -> StarterCardMeta(Icons.Outlined.FamilyRestroom, Color(0xFF9EDB9A))
+        option.id.contains("road_trip") -> StarterCardMeta(Icons.Outlined.DirectionsCar, Color(0xFFFFC774))
+        option.id.contains("spa_retreat") -> StarterCardMeta(Icons.Outlined.SelfImprovement, Color(0xFF9FD8C8))
+        option.id.contains("girls_trip") -> StarterCardMeta(Icons.Outlined.Celebration, Color(0xFFFF9DCB))
+        option.id.contains("adventure_trip") -> StarterCardMeta(Icons.Outlined.AutoAwesome, Color(0xFFFFA86E))
+        option.id.contains("arts_culture") -> StarterCardMeta(Icons.Outlined.Palette, Color(0xFFA9B2FF))
+        option.id.contains("nightlife_escape") -> StarterCardMeta(Icons.Outlined.Celebration, Color(0xFFFF7AC8))
+        option.id.contains("pet_friendly") -> StarterCardMeta(Icons.Outlined.Pets, Color(0xFFC6A6FF))
+        option.id.contains("shopping_weekend") -> StarterCardMeta(Icons.Outlined.ShoppingBag, Color(0xFFFFB98B))
+        option.id.contains("wellness_reset") -> StarterCardMeta(Icons.Outlined.SelfImprovement, Color(0xFF8EDBC4))
+        option.id.contains("island_hopping") -> StarterCardMeta(Icons.Outlined.WbSunny, Color(0xFFFFD76A))
+        option.id.contains("coffee_crawl") -> StarterCardMeta(Icons.Outlined.Coffee, Color(0xFFC58C5A))
         else -> StarterCardMeta(Icons.Outlined.AutoAwesome, TripWizardColors.Blue)
     }
 }

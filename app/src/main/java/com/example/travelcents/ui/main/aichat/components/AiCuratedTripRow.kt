@@ -39,8 +39,8 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImage
+import coil.request.CachePolicy
 import coil.request.ImageRequest
-import com.example.travelcents.BuildConfig
 import com.example.travelcents.data.ai.chat.AiCuratedTripRow
 import com.example.travelcents.data.ai.chat.AiCuratedTripSource
 import com.example.travelcents.data.ai.chat.AiCuratedTripStarter
@@ -106,9 +106,10 @@ private fun AiCuratedTripCard(
         imageUrl?.let { url ->
             ImageRequest.Builder(context)
                 .data(url)
-                .setHeader("User-Agent", WIKIMEDIA_IMAGE_USER_AGENT)
-                .setHeader("Api-User-Agent", WIKIMEDIA_IMAGE_USER_AGENT)
                 .crossfade(true)
+                .diskCachePolicy(CachePolicy.ENABLED)
+                .memoryCachePolicy(CachePolicy.ENABLED)
+                .networkCachePolicy(CachePolicy.ENABLED)
                 .listener(
                     onError = { request, result ->
                         Log.w(
@@ -278,7 +279,3 @@ private fun DurationPill(durationDays: Int) {
         )
     }
 }
-
-private const val WIKIMEDIA_CONTACT_URL = "https://github.com/bit-lords-csulb/Travel-Cents"
-private val WIKIMEDIA_IMAGE_USER_AGENT =
-    "TravelCents/${BuildConfig.VERSION_NAME} (Android app; $WIKIMEDIA_CONTACT_URL)"

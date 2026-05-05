@@ -165,6 +165,8 @@ data class TripEventEntity(
     val localImagePath: String,
     val photoUrls: List<String>,
     val selectedOptionId: String,
+    val isNativeBookable: String?,
+    val bookingUrl: String?,
     val details: Map<String, String>,
     val eventVersionGroup: Long,
     val updatedAtEpochMs: Long
@@ -238,6 +240,12 @@ fun TripEventEntity.toDomainModel(): TravelEvent = TravelEvent(
     localImagePath = localImagePath,
     photoUrls = photoUrls,
     selectedOptionId = selectedOptionId,
+    isNativeBookable = isNativeBookable
+        ?: details["isNativeBookable"]
+        ?: details["nativeBookable"],
+    bookingUrl = bookingUrl
+        ?: details["booking_url"]
+        ?: details["bookingUrl"],
     details = details
 )
 
@@ -261,6 +269,12 @@ fun TravelEvent.toTripEventEntity(
     localImagePath = localImagePath,
     photoUrls = photoUrls,
     selectedOptionId = selectedOptionId,
+    isNativeBookable = isNativeBookable
+        ?: details["isNativeBookable"]
+        ?: details["nativeBookable"],
+    bookingUrl = bookingUrl
+        ?: details["booking_url"]
+        ?: details["bookingUrl"],
     details = details,
     eventVersionGroup = eventVersionGroup,
     updatedAtEpochMs = updatedAtEpochMs

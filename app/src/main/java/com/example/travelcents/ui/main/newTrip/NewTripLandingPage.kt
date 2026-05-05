@@ -184,4 +184,3 @@ fun NewTripLandingPage(
         }
     }
 }
-

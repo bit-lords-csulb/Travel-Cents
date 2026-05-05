@@ -19,19 +19,18 @@ class AiCuratedTripCatalogTest {
     private val catalog = AiCuratedTripCatalog(tripRepository = FakeTripRepository())
 
     @Test
-    fun recommendTrips_returnsSeededHotspots_whenSignalsMatchPopularDestinations() = runBlocking {
-        val row = catalog.recommendTrips(
+    fun recommendSeededStarterRow_returnsSeededHotspots_whenSignalsMatchPopularDestinations() {
+        val row = catalog.recommendSeededStarterRow(
             profile = AiTravelerProfile(
                 travelPace = "Relaxed",
                 budgetSummary = "Comfort leaning",
                 interests = listOf("Beach", "Food"),
                 notes = listOf("Want somewhere warm")
-            ),
-            viewerUid = null
+            )
         )
 
         assertNotNull(row)
-        assertEquals("Curated hotspot starters", row?.title)
+        assertEquals("Popular trips", row?.title)
         assertTrue(row?.trips?.isNotEmpty() == true)
         assertTrue(row?.trips?.all { starter -> starter.source == AiCuratedTripSource.SEEDED } == true)
         assertTrue(
@@ -44,18 +43,17 @@ class AiCuratedTripCatalogTest {
     }
 
     @Test
-    fun recommendTrips_returnsEditableSeededStarter_forExplicitHotspotDestination() = runBlocking {
-        val row = catalog.recommendTrips(
+    fun recommendSeededStarterRow_returnsEditableSeededStarter_forExplicitHotspotDestination() {
+        val row = catalog.recommendSeededStarterRow(
             profile = AiTravelerProfile(
                 destination = "Tokyo, Japan",
                 interests = listOf("Food", "Nightlife")
-            ),
-            viewerUid = null
+            )
         )
 
         val starter = row?.trips?.singleOrNull()
         assertNotNull(starter)
-        assertEquals("Curated Tokyo starters", row?.title)
+        assertEquals("Popular trips in Tokyo", row?.title)
         assertEquals(AiCuratedTripSource.SEEDED, starter?.source)
         assertEquals(listOf(4, 5, 7), starter?.durationOptions)
         assertEquals("Tokyo, Japan", starter?.destination)
@@ -71,7 +69,7 @@ class AiCuratedTripCatalogTest {
         )
 
         assertNotNull(row)
-        assertEquals("Curated Paris starters", row?.title)
+        assertEquals("Popular trips in Paris", row?.title)
         assertEquals(1, row?.trips?.size)
         assertEquals("paris_romance_cafes", row?.trips?.firstOrNull()?.seedId)
     }

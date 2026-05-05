@@ -55,14 +55,21 @@ import com.example.travelcents.data.trip.model.ATTR_AVERAGE_RATING
 import com.example.travelcents.data.trip.model.ATTR_BUSINESS_NAME
 import com.example.travelcents.data.trip.model.ATTR_HOTEL_NAME
 import com.example.travelcents.data.trip.model.ATTR_HOTEL_RATING
+import com.example.travelcents.data.trip.model.ATTR_OPTION_DATE
+import com.example.travelcents.data.trip.model.ATTR_OPTION_END_TIME
+import com.example.travelcents.data.trip.model.ATTR_OPTION_START_TIME
+import com.example.travelcents.data.trip.model.ATTR_OPTION_TIME_LABEL
 import com.example.travelcents.data.trip.model.ATTR_PRICE_TIER
 import com.example.travelcents.data.trip.model.ATTR_RATE_PER_NIGHT
 import com.example.travelcents.data.trip.model.ATTR_REVIEW_COUNT
 import com.example.travelcents.data.trip.model.ATTR_ROOMS_NEEDED
+import com.example.travelcents.data.trip.model.ATTR_TICKETMASTER_EVENT_ID
 import com.example.travelcents.data.trip.model.EventOption
 import com.example.travelcents.data.trip.model.TravelEvent
 import com.example.travelcents.data.trip.model.displayName
 import com.example.travelcents.data.trip.model.firstNonBlank
+import com.example.travelcents.ui.main.current.overlays.cards.EventTypeChip
+import com.example.travelcents.ui.main.current.overlays.cards.eventTypeIcon
 import com.example.travelcents.ui.modules.heroImageModel
 
 private val BgColor = Color(0xFF010E24)
@@ -123,6 +130,21 @@ private fun formatOptionSubtitle(event: TravelEvent, opt: EventOption): String {
             ).joinToString(" · ")
         }
         else -> {
+            val isTicketmasterOption = opt.source.equals("ticketmaster", ignoreCase = true) ||
+                !opt.details[ATTR_TICKETMASTER_EVENT_ID].isNullOrBlank()
+            if (isTicketmasterOption) {
+                val date = opt.details[ATTR_OPTION_DATE].orEmpty()
+                val time = opt.details[ATTR_OPTION_TIME_LABEL]
+                    ?.takeIf { it.isNotBlank() }
+                    ?: listOfNotNull(
+                        opt.details[ATTR_OPTION_START_TIME]?.takeIf { it.isNotBlank() },
+                        opt.details[ATTR_OPTION_END_TIME]?.takeIf { it.isNotBlank() }
+                    ).joinToString(" - ")
+                return listOfNotNull(
+                    date.takeIf { it.isNotBlank() },
+                    time.takeIf { it.isNotBlank() }
+                ).joinToString(" · ")
+            }
             val isFree = opt.details["is_free"] == "true"
             val cost = opt.details["cost"] ?: ""
             val costMax = opt.details["cost_max"] ?: ""
@@ -218,18 +240,7 @@ fun EventOptionsPanel(
                     .padding(horizontal = 20.dp, vertical = 12.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Surface(
-                    color = typeColor.copy(alpha = 0.15f),
-                    shape = RoundedCornerShape(6.dp)
-                ) {
-                    Text(
-                        text = event.type.uppercase(),
-                        color = typeColor,
-                        fontSize = 9.sp,
-                        fontWeight = FontWeight.Bold,
-                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp)
-                    )
-                }
+                EventTypeChip(type = event.type, accent = typeColor)
                 Spacer(modifier = Modifier.width(10.dp))
                 Text(
                     text = "Choose an option",
@@ -427,11 +438,11 @@ private fun OptionRow(
                     contentScale = ContentScale.Crop
                 )
             } else {
-                Text(
-                    text = event.type.take(1).uppercase(),
-                    color = typeColor,
-                    fontSize = 20.sp,
-                    fontWeight = FontWeight.ExtraBold
+                Icon(
+                    imageVector = eventTypeIcon(event.type),
+                    contentDescription = event.type,
+                    tint = typeColor,
+                    modifier = Modifier.size(20.dp)
                 )
             }
         }

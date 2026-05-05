@@ -263,7 +263,11 @@ fun LoginPage(modifier: Modifier = Modifier, navController: NavController, authV
                     fontFamily = TravelCentsFonts.Body
                 )
             }
-            TextButton(onClick = { navController.navigate("forgot_password") }) {
+            TextButton(onClick = {
+                navController.navigate("forgot_password") {
+                    launchSingleTop = true
+                }
+            }) {
                 Text(
                     text = "Forgot Password?",
                     color = DeepSea4,
@@ -317,7 +321,7 @@ fun LoginPage(modifier: Modifier = Modifier, navController: NavController, authV
         Spacer(modifier = Modifier.height(16.dp))
 
         GoogleAuthButton(
-            text = "Signin with Google",
+            text = "Sign in with Google",
             authViewModel = authViewModel,
             enabled = !isLoading,
             fontFamily = TravelCentsFonts.Body

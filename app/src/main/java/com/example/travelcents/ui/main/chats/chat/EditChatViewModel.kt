@@ -52,8 +52,8 @@ class EditChatViewModel(
 
     private val _members = MutableStateFlow(initialGroup.members)
     val members: StateFlow<List<String>> = _members.asStateFlow()
-    private val _memberNames = MutableStateFlow<Map<String, String>>(emptyMap())
-    val memberNames: StateFlow<Map<String, String>> = _memberNames.asStateFlow()
+    private val _memberProfiles = MutableStateFlow<Map<String, Pair<String, String>>>(emptyMap())
+    val memberProfiles: StateFlow<Map<String, Pair<String, String>>> = _memberProfiles.asStateFlow()
 
     private val _isLoading = MutableStateFlow(false)
     val isLoading: StateFlow<Boolean> = _isLoading.asStateFlow()
@@ -96,10 +96,10 @@ class EditChatViewModel(
 
     private fun fetchMemberNames() {
         initialGroup.members.forEach { uid ->
-            userRepository.fetchUserDisplayName(uid) { displayName ->
-                val currentMap = _memberNames.value.toMutableMap()
-                currentMap[uid] = displayName
-                _memberNames.value = currentMap
+            userRepository.fetchUserFullProfile(uid) { name, photo ->
+                val currentMap = _memberProfiles.value.toMutableMap()
+                currentMap[uid] = Pair(name, photo)
+                _memberProfiles.value = currentMap
             }
         }
     }

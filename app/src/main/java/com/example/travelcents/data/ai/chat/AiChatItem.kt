@@ -42,6 +42,28 @@ sealed interface AiChatItem {
         override val id: String,
         val card: AiSingleEventSuggestion
     ) : AiChatItem
+
+    data class PreferenceQuestionCard(
+        override val id: String,
+        val track: DiscoveryTrack,
+        val questionKey: String,
+        val question: String,
+        val options: List<String>,
+        val multiSelect: Boolean,
+        val answered: Boolean = false,
+        val answerSummary: String = ""
+    ) : AiChatItem
+
+    data class SuggestionCarouselCard(
+        override val id: String,
+        val slotId: String,
+        val track: DiscoveryTrack,
+        val label: String,
+        val suggestions: List<SuggestionItem>,
+        val hasMore: Boolean,
+        val isStale: Boolean = false,
+        val exhausted: Boolean = false
+    ) : AiChatItem
 }
 
 enum class AiChatSender {

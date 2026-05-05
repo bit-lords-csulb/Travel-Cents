@@ -166,7 +166,7 @@ Tasks:
 
 ---
 
-## Phase 1 — Hero image fix + existing-card cleanup
+## [x] Phase 1 — Hero image fix + existing-card cleanup
 
 **Goal:** Ship the Section A hero image fix and bring the three existing
 flight cards into blueprint shape. No new external data yet — uses what
@@ -208,7 +208,7 @@ const val ATTR_STOP_AIRPORTS = "attr_stop_airports"            // CSV of IATA co
 
 ---
 
-## Phase 2 — FlightStatusCard (live status) + FlightLegsCard
+## [x] Phase 2 — FlightStatusCard (live status) + FlightLegsCard
 
 **Goal:** The highest-utility flight add: live flight status. Users check
 the itinerary the morning of the flight — showing gate / terminal / delay
@@ -279,7 +279,7 @@ no cache, or both providers failed).
 
 ---
 
-## Phase 3 — BookingOffersCard (flight edition) + LoyaltyCard
+## [x] Phase 3 — BookingOffersCard (flight edition) + LoyaltyCard
 
 **Goal:** Apply the hotel blueprint's multi-provider offers pattern to
 flights. Surface "Book on Skyscanner / Kayak / Google Flights / Airline."
@@ -333,7 +333,7 @@ implementation.
 
 ---
 
-## Phase 4 — FlightSeatCard + FlightBaggageCard + FlightAircraftCard
+## [ ] Phase 4 — FlightSeatCard + FlightBaggageCard + FlightAircraftCard
 
 **Goal:** Fill the "about this flight" sub-cards that hotels / restaurants
 already have analogs for. Seat maps, bag rules, aircraft type.

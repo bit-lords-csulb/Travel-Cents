@@ -8,6 +8,8 @@ import com.example.travelcents.data.ai.chat.AiChatCardCatalog
 import com.example.travelcents.data.ai.chat.AiChatCardGroup
 import com.example.travelcents.data.ai.chat.AiChatCardOption
 import com.example.travelcents.data.ai.chat.AiCuratedTripCatalog
+import com.example.travelcents.data.ai.chat.AiCuratedTripRow
+import com.example.travelcents.data.ai.chat.AiRecommendationMapper
 import com.example.travelcents.data.ai.chat.AiDestinationRecommendation
 import com.example.travelcents.data.ai.chat.AiCuratedTripSource
 import com.example.travelcents.data.ai.chat.AiCuratedTripStarter
@@ -16,10 +18,15 @@ import com.example.travelcents.data.ai.chat.AiChatSender
 import com.example.travelcents.data.ai.chat.AiChatSessionState
 import com.example.travelcents.data.ai.chat.AiChatSessionStore
 import com.example.travelcents.data.ai.chat.AiChatUiState
+import com.example.travelcents.data.ai.chat.AiChatPreviewDraft
+import com.example.travelcents.data.ai.chat.AiChatPreviewDraftType
 import com.example.travelcents.data.ai.chat.AiTravelerProfile
 import com.example.travelcents.data.ai.chat.AiTravelerProfileReducer
 import com.example.travelcents.data.ai.chat.AiDestinationRecommendationRow
 import com.example.travelcents.data.ai.chat.AiChatTripOption
+import com.example.travelcents.data.ai.chat.DiscoverySlot
+import com.example.travelcents.data.ai.chat.DiscoverySlotStatus
+import com.example.travelcents.data.ai.chat.DiscoveryTrack
 import com.example.travelcents.data.ai.chat.AiPlaceRecommendationRow
 import com.example.travelcents.data.ai.chat.AiPlaceRecommendationRowType
 import com.example.travelcents.data.ai.chat.AiPlaceRecommendationCoordinator
@@ -33,8 +40,11 @@ import com.example.travelcents.data.ai.chat.AiTripIntakeNextAction
 import com.example.travelcents.data.ai.chat.AiTripIntakeProfile
 import com.example.travelcents.data.ai.chat.AiTripIntakeOrchestrator
 import com.example.travelcents.data.ai.chat.AiTripIntakeTurnResult
+import com.example.travelcents.data.ai.chat.MealType
+import com.example.travelcents.data.ai.chat.PreferenceProfile
 import com.example.travelcents.data.ai.chat.PersistedAiChatMessage
 import com.example.travelcents.data.ai.chat.PersistedAiChatSnapshot
+import com.example.travelcents.data.ai.chat.SuggestionItem
 import com.example.travelcents.data.ai.chat.mergeIntakeProfile
 import com.example.travelcents.data.ai.chat.mergePatch
 import com.example.travelcents.data.ai.chat.toCardGroup
@@ -42,23 +52,30 @@ import com.example.travelcents.data.ai.chat.toDestinationRecommendationRow
 import com.example.travelcents.data.ai.chat.withDestinationRecommendations
 import com.example.travelcents.data.ai.chat.toModel
 import com.example.travelcents.data.ai.chat.toPersisted
-import com.example.travelcents.BuildConfig
 import com.example.travelcents.data.ai.model.LlmMessage
+import com.example.travelcents.data.media.ImageCacheManager
+import com.example.travelcents.data.media.UnsplashImageRepository
+import com.example.travelcents.data.media.UnsplashSearchParams
 import com.example.travelcents.data.ai.remote.LlmClient
+import com.example.travelcents.data.social.model.BookmarkedPlace
 import com.example.travelcents.data.social.repository.BookmarksRepository
 import com.example.travelcents.data.sync.TripSyncRemoteDataSource
 import com.example.travelcents.data.trip.TripKey
-import com.example.travelcents.data.trip.remote.DestinationImageRepository
-import com.example.travelcents.data.trip.remote.WikipediaApiService
+import com.example.travelcents.data.trip.model.DETAIL_YELP_ID
+import com.example.travelcents.data.trip.model.TravelEvent
+import com.example.travelcents.data.trip.model.YelpBusiness
+import com.example.travelcents.data.trip.model.YelpOptionPoolItem
+import com.example.travelcents.data.trip.model.detailValue
+import com.example.travelcents.data.trip.remote.YelpRepository
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FirebaseFirestore
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
-import okhttp3.OkHttpClient
-import retrofit2.Retrofit
-import retrofit2.converter.gson.GsonConverterFactory
+import java.time.LocalDate
+import java.time.format.DateTimeFormatter
+import java.time.temporal.ChronoUnit
 import java.util.Locale
 import java.util.UUID
 
@@ -78,25 +95,9 @@ class AiChatViewModel(application: Application) : AndroidViewModel(application) 
 
     private var pendingAddToTripEvent: AiSingleEventSuggestion? = null
     private var availableTripsForAdd: List<AiChatTripOption> = emptyList()
-
-    private val wikipediaClient = OkHttpClient.Builder()
-        .addInterceptor { chain ->
-            val request = chain.request().newBuilder()
-                .header("User-Agent", WIKIMEDIA_USER_AGENT)
-                .header("Api-User-Agent", WIKIMEDIA_USER_AGENT)
-                .build()
-            chain.proceed(request)
-        }
-        .build()
-
-    private val wikipedia: WikipediaApiService = Retrofit.Builder()
-        .baseUrl("https://en.wikipedia.org/")
-        .client(wikipediaClient)
-        .addConverterFactory(GsonConverterFactory.create())
-        .build()
-        .create(WikipediaApiService::class.java)
-    private val destinationImages = DestinationImageRepository(wikipedia)
+    private val destinationImages = UnsplashImageRepository()
     private val heroImageCache = mutableMapOf<String, String>()
+    private var processSnapshot: PersistedAiChatSnapshot? = null
 
     private var sessionState = AiChatSessionState()
     private var isLoading = false
@@ -123,10 +124,460 @@ class AiChatViewModel(application: Application) : AndroidViewModel(application) 
         toggleDraftOption(option, allowMultiple = group.allowMultiple)
     }
 
+    fun submitPreferenceQuestionAnswer(
+        card: AiChatItem.PreferenceQuestionCard,
+        answers: List<String>
+    ) {
+        answerPreferenceQuestion(card.id, answers)
+    }
+
+    fun startDiscoveryIfEligible() {
+        if (!startDiscoveryIfEligibleInternal()) return
+        persistLastSession()
+        publishUiState()
+    }
+
+    fun answerPreferenceQuestion(
+        cardId: String,
+        answers: List<String>
+    ) {
+        val activeCard = sessionState.activePreferenceQuestionCard ?: return
+        if (isLoading || activeCard.id != cardId || activeCard.answered) return
+        val selectedAnswers = answers
+            .map(String::trim)
+            .filter(String::isNotBlank)
+            .distinct()
+        if (selectedAnswers.isEmpty()) return
+
+        val answerText = selectedAnswers.joinToString(", ")
+        val answeredCard = activeCard.copy(
+            answered = true,
+            answerSummary = "Cuisine picks: $answerText"
+        )
+        conversationItems += AiChatItem.TextMessage(
+            text = answerText,
+            sender = AiChatSender.USER,
+            tags = selectedAnswers
+        )
+        sessionState = sessionState.copy(
+            preferenceProfile = sessionState.preferenceProfile.copy(cuisineTypes = selectedAnswers),
+            discoverySlots = upsertFoodDiscoverySlot(
+                status = DiscoverySlotStatus.SEARCHING,
+                shownSuggestionIds = emptySet(),
+                exhausted = false
+            ),
+            activePreferenceQuestionCard = answeredCard,
+            activeSuggestionCarouselCard = null,
+            discoverySuggestionPool = emptyList(),
+            activeResponseCardGroup = null,
+            activeDestinationRecommendationRow = null,
+            activeCuratedTripRow = null,
+            activePlaceRecommendationRow = null,
+            activeSingleEventCard = null,
+            anchorMessageId = null
+        )
+        isLoading = true
+        persistLastSession()
+        publishUiState()
+
+        viewModelScope.launch {
+            val suggestions = runCatching {
+                buildFoodSuggestions(selectedAnswers)
+            }.onFailure { error ->
+                Log.w(TAG, "Food discovery search failed: ${error.message}", error)
+            }.getOrDefault(emptyList())
+
+            val visibleSuggestions = visibleFoodSuggestions(pool = suggestions)
+            sessionState = sessionState.copy(
+                discoverySuggestionPool = suggestions,
+                discoverySlots = upsertFoodDiscoverySlot(
+                    status = DiscoverySlotStatus.SHOWING_RESULTS,
+                    shownSuggestionIds = visibleSuggestions.mapTo(mutableSetOf(), SuggestionItem::id),
+                    exhausted = visibleSuggestions.isEmpty()
+                ),
+                activeSuggestionCarouselCard = foodSuggestionCarouselCard(visibleSuggestions)
+            )
+            isLoading = false
+            persistLastSession()
+            publishUiState()
+        }
+    }
+
+    fun noteSuggestionAddedToPreview(suggestion: SuggestionItem) {
+        markDiscoverySuggestion(suggestion, added = true)
+        updatePreviewDraftWithAddedEvent(suggestion.rawEvent)
+        conversationItems += AiChatItem.TextMessage(
+            text = "Added \"${suggestion.name}\" to the preview trip.",
+            sender = AiChatSender.ASSISTANT
+        )
+        persistLastSession()
+        publishUiState()
+    }
+
+    fun bookmarkSuggestion(suggestion: SuggestionItem) {
+        val uid = currentUserId().orEmpty()
+        if (uid.isBlank()) {
+            conversationItems += AiChatItem.TextMessage(
+                text = "Sign in to save places.",
+                sender = AiChatSender.SYSTEM
+            )
+            publishUiState()
+            return
+        }
+
+        val bookmark = BookmarkedPlace(
+            id = suggestion.providerId.ifBlank { suggestion.id },
+            name = suggestion.name,
+            category = suggestion.rawEvent.type.ifBlank { suggestion.subtitle },
+            area = suggestion.address,
+            imageUrl = suggestion.imageUrl,
+            yelpUrl = suggestion.detailUrl,
+            savedAtEpochMs = System.currentTimeMillis()
+        )
+
+        markDiscoverySuggestion(suggestion, bookmarked = true)
+        refreshActiveFoodSuggestionCarousel()
+        persistLastSession()
+        publishUiState()
+
+        viewModelScope.launch {
+            val result = runCatching {
+                bookmarksRepository.addBookmark(uid, bookmark)
+            }.onFailure { error ->
+                Log.w(TAG, "Failed to bookmark AI suggestion: ${error.message}", error)
+            }
+
+            conversationItems += AiChatItem.TextMessage(
+                text = if (result.isSuccess) {
+                    "Saved \"${suggestion.name}\" to your bookmarks."
+                } else {
+                    "I could not save \"${suggestion.name}\" right now."
+                },
+                sender = AiChatSender.ASSISTANT
+            )
+            persistLastSession()
+            publishUiState()
+        }
+    }
+
+    fun skipSuggestion(suggestion: SuggestionItem) {
+        if (isLoading) return
+        val activeCard = sessionState.activeSuggestionCarouselCard
+        if (activeCard != null && activeCard.slotId == suggestion.slotId) {
+            markDiscoverySuggestion(suggestion, skipped = true)
+            refreshActiveFoodSuggestionCarousel()
+            conversationItems += AiChatItem.TextMessage(
+                text = "Skipped \"${suggestion.name}\".",
+                sender = AiChatSender.USER
+            )
+            persistLastSession()
+            publishUiState()
+            return
+        }
+
+        submitUserTurn(
+            visibleMessage = "Skip ${suggestion.name}",
+            llmUserMessage = "Skip this suggested option for ${suggestion.slotId}: ${suggestion.name}. Suggest a better alternative."
+        )
+    }
+
+    fun requestMoreSuggestions(card: AiChatItem.SuggestionCarouselCard) {
+        if (isLoading || !card.hasMore || card.exhausted) return
+        val shownNames = card.suggestions.joinToString { suggestion -> suggestion.name }
+        submitUserTurn(
+            visibleMessage = "Show more options",
+            llmUserMessage = "Show more options for ${card.label}. Avoid repeating these suggestions: $shownNames."
+        )
+    }
+
+    fun requestAddSuggestionToTrip(suggestion: SuggestionItem) {
+        val dateLine = listOf(suggestion.rawEvent.date, suggestion.rawEvent.startTime)
+            .filter(String::isNotBlank)
+            .joinToString(" ")
+        requestAddSingleEventToTrip(
+            AiSingleEventSuggestion(
+                id = suggestion.id,
+                headline = suggestion.name,
+                venue = suggestion.address,
+                cityLine = suggestion.address,
+                dateLine = dateLine,
+                priceLine = "",
+                category = suggestion.subtitle.ifBlank { suggestion.rawEvent.type.ifBlank { "Suggestion" } },
+                imageUrl = suggestion.imageUrl,
+                bookingUrl = suggestion.detailUrl,
+                source = suggestion.source,
+                event = suggestion.rawEvent
+            )
+        )
+    }
+
+    private fun startDiscoveryIfEligibleInternal(): Boolean {
+        if (sessionState.discoveryTrack != DiscoveryTrack.NOT_STARTED) return false
+        if (!hasDiscoveryTiming()) return false
+        if (discoveryDestination().isBlank()) return false
+
+        conversationItems += AiChatItem.TextMessage(
+            text = "Before I build the trip, let me tune the food picks.",
+            sender = AiChatSender.ASSISTANT
+        )
+        sessionState = sessionState.copy(
+            discoveryTrack = DiscoveryTrack.FOOD,
+            discoverySlots = upsertFoodDiscoverySlot(
+                status = DiscoverySlotStatus.PENDING_QUESTION,
+                shownSuggestionIds = emptySet(),
+                exhausted = false
+            ),
+            activeResponseCardGroup = null,
+            activeDestinationRecommendationRow = null,
+            activeCuratedTripRow = null,
+            activePlaceRecommendationRow = null,
+            activeSingleEventCard = null,
+            activePreferenceQuestionCard = foodPreferenceQuestionCard(),
+            activeSuggestionCarouselCard = null,
+            discoverySuggestionPool = emptyList()
+        )
+        return true
+    }
+
+    private fun foodPreferenceQuestionCard(): AiChatItem.PreferenceQuestionCard {
+        return AiChatItem.PreferenceQuestionCard(
+            id = FOOD_PREFERENCE_CARD_ID,
+            track = DiscoveryTrack.FOOD,
+            questionKey = "food_cuisine_preferences",
+            question = "What food should I prioritize?",
+            options = FOOD_PREFERENCE_OPTIONS,
+            multiSelect = true
+        )
+    }
+
+    private suspend fun buildFoodSuggestions(cuisines: List<String>): List<SuggestionItem> {
+        val destination = discoveryDestination()
+        if (destination.isBlank()) return emptyList()
+
+        val businesses = YelpRepository.fetchRestaurantPool(
+            location = destination,
+            targetCount = foodSuggestionPoolTarget()
+        )
+        val rankedBusinesses = rankFoodBusinesses(businesses, cuisines)
+        val poolItems = YelpRepository.mapBusinessesToPoolItems(rankedBusinesses)
+            .take(FOOD_SUGGESTION_POOL_MAX)
+
+        return poolItems.mapIndexed { index, item ->
+            item.toFoodSuggestion(index = index)
+        }
+    }
+
+    private fun rankFoodBusinesses(
+        businesses: List<YelpBusiness>,
+        cuisines: List<String>
+    ): List<YelpBusiness> {
+        val cuisineTerms = cuisines
+            .map { cuisine -> cuisine.trim().lowercase(Locale.US) }
+            .filter(String::isNotBlank)
+        if (cuisineTerms.isEmpty()) return businesses
+
+        return businesses.sortedWith(
+            compareByDescending<YelpBusiness> { business ->
+                val haystack = buildString {
+                    append(business.name.lowercase(Locale.US))
+                    business.categories.forEach { category ->
+                        append(' ')
+                        append(category.title.lowercase(Locale.US))
+                        append(' ')
+                        append(category.alias.lowercase(Locale.US))
+                    }
+                }
+                cuisineTerms.count { term -> term in haystack }
+            }.thenByDescending { business -> business.rating }
+        )
+    }
+
+    private fun YelpOptionPoolItem.toFoodSuggestion(index: Int): SuggestionItem {
+        val timeWindow = FOOD_TIME_WINDOWS[index % FOOD_TIME_WINDOWS.size]
+        val event = TravelEvent(
+            eventId = UUID.randomUUID().toString(),
+            type = "restaurant",
+            itineraryId = "",
+            date = discoveryStartDate(),
+            startTime = timeWindow.first,
+            endTime = timeWindow.second,
+            imageUrl = imageUrl,
+            selectedOptionId = providerId,
+            details = toEventDetails()
+        )
+        val subtitleParts = buildList {
+            categories.firstOrNull()?.takeIf(String::isNotBlank)?.let(::add)
+            priceTier.takeIf(String::isNotBlank)?.let(::add)
+            rating?.takeIf { it > 0.0 }?.let { add("${it.formatRating()} stars") }
+        }
+        return SuggestionItem(
+            id = providerId,
+            name = name,
+            subtitle = subtitleParts.joinToString(" | ").ifBlank { "Restaurant" },
+            imageUrl = imageUrl.takeIf(String::isNotBlank),
+            address = shortAddress,
+            detailUrl = yelpUrl.takeIf(String::isNotBlank),
+            source = source,
+            providerId = providerId,
+            slotId = FOOD_DISCOVERY_SLOT_ID,
+            rawEvent = event
+        )
+    }
+
+    private fun upsertFoodDiscoverySlot(
+        status: DiscoverySlotStatus,
+        shownSuggestionIds: Set<String>,
+        exhausted: Boolean
+    ): List<DiscoverySlot> {
+        val existingSlot = sessionState.discoverySlots.firstOrNull { slot -> slot.id == FOOD_DISCOVERY_SLOT_ID }
+        val nextSlot = (existingSlot ?: DiscoverySlot(
+            id = FOOD_DISCOVERY_SLOT_ID,
+            track = DiscoveryTrack.FOOD,
+            dayIndex = 0,
+            date = discoveryStartDate(),
+            mealType = MealType.DINNER,
+            title = "Dinner ideas",
+            pageSize = FOOD_VISIBLE_SUGGESTION_COUNT
+        )).copy(
+            status = status,
+            shownSuggestionIds = existingSlot?.shownSuggestionIds.orEmpty() + shownSuggestionIds,
+            exhausted = exhausted,
+            pageSize = FOOD_VISIBLE_SUGGESTION_COUNT
+        )
+        return sessionState.discoverySlots
+            .filterNot { slot -> slot.id == FOOD_DISCOVERY_SLOT_ID } + nextSlot
+    }
+
+    private fun foodSuggestionCarouselCard(
+        suggestions: List<SuggestionItem>
+    ): AiChatItem.SuggestionCarouselCard {
+        return AiChatItem.SuggestionCarouselCard(
+            id = FOOD_SUGGESTION_CARD_ID,
+            slotId = FOOD_DISCOVERY_SLOT_ID,
+            track = DiscoveryTrack.FOOD,
+            label = "Food ideas for ${shortDiscoveryDestination()}",
+            suggestions = suggestions,
+            hasMore = false,
+            exhausted = suggestions.isEmpty()
+        )
+    }
+
+    private fun visibleFoodSuggestions(
+        pool: List<SuggestionItem> = sessionState.discoverySuggestionPool
+    ): List<SuggestionItem> {
+        val foodSlot = sessionState.discoverySlots.firstOrNull { slot -> slot.id == FOOD_DISCOVERY_SLOT_ID }
+        val hiddenSuggestionIds = foodSlot?.let { slot ->
+            slot.skippedSuggestionIds + slot.bookmarkedSuggestionIds
+        }.orEmpty()
+        return pool
+            .filterNot { suggestion -> suggestion.id in hiddenSuggestionIds }
+            .take(FOOD_VISIBLE_SUGGESTION_COUNT)
+    }
+
+    private fun refreshActiveFoodSuggestionCarousel() {
+        if (sessionState.discoveryTrack != DiscoveryTrack.FOOD) return
+        val visibleSuggestions = visibleFoodSuggestions()
+        sessionState = sessionState.copy(
+            discoverySlots = upsertFoodDiscoverySlot(
+                status = DiscoverySlotStatus.SHOWING_RESULTS,
+                shownSuggestionIds = visibleSuggestions.mapTo(mutableSetOf(), SuggestionItem::id),
+                exhausted = visibleSuggestions.isEmpty()
+            ),
+            activeSuggestionCarouselCard = foodSuggestionCarouselCard(visibleSuggestions)
+        )
+    }
+
+    private fun markDiscoverySuggestion(
+        suggestion: SuggestionItem,
+        added: Boolean = false,
+        bookmarked: Boolean = false,
+        skipped: Boolean = false
+    ) {
+        sessionState = sessionState.copy(
+            discoverySlots = sessionState.discoverySlots.map { slot ->
+                if (slot.id != suggestion.slotId) {
+                    slot
+                } else {
+                    slot.copy(
+                        addedSuggestionIds = if (added) slot.addedSuggestionIds + suggestion.id else slot.addedSuggestionIds,
+                        bookmarkedSuggestionIds = if (bookmarked) slot.bookmarkedSuggestionIds + suggestion.id else slot.bookmarkedSuggestionIds,
+                        skippedSuggestionIds = if (skipped) slot.skippedSuggestionIds + suggestion.id else slot.skippedSuggestionIds
+                    )
+                }
+            }
+        )
+    }
+
+    private fun updatePreviewDraftWithAddedEvent(event: TravelEvent) {
+        val previewDraft = sessionState.previewDraft ?: return
+        sessionState = sessionState.copy(
+            previewDraft = previewDraft.copy(
+                addedEvents = previewDraft.addedEvents.upsertPreviewDraftEvent(event)
+            )
+        )
+    }
+
+    private fun List<TravelEvent>.upsertPreviewDraftEvent(event: TravelEvent): List<TravelEvent> {
+        val incomingKey = event.previewDraftIdentityKey()
+        return if (any { existing -> existing.previewDraftIdentityKey() == incomingKey }) {
+            this
+        } else {
+            this + event
+        }
+    }
+
+    private fun TravelEvent.previewDraftIdentityKey(): String {
+        return detailValue(DETAIL_YELP_ID)?.takeIf(String::isNotBlank)
+            ?: selectedOptionId.takeIf(String::isNotBlank)
+            ?: eventId
+    }
+
+    private fun discoveryDestination(): String {
+        return sessionState.intakeProfile.destination
+            .ifBlank { sessionState.lockedDestination.orEmpty() }
+            .ifBlank { sessionState.profile.destination }
+            .trim()
+    }
+
+    private fun hasDiscoveryTiming(): Boolean {
+        val intakeProfile = sessionState.intakeProfile
+        val hasExactDates = intakeProfile.dateFrom.isNotBlank() && intakeProfile.dateTo.isNotBlank()
+        val hasRelativeDates = intakeProfile.dateWindow.isNotBlank() && intakeProfile.durationDays != null
+        return hasExactDates || hasRelativeDates
+    }
+
+    private fun foodSuggestionPoolTarget(): Int {
+        val intakeProfile = sessionState.intakeProfile
+        val dayCount = intakeProfile.durationDays
+            ?: runCatching {
+                val start = LocalDate.parse(intakeProfile.dateFrom)
+                val end = LocalDate.parse(intakeProfile.dateTo)
+                ChronoUnit.DAYS.between(start, end).toInt() + 1
+            }.getOrDefault(1)
+        return (dayCount + 4).coerceIn(FOOD_SUGGESTION_POOL_MIN, FOOD_SUGGESTION_POOL_MAX)
+    }
+
+    private fun discoveryStartDate(): String {
+        return sessionState.intakeProfile.dateFrom.ifBlank {
+            LocalDate.now().plusDays(14).format(DateTimeFormatter.ISO_LOCAL_DATE)
+        }
+    }
+
+    private fun shortDiscoveryDestination(): String {
+        return discoveryDestination()
+            .substringBefore(",")
+            .trim()
+            .ifBlank { "your trip" }
+    }
+
+    private fun Double.formatRating(): String {
+        return if (this % 1.0 == 0.0) toInt().toString() else String.format(Locale.US, "%.1f", this)
+    }
+
     fun handleRecommendedStarterSelection(
         starter: AiCuratedTripStarter,
         onOpenTrip: (TripKey) -> Unit,
-        onCreateDraftTrip: (AiCuratedTripStarter, AiTripIntakeProfile) -> Unit
+        onStarterSelected: (AiCuratedTripStarter, AiTripIntakeProfile) -> Unit
     ) {
         selectCuratedTrip(starter)
 
@@ -137,7 +588,11 @@ class AiChatViewModel(application: Application) : AndroidViewModel(application) 
 
             AiCuratedTripSource.SEEDED,
             AiCuratedTripSource.GENERATED -> {
-                onCreateDraftTrip(starter, sessionState.intakeProfile)
+                onStarterSelected(starter, sessionState.intakeProfile)
+                if (startDiscoveryIfEligibleInternal()) {
+                    persistLastSession()
+                    publishUiState()
+                }
             }
         }
     }
@@ -179,6 +634,14 @@ class AiChatViewModel(application: Application) : AndroidViewModel(application) 
             activeCuratedTripRow = null,
             activePlaceRecommendationRow = null,
             activeSingleEventCard = null,
+            lockedDestination = starter.destination,
+            lockedDestinationImageUrl = starter.heroImageUrl,
+            previewDraft = AiChatPreviewDraft(
+                type = AiChatPreviewDraftType.CURATED_STARTER,
+                destination = starter.destination,
+                intakeProfile = updatedIntakeProfile,
+                curatedStarter = starter
+            ),
             anchorMessageId = userMessage.id
         )
 
@@ -187,9 +650,26 @@ class AiChatViewModel(application: Application) : AndroidViewModel(application) 
         generateTitleIfNeeded()
     }
 
-    fun selectDestinationRecommendation(recommendation: AiDestinationRecommendation) {
+    fun selectDestinationRecommendation(
+        recommendation: AiDestinationRecommendation,
+        onDestinationLocked: (AiDestinationRecommendation, AiTripIntakeProfile) -> Unit = { _, _ -> }
+    ) {
         val destination = recommendation.destination.trim()
         if (destination.isBlank()) return
+
+        sessionState = sessionState.copy(
+            lockedDestination = destination,
+            lockedDestinationImageUrl = recommendation.imageUrl,
+            intakeProfile = sessionState.intakeProfile.copy(destination = destination),
+            previewDraft = AiChatPreviewDraft(
+                type = AiChatPreviewDraftType.DESTINATION_LOCK,
+                destination = destination,
+                intakeProfile = sessionState.intakeProfile.copy(destination = destination)
+            )
+        )
+        publishUiState()
+
+        onDestinationLocked(recommendation, sessionState.intakeProfile)
 
         submitUserTurn(
             visibleMessage = "Let's plan around $destination",
@@ -241,12 +721,22 @@ class AiChatViewModel(application: Application) : AndroidViewModel(application) 
         val trimmedText = sessionState.draftText.trim()
         val selectedOptions = sessionState.selectedDraftOptions.distinctBy(AiChatCardOption::id)
         if (trimmedText.isBlank() && selectedOptions.isEmpty()) return
-        if (trimmedText.isBlank() && selectedOptions.any { option -> option.requiresText }) return
+
+        // Dead-end action chips bypass the intake loop and call deterministic handlers.
+        if (trimmedText.isBlank() &&
+            selectedOptions.size == 1 &&
+            selectedOptions.first().groupId == AiChatCardCatalog.DEAD_END_GROUP_ID
+        ) {
+            dispatchDeadEndAction(selectedOptions.first())
+            return
+        }
+
+        val activeQuestionTitle = sessionState.activeResponseCardGroup?.title.orEmpty()
 
         submitUserTurn(
             visibleMessage = buildVisibleUserMessage(selectedOptions, trimmedText),
-            llmUserMessage = buildLlmUserMessage(selectedOptions, trimmedText),
-            visibleTags = buildVisibleUserTags(selectedOptions)
+            llmUserMessage = buildLlmUserMessage(selectedOptions, trimmedText, activeQuestionTitle),
+            visibleTags = buildVisibleUserTags(selectedOptions, trimmedText)
         )
     }
 
@@ -264,7 +754,10 @@ class AiChatViewModel(application: Application) : AndroidViewModel(application) 
         restoreSnapshot(snapshot)
         processSnapshot = snapshot
         publishUiState()
-        launchHeroImageEnrichment(sessionState.activeCuratedTripRow?.id)
+        launchHeroImageEnrichment(
+            curatedRowId = sessionState.activeCuratedTripRow?.id,
+            destinationRowId = sessionState.activeDestinationRecommendationRow?.id
+        )
     }
 
     fun deleteSession(sessionId: String) {
@@ -367,6 +860,163 @@ class AiChatViewModel(application: Application) : AndroidViewModel(application) 
         publishUiState()
     }
 
+    private fun dispatchDeadEndAction(option: AiChatCardOption) {
+        val submittedMessage = AiChatItem.TextMessage(
+            text = "",
+            sender = AiChatSender.USER,
+            tags = listOf(option.label)
+        )
+        conversationItems += submittedMessage
+
+        sessionState = sessionState.copy(
+            llmHistory = sessionState.llmHistory + LlmMessage(role = "user", content = option.message),
+            draftText = "",
+            selectedDraftOptions = emptyList(),
+            activeResponseCardGroup = null,
+            activeDestinationRecommendationRow = null,
+            activeCuratedTripRow = null,
+            activePlaceRecommendationRow = null,
+            activeSingleEventCard = null,
+            anchorMessageId = submittedMessage.id
+        )
+        isLoading = true
+        persistLastSession()
+        publishUiState()
+
+        when {
+            option.id.endsWith("_suggest") -> handleSuggestDestinationsAction()
+            option.id.endsWith("_build") -> handleBuildStarterTripAction()
+            option.id.endsWith("_refine") -> handleKeepRefiningAction()
+            else -> {
+                Log.w(TAG, "Unknown dead-end action option id=${option.id}")
+                finishDeadEndAction(
+                    assistantText = "I'm not sure what to do with that. Pick one of the options below.",
+                    followUpGroup = AiChatCardCatalog.deadEndActionGroup()
+                )
+            }
+        }
+    }
+
+    private fun handleSuggestDestinationsAction() {
+        viewModelScope.launch {
+            val recommendations = runCatching {
+                intakeOrchestrator.suggestDestinations(
+                    currentProfile = sessionState.intakeProfile,
+                    latestUserInput = "Suggest 2 or 3 destinations that fit my profile so far.",
+                    history = sessionState.llmHistory.dropLast(1)
+                )
+            }.onFailure { error ->
+                Log.w(TAG, "Suggest-destinations action failed: ${error.message}", error)
+            }.getOrDefault(emptyList())
+
+            val row = AiRecommendationMapper.destinationRowFromIntake(recommendations)
+            if (row != null) {
+                finishDeadEndAction(
+                    assistantText = "Here are a few destinations that fit what you've shared so far. Tap one to use it as the planning destination.",
+                    destinationRow = row
+                )
+            } else {
+                finishDeadEndAction(
+                    assistantText = "I couldn't pull destination ideas this time. Pick another option below.",
+                    followUpGroup = AiChatCardCatalog.deadEndActionGroup()
+                )
+            }
+        }
+    }
+
+    private fun handleBuildStarterTripAction() {
+        viewModelScope.launch {
+            val row = curatedTripCatalog.recommendSeededStarterRow(sessionState.profile)
+            if (row != null) {
+                finishDeadEndAction(
+                    assistantText = "Here are starter trip templates that match your profile. Tap one to open or edit it.",
+                    curatedTripRow = row
+                )
+            } else {
+                finishDeadEndAction(
+                    assistantText = "I couldn't match a starter trip to your profile yet. Pick another option below.",
+                    followUpGroup = AiChatCardCatalog.deadEndActionGroup()
+                )
+            }
+        }
+    }
+
+    private fun handleKeepRefiningAction() {
+        viewModelScope.launch {
+            val askedSummary = sessionState.askedFollowUpGroupIds.joinToString().ifBlank { "none yet" }
+            val intakeResult = runCatching {
+                intakeOrchestrator.analyzeTurn(
+                    currentProfile = sessionState.intakeProfile,
+                    latestUserInput = "Ask me one new question I haven't answered yet about my trip. " +
+                        "Already asked: $askedSummary. " +
+                        "If you cannot pick a genuinely new question, set next_action=suggest_destinations and return no card.",
+                    history = sessionState.llmHistory.dropLast(1),
+                    askedQuestionIds = sessionState.askedFollowUpGroupIds,
+                    planningObjective = sessionState.planningObjective
+                )
+            }.onFailure { error ->
+                Log.w(TAG, "Keep-refining action failed: ${error.message}", error)
+            }.getOrNull()
+
+            val followUpGroup = resolveFollowUpGroup(
+                intakeResult = intakeResult,
+                askedGroupIds = sessionState.askedFollowUpGroupIds
+            )
+
+            if (followUpGroup != null) {
+                val mergedIntakeProfile = sessionState.intakeProfile.mergePatch(intakeResult?.profilePatch)
+                val mergedProfile = sessionState.profile.mergeIntakeProfile(mergedIntakeProfile)
+                sessionState = sessionState.copy(
+                    profile = mergedProfile,
+                    intakeProfile = mergedIntakeProfile,
+                    stage = AiTravelerProfileReducer.stageFor(mergedProfile),
+                    askedFollowUpGroupIds = recordAskedFollowUpGroupId(
+                        existingIds = sessionState.askedFollowUpGroupIds,
+                        group = followUpGroup
+                    )
+                )
+                finishDeadEndAction(
+                    assistantText = intakeResult?.assistantMessage.orEmpty().ifBlank { "Got it." },
+                    followUpGroup = followUpGroup
+                )
+            } else {
+                finishDeadEndAction(
+                    assistantText = "I'm out of new questions for this profile. Tap one of the options below to take the next step.",
+                    followUpGroup = AiChatCardCatalog.deadEndActionGroup()
+                )
+            }
+        }
+    }
+
+    private fun finishDeadEndAction(
+        assistantText: String,
+        followUpGroup: AiChatCardGroup? = null,
+        destinationRow: AiDestinationRecommendationRow? = null,
+        curatedTripRow: AiCuratedTripRow? = null
+    ) {
+        if (assistantText.isNotBlank()) {
+            conversationItems += AiChatItem.TextMessage(
+                text = assistantText,
+                sender = AiChatSender.ASSISTANT
+            )
+        }
+        sessionState = sessionState.copy(
+            llmHistory = sessionState.llmHistory + LlmMessage(
+                role = "assistant",
+                content = assistantText.ifBlank { "(action)" }
+            ),
+            activeResponseCardGroup = followUpGroup,
+            activeDestinationRecommendationRow = destinationRow,
+            activeCuratedTripRow = curatedTripRow,
+            activePlaceRecommendationRow = null,
+            activeSingleEventCard = null
+        )
+        isLoading = false
+        persistLastSession()
+        publishUiState()
+        launchHeroImageEnrichment(curatedTripRow?.id, destinationRow?.id)
+    }
+
     private fun toggleDraftOption(
         option: AiChatCardOption,
         allowMultiple: Boolean
@@ -427,7 +1077,10 @@ class AiChatViewModel(application: Application) : AndroidViewModel(application) 
             pendingAddToTripEvent = pendingAddToTripEvent,
             availableTrips = availableTripsForAdd,
             bookmarkedPlaceIds = _bookmarkedPlaceIds.value,
-            isLoading = isLoading
+            isLoading = isLoading,
+            lockedDestination = sessionState.lockedDestination,
+            lockedDestinationImageUrl = sessionState.lockedDestinationImageUrl,
+            previewDraft = sessionState.previewDraft
         )
     }
 
@@ -475,11 +1128,13 @@ class AiChatViewModel(application: Application) : AndroidViewModel(application) 
                     )
                 )
             }
+            sessionState.activePreferenceQuestionCard?.let(::add)
+            sessionState.activeSuggestionCarouselCard?.let(::add)
         }
     }
 
     private fun restoreLastSessionOrStartFresh() {
-        val cached = processSnapshot
+        val cached = (processSnapshot ?: sessionStore.loadActiveSession(currentUserId()))
             ?.takeIf { snapshot ->
                 snapshot.messages.any { message -> message.sender == AiChatSender.USER }
             }
@@ -511,6 +1166,10 @@ class AiChatViewModel(application: Application) : AndroidViewModel(application) 
             intakeProfile = snapshot.intakeProfile ?: snapshot.profile.intakeProfile(),
             planningObjective = snapshot.planningObjective,
             stage = snapshot.stage,
+            preferenceProfile = snapshot.preferenceProfile ?: PreferenceProfile(),
+            discoveryTrack = snapshot.discoveryTrack ?: DiscoveryTrack.NOT_STARTED,
+            discoverySlots = snapshot.discoverySlots.orEmpty(),
+            discoverySuggestionPool = snapshot.discoverySuggestionPool.orEmpty(),
             llmHistory = snapshot.llmHistory,
             starterCards = AiChatCardCatalog.starterCards(snapshot.sessionId),
             askedFollowUpGroupIds = snapshot.askedFollowUpGroupIds,
@@ -518,8 +1177,19 @@ class AiChatViewModel(application: Application) : AndroidViewModel(application) 
             activeDestinationRecommendationRow = snapshot.activeDestinationRecommendationRow?.toModel(),
             activeCuratedTripRow = snapshot.activeCuratedTripRow?.toModel(),
             activePlaceRecommendationRow = snapshot.activePlaceRecommendationRow?.toModel(),
-            anchorMessageId = snapshot.anchorMessageId
+            activePreferenceQuestionCard = snapshot.activePreferenceQuestionCard,
+            activeSuggestionCarouselCard = snapshot.activeSuggestionCarouselCard,
+            anchorMessageId = snapshot.anchorMessageId,
+            lockedDestination = snapshot.lockedDestination,
+            lockedDestinationImageUrl = snapshot.lockedDestinationImageUrl,
+            previewDraft = snapshot.previewDraft
         )
+        if (sessionState.discoveryTrack == DiscoveryTrack.FOOD &&
+            sessionState.discoverySuggestionPool.isNotEmpty() &&
+            sessionState.activeSuggestionCarouselCard == null
+        ) {
+            refreshActiveFoodSuggestionCarousel()
+        }
         isLoading = false
     }
 
@@ -555,13 +1225,22 @@ class AiChatViewModel(application: Application) : AndroidViewModel(application) 
             intakeProfile = sessionState.intakeProfile,
             planningObjective = sessionState.planningObjective,
             stage = sessionState.stage,
+            preferenceProfile = sessionState.preferenceProfile,
+            discoveryTrack = sessionState.discoveryTrack,
+            discoverySlots = sessionState.discoverySlots,
+            discoverySuggestionPool = sessionState.discoverySuggestionPool,
             llmHistory = sessionState.llmHistory,
             askedFollowUpGroupIds = sessionState.askedFollowUpGroupIds,
             activeResponseCardGroup = sessionState.activeResponseCardGroup?.toPersisted(),
             activeDestinationRecommendationRow = sessionState.activeDestinationRecommendationRow?.toPersisted(),
             activeCuratedTripRow = sessionState.activeCuratedTripRow?.toPersisted(),
             activePlaceRecommendationRow = sessionState.activePlaceRecommendationRow?.toPersisted(),
-            anchorMessageId = sessionState.anchorMessageId
+            activePreferenceQuestionCard = sessionState.activePreferenceQuestionCard,
+            activeSuggestionCarouselCard = sessionState.activeSuggestionCarouselCard,
+            anchorMessageId = sessionState.anchorMessageId,
+            lockedDestination = sessionState.lockedDestination,
+            lockedDestinationImageUrl = sessionState.lockedDestinationImageUrl,
+            previewDraft = sessionState.previewDraft
         )
 
         processSnapshot = snapshot
@@ -672,34 +1351,25 @@ class AiChatViewModel(application: Application) : AndroidViewModel(application) 
         selectedOptions: List<AiChatCardOption>,
         typedText: String
     ): String {
-        if (selectedOptions.isNotEmpty() && selectedOptions.all { option -> option.groupId == STARTER_CARD_GROUP_ID }) {
-            return typedText
-        }
-
-        val selectionLine = selectedOptions
-            .filterNot { option -> option.requiresText && typedText.isNotBlank() }
-            .joinToString(separator = "  •  ") { option ->
-                option.label
-            }
-
-        return listOf(selectionLine, typedText)
-            .filter { value -> value.isNotBlank() }
-            .joinToString(separator = "\n")
-            .trim()
+        // Card-only submissions render as chips; typed text is shown as a regular bubble below.
+        return typedText
     }
 
     private fun buildVisibleUserTags(
-        selectedOptions: List<AiChatCardOption>
+        selectedOptions: List<AiChatCardOption>,
+        typedText: String
     ): List<String> {
+        val typedNonBlank = typedText.isNotBlank()
         return selectedOptions
-            .takeIf { options -> options.isNotEmpty() && options.all { option -> option.groupId == STARTER_CARD_GROUP_ID } }
-            ?.map(AiChatCardOption::label)
-            .orEmpty()
+            // Hide the Other chip when the user typed text — the bubble carries that text instead.
+            .filterNot { option -> option.requiresText && typedNonBlank }
+            .map(AiChatCardOption::label)
     }
 
     private fun buildLlmUserMessage(
         selectedOptions: List<AiChatCardOption>,
-        typedText: String
+        typedText: String,
+        activeQuestionTitle: String
     ): String {
         if (selectedOptions.isNotEmpty() && selectedOptions.all { option -> option.groupId == STARTER_CARD_GROUP_ID }) {
             return buildList {
@@ -715,16 +1385,23 @@ class AiChatViewModel(application: Application) : AndroidViewModel(application) 
         }
 
         val standardOptions = selectedOptions.filterNot { option -> option.requiresText }
-        val hasTypedOther = selectedOptions.any { option -> option.requiresText } && typedText.isNotBlank()
+        val otherSelected = selectedOptions.any { option -> option.requiresText }
+        val typedNonBlank = typedText.isNotBlank()
 
         return buildList {
             if (standardOptions.isNotEmpty()) {
                 add("Selected choices:")
                 addAll(standardOptions.map { option -> "- ${option.message}" })
             }
-            if (hasTypedOther) {
+            if (otherSelected && typedNonBlank) {
                 add("Custom answer: $typedText")
-            } else if (typedText.isNotBlank()) {
+            } else if (otherSelected && !typedNonBlank) {
+                if (activeQuestionTitle.isNotBlank()) {
+                    add("I would like different options for: $activeQuestionTitle")
+                } else {
+                    add("Please show me different options.")
+                }
+            } else if (typedNonBlank) {
                 add("Extra context: $typedText")
             }
         }.joinToString(separator = "\n").trim()
@@ -742,6 +1419,11 @@ class AiChatViewModel(application: Application) : AndroidViewModel(application) 
                 append(recommendation.matchReason)
                 append('.')
             }
+            appendLine()
+            appendLine("Destination is now locked. Respond with next_action=ask_more.")
+            appendLine("Ask when the user would like to travel (question_id='travel_timeline').")
+            appendLine("Suggest 4-5 time options: 'This month', 'Next month', 'In 3 months', 'In 6 months', 'I have specific dates'.")
+            append("Do not set next_action=build_trip.")
         }
     }
 
@@ -852,6 +1534,24 @@ class AiChatViewModel(application: Application) : AndroidViewModel(application) 
         val trimmedLlmUserMessage = llmUserMessage.trim()
         if ((trimmedVisibleMessage.isBlank() && visibleTags.isEmpty()) || trimmedLlmUserMessage.isBlank()) return
 
+        // Capture the question the user just answered before we clear the active card group.
+        val answeredQuestionTitle = sessionState.activeResponseCardGroup
+            ?.takeIf { group -> group.id != AiChatCardCatalog.DEAD_END_GROUP_ID }
+            ?.title
+            .orEmpty()
+
+        // Promote the question into the last AI bubble so it sits above the user's answer,
+        // not in the following AI response.
+        if (answeredQuestionTitle.isNotBlank()) {
+            val lastIndex = conversationItems.indexOfLast { it.sender == AiChatSender.ASSISTANT }
+            if (lastIndex >= 0) {
+                val prev = conversationItems[lastIndex]
+                conversationItems[lastIndex] = prev.copy(
+                    text = "${prev.text} $answeredQuestionTitle"
+                )
+            }
+        }
+
         val submittedMessage = AiChatItem.TextMessage(
             text = trimmedVisibleMessage,
             sender = AiChatSender.USER,
@@ -920,16 +1620,22 @@ class AiChatViewModel(application: Application) : AndroidViewModel(application) 
             val mergedProfile = sessionState.profile.mergeIntakeProfile(mergedIntakeProfile)
             val assistantPlanningObjective = (enrichedIntakeResult?.planningObjective ?: "")
                 .ifBlank { sessionState.planningObjective }
-            val toolRouterResult = runCatching {
-                toolRouter.routeTools(
-                    currentProfile = mergedIntakeProfile,
-                    latestUserInput = trimmedLlmUserMessage,
-                    history = sessionState.llmHistory.dropLast(1),
-                    planningObjective = assistantPlanningObjective
-                )
-            }.onFailure { error ->
-                Log.w(TAG, "Tool routing failed. Continuing without routed tool calls.", error)
-            }.getOrNull()
+            val destinationKnown = mergedIntakeProfile.destination.isNotBlank() ||
+                sessionState.lockedDestination?.isNotBlank() == true
+            val toolRouterResult = if (destinationKnown) {
+                runCatching {
+                    toolRouter.routeTools(
+                        currentProfile = mergedIntakeProfile,
+                        latestUserInput = trimmedLlmUserMessage,
+                        history = sessionState.llmHistory.dropLast(1),
+                        planningObjective = assistantPlanningObjective
+                    )
+                }.onFailure { error ->
+                    Log.w(TAG, "Tool routing failed. Continuing without routed tool calls.", error)
+                }.getOrNull()
+            } else {
+                null
+            }
             val toolDispatch = runCatching {
                 dispatchToolCalls(
                     toolRouterResult = toolRouterResult,
@@ -940,23 +1646,8 @@ class AiChatViewModel(application: Application) : AndroidViewModel(application) 
             }.onFailure { error ->
                 Log.w(TAG, "Tool dispatch failed. Continuing without live tool results.", error)
             }.getOrDefault(AiToolDispatchResult())
-            val assistantResponse = buildAssistantResponse(
-                intakeResult = enrichedIntakeResult,
-                profile = mergedProfile,
-                intakeProfile = mergedIntakeProfile,
-                planningObjective = assistantPlanningObjective,
-                history = sessionState.llmHistory,
-                ticketmasterGrounding = toolDispatch.singleEventResolution?.groundingContext,
-                viabilityWarning = toolDispatch.viabilityWarning,
-                placeRecommendationRow = toolDispatch.placeRecommendationRow
-            )
 
-            conversationItems += AiChatItem.TextMessage(
-                text = assistantResponse,
-                sender = AiChatSender.ASSISTANT
-            )
-
-            val followUpGroup = resolveFollowUpGroup(
+            val intakeFollowUpGroup = resolveFollowUpGroup(
                 intakeResult = enrichedIntakeResult,
                 askedGroupIds = sessionState.askedFollowUpGroupIds
             )
@@ -983,6 +1674,46 @@ class AiChatViewModel(application: Application) : AndroidViewModel(application) 
             val placeRecommendationRow = toolDispatch.placeRecommendationRow
             val singleEventCard = toolDispatch.singleEventResolution?.suggestion
 
+            val anyUiResolved = intakeFollowUpGroup != null ||
+                destinationRecommendationRow != null ||
+                curatedTripRow != null ||
+                placeRecommendationRow != null ||
+                singleEventCard != null
+            val intakeDeadEnd = enrichedIntakeResult != null && !anyUiResolved
+            if (intakeDeadEnd) {
+                Log.w(
+                    TAG,
+                    "Intake next_action=${enrichedIntakeResult?.nextAction} produced no card or row. " +
+                        "Recovering with summary + next-step actions."
+                )
+            }
+
+            val followUpGroup = when {
+                intakeFollowUpGroup != null -> intakeFollowUpGroup
+                intakeDeadEnd && sessionState.lockedDestination?.isNotBlank() == true
+                    && mergedIntakeProfile.dateWindow.isBlank() -> AiChatCardCatalog.timelineQuestionGroup()
+                intakeDeadEnd -> AiChatCardCatalog.deadEndActionGroup()
+                else -> null
+            }
+
+            val assistantResponse = buildAssistantResponse(
+                intakeResult = enrichedIntakeResult,
+                profile = mergedProfile,
+                intakeProfile = mergedIntakeProfile,
+                planningObjective = assistantPlanningObjective,
+                history = sessionState.llmHistory,
+                ticketmasterGrounding = toolDispatch.singleEventResolution?.groundingContext,
+                viabilityWarning = toolDispatch.viabilityWarning,
+                placeRecommendationRow = toolDispatch.placeRecommendationRow,
+                intakeDeadEnd = intakeDeadEnd,
+                isPostDestinationLock = sessionState.lockedDestination?.isNotBlank() == true
+            )
+
+            conversationItems += AiChatItem.TextMessage(
+                text = assistantResponse,
+                sender = AiChatSender.ASSISTANT
+            )
+
             sessionState = sessionState.copy(
                 profile = mergedProfile,
                 intakeProfile = mergedIntakeProfile,
@@ -994,7 +1725,7 @@ class AiChatViewModel(application: Application) : AndroidViewModel(application) 
                 ),
                 askedFollowUpGroupIds = recordAskedFollowUpGroupId(
                     existingIds = sessionState.askedFollowUpGroupIds,
-                    group = followUpGroup
+                    group = intakeFollowUpGroup
                 ),
                 activeResponseCardGroup = followUpGroup,
                 activeDestinationRecommendationRow = destinationRecommendationRow,
@@ -1003,6 +1734,7 @@ class AiChatViewModel(application: Application) : AndroidViewModel(application) 
                 activeSingleEventCard = singleEventCard
             )
             isLoading = false
+            startDiscoveryIfEligibleInternal()
             persistLastSession()
             publishUiState()
             generateTitleIfNeeded()
@@ -1018,22 +1750,30 @@ class AiChatViewModel(application: Application) : AndroidViewModel(application) 
         history: List<LlmMessage>,
         ticketmasterGrounding: String?,
         viabilityWarning: String,
-        placeRecommendationRow: AiPlaceRecommendationRow?
+        placeRecommendationRow: AiPlaceRecommendationRow?,
+        intakeDeadEnd: Boolean,
+        isPostDestinationLock: Boolean = false
     ): String {
-        val structuredResponse = intakeResult?.assistantMessage
+        val structuredAck = intakeResult?.assistantMessage
             ?.takeIf { message -> message.isNotBlank() }
-        val baseResponse = if (!ticketmasterGrounding.isNullOrBlank()) {
-            fallbackAssistantMessage(
+        val baseResponse = when {
+            !ticketmasterGrounding.isNullOrBlank() -> fallbackAssistantMessage(
                 profile = profile,
                 intakeProfile = intakeProfile,
                 history = history,
                 planningObjective = planningObjective,
                 groundingContext = ticketmasterGrounding
             )
-        } else if (structuredResponse != null) {
-            structuredResponse
-        } else {
-            fallbackAssistantMessage(
+            intakeDeadEnd && isPostDestinationLock -> structuredAck ?: DESTINATION_ACK_POOL.random()
+            intakeDeadEnd -> fallbackAssistantMessage(
+                profile = profile,
+                intakeProfile = intakeProfile,
+                history = history,
+                planningObjective = planningObjective,
+                groundingContext = DEAD_END_RECOVERY_GROUNDING
+            )
+            structuredAck != null -> structuredAck
+            else -> fallbackAssistantMessage(
                 profile = profile,
                 intakeProfile = intakeProfile,
                 history = history,
@@ -1104,10 +1844,21 @@ class AiChatViewModel(application: Application) : AndroidViewModel(application) 
         intakeResult: AiTripIntakeTurnResult?,
         askedGroupIds: List<String>
     ): AiChatCardGroup? {
-        val followUpQuestion = intakeResult
-            ?.takeIf { result -> result.nextAction == AiTripIntakeNextAction.ASK_MORE }
-            ?.followUpQuestion
-            ?: return null
+        if (intakeResult == null) {
+            Log.d(TAG, "No intake result; skipping follow-up resolution.")
+            return null
+        }
+        if (intakeResult.nextAction != AiTripIntakeNextAction.ASK_MORE) {
+            Log.d(
+                TAG,
+                "Intake next_action=${intakeResult.nextAction}; no card follow-up expected."
+            )
+            return null
+        }
+        val followUpQuestion = intakeResult.followUpQuestion ?: run {
+            Log.w(TAG, "Intake next_action=ASK_MORE but no valid followUpQuestion was returned.")
+            return null
+        }
 
         val intakeGroup = followUpQuestion
             .toCardGroup()
@@ -1154,14 +1905,16 @@ class AiChatViewModel(application: Application) : AndroidViewModel(application) 
                 needsLookup.map { it.destination }
                     .distinct()
                     .forEach { destination ->
-                        val key = heroImageCacheKey(destination)
+                        val query = "$destination skyline"
+                        val params = UnsplashSearchParams(orientation = "landscape")
+                        val key = heroImageCacheKey(query, params)
                         val cached = heroImageCache[key]
                         if (cached != null) {
                             resolved[destination] = cached
                             return@forEach
                         }
                         val resolvedUrl = runCatching {
-                            destinationImages.resolveDestinationImage(destination).imageUrl
+                            destinationImages.resolve(query = query, params = params)
                         }.onFailure { error ->
                             Log.w(TAG, "Hero image lookup failed for '$destination': ${error.message}")
                         }.getOrNull()
@@ -1173,12 +1926,25 @@ class AiChatViewModel(application: Application) : AndroidViewModel(application) 
 
                 if (resolved.isEmpty()) return@launch
 
+                val context = getApplication<Application>()
+                val cachedMedia = runCatching {
+                    ImageCacheManager.cacheMedia(
+                        context = context,
+                        bucketName = AI_CHAT_IMAGE_CACHE_BUCKET,
+                        urls = resolved.values.toList()
+                    )
+                }.onFailure { error ->
+                    Log.w(TAG, "Curated trip image cache write failed: ${error.message}")
+                }.getOrDefault(emptyMap())
+
                 val current = sessionState.activeCuratedTripRow ?: return@launch
                 if (current.id != curatedRowId) return@launch
 
                 val updatedTrips = current.trips.map { starter ->
                     if (!starter.heroImageUrl.isNullOrBlank()) starter
-                    else resolved[starter.destination]?.let { url -> starter.copy(heroImageUrl = url) }
+                    else resolved[starter.destination]?.let { url ->
+                        starter.copy(heroImageUrl = cachedMedia[url] ?: url)
+                    }
                         ?: starter
                 }
                 if (updatedTrips == current.trips) return@launch
@@ -1203,14 +1969,16 @@ class AiChatViewModel(application: Application) : AndroidViewModel(application) 
                 needsLookup.map { it.destination }
                     .distinct()
                     .forEach { destination ->
-                        val key = heroImageCacheKey(destination)
+                        val query = "$destination travel"
+                        val params = UnsplashSearchParams()
+                        val key = heroImageCacheKey(query, params)
                         val cached = heroImageCache[key]
                         if (cached != null) {
                             resolved[destination] = cached
                             return@forEach
                         }
                         val resolvedUrl = runCatching {
-                            destinationImages.resolveDestinationImage(destination).imageUrl
+                            destinationImages.resolve(query = query, params = params)
                         }.onFailure { error ->
                             Log.w(TAG, "Destination image lookup failed for '$destination': ${error.message}")
                         }.getOrNull()
@@ -1222,12 +1990,25 @@ class AiChatViewModel(application: Application) : AndroidViewModel(application) 
 
                 if (resolved.isEmpty()) return@launch
 
+                val context = getApplication<Application>()
+                val cachedMedia = runCatching {
+                    ImageCacheManager.cacheMedia(
+                        context = context,
+                        bucketName = AI_CHAT_IMAGE_CACHE_BUCKET,
+                        urls = resolved.values.toList()
+                    )
+                }.onFailure { error ->
+                    Log.w(TAG, "Destination image cache write failed: ${error.message}")
+                }.getOrDefault(emptyMap())
+
                 val current = sessionState.activeDestinationRecommendationRow ?: return@launch
                 if (current.id != destinationRowId) return@launch
 
                 val updatedRecs = current.recommendations.map { rec ->
                     if (!rec.imageUrl.isNullOrBlank()) rec
-                    else resolved[rec.destination]?.let { url -> rec.copy(imageUrl = url) }
+                    else resolved[rec.destination]?.let { url ->
+                        rec.copy(imageUrl = cachedMedia[url] ?: url)
+                    }
                         ?: rec
                 }
                 if (updatedRecs == current.recommendations) return@launch
@@ -1239,23 +2020,55 @@ class AiChatViewModel(application: Application) : AndroidViewModel(application) 
         }
     }
 
-    private fun heroImageCacheKey(destination: String): String {
-        return destination.substringBefore(",").trim().lowercase(Locale.US)
+    private fun heroImageCacheKey(query: String, params: UnsplashSearchParams): String {
+        val sanitizedParams = params.sanitized()
+        return listOf(
+            query.trim().lowercase(Locale.US),
+            sanitizedParams.orientation.orEmpty().lowercase(Locale.US),
+            sanitizedParams.color.orEmpty().lowercase(Locale.US),
+            sanitizedParams.orderBy.lowercase(Locale.US),
+            sanitizedParams.contentFilter.lowercase(Locale.US),
+            sanitizedParams.perPage.toString(),
+            sanitizedParams.pageIndex.toString()
+        ).joinToString("|")
     }
 
     private companion object {
         private const val STARTER_CARD_GROUP_ID = "starter_grid"
         private const val TAG = "AiChatViewModel"
+        private const val AI_CHAT_IMAGE_CACHE_BUCKET = "ai_chat_destination_images"
+        private const val FOOD_PREFERENCE_CARD_ID = "phase5_food_preference_question"
+        private const val FOOD_SUGGESTION_CARD_ID = "phase5_food_suggestion_carousel"
+        private const val FOOD_DISCOVERY_SLOT_ID = "phase5_food_dinner_slot"
+        private const val FOOD_VISIBLE_SUGGESTION_COUNT = 3
+        private const val FOOD_SUGGESTION_POOL_MIN = 10
+        private const val FOOD_SUGGESTION_POOL_MAX = 15
+        private val FOOD_PREFERENCE_OPTIONS = listOf(
+            "Local favorites",
+            "Street food",
+            "Fine dining",
+            "Cafes",
+            "Vegetarian",
+            "Seafood"
+        )
+        private val FOOD_TIME_WINDOWS = listOf(
+            "18:30" to "20:00",
+            "19:00" to "20:30",
+            "20:00" to "21:30"
+        )
         private const val BASE_SYSTEM_PROMPT =
             "You are TravelCents AI, a trip-planning copilot inside the TravelCents app. " +
                 "Be concise, helpful, and practical. Keep replies to short acknowledgment paragraphs. " +
                 "The app may present follow-up choices separately, so do not stack multiple questions or long questionnaires. " +
                 "Use the traveler profile context when available. Do not mention model vendors or say you are a generic AI chatbot."
-        private const val WIKIMEDIA_CONTACT_URL = "https://github.com/bit-lords-csulb/Travel-Cents"
-        private val WIKIMEDIA_USER_AGENT =
-            "TravelCents/${BuildConfig.VERSION_NAME} (Android app; $WIKIMEDIA_CONTACT_URL)"
-
-        private var processSnapshot: PersistedAiChatSnapshot? = null
+        private val DESTINATION_ACK_POOL = listOf(
+            "Sounds good!", "Love it!", "Nice choice!", "Great pick!", "Perfect!"
+        )
+        private const val DEAD_END_RECOVERY_GROUNDING =
+            "The structured intake step produced no follow-up. " +
+                "Briefly summarize what you already know about the user's trip in 1 to 2 sentences, " +
+                "then say the app is showing next-step options below to suggest destinations, build a starter trip, or keep refining. " +
+                "Do not ask another question — the user will pick from the buttons."
     }
 }
 

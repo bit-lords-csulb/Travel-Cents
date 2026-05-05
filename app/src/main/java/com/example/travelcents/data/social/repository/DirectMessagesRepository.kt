@@ -4,6 +4,7 @@ import android.util.Log
 import com.example.travelcents.data.social.model.DirectChatPreview
 import com.example.travelcents.data.social.model.Message
 import com.google.firebase.Timestamp
+import com.google.firebase.firestore.DocumentSnapshot
 import com.google.firebase.firestore.FieldPath
 import com.google.firebase.firestore.FieldValue
 import com.google.firebase.firestore.FirebaseFirestore
@@ -28,7 +29,9 @@ class DirectMessagesRepository(
                     val data = hashMapOf(
                         "members" to listOf(myUid, theirUid),
                         "lastMessage" to "",
-                        "lastMessageTime" to Timestamp.now()
+                        "lastMessageTime" to Timestamp.now(),
+                        "lastSenderId" to "",
+                        "lastSenderName" to ""
                     )
                     db.collection("directChats").add(data)
                         .addOnSuccessListener { onResult(it.id) }
@@ -41,18 +44,12 @@ class DirectMessagesRepository(
         onUpdate: (List<DirectChatPreview>) -> Unit
     ): ListenerRegistration {
         val nameCache = mutableMapOf<String, String>()
+        val photoCache = mutableMapOf<String, String>()
         val previewMap = mutableMapOf<String, DirectChatPreview>()
 
         fun publish() {
             onUpdate(previewMap.values.sortedByDescending { it.lastMessageTime })
         }
-
-        data class ChatEntry(
-            val chatId: String,
-            val otherUid: String,
-            val lastMsg: String,
-            val lastTime: Timestamp?
-        )
 
         return db.collection("directChats")
             .whereArrayContains("members", myUid)
@@ -70,45 +67,57 @@ class DirectMessagesRepository(
                 val currentIds = snapshot.documents.map { it.id }.toSet()
                 previewMap.keys.retainAll(currentIds)
 
-                val entries = snapshot.documents.mapNotNull { doc ->
-                    val members = (doc.get("members") as? List<*>)?.filterIsInstance<String>() ?: return@mapNotNull null
-                    val otherUid = members.firstOrNull { it != myUid } ?: return@mapNotNull null
-                    ChatEntry(doc.id, otherUid, doc.getString("lastMessage") ?: "", doc.getTimestamp("lastMessageTime"))
-                }
+                snapshot.documents.forEach { doc ->
+                    val members = (doc.get("members") as? List<*>)?.filterIsInstance<String>() ?: return@forEach
+                    val otherUid = members.firstOrNull { it != myUid } ?: myUid
+                    val lastMsg = doc.getString("lastMessage") ?: ""
+                    val lastTime = doc.getTimestamp("lastMessageTime")
+                    val lastSenderId = doc.getString("lastSenderId") ?: ""
+                    val lastSenderName = doc.getString("lastSenderName") ?: ""
 
-                entries.forEach { entry ->
-                    nameCache[entry.otherUid]?.let { name ->
-                        previewMap[entry.chatId] = DirectChatPreview(
-                            entry.chatId,
-                            entry.otherUid,
-                            name,
-                            entry.lastMsg,
-                            entry.lastTime
-                        )
-                    }
+                    previewMap[doc.id] = DirectChatPreview(
+                        id = doc.id,
+                        otherUid = otherUid,
+                        otherUserName = nameCache[otherUid] ?: "Loading...",
+                        lastMessage = lastMsg,
+                        lastMessageTime = lastTime,
+                        lastSenderId = lastSenderId,
+                        lastSenderName = lastSenderName,
+                        otherPhotoUrl = photoCache[otherUid] ?: ""
+                    )
                 }
                 publish()
 
-                val uncachedUids = entries.map { it.otherUid }.distinct().filter { it !in nameCache }
-                if (uncachedUids.isNotEmpty()) {
-                    uncachedUids.chunked(30).forEach { batch ->
+                val uidsToFetch = snapshot.documents.mapNotNull { doc ->
+                    val members = (doc.get("members") as? List<*>)?.filterIsInstance<String>()
+                    members?.firstOrNull { it != myUid } ?: members?.firstOrNull()
+                }.distinct().filter { it !in nameCache }
+
+                if (uidsToFetch.isNotEmpty()) {
+                    uidsToFetch.chunked(30).forEach { batch ->
                         db.collection("users")
                             .whereIn(FieldPath.documentId(), batch)
                             .get()
                             .addOnSuccessListener { userDocs ->
                                 userDocs.forEach { userDoc ->
                                     nameCache[userDoc.id] = userDoc.displayName()
+                                    photoCache[userDoc.id] = userDoc.getString("profileImageUrl") ?: ""
                                 }
-                                entries.forEach { entry ->
-                                    nameCache[entry.otherUid]?.let { name ->
-                                        previewMap[entry.chatId] = DirectChatPreview(
-                                            entry.chatId,
-                                            entry.otherUid,
-                                            name,
-                                            entry.lastMsg,
-                                            entry.lastTime
-                                        )
-                                    }
+                                // Second pass to update names after fetch
+                                snapshot.documents.forEach { doc ->
+                                    val members = (doc.get("members") as? List<*>)?.filterIsInstance<String>() ?: return@forEach
+                                    val otherUid = members.firstOrNull { it != myUid } ?: myUid
+                                    
+                                    previewMap[doc.id] = DirectChatPreview(
+                                        id = doc.id,
+                                        otherUid = otherUid,
+                                        otherUserName = nameCache[otherUid] ?: "Unknown User",
+                                        lastMessage = doc.getString("lastMessage") ?: "",
+                                        lastMessageTime = doc.getTimestamp("lastMessageTime"),
+                                        lastSenderId = doc.getString("lastSenderId") ?: "",
+                                        lastSenderName = doc.getString("lastSenderName") ?: "",
+                                        otherPhotoUrl = photoCache[otherUid] ?: ""
+                                    )
                                 }
                                 publish()
                             }
@@ -136,6 +145,7 @@ class DirectMessagesRepository(
             "text" to text,
             "senderId" to senderId,
             "senderName" to senderName,
+            "messageType" to "text",
             "timestamp" to FieldValue.serverTimestamp()
         )
         val chatRef = db.collection("directChats").document(chatId)
@@ -145,7 +155,9 @@ class DirectMessagesRepository(
                 chatRef,
                 mapOf(
                     "lastMessage" to text,
-                    "lastMessageTime" to FieldValue.serverTimestamp()
+                    "lastMessageTime" to FieldValue.serverTimestamp(),
+                    "lastSenderId" to senderId,
+                    "lastSenderName" to senderName
                 )
             )
         }
@@ -174,5 +186,14 @@ class DirectMessagesRepository(
                     }
                     .addOnFailureListener { onComplete() }
             }
+    }
+
+    private fun DocumentSnapshot.displayName(): String {
+        val first = getString("firstName") ?: ""
+        val last = getString("lastName") ?: ""
+        val full = "$first $last".trim()
+        if (full.isNotEmpty()) return full
+
+        return getString("name") ?: getString("displayName") ?: getString("username") ?: "Unknown User"
     }
 }

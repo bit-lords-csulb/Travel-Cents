@@ -2,6 +2,11 @@ package com.example.travelcents.data.ai.chat
 
 import com.example.travelcents.data.trip.TripAccessRole
 import com.example.travelcents.data.trip.TripKey
+import com.example.travelcents.data.trip.advisory.ActivityEnvironmentClassifier
+import com.example.travelcents.data.trip.advisory.ActivityEnvironmentMetadata
+import com.example.travelcents.data.trip.model.ATTR_ACTIVITY_ENVIRONMENT
+import com.example.travelcents.data.trip.model.ATTR_ENVIRONMENT_CONFIDENCE
+import com.example.travelcents.data.trip.model.ATTR_WEATHER_SENSITIVITY
 import com.example.travelcents.data.trip.model.Itinerary
 import com.example.travelcents.data.trip.model.TravelEvent
 import java.time.Instant
@@ -96,11 +101,44 @@ object AiCuratedTripToItineraryMapper {
                     if (suggestion.category.isNotBlank()) {
                         put("category", suggestion.category)
                     }
+                    putAll(previewEnvironmentDetails(suggestion))
                     put("colorKey", "lightBlue")
                     put("sortOrder", (index / durationDays).toString())
                 }
             )
         }
+    }
+
+    private fun previewEnvironmentDetails(
+        suggestion: AiCuratedPlaceSuggestion
+    ): Map<String, String> {
+        val classified = ActivityEnvironmentClassifier.classify(
+            TravelEvent(
+                eventId = "preview_metadata",
+                type = "activity",
+                itineraryId = "",
+                details = buildMap {
+                    put("title", suggestion.name)
+                    put("activity_name", suggestion.name)
+                    if (suggestion.summary.isNotBlank()) {
+                        put("description", suggestion.summary)
+                    }
+                    if (suggestion.category.isNotBlank()) {
+                        put("category", suggestion.category)
+                    }
+                }
+            )
+        )
+
+        if (classified.environment == ActivityEnvironmentMetadata.ENVIRONMENT_UNKNOWN) {
+            return emptyMap()
+        }
+
+        return mapOf(
+            ATTR_ACTIVITY_ENVIRONMENT to classified.environment,
+            ATTR_WEATHER_SENSITIVITY to classified.weatherSensitivity,
+            ATTR_ENVIRONMENT_CONFIDENCE to classified.confidence
+        )
     }
 
     private fun previewStartTime(index: Int): String {

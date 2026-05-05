@@ -16,6 +16,8 @@ private val SUPPORTED_INTAKE_PROFILE_PATCH_FIELDS = listOf(
     "destination",
     "destination_style",
     "origin",
+    "date_from",
+    "date_to",
     "date_window",
     "duration_days",
     "budget_level",
@@ -27,6 +29,25 @@ private val SUPPORTED_INTAKE_PROFILE_PATCH_FIELDS = listOf(
     "avoid",
     "notes"
 )
+
+private val MINIMAL_DESTINATION_RESPONSE_EXAMPLE = """
+{
+  "recommendations": [
+    {
+      "id": "lisbon_portugal",
+      "destination": "Lisbon, Portugal",
+      "summary": "Coastal capital with hilltop views and Atlantic seafood.",
+      "reason": "Romantic, walkable, and budget-friendly relative to Western Europe."
+    },
+    {
+      "id": "santorini_greece",
+      "destination": "Santorini, Greece",
+      "summary": "Cliffside Cycladic island known for caldera sunsets.",
+      "reason": "Beach + romance fit; works well at a relaxed pace."
+    }
+  ]
+}
+""".trimIndent()
 
 private val MINIMAL_INTAKE_RESPONSE_EXAMPLE = """
 {
@@ -96,16 +117,36 @@ class AiTripIntakeOrchestrator {
             maxTokens = 600,
             responseFormat = destinationSuggestionResponseFormat()
         )
-        if (rawResponse.isBlank()) return emptyList()
+        if (rawResponse.isBlank()) {
+            android.util.Log.w(
+                "AiTripIntakeOrchestrator",
+                "suggestDestinations: blank response from LLM"
+            )
+            return emptyList()
+        }
 
         val root = runCatching {
             JsonParser.parseString(rawResponse).asJsonObject
-        }.getOrNull() ?: return emptyList()
+        }.getOrNull() ?: run {
+            android.util.Log.w(
+                "AiTripIntakeOrchestrator",
+                "suggestDestinations: response was not a JSON object. Raw: ${rawResponse.take(200)}"
+            )
+            return emptyList()
+        }
 
-        return root.getAsJsonArrayOrNull("recommendations")
+        val recommendations = root.getAsJsonArrayOrNull("recommendations")
             ?.toDestinationRecommendations()
             .orEmpty()
             .take(3)
+
+        if (recommendations.isEmpty()) {
+            android.util.Log.w(
+                "AiTripIntakeOrchestrator",
+                "suggestDestinations: parsed 0 recommendations. Raw: ${rawResponse.take(300)}"
+            )
+        }
+        return recommendations
     }
 
     private fun buildIntakeMessages(
@@ -133,9 +174,11 @@ class AiTripIntakeOrchestrator {
                     append("Do not repeat the same planning gap if it appears in asked_question_ids. ")
                     append("Do not suggest specific destinations until you have gathered trip_type, at least 2 interests, and budget_level. Ask about missing fields first. ")
                     append("If the user has enough direction for destination suggestions but no destination yet, set next_action to suggest_destinations. ")
-                    append("If the destination is already clear and the trip can move forward, set next_action to build_trip. ")
+                    append("If destination is known AND date_window is known AND duration_days is known, set next_action to build_trip. ")
+                    append("If destination is known but date_window or duration_days is still missing, set next_action to ask_more and ask about the missing timing field — do NOT set build_trip just because destination is confirmed. ")
+                    append("Return exactly one of these outcomes: no follow-up, or one cards follow-up. ")
                     append("If more information is still needed before either of those, set next_action to ask_more. ")
-                    append("When next_action is ask_more, ask exactly one short cards-friendly follow-up with 2 to 6 options. ")
+                    append("When next_action is ask_more, cards are the only valid follow-up mode. Ask exactly one short cards-friendly follow-up with 2 to 6 options. ")
                     append("Use a stable snake_case question_id, a short question_title, and short option labels. Users can still type free text instead of tapping a card. ")
                     append("When next_action is suggest_destinations or build_trip, set question_id and question_title to empty strings and set options to an empty array. ")
                     append("Return JSON only.")
@@ -143,15 +186,25 @@ class AiTripIntakeOrchestrator {
             ),
             LlmMessage(
                 role = "system",
-                content =
-                    "Current intake profile JSON:\n${currentProfile.toPromptJson()}\n\n" +
-                        "Fields still missing:\n${currentProfile.missingFields().joinToString().ifBlank { "None" }}"
+                content = buildString {
+                    append("Current intake profile JSON:\n${currentProfile.toPromptJson()}\n\n")
+                    append("Fields still missing:\n${currentProfile.missingFields().joinToString().ifBlank { "None" }}")
+                    if (currentProfile.destination.isNotBlank() && currentProfile.dateWindow.isBlank()) {
+                        append("\n\nPriority rule: destination is set but date_window is missing. The ONLY valid next_action is ask_more. Ask when the user would like to travel (question_id='travel_timeline'). Do not set next_action=build_trip.")
+                    } else if (currentProfile.destination.isNotBlank() && currentProfile.dateWindow.isNotBlank() && currentProfile.durationDays == null) {
+                        append("\n\nPriority rule: destination and date_window are set but duration_days is missing. The ONLY valid next_action is ask_more. Ask how many days the user wants to travel (question_id='trip_duration'). Do not set next_action=build_trip.")
+                    }
+                }
             ),
             LlmMessage(
                 role = "system",
                 content = buildString {
                     appendLine("Return exactly one JSON object with these top-level keys and no others:")
                     appendLine("ack_key, profile_patch, next_action, question_id, question_title, options")
+                    appendLine()
+                    appendLine("Produce exactly one of these shapes:")
+                    appendLine("1. No follow-up: next_action is suggest_destinations or build_trip, question_id is '', question_title is '', options is [].")
+                    appendLine("2. One cards follow-up: next_action is ask_more, question_id is snake_case, question_title is concise, options has 2 to 6 objects.")
                     appendLine()
                     appendLine("Do not return resolved_fields, missing_fields, next_action_reason, question_kind, question_subtitle, allow_multiple, allow_other, other_prompt_hint, text_prompt, destination_recommendations, place_recommendations, or decision.")
                     appendLine("If next_action='ask_more', question_id must be snake_case, question_title must be concise, and options must contain 2 to 6 objects with id, label, and message.")
@@ -203,6 +256,20 @@ class AiTripIntakeOrchestrator {
                         "Prefer varied but realistic fits. " +
                         "Keep each summary and reason concise. " +
                         "Return JSON only."
+            ),
+            LlmMessage(
+                role = "system",
+                content = buildString {
+                    appendLine("Return exactly one JSON object with a top-level 'recommendations' array of 2 or 3 items.")
+                    appendLine("Each item must have these fields and no others:")
+                    appendLine("  id: stable snake_case slug derived from the destination, e.g. 'lisbon_portugal'")
+                    appendLine("  destination: human-readable place name, e.g. 'Lisbon, Portugal'")
+                    appendLine("  summary: 1 short sentence describing the place")
+                    appendLine("  reason: 1 short sentence explaining why it fits the user's profile")
+                    appendLine()
+                    appendLine("Example:")
+                    append(MINIMAL_DESTINATION_RESPONSE_EXAMPLE)
+                }
             ),
             LlmMessage(
                 role = "system",
@@ -273,6 +340,8 @@ private fun JsonObject.toIntakeProfilePatch(): AiTripIntakeProfile {
         destination = getStringOrEmpty("destination"),
         destinationStyle = getStringList("destination_style"),
         origin = getStringOrEmpty("origin"),
+        dateFrom = getStringOrEmpty("date_from"),
+        dateTo = getStringOrEmpty("date_to"),
         dateWindow = getStringOrEmpty("date_window"),
         durationDays = getIntOrNull("duration_days"),
         budgetLevel = enumValueOrDefault("budget_level", AiBudgetLevel.UNKNOWN),

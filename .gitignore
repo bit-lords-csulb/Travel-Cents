@@ -22,3 +22,9 @@ __pycache__/
 .codex_tmp_signin_assets.zip
 analytics.settings
 /credentials.json
+/functions
+/docs
+travel_cents_emulator.db
+travel_cents_emulator_latest.db
+*.db
+*.log

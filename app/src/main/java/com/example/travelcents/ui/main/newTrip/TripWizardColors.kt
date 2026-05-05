@@ -12,4 +12,3 @@ object TripWizardColors {
     val OnSurfaceVariant = Color(0xFF9EABC8)
     val SecondaryContainer = Color(0xFF3A485B)
 }
-

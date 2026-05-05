@@ -34,12 +34,31 @@ fun TravelEvent.withSelectedOption(option: EventOption): TravelEvent {
     val nextImageUrl = option.imageUrl.ifBlank { imageUrl }
     val nextLocalImagePath = option.localImagePath.ifBlank { localImagePath }
     val nextPhotoUrls = option.photoUrls.ifEmpty { photoUrls }
+    val nextDate = option.detailValue(ATTR_OPTION_DATE)?.takeIf { it.isNotBlank() } ?: date
+    val nextStartTime = option.detailValue(ATTR_OPTION_START_TIME)?.takeIf { it.isNotBlank() } ?: startTime
+    val nextEndTime = option.detailValue(ATTR_OPTION_END_TIME)?.takeIf { it.isNotBlank() } ?: endTime
+    val nextTimeZone = option.detailValue(ATTR_OPTION_TZ)?.takeIf { it.isNotBlank() } ?: tz
+    val optionNativeBookable = option.detailValue("isNativeBookable", "nativeBookable")
+    val optionBookingUrl = option.detailValue("booking_url", "bookingUrl", ATTR_BOOKING_URL)
+        ?.takeIf { it.isNotBlank() }
+    val selectedNativeBookable = optionNativeBookable ?: isNativeBookable
+    val selectedBookingUrl = when {
+        optionNativeBookable != null -> optionBookingUrl
+        optionBookingUrl != null -> optionBookingUrl
+        else -> bookingUrl
+    }
 
     return copy(
+        date = nextDate,
+        startTime = nextStartTime,
+        endTime = nextEndTime,
+        tz = nextTimeZone,
         imageUrl = nextImageUrl,
         localImagePath = nextLocalImagePath,
         photoUrls = nextPhotoUrls,
         selectedOptionId = option.optionId,
+        isNativeBookable = selectedNativeBookable,
+        bookingUrl = selectedBookingUrl,
         details = mergedDetails
     )
 }

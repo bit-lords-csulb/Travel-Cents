@@ -29,11 +29,13 @@ class AiSingleEventCoordinatorTest {
                 didSearch = true
                 emptyList()
             },
-            isSearchAvailable = { true },
+            isSearchAvailable = { false },
             clock = fixedClock()
         )
 
         val grounding = coordinator.buildGroundingContext(
+            toolCall = eventToolCall(city = "Nashville, TN"),
+            toolCall = AiToolCall.SearchEvents(city = "", classification = null, keyword = null),
             userMessage = "Find me some good ramen in Nashville",
             intakeProfile = AiTripIntakeProfile(
                 destination = "Nashville, TN",
@@ -90,6 +92,8 @@ class AiSingleEventCoordinatorTest {
         )
 
         val grounding = coordinator.buildGroundingContext(
+            toolCall = eventToolCall(city = "Nashville, TN", classification = "Music"),
+            toolCall = AiToolCall.SearchEvents(city = "Nashville, TN", classification = "Music", keyword = null),
             userMessage = "Any good concerts while I'm in Nashville?",
             intakeProfile = AiTripIntakeProfile(
                 destination = "Nashville, TN",
@@ -122,6 +126,8 @@ class AiSingleEventCoordinatorTest {
         )
 
         val grounding = coordinator.buildGroundingContext(
+            toolCall = eventToolCall(city = "Nashville, TN", classification = "Music"),
+            toolCall = AiToolCall.SearchEvents(city = "Nashville, TN", classification = null, keyword = null),
             userMessage = "Any tickets this weekend in Nashville?",
             intakeProfile = AiTripIntakeProfile(destination = "Nashville, TN"),
             profile = AiTravelerProfile(destination = "Nashville, TN")
@@ -163,5 +169,17 @@ class AiSingleEventCoordinatorTest {
 
     private fun fixedClock(): Clock {
         return Clock.fixed(Instant.parse("2026-04-23T12:00:00Z"), ZoneOffset.UTC)
+    }
+
+    private fun eventToolCall(
+        city: String,
+        classification: String? = null,
+        keyword: String? = null
+    ): AiToolCall.SearchEvents {
+        return AiToolCall.SearchEvents(
+            city = city,
+            classification = classification,
+            keyword = keyword
+        )
     }
 }

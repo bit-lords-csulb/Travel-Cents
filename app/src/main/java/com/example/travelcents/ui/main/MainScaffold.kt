@@ -17,6 +17,8 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Scaffold
+import androidx.compose.runtime.*
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
@@ -36,15 +38,27 @@ import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
+import com.example.travelcents.MainActivity
+import com.example.travelcents.data.ai.chat.AiChatPreviewDraft
+import com.example.travelcents.data.ai.chat.AiChatPreviewDraftType
+import com.example.travelcents.data.ai.chat.AiCuratedTripStarter
+import com.example.travelcents.data.ai.chat.AiDestinationRecommendation
+import com.example.travelcents.data.ai.chat.AiTripIntakeProfile
 import com.example.travelcents.data.trip.TripKey
 import com.example.travelcents.data.social.model.DirectChatPreview
 import com.example.travelcents.data.social.model.Friend
 import com.example.travelcents.data.social.model.Group
+import com.example.travelcents.data.trip.model.DETAIL_YELP_ID
 import com.example.travelcents.data.trip.model.Event
+import com.example.travelcents.data.trip.model.TravelEvent
+import com.example.travelcents.data.trip.model.detailValue
+import com.example.travelcents.notification.ChatNotificationTarget
+import com.example.travelcents.notification.NotificationHelper
 import com.example.travelcents.ui.components.MainBottomNavBar
 import com.example.travelcents.ui.main.aichat.AiTripChatPage
 import com.example.travelcents.ui.main.chats.chat.*
 import com.example.travelcents.ui.main.chats.friends.*
+import com.google.firebase.auth.FirebaseAuth
 import com.example.travelcents.ui.main.chats.groups.*
 import com.example.travelcents.ui.main.current.CurrentDisplayMode
 import com.example.travelcents.ui.main.current.CurrentTripRoutes
@@ -63,8 +77,10 @@ import com.example.travelcents.ui.main.newTrip.TripStep2DatesPage
 import com.example.travelcents.ui.main.newTrip.TripStep3TravelersPage
 import com.example.travelcents.ui.main.newTrip.TripStep4BudgetPage
 import com.example.travelcents.ui.main.newTrip.TripStep5InterestsPage
+import com.example.travelcents.ui.main.passes.MyPassesScreen
 import com.example.travelcents.ui.main.settings.SettingsPage
 import com.example.travelcents.ui.theme.DeepSea1
+import com.google.firebase.firestore.FirebaseFirestore
 
 object MainRoutes {
     const val CURRENT = CurrentTripRoutes.ROOT
@@ -85,6 +101,7 @@ object MainRoutes {
 
     const val AI_TRIP_CHAT = "ai_trip_chat"
     const val SAVED_PLACES = "saved_places"
+    const val DOCUMENTS = "documents"
 }
 
 private val bottomNavRoutes = setOf(
@@ -126,8 +143,13 @@ fun MainScaffold(modifier: Modifier = Modifier, onLogout: () -> Unit = {}) {
     val newTripViewModel: NewTripViewModel = viewModel()
     val currentTripViewModel: CurrentTripViewModel = viewModel()
     val navController = rememberNavController()
+    val context = LocalContext.current
+    val activity = context as? MainActivity
 
-    var pendingPreview by remember { mutableStateOf<PreviewSource.CuratedStarter?>(null) }
+    val groupsRepository = remember { com.example.travelcents.data.social.repository.GroupsRepository() }
+    val socialUserRepository = remember { com.example.travelcents.data.social.repository.SocialUserRepository() }
+
+    var pendingPreview by remember { mutableStateOf<PreviewSource?>(null) }
 
     // Chat navigation states
     var selectedGroup   by remember { mutableStateOf<Group?>(null) }
@@ -137,15 +159,99 @@ fun MainScaffold(modifier: Modifier = Modifier, onLogout: () -> Unit = {}) {
     var showAddFriend   by remember { mutableStateOf(false) }
     var showRequests    by remember { mutableStateOf(false) }
     var selectedDM      by remember { mutableStateOf<DirectChatPreview?>(null) }
+    var selectedDirectChatId by remember { mutableStateOf<String?>(null) }
     var activeTab       by remember { mutableIntStateOf(0) }
     var showEvents      by remember { mutableStateOf(false) }
     var showCreateEvent by remember { mutableStateOf(false) }
     var selectedEvent   by remember { mutableStateOf<Event?>(null) }
     var showEditChat    by remember { mutableStateOf(false) }
 
+    fun resetChatDrillIn() {
+        selectedGroup = null
+        selectedFriend = null
+        selectedDM = null
+        selectedDirectChatId = null
+        showNewTrip = false
+        showFriends = false
+        showAddFriend = false
+        showRequests = false
+        showEvents = false
+        showCreateEvent = false
+        selectedEvent = null
+        showEditChat = false
+    }
+
+    // Observe navigation requests from notifications
+    val pendingChatTarget by activity?.pendingChatTarget?.collectAsState() ?: remember { mutableStateOf(null) }
+
+    LaunchedEffect(pendingChatTarget) {
+        val target = pendingChatTarget ?: return@LaunchedEffect
+        activity?.clearPendingChatTarget()
+        resetChatDrillIn()
+
+        navController.navigate(MainRoutes.CHATS) {
+            launchSingleTop = true
+        }
+
+        when (target.chatType) {
+            ChatNotificationTarget.TYPE_GROUP -> {
+                activeTab = 0
+                groupsRepository.fetchGroup(target.chatId) { group ->
+                    if (group != null) {
+                        selectedGroup = group
+                    }
+                }
+            }
+            ChatNotificationTarget.TYPE_DIRECT -> {
+                activeTab = 1
+                FirebaseFirestore.getInstance()
+                    .collection("directChats")
+                    .document(target.chatId)
+                    .get()
+                    .addOnSuccessListener { doc ->
+                        if (doc.exists()) {
+                            val members = (doc.get("members") as? List<*>)
+                                ?.filterIsInstance<String>()
+                                .orEmpty()
+                            val otherUid = members.firstOrNull {
+                                it != FirebaseAuth.getInstance().currentUser?.uid
+                            }
+                            if (otherUid != null) {
+                                socialUserRepository.fetchUserFullProfile(otherUid) { name, photo ->
+                                    selectedDirectChatId = target.chatId
+                                    selectedDM = DirectChatPreview(
+                                        id = target.chatId,
+                                        otherUid = otherUid,
+                                        otherUserName = name,
+                                        otherPhotoUrl = photo
+                                    )
+                                }
+                            }
+                        }
+                    }
+            }
+        }
+    }
+
     val navBackStackEntry by navController.currentBackStackEntryAsState()
     val currentRoute = navBackStackEntry?.destination?.route ?: MainRoutes.HOME
     val currentTopLevelRoute = selectedBottomRoute(currentRoute)
+
+    LaunchedEffect(currentRoute, selectedGroup?.id, selectedFriend?.uid, selectedDM?.id, selectedDirectChatId) {
+        NotificationHelper.activeChatTarget = when {
+            currentRoute != MainRoutes.CHATS -> null
+            selectedGroup != null -> ChatNotificationTarget(
+                chatType = ChatNotificationTarget.TYPE_GROUP,
+                chatId = selectedGroup!!.id
+            )
+            (selectedFriend != null || selectedDM != null) && !selectedDirectChatId.isNullOrBlank() ->
+                ChatNotificationTarget(
+                    chatType = ChatNotificationTarget.TYPE_DIRECT,
+                    chatId = selectedDirectChatId!!
+                )
+            else -> null
+        }
+    }
 
     Scaffold(
         modifier = modifier
@@ -297,8 +403,8 @@ fun MainScaffold(modifier: Modifier = Modifier, onLogout: () -> Unit = {}) {
                     TripGeneratingPage(
                         modifier = Modifier.fillMaxSize(),
                         viewModel = newTripViewModel,
-                        onTripReady = {
-                            currentTripViewModel.loadTrip()
+                        onTripReady = { tripKey ->
+                            currentTripViewModel.loadTrip(tripKey)
                             navController.navigate(MainRoutes.CURRENT_ITINERARY) {
                                 popUpTo(MainRoutes.HOME) { inclusive = false }
                             }
@@ -319,11 +425,17 @@ fun MainScaffold(modifier: Modifier = Modifier, onLogout: () -> Unit = {}) {
                         },
                         onSavedPlacesClick = {
                             navController.navigate(MainRoutes.SAVED_PLACES)
+                        },
+                        onDocumentsClick = {
+                            navController.navigate(MainRoutes.DOCUMENTS)
                         }
                     )
                 }
                 composable(MainRoutes.SAVED_PLACES) {
                     SavedPlacesPage(onBack = { navController.popBackStack() })
+                }
+                composable(MainRoutes.DOCUMENTS) {
+                    MyPassesScreen(onBack = { navController.popBackStack() })
                 }
                 composable(MainRoutes.CHATS) {
                     val onTripCardClick: (String, String) -> Unit = { tripId, ownerUid ->
@@ -376,23 +488,45 @@ fun MainScaffold(modifier: Modifier = Modifier, onLogout: () -> Unit = {}) {
 
                         selectedFriend != null -> DirectChatPage(
                             friend      = selectedFriend!!,
-                            onBackClick = { selectedFriend = null },
-                            onTripCardClick = onTripCardClick
+                            onBackClick = {
+                                selectedFriend = null
+                                selectedDirectChatId = null
+                                activeTab = 1 // Go back to Direct Messages tab
+                            },
+                            onTripCardClick = onTripCardClick,
+                            onChatResolved = { selectedDirectChatId = it }
                         )
                         selectedDM != null -> DirectChatPage(
-                            friend      = Friend(uid = selectedDM!!.otherUid, displayName = selectedDM!!.otherUserName),
-                            onBackClick = { selectedDM = null; activeTab = 1 },
-                            onTripCardClick = onTripCardClick
+                            friend      = Friend(
+                                uid = selectedDM!!.otherUid, 
+                                displayName = selectedDM!!.otherUserName,
+                                profileImageUrl = selectedDM!!.otherPhotoUrl
+                            ),
+                            onBackClick = {
+                                selectedDM = null
+                                selectedDirectChatId = null
+                                activeTab = 1 // Go back to Direct Messages tab
+                            },
+                            onTripCardClick = onTripCardClick,
+                            onChatResolved = { selectedDirectChatId = it }
                         )
                         showAddFriend -> AddFriendPage(onBackClick = { showAddFriend = false })
                         showRequests  -> FriendRequestsPage(onBackClick = { showRequests = false })
                         showNewTrip   -> NewTripChatPage(
                             onBackClick   = { showNewTrip = false },
-                            onTripCreated = { newGroup -> showNewTrip = false; selectedGroup = newGroup }
+                            onTripCreated = { newGroup ->
+                                showNewTrip = false
+                                selectedDirectChatId = null
+                                selectedGroup = newGroup
+                            }
                         )
                         showFriends -> FriendsPage(
                             onBackClick          = { showFriends = false },
-                            onMessageFriendClick = { friend -> showFriends = false; selectedFriend = friend },
+                            onMessageFriendClick = { friend ->
+                                showFriends = false
+                                selectedDirectChatId = null
+                                selectedFriend = friend
+                            },
                             onAddFriendClick     = { showAddFriend = true },
                             onRequestsClick      = { showRequests = true }
                         )
@@ -401,8 +535,16 @@ fun MainScaffold(modifier: Modifier = Modifier, onLogout: () -> Unit = {}) {
                             startTab          = activeTab,
                             onNewChatClick    = { showNewTrip = true },
                             onFriendsClick    = { showFriends = true },
-                            onGroupClick      = { group -> selectedGroup = group; activeTab = 0 },
-                            onDirectChatClick = { dm -> selectedDM = dm; activeTab = 1 }
+                            onGroupClick      = { group ->
+                                selectedDirectChatId = null
+                                selectedGroup = group
+                                activeTab = 0
+                            },
+                            onDirectChatClick = { dm ->
+                                selectedDirectChatId = dm.id
+                                selectedDM = dm
+                                activeTab = 1
+                            }
                         )
                     }
                 }
@@ -422,15 +564,50 @@ fun MainScaffold(modifier: Modifier = Modifier, onLogout: () -> Unit = {}) {
                                 launchSingleTop = true
                             }
                         },
-                        onCreateDraftTrip = { starter, intakeProfile ->
+                        onOpenPreviewTrip = { previewDraft ->
+                            val source = pendingPreview ?: previewDraft?.toPreviewSource()
+                            if (source != null) {
+                                pendingPreview = source
+                                currentTripViewModel.loadPreview(source)
+                            }
+                            navController.navigate(MainRoutes.CURRENT_TRIP_PREVIEW) {
+                                launchSingleTop = true
+                            }
+                        },
+                        onPreviewDraftChanged = { previewDraft ->
+                            val source = previewDraft?.toPreviewSource()
+                            if (source != null) {
+                                pendingPreview = source
+                                currentTripViewModel.loadPreview(source)
+                            } else {
+                                pendingPreview = null
+                            }
+                        },
+                        onStarterSelected = { starter, intakeProfile ->
                             val source = PreviewSource.CuratedStarter(
                                 starter = starter,
                                 intakeProfile = intakeProfile
                             )
                             pendingPreview = source
                             currentTripViewModel.loadPreview(source)
-                            navController.navigate(MainRoutes.CURRENT_TRIP_PREVIEW) {
-                                launchSingleTop = true
+                            // Stay in chat — the banner is the user's path to the curated preview
+                        },
+                        onDestinationLocked = { recommendation, intakeProfile ->
+                            val source = PreviewSource.DestinationLock(
+                                destination = recommendation.destination,
+                                intakeProfile = intakeProfile
+                            )
+                            pendingPreview = source
+                            currentTripViewModel.loadPreview(source)
+                            // Stay in chat — the banner is the user's path to the skeleton
+                        },
+                        onAddEventToPreview = { event ->
+                            val updatedPreview = pendingPreview?.withAddedPreviewEvent(event)
+                            if (updatedPreview != null) {
+                                pendingPreview = updatedPreview
+                                currentTripViewModel.loadPreview(updatedPreview)
+                            } else {
+                                currentTripViewModel.addPreviewEvent(event)
                             }
                         }
                     )
@@ -452,8 +629,8 @@ fun MainScaffold(modifier: Modifier = Modifier, onLogout: () -> Unit = {}) {
                                 }
                             }
                         )
-                        if (previewSource != null) {
-                            PreviewActionBar(
+                        when (previewSource) {
+                            is PreviewSource.CuratedStarter -> PreviewActionBar(
                                 modifier = Modifier
                                     .align(Alignment.BottomCenter)
                                     .fillMaxWidth(),
@@ -467,6 +644,7 @@ fun MainScaffold(modifier: Modifier = Modifier, onLogout: () -> Unit = {}) {
                                     newTripViewModel.commitItinerary(
                                         starter = toCommit.starter,
                                         intakeProfile = toCommit.intakeProfile,
+                                        events = toCommit.addedEvents,
                                         onTripReady = { tripKey ->
                                             currentTripViewModel.loadTrip(tripKey)
                                             navController.navigate(MainRoutes.CURRENT_ITINERARY) {
@@ -477,10 +655,88 @@ fun MainScaffold(modifier: Modifier = Modifier, onLogout: () -> Unit = {}) {
                                     )
                                 }
                             )
+
+                            is PreviewSource.DestinationLock -> SkeletonPreviewBar(
+                                modifier = Modifier
+                                    .align(Alignment.BottomCenter)
+                                    .fillMaxWidth(),
+                                onBack = {
+                                    navController.popBackStack()
+                                }
+                            )
+
+                            null -> {}
                         }
                     }
                 }
             }
+        }
+    }
+}
+
+private fun PreviewSource.withAddedPreviewEvent(event: TravelEvent): PreviewSource {
+    return when (this) {
+        is PreviewSource.CuratedStarter -> copy(addedEvents = addedEvents.upsertPreviewEvent(event))
+        is PreviewSource.DestinationLock -> copy(addedEvents = addedEvents.upsertPreviewEvent(event))
+    }
+}
+
+private fun AiChatPreviewDraft.toPreviewSource(): PreviewSource? {
+    return when (type) {
+        AiChatPreviewDraftType.CURATED_STARTER -> curatedStarter?.let { starter ->
+            PreviewSource.CuratedStarter(
+                starter = starter,
+                intakeProfile = intakeProfile,
+                addedEvents = addedEvents
+            )
+        }
+
+        AiChatPreviewDraftType.DESTINATION_LOCK -> PreviewSource.DestinationLock(
+            destination = destination,
+            intakeProfile = intakeProfile,
+            addedEvents = addedEvents
+        )
+    }
+}
+
+private fun List<TravelEvent>.upsertPreviewEvent(event: TravelEvent): List<TravelEvent> {
+    val incomingKey = event.previewIdentityKey()
+    return if (any { existing -> existing.previewIdentityKey() == incomingKey }) {
+        this
+    } else {
+        this + event
+    }
+}
+
+private fun TravelEvent.previewIdentityKey(): String {
+    return detailValue(DETAIL_YELP_ID)?.takeIf(String::isNotBlank)
+        ?: selectedOptionId.takeIf(String::isNotBlank)
+        ?: eventId
+}
+
+@Composable
+private fun SkeletonPreviewBar(
+    onBack: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    Column(
+        modifier = modifier
+            .background(TripWizardColors.ContainerLow)
+            .navigationBarsPadding()
+            .padding(horizontal = 16.dp, vertical = 12.dp)
+    ) {
+        Text(
+            text = "Draft trip — keep chatting to fill it in.",
+            color = DeepSea5.copy(alpha = 0.78f),
+            fontWeight = FontWeight.Medium
+        )
+        Spacer(Modifier.height(10.dp))
+        OutlinedButton(
+            onClick = onBack,
+            modifier = Modifier.fillMaxWidth(),
+            shape = RoundedCornerShape(14.dp)
+        ) {
+            Text(text = "← Back to Chat")
         }
     }
 }

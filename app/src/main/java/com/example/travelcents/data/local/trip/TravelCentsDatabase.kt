@@ -41,6 +41,10 @@ abstract class TravelCentsDatabase : RoomDatabase() {
                 )
                 database.execSQL(
                     "ALTER TABLE trip_summary ADD COLUMN interests TEXT NOT NULL DEFAULT ''"
+        private val MIGRATION_5_6 = object : Migration(5, 6) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL(
+                    "ALTER TABLE trip_summary ADD COLUMN timeZoneId TEXT NOT NULL DEFAULT ''"
                 )
             }
         }
@@ -57,6 +61,8 @@ abstract class TravelCentsDatabase : RoomDatabase() {
                 )
                     .addMigrations(MIGRATION_6_7)
                     .fallbackToDestructiveMigration()
+                    .addMigrations(MIGRATION_5_6)
+                    .fallbackToDestructiveMigration(true)
                     .build()
                     .also { built -> instance = built }
             }

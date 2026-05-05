@@ -7,7 +7,6 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.example.travelcents.data.trip.model.ATTR_HAS_OUTDOOR_SEATING
 import com.example.travelcents.data.trip.model.ATTR_WEATHER_CONDITION
 import com.example.travelcents.data.trip.model.ATTR_WEATHER_PRECIP_PCT
 import com.example.travelcents.data.trip.model.ATTR_WEATHER_SUMMARY
@@ -22,6 +21,7 @@ fun WeatherCard(event: TravelEvent, usesFahrenheit: Boolean = false) {
         ?.equals("true", ignoreCase = true) == true
     if (!hasOutdoorSeating) return
 
+fun WeatherCard(event: TravelEvent) {
     val condition = event.detailValue(ATTR_WEATHER_CONDITION)?.takeIf { it.isNotBlank() }
     val temperatureC = event.detailValue(ATTR_WEATHER_TEMP_C)?.toIntOrNull()
     val precipPct = event.detailValue(ATTR_WEATHER_PRECIP_PCT)?.toIntOrNull()

@@ -118,45 +118,12 @@ fun TripStep1DestinationPage(
                 .fillMaxSize()
                 .background(DeepSea1)
         ) {
-        // Top bar + progress strip
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .background(Color(0xFF010E24))
-                .statusBarsPadding()
-        ) {
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 8.dp, vertical = 4.dp),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                IconButton(onClick = onBackClick) {
-                    Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back", tint = TripWizardColors.Blue)
-                }
-                Text("Step 1 of 5", fontSize = 15.sp, fontWeight = FontWeight.Bold, color = DeepSea5)
-                IconButton(onClick = onCloseClick) {
-                    Icon(Icons.Default.Close, contentDescription = "Close", tint = TripWizardColors.Blue)
-                }
-            }
-            // Thin progress bar at 20%
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(3.dp)
-                    .background(TripWizardColors.ContainerHigh)
-            ) {
-                Box(
-                    modifier = Modifier
-                        .fillMaxWidth(0.2f)
-                        .height(3.dp)
-                        .background(
-                            Brush.horizontalGradient(listOf(TripWizardColors.Blue, TripWizardColors.Blue.copy(alpha = 0.7f)))
-                        )
-                )
-            }
-        }
+        WizardHeader(
+            currentStep = 1,
+            title = "Where to?",
+            onBack = onBackClick,
+            onClose = onCloseClick
+        )
 
         // Scrollable content
         LazyVerticalGrid(
@@ -166,11 +133,6 @@ fun TripStep1DestinationPage(
             verticalArrangement = Arrangement.spacedBy(12.dp),
             horizontalArrangement = Arrangement.spacedBy(12.dp)
         ) {
-            // Progress widget
-            item(span = { GridItemSpan(2) }) {
-                ProgressSummaryWidget()
-            }
-
             // Hero
             item(span = { GridItemSpan(2) }) {
                 Column(modifier = Modifier.padding(top = 8.dp)) {
@@ -180,15 +142,6 @@ fun TripStep1DestinationPage(
                         fontWeight = FontWeight.Bold,
                         color = TripWizardColors.Blue,
                         letterSpacing = 1.5.sp
-                    )
-                    Spacer(modifier = Modifier.height(6.dp))
-                    Text(
-                        text = "Where to?",
-                        fontSize = 40.sp,
-                        fontWeight = FontWeight.ExtraBold,
-                        color = DeepSea5,
-                        letterSpacing = (-1.5).sp,
-                        fontFamily = TravelCentsFonts.Headline
                     )
                     Spacer(modifier = Modifier.height(6.dp))
                     Text(
@@ -512,57 +465,6 @@ private fun CustomDestinationCard(name: String) {
 }
 
 @Composable
-private fun ProgressSummaryWidget() {
-    Box(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clip(RoundedCornerShape(16.dp))
-            .background(TripWizardColors.ContainerHigh.copy(alpha = 0.5f))
-            .border(1.dp, Color.White.copy(alpha = 0.05f), RoundedCornerShape(16.dp))
-            .padding(16.dp)
-    ) {
-        Column {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Text(
-                    text = "YOUR PROGRESS",
-                    fontSize = 10.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = TripWizardColors.OnSurfaceVariant,
-                    letterSpacing = 1.5.sp
-                )
-                Box(
-                    modifier = Modifier
-                        .background(TripWizardColors.Blue.copy(alpha = 0.2f), RoundedCornerShape(12.dp))
-                        .border(1.dp, TripWizardColors.Blue.copy(alpha = 0.2f), RoundedCornerShape(12.dp))
-                        .padding(horizontal = 14.dp, vertical = 6.dp)
-                ) {
-                    Text(text = "20%", fontSize = 14.sp, fontWeight = FontWeight.Bold, color = TripWizardColors.Blue)
-                }
-            }
-            Spacer(modifier = Modifier.height(12.dp))
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(6.dp)
-            ) {
-                repeat(5) { index ->
-                    Box(
-                        modifier = Modifier
-                            .weight(1f)
-                            .height(6.dp)
-                            .clip(RoundedCornerShape(3.dp))
-                            .background(if (index == 0) TripWizardColors.Blue else TripWizardColors.ContainerHighest)
-                    )
-                }
-            }
-        }
-    }
-}
-
-@Composable
 private fun DestinationCard(
     destination: PopularDestination,
     isSelected: Boolean,
@@ -627,4 +529,3 @@ private fun DestinationCard(
         }
     }
 }
-

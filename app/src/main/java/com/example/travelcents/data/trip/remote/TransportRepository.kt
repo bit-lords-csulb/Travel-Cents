@@ -233,18 +233,19 @@ object TransportRepository {
         val destinationLat = destination.latitude ?: return null
         val destinationLng = destination.longitude ?: return null
         val destinationLabel = destination.label.ifBlank { "Destination" }
-        val destinationAddress = destination.address?.ifBlank { null } ?: destinationLabel
-
-        return buildString {
-            append("uber://riderequest?")
-            append("pickup[latitude]=").append(Uri.encode(decimal(anchor.latitude)))
-            append("&pickup[longitude]=").append(Uri.encode(decimal(anchor.longitude)))
-            append("&pickup[nickname]=").append(Uri.encode(anchor.label))
-            append("&dropoff[latitude]=").append(Uri.encode(decimal(destinationLat)))
-            append("&dropoff[longitude]=").append(Uri.encode(decimal(destinationLng)))
-            append("&dropoff[nickname]=").append(Uri.encode(destinationLabel))
-            append("&dropoff[formatted_address]=").append(Uri.encode(destinationAddress))
-        }
+        return Uri.parse("https://m.uber.com/ul/").buildUpon()
+            .appendQueryParameter("action", "setPickup")
+            .appendQueryParameter("pickup", "my_location")
+            .appendQueryParameter("pickup[nickname]", anchor.label)
+            .appendQueryParameter("dropoff[latitude]", decimal(destinationLat))
+            .appendQueryParameter("dropoff[longitude]", decimal(destinationLng))
+            .appendQueryParameter("dropoff[nickname]", destinationLabel)
+            .appendQueryParameter(
+                "dropoff[formatted_address]",
+                destination.address?.ifBlank { null } ?: destinationLabel
+            )
+            .build()
+            .toString()
     }
 
     private fun buildLyftDeepLink(
@@ -253,19 +254,21 @@ object TransportRepository {
     ): String? {
         val destinationLat = destination.latitude ?: return null
         val destinationLng = destination.longitude ?: return null
-
-        return buildString {
-            append("lyft://ridetype?id=lyft")
-            append("&pickup[latitude]=").append(Uri.encode(decimal(anchor.latitude)))
-            append("&pickup[longitude]=").append(Uri.encode(decimal(anchor.longitude)))
-            append("&destination[latitude]=").append(Uri.encode(decimal(destinationLat)))
-            append("&destination[longitude]=").append(Uri.encode(decimal(destinationLng)))
-            destination.address
-                ?.takeIf { it.isNotBlank() }
-                ?.let { address ->
-                    append("&destination[address]=").append(Uri.encode(address))
-                }
-        }
+        return Uri.parse("https://ride.lyft.com/").buildUpon()
+            .appendQueryParameter("id", "lyft")
+            .appendQueryParameter("pickup[latitude]", decimal(anchor.latitude))
+            .appendQueryParameter("pickup[longitude]", decimal(anchor.longitude))
+            .appendQueryParameter("pickup[nickname]", anchor.label)
+            .appendQueryParameter("destination[latitude]", decimal(destinationLat))
+            .appendQueryParameter("destination[longitude]", decimal(destinationLng))
+            .appendQueryParameter("destination[nickname]", destination.label.ifBlank { "Destination" })
+            .apply {
+                destination.address
+                    ?.takeIf { it.isNotBlank() }
+                    ?.let { appendQueryParameter("destination[address]", it) }
+            }
+            .build()
+            .toString()
     }
 
     private fun estimateRideShareUsd(distanceMeters: Int?): String? {

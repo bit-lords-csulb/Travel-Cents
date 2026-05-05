@@ -30,11 +30,23 @@ import com.example.travelcents.data.media.ImageCacheManager
 import com.example.travelcents.data.trip.model.ATTR_HERO_IMAGE_URL
 import com.example.travelcents.data.trip.model.EventOption
 import com.example.travelcents.data.trip.model.TravelEvent
+import com.example.travelcents.data.trip.remote.isAirlineLogoFallbackHeroUrl
 
 private fun TravelEvent.resolvedRemoteHero(): String {
-    val attrHero = details[ATTR_HERO_IMAGE_URL]?.takeIf { it.isNotBlank() }
+    val attrHero = details[ATTR_HERO_IMAGE_URL]
+        ?.takeIf { it.isNotBlank() }
+        ?.takeUnless(::isAirlineLogoFallbackHeroUrl)
     if (attrHero != null) return attrHero
-    return imageUrl.ifBlank { details["imageUrl"] ?: details["image_url"] ?: "" }
+    return imageUrl
+        .takeIf { it.isNotBlank() }
+        ?.takeUnless(::isAirlineLogoFallbackHeroUrl)
+        ?: details["imageUrl"]
+            ?.takeIf { it.isNotBlank() }
+            ?.takeUnless(::isAirlineLogoFallbackHeroUrl)
+        ?: details["image_url"]
+            ?.takeIf { it.isNotBlank() }
+            ?.takeUnless(::isAirlineLogoFallbackHeroUrl)
+        ?: ""
 }
 
 fun TravelEvent.heroImageModel(context: Context): String {

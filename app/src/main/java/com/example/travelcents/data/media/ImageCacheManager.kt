@@ -40,39 +40,11 @@ object ImageCacheManager {
         tripId: String,
         urls: List<String>
     ): List<CachedMediaAsset> = withContext(Dispatchers.IO) {
-        val dir = File(context.filesDir, "trip_images/$tripId").also { it.mkdirs() }
-        val result = mutableListOf<CachedMediaAsset>()
-
-        urls.asSequence()
-            .filter { it.isNotBlank() }
-            .distinct()
-            .forEach { url ->
-            try {
-                val fileName = cacheFileNameForUrl(url)
-                val file = File(dir, fileName)
-                if (!file.exists()) {
-                    val req = Request.Builder().url(url).build()
-                    http.newCall(req).execute().use { resp ->
-                        if (resp.isSuccessful) {
-                            resp.body?.byteStream()?.use { input ->
-                                file.outputStream().use { output -> input.copyTo(output) }
-                            }
-                        }
-                    }
-                }
-                if (file.exists()) {
-                    result += CachedMediaAsset(
-                        remoteUrl = url,
-                        localPath = file.absolutePath,
-                        contentHash = sha256(file.inputStream())
-                    )
-                }
-            } catch (e: Exception) {
-                Log.w("ImageCacheManager", "Failed to download $url: ${e.message}")
-            }
-        }
-
-        result
+        cacheMediaAssetsInBucket(
+            context = context,
+            bucketPath = "trip_images/$tripId",
+            urls = urls
+        )
     }
 
     suspend fun downloadTripImages(
@@ -80,6 +52,33 @@ object ImageCacheManager {
         tripId: String,
         urls: List<String>
     ): Map<String, String> = cacheTripMedia(context, tripId, urls)
+
+    suspend fun cacheMedia(
+        context: Context,
+        bucketName: String,
+        urls: List<String>
+    ): Map<String, String> {
+        return cacheMediaAssets(
+            context = context,
+            bucketName = bucketName,
+            urls = urls
+        ).associate { asset -> asset.remoteUrl to asset.localPath }
+    }
+
+    suspend fun cacheMediaAssets(
+        context: Context,
+        bucketName: String,
+        urls: List<String>
+    ): List<CachedMediaAsset> {
+        if (bucketName.isBlank()) return emptyList()
+        return withContext(Dispatchers.IO) {
+            cacheMediaAssetsInBucket(
+                context = context,
+                bucketPath = "media_cache/${sanitizeBucketName(bucketName)}",
+                urls = urls
+            )
+        }
+    }
 
     // Deletes all cached images for a trip (called when the trip is deleted).
     fun deleteTripImages(context: Context, tripId: String) {
@@ -96,6 +95,19 @@ object ImageCacheManager {
         return file.absolutePath.takeIf { file.exists() }
     }
 
+    fun localPathForCachedMedia(
+        context: Context,
+        bucketName: String,
+        url: String
+    ): String? {
+        if (bucketName.isBlank() || url.isBlank()) return null
+        val file = File(
+            context.filesDir,
+            "media_cache/${sanitizeBucketName(bucketName)}/${cacheFileNameForUrl(url)}"
+        )
+        return file.absolutePath.takeIf { file.exists() }
+    }
+
     fun resolveCachedMediaUrl(
         context: Context,
         tripId: String,
@@ -103,6 +115,15 @@ object ImageCacheManager {
     ): String? {
         if (tripId.isBlank() || remoteUrl.isBlank()) return remoteUrl.takeIf { it.isNotBlank() }
         return localPathForUrl(context, tripId, remoteUrl) ?: remoteUrl
+    }
+
+    fun resolveBucketCachedMediaUrl(
+        context: Context,
+        bucketName: String,
+        remoteUrl: String
+    ): String? {
+        if (bucketName.isBlank() || remoteUrl.isBlank()) return remoteUrl.takeIf { it.isNotBlank() }
+        return localPathForCachedMedia(context, bucketName, remoteUrl) ?: remoteUrl
     }
 
     internal fun cacheFileNameForUrl(url: String): String {
@@ -114,6 +135,50 @@ object ImageCacheManager {
             .takeLast(4)
         val ext = extCandidate.takeIf { it.matches(Regex("[a-z0-9]{2,4}")) } ?: "img"
         return "${hash}.${ext}"
+    }
+
+    private fun cacheMediaAssetsInBucket(
+        context: Context,
+        bucketPath: String,
+        urls: List<String>
+    ): List<CachedMediaAsset> {
+        val dir = File(context.filesDir, bucketPath).also { it.mkdirs() }
+        val result = mutableListOf<CachedMediaAsset>()
+
+        urls.asSequence()
+            .filter { it.isNotBlank() }
+            .distinct()
+            .forEach { url ->
+                try {
+                    val fileName = cacheFileNameForUrl(url)
+                    val file = File(dir, fileName)
+                    if (!file.exists()) {
+                        val req = Request.Builder().url(url).build()
+                        http.newCall(req).execute().use { resp ->
+                            if (resp.isSuccessful) {
+                                resp.body?.byteStream()?.use { input ->
+                                    file.outputStream().use { output -> input.copyTo(output) }
+                                }
+                            }
+                        }
+                    }
+                    if (file.exists()) {
+                        result += CachedMediaAsset(
+                            remoteUrl = url,
+                            localPath = file.absolutePath,
+                            contentHash = sha256(file.inputStream())
+                        )
+                    }
+                } catch (e: Exception) {
+                    Log.w("ImageCacheManager", "Failed to download $url: ${e.message}")
+                }
+            }
+
+        return result
+    }
+
+    private fun sanitizeBucketName(bucketName: String): String {
+        return bucketName.replace(Regex("[^a-zA-Z0-9._-]"), "_")
     }
 
     private fun sha256(input: InputStream): String {

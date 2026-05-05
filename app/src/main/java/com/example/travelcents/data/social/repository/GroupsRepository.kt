@@ -132,6 +132,19 @@ class GroupsRepository(
             .addOnSuccessListener { doc ->
                 onResult(doc.toObject(Group::class.java)?.copy(id = doc.id))
             }
+            .addOnFailureListener { onResult(null) }
+    }
+
+    fun findGroupByTripId(tripId: String, onResult: (Group?) -> Unit) {
+        db.collection("groups")
+            .whereEqualTo("linkedTripId", tripId)
+            .limit(1)
+            .get()
+            .addOnSuccessListener { snap ->
+                val doc = snap.documents.firstOrNull()
+                onResult(doc?.toObject(Group::class.java)?.copy(id = doc.id))
+            }
+            .addOnFailureListener { onResult(null) }
     }
 
     fun listenToMessages(groupId: String, onUpdate: (List<Message>) -> Unit): ListenerRegistration {
@@ -200,6 +213,7 @@ class GroupsRepository(
             "text" to text,
             "senderId" to senderId,
             "senderName" to senderName,
+            "messageType" to "text",
             "timestamp" to FieldValue.serverTimestamp()
         )
         val groupRef = db.collection("groups").document(groupId)
@@ -209,7 +223,9 @@ class GroupsRepository(
                 groupRef,
                 mapOf(
                     "lastMessage" to text,
-                    "lastMessageTime" to FieldValue.serverTimestamp()
+                    "lastMessageTime" to FieldValue.serverTimestamp(),
+                    "lastSenderId" to senderId,
+                    "lastSenderName" to senderName
                 )
             )
         }
