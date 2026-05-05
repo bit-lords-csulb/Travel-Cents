@@ -7,7 +7,6 @@ import androidx.lifecycle.viewModelScope
 import com.example.travelcents.data.ai.chat.AiCuratedTripStarter
 import com.example.travelcents.data.ai.chat.AiCuratedTripToItineraryMapper
 import com.example.travelcents.data.ai.chat.AiTripIntakeProfile
-import com.example.travelcents.data.ai.chat.PREVIEW_TRIP_STATUS
 import com.example.travelcents.data.ai.repository.PineconeTripAlternativeProvider
 import com.example.travelcents.data.media.TripMediaCacheStore
 import com.example.travelcents.data.local.trip.TravelCentsDatabase
@@ -1011,7 +1010,7 @@ class CurrentTripViewModel(application: Application) : AndroidViewModel(applicat
 
     fun refreshEventLiveContext(eventId: String) {
         val event = _uiState.value.events.firstOrNull { it.eventId == eventId } ?: return
-        if (!isRestaurantEvent(event) || eventId in _eventLiveContextInFlight.value) return
+        if (eventId in _eventLiveContextInFlight.value) return
 
         val venueName = event.displayName()?.takeIf { it.isNotBlank() } ?: return
         val venueAddress = event.detailValue(ATTR_BUSINESS_ADDRESS, "address")
