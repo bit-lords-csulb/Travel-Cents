@@ -11,6 +11,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.MoreVert
@@ -103,6 +104,7 @@ fun CurrentTripEventDetailsDialog(
     reviewsLoading: Boolean,
     canEditTrip: Boolean,
     canShowAlternatives: Boolean = currentOptions.size > 1,
+    weatherAlertMessage: String? = null,
     onDismiss: () -> Unit,
     onEdit: () -> Unit,
     onDelete: () -> Unit,
@@ -218,6 +220,23 @@ fun CurrentTripEventDetailsDialog(
                         .padding(horizontal = 18.dp, vertical = 14.dp),
                     verticalArrangement = Arrangement.spacedBy(10.dp)
                 ) {
+                    weatherAlertMessage?.let { message ->
+                        Surface(
+                            color = CardSurface,
+                            shape = RoundedCornerShape(16.dp),
+                            border = androidx.compose.foundation.BorderStroke(
+                                1.dp,
+                                CardCoral.copy(alpha = 0.35f)
+                            )
+                        ) {
+                            Text(
+                                text = message,
+                                color = CardText,
+                                fontSize = 13.sp,
+                                modifier = Modifier.padding(horizontal = 14.dp, vertical = 12.dp)
+                            )
+                        }
+                    }
                     EventSummaryCard(
                         event = event,
                         heroImage = heroImage,

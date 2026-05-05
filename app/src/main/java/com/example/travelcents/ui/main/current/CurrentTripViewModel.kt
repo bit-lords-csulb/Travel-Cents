@@ -69,6 +69,7 @@ import com.example.travelcents.data.trip.remote.PopularTimesRepository
 import com.example.travelcents.data.trip.remote.TransportRepository
 import com.example.travelcents.data.trip.remote.WalkScoreRepository
 import com.example.travelcents.data.trip.remote.WeatherRepository
+import com.example.travelcents.data.trip.remote.buildWeatherAlertMessage
 import com.example.travelcents.data.trip.remote.YelpRepository
 import com.example.travelcents.ui.main.shared.TripMediaDetailPipeline
 import com.example.travelcents.ui.modules.defaultPlanTimeZoneId
@@ -80,12 +81,14 @@ import com.google.firebase.firestore.FieldValue
 import com.google.firebase.firestore.FirebaseFirestore
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.tasks.await
+import kotlinx.coroutines.isActive
 import java.time.Duration
 import java.time.LocalDate
 import java.time.LocalDateTime
@@ -131,6 +134,8 @@ data class CurrentTripUiState(
     val adults: Int = 1,
     val children: Int = 0,
     val events: List<TravelEvent> = emptyList(),
+    val weatherAlertMessage: String? = null,
+    val weatherAlertEventId: String? = null,
     val infoMessage: String? = null,
     val errorMessage: String? = null,
     val isPreview: Boolean = false
@@ -172,6 +177,7 @@ class CurrentTripViewModel(application: Application) : AndroidViewModel(applicat
             DateTimeFormatter.ofPattern("hh:mm a", Locale.US)
         )
         private val MERIDIEM_REGEX = Regex("\\b[AP]M\\b", RegexOption.IGNORE_CASE)
+        private const val WEATHER_MONITORING_INTERVAL_MS = 15 * 60 * 1000L
     }
 
     private val _events = MutableStateFlow<List<TravelEvent>>(emptyList())
@@ -230,6 +236,7 @@ class CurrentTripViewModel(application: Application) : AndroidViewModel(applicat
     private var currentTripEventsJob: Job? = null
     private var currentTripMembersJob: Job? = null
     private var currentTripOptionsJob: Job? = null
+    private var weatherMonitoringJob: Job? = null
     private var allTripsJob: Job? = null
     private var allTripsObserverUid: String? = null
     private var currentTripKey: TripKey? = null
@@ -237,11 +244,13 @@ class CurrentTripViewModel(application: Application) : AndroidViewModel(applicat
     private var currentTripDestination: String = ""
     private var currentTripTimeZoneId: String = ""
     private var localEventsSnapshot: List<TravelEvent> = emptyList()
+    private val weatherSnapshotsByEventId = mutableMapOf<String, WeatherRepository.WeatherSnapshot>()
     private val sharedYelpPools = mutableMapOf<String, List<YelpOptionPoolItem>>()
     private val sharedYelpWindowBoost = mutableMapOf<String, Int>()
     private val mediaDetailPipeline = TripMediaDetailPipeline(application)
     private val currencyPreviewRepository = CurrencyPreviewRepository(application)
     private var liveEventDetailOverrides: Map<String, Map<String, String>> = emptyMap()
+    private val _weatherRefreshInFlight = MutableStateFlow<Set<String>>(emptySet())
 
     private fun resetTripState(
         isLoading: Boolean = false,
@@ -257,11 +266,14 @@ class CurrentTripViewModel(application: Application) : AndroidViewModel(applicat
         currentTripMembersJob = null
         currentTripOptionsJob?.cancel()
         currentTripOptionsJob = null
+        weatherMonitoringJob?.cancel()
+        weatherMonitoringJob = null
         currentTripKey = null
         currentTripSummary = null
         currentTripDestination = ""
         currentTripTimeZoneId = ""
         localEventsSnapshot = emptyList()
+        weatherSnapshotsByEventId.clear()
         sharedYelpPools.clear()
         sharedYelpWindowBoost.clear()
         _events.value = emptyList()
@@ -273,6 +285,7 @@ class CurrentTripViewModel(application: Application) : AndroidViewModel(applicat
         _reviewsLoading.value = emptySet()
         _yelpEnrichmentInFlight.value = emptySet()
         _restaurantLiveContextInFlight.value = emptySet()
+        _weatherRefreshInFlight.value = emptySet()
         _shareTargets.value = emptyList()
         _tripMembers.value = emptyList()
         liveEventDetailOverrides = emptyMap()
@@ -382,6 +395,7 @@ class CurrentTripViewModel(application: Application) : AndroidViewModel(applicat
                 errorMessage = null
             )
         }
+        startWeatherMonitoringIfNeeded()
 
         backfillTripTimeZoneIfNeeded(
             viewerUid = viewerUid,
@@ -429,6 +443,7 @@ class CurrentTripViewModel(application: Application) : AndroidViewModel(applicat
                 }
             )
         )
+        seedWeatherSnapshots(visibleEvents)
         _events.value = visibleEvents
         _uiState.update {
             it.copy(
@@ -443,6 +458,7 @@ class CurrentTripViewModel(application: Application) : AndroidViewModel(applicat
                 errorMessage = null
             )
         }
+        startWeatherMonitoringIfNeeded()
         prefetchSharedEventMedia(visibleEvents)
     }
 
@@ -505,6 +521,176 @@ class CurrentTripViewModel(application: Application) : AndroidViewModel(applicat
             }
         }
         publishCurrentEvents(localEventsSnapshot, _eventOptions.value)
+    }
+
+    private fun startWeatherMonitoringIfNeeded() {
+        if (currentTripSummary == null) return
+        if (_uiState.value.isPreview) return
+        if (weatherMonitoringJob?.isActive == true) return
+
+        weatherMonitoringJob = viewModelScope.launch {
+            while (isActive) {
+                runCatching {
+                    refreshWeatherAlerts(forceRefresh = true)
+                }.onFailure { error ->
+                    Log.w("CurrentTripViewModel", "Weather monitoring refresh failed", error)
+                }
+                delay(WEATHER_MONITORING_INTERVAL_MS)
+            }
+        }
+    }
+
+    private suspend fun refreshWeatherAlerts(forceRefresh: Boolean) {
+        val events = _uiState.value.events.filter(::isWeatherAwareEvent)
+        if (events.isEmpty()) return
+
+        for (event in events) {
+            refreshWeatherContextForEvent(
+                event = event,
+                forceRefresh = forceRefresh,
+                updateLiveOverrides = true,
+                showAlert = true
+            )
+        }
+    }
+
+    private fun seedWeatherSnapshots(events: List<TravelEvent>) {
+        events.forEach { event ->
+            if (event.eventId in weatherSnapshotsByEventId) return@forEach
+            weatherSnapshotFromEventDetails(event)?.let { snapshot ->
+                weatherSnapshotsByEventId[event.eventId] = snapshot
+            }
+        }
+    }
+
+    private fun isWeatherAwareEvent(event: TravelEvent): Boolean {
+        val latitude = event.detailValue(ATTR_LATITUDE)?.toDoubleOrNull()
+        val longitude = event.detailValue(ATTR_LONGITUDE)?.toDoubleOrNull()
+        return latitude != null && longitude != null && event.date.isNotBlank()
+    }
+
+    private fun weatherSnapshotFromEventDetails(event: TravelEvent): WeatherRepository.WeatherSnapshot? {
+        val temperatureC = event.detailValue(ATTR_WEATHER_TEMP_C)?.toIntOrNull() ?: return null
+        val condition = event.detailValue(ATTR_WEATHER_CONDITION)?.takeIf { it.isNotBlank() } ?: return null
+        val summary = event.detailValue(ATTR_WEATHER_SUMMARY).orEmpty()
+        return WeatherRepository.WeatherSnapshot(
+            temperatureC = temperatureC,
+            condition = condition,
+            precipPct = event.detailValue(ATTR_WEATHER_PRECIP_PCT)?.toIntOrNull(),
+            windKph = event.detailValue(ATTR_WEATHER_WIND_KPH)?.toIntOrNull(),
+            summary = summary
+        )
+    }
+
+    private fun weatherSnapshotToOverrides(
+        snapshot: WeatherRepository.WeatherSnapshot
+    ): Map<String, String> {
+        return buildMap {
+            put(ATTR_WEATHER_TEMP_C, snapshot.temperatureC.toString())
+            put(ATTR_WEATHER_CONDITION, snapshot.condition)
+            snapshot.precipPct?.let {
+                put(ATTR_WEATHER_PRECIP_PCT, it.toString())
+            }
+            snapshot.windKph?.let {
+                put(ATTR_WEATHER_WIND_KPH, it.toString())
+            }
+            put(ATTR_WEATHER_SUMMARY, snapshot.summary)
+        }
+    }
+
+    private fun updateWeatherOverrides(
+        eventId: String,
+        overrides: Map<String, String>
+    ) {
+        val current = liveEventDetailOverrides[eventId].orEmpty()
+        val weatherKeys = setOf(
+            ATTR_WEATHER_TEMP_C,
+            ATTR_WEATHER_CONDITION,
+            ATTR_WEATHER_PRECIP_PCT,
+            ATTR_WEATHER_SUMMARY,
+            ATTR_WEATHER_WIND_KPH
+        )
+        val next = current
+            .filterKeys { key -> key !in weatherKeys }
+            .toMutableMap()
+            .apply { putAll(overrides) }
+
+        if (current == next) return
+
+        liveEventDetailOverrides = liveEventDetailOverrides.toMutableMap().apply {
+            if (next.isEmpty()) {
+                remove(eventId)
+            } else {
+                put(eventId, next)
+            }
+        }
+        publishCurrentEvents(localEventsSnapshot, _eventOptions.value)
+    }
+
+    private fun weatherAlertLabelFor(event: TravelEvent): String {
+        return listOfNotNull(
+            event.displayName()?.takeIf { it.isNotBlank() },
+            event.details["title"]?.takeIf { it.isNotBlank() },
+            currentTripDestination.takeIf { it.isNotBlank() }
+        ).firstOrNull()
+            ?: when (event.type.lowercase(Locale.US)) {
+                "flight" -> "this flight"
+                "hotel" -> "this stay"
+                else -> "this event"
+            }
+    }
+
+    private suspend fun refreshWeatherContextForEvent(
+        event: TravelEvent,
+        forceRefresh: Boolean,
+        updateLiveOverrides: Boolean,
+        showAlert: Boolean
+    ): WeatherRepository.WeatherSnapshot? {
+        val latitude = event.detailValue(ATTR_LATITUDE)?.toDoubleOrNull() ?: return null
+        val longitude = event.detailValue(ATTR_LONGITUDE)?.toDoubleOrNull() ?: return null
+        if (event.date.isBlank()) return null
+        if (_weatherRefreshInFlight.value.contains(event.eventId)) return null
+
+        _weatherRefreshInFlight.update { it + event.eventId }
+        try {
+            val snapshot = WeatherRepository.fetchSnapshot(
+                latitude = latitude,
+                longitude = longitude,
+                date = event.date,
+                startTime = event.startTime,
+                timeZoneId = event.tz.ifBlank { currentTripTimeZoneId },
+                forceRefresh = forceRefresh
+            ) ?: return null
+
+            val previous = weatherSnapshotsByEventId[event.eventId]
+            weatherSnapshotsByEventId[event.eventId] = snapshot
+
+            if (updateLiveOverrides) {
+                updateWeatherOverrides(
+                    eventId = event.eventId,
+                    overrides = weatherSnapshotToOverrides(snapshot)
+                )
+            }
+
+            if (showAlert) {
+                buildWeatherAlertMessage(
+                    eventLabel = weatherAlertLabelFor(event),
+                    previous = previous,
+                    current = snapshot
+                )?.let { message ->
+                    _uiState.update {
+                        it.copy(
+                            weatherAlertMessage = message,
+                            weatherAlertEventId = event.eventId
+                        )
+                    }
+                }
+            }
+
+            return snapshot
+        } finally {
+            _weatherRefreshInFlight.update { it - event.eventId }
+        }
     }
 
     private fun alignEventOptionsWithSelectedState(
@@ -595,6 +781,15 @@ class CurrentTripViewModel(application: Application) : AndroidViewModel(applicat
 
     fun clearMessages() {
         _uiState.update { it.copy(infoMessage = null, errorMessage = null) }
+    }
+
+    fun clearWeatherAlert() {
+        _uiState.update {
+            it.copy(
+                weatherAlertMessage = null,
+                weatherAlertEventId = null
+            )
+        }
     }
 
     fun postError(message: String) {
@@ -883,22 +1078,13 @@ class CurrentTripViewModel(application: Application) : AndroidViewModel(applicat
                     }
 
                     if (hasOutdoorSeating && latitude != null && longitude != null) {
-                        WeatherRepository.fetchSnapshot(
-                            latitude = latitude,
-                            longitude = longitude,
-                            date = event.date,
-                            startTime = event.startTime,
-                            timeZoneId = event.tz
+                        refreshWeatherContextForEvent(
+                            event = event,
+                            forceRefresh = true,
+                            updateLiveOverrides = false,
+                            showAlert = true
                         )?.let { snapshot ->
-                            put(ATTR_WEATHER_TEMP_C, snapshot.temperatureC.toString())
-                            put(ATTR_WEATHER_CONDITION, snapshot.condition)
-                            snapshot.precipPct?.let {
-                                put(ATTR_WEATHER_PRECIP_PCT, it.toString())
-                            }
-                            snapshot.windKph?.let {
-                                put(ATTR_WEATHER_WIND_KPH, it.toString())
-                            }
-                            put(ATTR_WEATHER_SUMMARY, snapshot.summary)
+                            putAll(weatherSnapshotToOverrides(snapshot))
                         }
                     }
 
@@ -958,6 +1144,64 @@ class CurrentTripViewModel(application: Application) : AndroidViewModel(applicat
             } finally {
                 _restaurantLiveContextInFlight.update { it - eventId }
             }
+        }
+    }
+
+    fun refreshWeatherContext(
+        eventId: String,
+        forceRefresh: Boolean = false
+    ) {
+        val event = _uiState.value.events.firstOrNull { it.eventId == eventId } ?: return
+        if (eventId in _weatherRefreshInFlight.value) return
+
+        viewModelScope.launch {
+            refreshWeatherContextForEvent(
+                event = event,
+                forceRefresh = forceRefresh,
+                updateLiveOverrides = true,
+                showAlert = true
+            )
+        }
+    }
+
+    fun simulateWeatherAlert(preferredEventId: String? = null) {
+        val event = preferredEventId
+            ?.let { id -> _uiState.value.events.firstOrNull { it.eventId == id } }
+            ?: _uiState.value.events.firstOrNull(::isWeatherAwareEvent)
+            ?: run {
+                postError("No weather-aware event is available to simulate.")
+                return
+            }
+
+        viewModelScope.launch {
+            val current = refreshWeatherContextForEvent(
+                event = event,
+                forceRefresh = true,
+                updateLiveOverrides = true,
+                showAlert = false
+            ) ?: run {
+                postError("Unable to load weather for the selected event.")
+                return@launch
+            }
+
+            val syntheticPrevious = current.copy(
+                temperatureC = current.temperatureC + 6,
+                precipPct = current.precipPct?.let { (it - 35).coerceAtLeast(0) },
+                windKph = current.windKph?.let { (it - 12).coerceAtLeast(0) }
+            )
+            buildWeatherAlertMessage(
+                eventLabel = weatherAlertLabelFor(event),
+                previous = syntheticPrevious,
+                current = current
+            )?.let { message ->
+                _uiState.update {
+                    it.copy(
+                        weatherAlertMessage = message,
+                        weatherAlertEventId = event.eventId,
+                        errorMessage = null
+                    )
+                }
+            } ?: postError("Unable to simulate a weather alert for this event.")
         }
     }
 

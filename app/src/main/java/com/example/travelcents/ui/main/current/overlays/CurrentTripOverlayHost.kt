@@ -65,6 +65,9 @@ fun CurrentTripOverlayHost(
                 reviewsLoading = reviewsLoading.contains(yelpId),
                 canEditTrip = canEditTrip,
                 canShowAlternatives = canShowAlternatives,
+                weatherAlertMessage = uiState.weatherAlertMessage?.takeIf {
+                    selectedEventId == uiState.weatherAlertEventId
+                },
                 onDismiss = { onSelectedEventIdChange(null) },
                 onEdit = {
                     onSelectedEventIdChange(null)

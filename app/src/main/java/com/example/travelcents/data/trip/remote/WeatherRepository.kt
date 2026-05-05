@@ -45,7 +45,8 @@ object WeatherRepository {
         longitude: Double,
         date: String,
         startTime: String?,
-        timeZoneId: String?
+        timeZoneId: String?,
+        forceRefresh: Boolean = false
     ): WeatherSnapshot? = withContext(Dispatchers.IO) {
         val eventDate = runCatching { LocalDate.parse(date) }.getOrNull() ?: return@withContext null
         val zoneId = resolveZoneId(timeZoneId)
@@ -53,9 +54,11 @@ object WeatherRepository {
         val cacheKey = buildWeatherCacheKey(latitude, longitude, eventDate, eventHour, zoneId)
         val now = System.currentTimeMillis()
 
-        cache[cacheKey]
-            ?.takeIf { it.expiresAtMs > now }
-            ?.let { return@withContext it.snapshot }
+        if (!forceRefresh) {
+            cache[cacheKey]
+                ?.takeIf { it.expiresAtMs > now }
+                ?.let { return@withContext it.snapshot }
+        }
 
         val url = FORECAST_URL.toHttpUrl().newBuilder()
             .addQueryParameter("latitude", decimal(latitude))

@@ -1,11 +1,15 @@
 package com.example.travelcents.ui.main.current
 
+import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.material3.Text
 import androidx.compose.material3.ProvideTextStyle
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
@@ -16,7 +20,9 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
+import com.example.travelcents.BuildConfig
 import com.example.travelcents.data.trip.TripPerformanceLogger
 import com.example.travelcents.ui.main.current.calendar.buildTripDateRange
 import com.example.travelcents.ui.main.current.header.CurrentTripHeader
@@ -24,6 +30,7 @@ import com.example.travelcents.ui.modules.buildCalendarDates
 import com.example.travelcents.ui.modules.sortEventsForCalendar
 import com.example.travelcents.ui.modules.todayIsoDate
 import com.example.travelcents.ui.theme.DeepSea1
+import com.example.travelcents.ui.theme.DeepSea5
 import com.example.travelcents.ui.theme.TravelCentsFonts
 
 @Composable
@@ -114,7 +121,16 @@ fun CurrentTripScreen(
             viewModel.fetchYelpReviews(yelpId)
             viewModel.ensureYelpEventEnriched(event.eventId)
         }
-        event?.eventId?.let(viewModel::refreshRestaurantLiveContext)
+        event?.let {
+            when {
+                it.type.equals("restaurant", ignoreCase = true) ||
+                    it.type.equals("dining", ignoreCase = true) ||
+                it.type.equals("food", ignoreCase = true) -> {
+                    viewModel.refreshRestaurantLiveContext(it.eventId)
+                }
+                else -> viewModel.refreshWeatherContext(it.eventId, forceRefresh = true)
+            }
+        }
         event?.eventId?.let(viewModel::ensureEventOptionsLoaded)
     }
 
@@ -221,12 +237,42 @@ fun CurrentTripScreen(
                     }
                 )
 
-                if (uiState.infoMessage != null || uiState.errorMessage != null) {
-                    CurrentTripMessageCard(
-                        message = uiState.errorMessage ?: uiState.infoMessage.orEmpty(),
-                        isError = uiState.errorMessage != null,
-                        onDismiss = viewModel::clearMessages
-                    )
+                if (
+                    uiState.weatherAlertMessage != null ||
+                        uiState.infoMessage != null ||
+                        uiState.errorMessage != null
+                ) {
+                    Column(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        uiState.weatherAlertMessage?.let { message ->
+                            CurrentTripMessageCard(
+                                message = message,
+                                isError = false,
+                                onDismiss = viewModel::clearWeatherAlert
+                            )
+                        }
+                        if (uiState.infoMessage != null || uiState.errorMessage != null) {
+                            CurrentTripMessageCard(
+                                message = uiState.errorMessage ?: uiState.infoMessage.orEmpty(),
+                                isError = uiState.errorMessage != null,
+                                onDismiss = viewModel::clearMessages
+                            )
+                        }
+                    }
+                }
+
+                if (BuildConfig.DEBUG) {
+                    TextButton(
+                        onClick = { viewModel.simulateWeatherAlert(selectedEventId) },
+                        modifier = Modifier.padding(start = 12.dp, top = 4.dp, end = 12.dp)
+                    ) {
+                        Text(
+                            text = "Simulate weather alert",
+                            color = DeepSea5
+                        )
+                    }
                 }
 
                 Box(
