@@ -65,6 +65,21 @@ object AiChatCardCatalog {
         )
     }
 
+    fun timelineQuestionGroup(): AiChatCardGroup {
+        return AiChatCardGroup(
+            id = "travel_timeline",
+            title = "When are you thinking of going?",
+            allowMultiple = false,
+            options = listOf(
+                AiChatCardOption(id = "travel_timeline_this_month", label = "This month", message = "I'd like to go this month.", groupId = "travel_timeline"),
+                AiChatCardOption(id = "travel_timeline_next_month", label = "Next month", message = "I'd like to go next month.", groupId = "travel_timeline"),
+                AiChatCardOption(id = "travel_timeline_3_months", label = "In 3 months", message = "I'd like to go in about 3 months.", groupId = "travel_timeline"),
+                AiChatCardOption(id = "travel_timeline_6_months", label = "In 6 months", message = "I'd like to go in about 6 months.", groupId = "travel_timeline"),
+                AiChatCardOption(id = "travel_timeline_specific", label = "I have specific dates", message = "I have specific dates in mind.", groupId = "travel_timeline")
+            )
+        )
+    }
+
     private fun starterOption(id: String, label: String, message: String): AiChatCardOption {
         return AiChatCardOption(
             id = "$STARTER_GROUP_ID:$id",

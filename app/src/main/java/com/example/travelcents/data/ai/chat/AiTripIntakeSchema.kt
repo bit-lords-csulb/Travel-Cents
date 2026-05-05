@@ -561,10 +561,10 @@ private fun AiTripIntakeProfile.toPaceSummary(): String {
 
 private fun AiTripIntakeAckKey.displayText(): String {
     return when (this) {
-        AiTripIntakeAckKey.GOT_IT -> "Got it!"
-        AiTripIntakeAckKey.SOUNDS_GOOD -> "Sounds good!"
-        AiTripIntakeAckKey.UNDERSTOOD -> "Understood."
-        AiTripIntakeAckKey.PERFECT -> "Perfect."
+        AiTripIntakeAckKey.GOT_IT -> listOf("Got it!", "Noted!", "Makes sense!").random()
+        AiTripIntakeAckKey.SOUNDS_GOOD -> listOf("Sounds good!", "Love it!", "Nice choice!").random()
+        AiTripIntakeAckKey.UNDERSTOOD -> listOf("Got it!", "Understood.", "Makes sense!").random()
+        AiTripIntakeAckKey.PERFECT -> listOf("Perfect!", "Great choice!", "Awesome!").random()
     }
 }
 

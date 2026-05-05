@@ -179,7 +179,8 @@ class AiChatViewModel(application: Application) : AndroidViewModel(application) 
 
         sessionState = sessionState.copy(
             lockedDestination = destination,
-            lockedDestinationImageUrl = recommendation.imageUrl
+            lockedDestinationImageUrl = recommendation.imageUrl,
+            intakeProfile = sessionState.intakeProfile.copy(destination = destination)
         )
         publishUiState()
 
@@ -910,6 +911,11 @@ class AiChatViewModel(application: Application) : AndroidViewModel(application) 
                 append(recommendation.matchReason)
                 append('.')
             }
+            appendLine()
+            appendLine("Destination is now locked. Respond with next_action=ask_more.")
+            appendLine("Ask when the user would like to travel (question_id='travel_timeline').")
+            appendLine("Suggest 4-5 time options: 'This month', 'Next month', 'In 3 months', 'In 6 months', 'I have specific dates'.")
+            append("Do not set next_action=build_trip.")
         }
     }
 
@@ -1033,7 +1039,7 @@ class AiChatViewModel(application: Application) : AndroidViewModel(application) 
             if (lastIndex >= 0) {
                 val prev = conversationItems[lastIndex]
                 conversationItems[lastIndex] = prev.copy(
-                    text = "${prev.text}\n\n$answeredQuestionTitle"
+                    text = "${prev.text} $answeredQuestionTitle"
                 )
             }
         }
@@ -1106,16 +1112,22 @@ class AiChatViewModel(application: Application) : AndroidViewModel(application) 
             val mergedProfile = sessionState.profile.mergeIntakeProfile(mergedIntakeProfile)
             val assistantPlanningObjective = (enrichedIntakeResult?.planningObjective ?: "")
                 .ifBlank { sessionState.planningObjective }
-            val toolRouterResult = runCatching {
-                toolRouter.routeTools(
-                    currentProfile = mergedIntakeProfile,
-                    latestUserInput = trimmedLlmUserMessage,
-                    history = sessionState.llmHistory.dropLast(1),
-                    planningObjective = assistantPlanningObjective
-                )
-            }.onFailure { error ->
-                Log.w(TAG, "Tool routing failed. Continuing without routed tool calls.", error)
-            }.getOrNull()
+            val destinationKnown = mergedIntakeProfile.destination.isNotBlank() ||
+                sessionState.lockedDestination?.isNotBlank() == true
+            val toolRouterResult = if (destinationKnown) {
+                runCatching {
+                    toolRouter.routeTools(
+                        currentProfile = mergedIntakeProfile,
+                        latestUserInput = trimmedLlmUserMessage,
+                        history = sessionState.llmHistory.dropLast(1),
+                        planningObjective = assistantPlanningObjective
+                    )
+                }.onFailure { error ->
+                    Log.w(TAG, "Tool routing failed. Continuing without routed tool calls.", error)
+                }.getOrNull()
+            } else {
+                null
+            }
             val toolDispatch = runCatching {
                 dispatchToolCalls(
                     toolRouterResult = toolRouterResult,
@@ -1168,8 +1180,13 @@ class AiChatViewModel(application: Application) : AndroidViewModel(application) 
                 )
             }
 
-            val followUpGroup = intakeFollowUpGroup
-                ?: AiChatCardCatalog.deadEndActionGroup().takeIf { intakeDeadEnd }
+            val followUpGroup = when {
+                intakeFollowUpGroup != null -> intakeFollowUpGroup
+                intakeDeadEnd && sessionState.lockedDestination?.isNotBlank() == true
+                    && mergedIntakeProfile.dateWindow.isBlank() -> AiChatCardCatalog.timelineQuestionGroup()
+                intakeDeadEnd -> AiChatCardCatalog.deadEndActionGroup()
+                else -> null
+            }
 
             val assistantResponse = buildAssistantResponse(
                 intakeResult = enrichedIntakeResult,
@@ -1180,7 +1197,8 @@ class AiChatViewModel(application: Application) : AndroidViewModel(application) 
                 ticketmasterGrounding = toolDispatch.singleEventResolution?.groundingContext,
                 viabilityWarning = toolDispatch.viabilityWarning,
                 placeRecommendationRow = toolDispatch.placeRecommendationRow,
-                intakeDeadEnd = intakeDeadEnd
+                intakeDeadEnd = intakeDeadEnd,
+                isPostDestinationLock = sessionState.lockedDestination?.isNotBlank() == true
             )
 
             conversationItems += AiChatItem.TextMessage(
@@ -1224,7 +1242,8 @@ class AiChatViewModel(application: Application) : AndroidViewModel(application) 
         ticketmasterGrounding: String?,
         viabilityWarning: String,
         placeRecommendationRow: AiPlaceRecommendationRow?,
-        intakeDeadEnd: Boolean
+        intakeDeadEnd: Boolean,
+        isPostDestinationLock: Boolean = false
     ): String {
         val structuredAck = intakeResult?.assistantMessage
             ?.takeIf { message -> message.isNotBlank() }
@@ -1236,6 +1255,7 @@ class AiChatViewModel(application: Application) : AndroidViewModel(application) 
                 planningObjective = planningObjective,
                 groundingContext = ticketmasterGrounding
             )
+            intakeDeadEnd && isPostDestinationLock -> structuredAck ?: DESTINATION_ACK_POOL.random()
             intakeDeadEnd -> fallbackAssistantMessage(
                 profile = profile,
                 intakeProfile = intakeProfile,
@@ -1513,6 +1533,9 @@ class AiChatViewModel(application: Application) : AndroidViewModel(application) 
                 "Be concise, helpful, and practical. Keep replies to short acknowledgment paragraphs. " +
                 "The app may present follow-up choices separately, so do not stack multiple questions or long questionnaires. " +
                 "Use the traveler profile context when available. Do not mention model vendors or say you are a generic AI chatbot."
+        private val DESTINATION_ACK_POOL = listOf(
+            "Sounds good!", "Love it!", "Nice choice!", "Great pick!", "Perfect!"
+        )
         private const val DEAD_END_RECOVERY_GROUNDING =
             "The structured intake step produced no follow-up. " +
                 "Briefly summarize what you already know about the user's trip in 1 to 2 sentences, " +

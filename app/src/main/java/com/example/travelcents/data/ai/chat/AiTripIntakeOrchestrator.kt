@@ -172,7 +172,8 @@ class AiTripIntakeOrchestrator {
                     append("Do not repeat the same planning gap if it appears in asked_question_ids. ")
                     append("Do not suggest specific destinations until you have gathered trip_type, at least 2 interests, and budget_level. Ask about missing fields first. ")
                     append("If the user has enough direction for destination suggestions but no destination yet, set next_action to suggest_destinations. ")
-                    append("If the destination is already clear and the trip can move forward, set next_action to build_trip. ")
+                    append("If destination is known AND date_window is known AND duration_days is known, set next_action to build_trip. ")
+                    append("If destination is known but date_window or duration_days is still missing, set next_action to ask_more and ask about the missing timing field — do NOT set build_trip just because destination is confirmed. ")
                     append("Return exactly one of these outcomes: no follow-up, or one cards follow-up. ")
                     append("If more information is still needed before either of those, set next_action to ask_more. ")
                     append("When next_action is ask_more, cards are the only valid follow-up mode. Ask exactly one short cards-friendly follow-up with 2 to 6 options. ")
@@ -183,9 +184,15 @@ class AiTripIntakeOrchestrator {
             ),
             LlmMessage(
                 role = "system",
-                content =
-                    "Current intake profile JSON:\n${currentProfile.toPromptJson()}\n\n" +
-                        "Fields still missing:\n${currentProfile.missingFields().joinToString().ifBlank { "None" }}"
+                content = buildString {
+                    append("Current intake profile JSON:\n${currentProfile.toPromptJson()}\n\n")
+                    append("Fields still missing:\n${currentProfile.missingFields().joinToString().ifBlank { "None" }}")
+                    if (currentProfile.destination.isNotBlank() && currentProfile.dateWindow.isBlank()) {
+                        append("\n\nPriority rule: destination is set but date_window is missing. The ONLY valid next_action is ask_more. Ask when the user would like to travel (question_id='travel_timeline'). Do not set next_action=build_trip.")
+                    } else if (currentProfile.destination.isNotBlank() && currentProfile.dateWindow.isNotBlank() && currentProfile.durationDays == null) {
+                        append("\n\nPriority rule: destination and date_window are set but duration_days is missing. The ONLY valid next_action is ask_more. Ask how many days the user wants to travel (question_id='trip_duration'). Do not set next_action=build_trip.")
+                    }
+                }
             ),
             LlmMessage(
                 role = "system",
