@@ -317,6 +317,7 @@ private fun EventDetailCardStack(
                     onOpenMaps = { uriHandler.openUri(mapsUrl) }
                 )
             }
+            WeatherCard(event)
         }
         "restaurant", "dining", "food" -> {
             val restaurantReviewsUrl = yelpReviews.firstOrNull()?.url?.takeIf { it.isNotBlank() }
@@ -377,6 +378,7 @@ private fun EventDetailCardStack(
                     onOpenMaps = { uriHandler.openUri(mapsUrl) }
                 )
             }
+            WeatherCard(event)
             if (showActivityReviews) {
                 ReviewsCard(
                     ratingLabel = ratingLabel,
