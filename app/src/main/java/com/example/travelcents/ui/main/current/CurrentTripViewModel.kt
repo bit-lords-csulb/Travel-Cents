@@ -7,7 +7,6 @@ import androidx.lifecycle.viewModelScope
 import com.example.travelcents.data.ai.chat.AiCuratedTripStarter
 import com.example.travelcents.data.ai.chat.AiCuratedTripToItineraryMapper
 import com.example.travelcents.data.ai.chat.AiTripIntakeProfile
-import com.example.travelcents.data.ai.chat.PREVIEW_TRIP_STATUS
 import com.example.travelcents.data.media.TripMediaCacheStore
 import com.example.travelcents.data.local.trip.TravelCentsDatabase
 import com.example.travelcents.data.local.trip.TripLocalDataSource
@@ -172,6 +171,13 @@ class CurrentTripViewModel(application: Application) : AndroidViewModel(applicat
             DateTimeFormatter.ofPattern("hh:mm a", Locale.US)
         )
         private val MERIDIEM_REGEX = Regex("\\b[AP]M\\b", RegexOption.IGNORE_CASE)
+        private val WEATHER_DETAIL_KEYS = setOf(
+            ATTR_WEATHER_TEMP_C,
+            ATTR_WEATHER_CONDITION,
+            ATTR_WEATHER_PRECIP_PCT,
+            ATTR_WEATHER_WIND_KPH,
+            ATTR_WEATHER_SUMMARY
+        )
     }
 
     private val _events = MutableStateFlow<List<TravelEvent>>(emptyList())
@@ -201,7 +207,7 @@ class CurrentTripViewModel(application: Application) : AndroidViewModel(applicat
     private val _reviewsLoading = MutableStateFlow<Set<String>>(emptySet())
     val reviewsLoading: StateFlow<Set<String>> = _reviewsLoading.asStateFlow()
     private val _yelpEnrichmentInFlight = MutableStateFlow<Set<String>>(emptySet())
-    private val _restaurantLiveContextInFlight = MutableStateFlow<Set<String>>(emptySet())
+    private val _eventLiveContextInFlight = MutableStateFlow<Set<String>>(emptySet())
 
     private val _shareTargets = MutableStateFlow<List<ShareTarget>>(emptyList())
     val shareTargets: StateFlow<List<ShareTarget>> = _shareTargets.asStateFlow()
@@ -272,7 +278,7 @@ class CurrentTripViewModel(application: Application) : AndroidViewModel(applicat
         _yelpReviews.value = emptyMap()
         _reviewsLoading.value = emptySet()
         _yelpEnrichmentInFlight.value = emptySet()
-        _restaurantLiveContextInFlight.value = emptySet()
+        _eventLiveContextInFlight.value = emptySet()
         _shareTargets.value = emptyList()
         _tripMembers.value = emptyList()
         liveEventDetailOverrides = emptyMap()
@@ -505,6 +511,40 @@ class CurrentTripViewModel(application: Application) : AndroidViewModel(applicat
             }
         }
         publishCurrentEvents(localEventsSnapshot, _eventOptions.value)
+    }
+
+    private suspend fun persistWeatherDetailOverrides(
+        event: TravelEvent,
+        weatherOverrides: Map<String, String>
+    ) {
+        if (weatherOverrides.isEmpty()) return
+
+        val tripKey = currentTripKey ?: return
+        val baseEvent = localEventsSnapshot.firstOrNull { it.eventId == event.eventId } ?: event
+        val updatedEvent = baseEvent.copy(details = baseEvent.details + weatherOverrides)
+        if (baseEvent.details.filterKeys { it in WEATHER_DETAIL_KEYS } == weatherOverrides) return
+
+        localEventsSnapshot = sortPlanEvents(
+            localEventsSnapshot.map { existing ->
+                if (existing.eventId == event.eventId) updatedEvent else existing
+            }
+        )
+        publishCurrentEvents(localEventsSnapshot, _eventOptions.value)
+        persistLocalTripSnapshot(
+            tripKey = tripKey,
+            events = localEventsSnapshot
+        )
+
+        currentTripWriteKeyIfContributor()?.let { writeKey ->
+            runCatching {
+                tripSyncRemoteDataSource.upsertEvent(
+                    tripKey = writeKey,
+                    event = event.copy(details = event.details + weatherOverrides)
+                )
+            }.onFailure { error ->
+                Log.w("CurrentTripViewModel", "Failed to persist event weather details", error)
+            }
+        }
     }
 
     private fun alignEventOptionsWithSelectedState(
@@ -805,41 +845,49 @@ class CurrentTripViewModel(application: Application) : AndroidViewModel(applicat
         refreshCurrentTripInBackground(tripKey)
     }
 
-    fun refreshRestaurantLiveContext(eventId: String) {
+    fun refreshEventLiveContext(eventId: String) {
         val event = _uiState.value.events.firstOrNull { it.eventId == eventId } ?: return
-        if (!isRestaurantEvent(event) || eventId in _restaurantLiveContextInFlight.value) return
+        if (eventId in _eventLiveContextInFlight.value) return
 
-        val venueName = event.displayName()?.takeIf { it.isNotBlank() } ?: return
-        val venueAddress = event.detailValue(ATTR_BUSINESS_ADDRESS, "address")
-            ?.takeIf { it.isNotBlank() }
-        val transportAnchor = resolveTransportAnchor(event)
-        val transportDestination = resolveTransportDestination(event)
+        val isRestaurant = isRestaurantEvent(event)
         val latitude = event.detailValue(ATTR_LATITUDE)?.toDoubleOrNull()
         val longitude = event.detailValue(ATTR_LONGITUDE)?.toDoubleOrNull()
-        val hasOutdoorSeating = event.detailValue(ATTR_HAS_OUTDOOR_SEATING)
-            ?.equals("true", ignoreCase = true) == true
-        val tripCurrency = currentTripSummary?.currency
+        val canFetchWeather = isWeatherEligiblePlaceEvent(event) && latitude != null && longitude != null
+        val venueName = if (isRestaurant) event.displayName()?.takeIf { it.isNotBlank() } else null
+        val venueAddress = if (isRestaurant) {
+            event.detailValue(ATTR_BUSINESS_ADDRESS, "address")
+                ?.takeIf { it.isNotBlank() }
+        } else {
+            null
+        }
+        val transportAnchor = if (isRestaurant) resolveTransportAnchor(event) else null
+        val transportDestination = if (isRestaurant) resolveTransportDestination(event) else null
+        val tripCurrency = (if (isRestaurant) currentTripSummary?.currency else null)
             ?.takeIf { it.isNotBlank() }
             ?.uppercase(Locale.US)
         val homeCurrency = resolvedHomeCurrencyCode()
-        val usdAnchorAmount = restaurantUsdAnchorAmount(event)
-        val walkScoreAddress = venueAddress
-            ?: transportDestination?.address
-            ?: event.details["location"]?.takeIf { it.isNotBlank() }
+        val usdAnchorAmount = if (isRestaurant) restaurantUsdAnchorAmount(event) else null
+        val walkScoreAddress = if (isRestaurant) {
+            venueAddress
+                ?: transportDestination?.address
+                ?: event.details["location"]?.takeIf { it.isNotBlank() }
+        } else {
+            null
+        }
 
         if (
             venueAddress == null &&
             (transportAnchor == null || transportDestination == null) &&
-            (!hasOutdoorSeating || latitude == null || longitude == null) &&
+            !canFetchWeather &&
             (latitude == null || longitude == null || walkScoreAddress == null) &&
             (tripCurrency == null || usdAnchorAmount == null)
         ) return
 
         viewModelScope.launch {
-            _restaurantLiveContextInFlight.update { it + eventId }
+            _eventLiveContextInFlight.update { it + eventId }
             try {
                 val overrides = buildMap {
-                    if (venueAddress != null) {
+                    if (venueName != null && venueAddress != null) {
                         PopularTimesRepository.fetchSnapshot(
                             venueName = venueName,
                             venueAddress = venueAddress,
@@ -882,7 +930,10 @@ class CurrentTripViewModel(application: Application) : AndroidViewModel(applicat
                         }
                     }
 
-                    if (hasOutdoorSeating && latitude != null && longitude != null) {
+                    val isFlight = event.type.equals("flight", ignoreCase = true)
+                    val hasOutdoorSeating = event.detailValue(ATTR_HAS_OUTDOOR_SEATING)?.toBoolean() ?: false
+                    
+                    if ((hasOutdoorSeating || isFlight) && latitude != null && longitude != null) {
                         WeatherRepository.fetchSnapshot(
                             latitude = latitude,
                             longitude = longitude,
@@ -952,11 +1003,13 @@ class CurrentTripViewModel(application: Application) : AndroidViewModel(applicat
                     }
                 }
 
+                val weatherOverrides = overrides.filterKeys { it in WEATHER_DETAIL_KEYS }
+                persistWeatherDetailOverrides(event, weatherOverrides)
                 replaceLiveDetailOverrides(eventId, overrides)
             } catch (e: Exception) {
-                Log.w("CurrentTripViewModel", "Failed to refresh restaurant live context", e)
+                Log.w("CurrentTripViewModel", "Failed to refresh event live context", e)
             } finally {
-                _restaurantLiveContextInFlight.update { it - eventId }
+                _eventLiveContextInFlight.update { it - eventId }
             }
         }
     }
@@ -1984,6 +2037,11 @@ class CurrentTripViewModel(application: Application) : AndroidViewModel(applicat
             "restaurant", "dining", "food" -> true
             else -> false
         }
+    }
+
+    private fun isWeatherEligiblePlaceEvent(event: TravelEvent): Boolean {
+        // Allowed for all events including flights to show destination weather
+        return true
     }
 
     private fun resolveTransportAnchor(event: TravelEvent): TransportRepository.TransportAnchor? {

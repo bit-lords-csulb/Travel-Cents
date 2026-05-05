@@ -10,6 +10,7 @@ import java.time.LocalDate
 import java.time.LocalDateTime
 import java.time.LocalTime
 import java.time.ZoneId
+import java.time.format.DateTimeFormatter
 import java.util.Locale
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.TimeUnit
@@ -189,8 +190,24 @@ object WeatherRepository {
 
     private fun parseHour(rawTime: String?): Int {
         val value = rawTime?.trim().orEmpty()
-        if (value.length < 2) return 18
-        return value.substring(0, 2).toIntOrNull()?.coerceIn(0, 23) ?: 18
+        if (value.isBlank()) return 18
+
+        val normalized = value.uppercase(Locale.US)
+        val formatters = listOf(
+            DateTimeFormatter.ofPattern("H:mm", Locale.US),
+            DateTimeFormatter.ofPattern("HH:mm", Locale.US),
+            DateTimeFormatter.ofPattern("h:mm a", Locale.US)
+        )
+        formatters.firstNotNullOfOrNull { formatter ->
+            runCatching { LocalTime.parse(normalized, formatter).hour }.getOrNull()
+        }?.let { return it }
+
+        return Regex("""^\d{1,2}""")
+            .find(value)
+            ?.value
+            ?.toIntOrNull()
+            ?.coerceIn(0, 23)
+            ?: 18
     }
 
     private fun resolveZoneId(rawTimeZone: String?): ZoneId {
