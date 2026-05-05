@@ -10,7 +10,6 @@ import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.IntrinsicSize
@@ -31,8 +30,8 @@ import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.DeleteOutline
 import androidx.compose.material.icons.filled.DragHandle
+import androidx.compose.material.icons.outlined.Edit
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Icon
@@ -450,43 +449,22 @@ private fun CurrentTripItineraryCard(
                     }
                 }
 
-                Row(
-                    modifier = Modifier
-                        .align(Alignment.TopEnd)
-                        .padding(top = 8.dp, end = 8.dp),
-                    horizontalArrangement = Arrangement.spacedBy(6.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    if (canEditTrip && hasAlternatives) {
-                        Surface(
-                            color = DeepSea2,
-                            shape = RoundedCornerShape(8.dp),
-                            modifier = Modifier.clickable(enabled = !jiggleMode, onClick = onAlternativesClick)
-                        ) {
-                            Text(
-                                text = "Change",
-                                color = DeepSea5,
-                                fontSize = 10.sp,
-                                fontWeight = FontWeight.SemiBold,
-                                modifier = Modifier.padding(horizontal = 8.dp, vertical = 5.dp)
+                if (canEditTrip && hasAlternatives) {
+                    Surface(
+                        color = DeepSea2,
+                        shape = CircleShape,
+                        modifier = Modifier
+                            .align(Alignment.TopEnd)
+                            .padding(top = 8.dp, end = 8.dp)
+                            .clickable(enabled = !jiggleMode, onClick = onAlternativesClick)
+                    ) {
+                        Box(modifier = Modifier.size(28.dp), contentAlignment = Alignment.Center) {
+                            Icon(
+                                imageVector = Icons.Outlined.Edit,
+                                contentDescription = "Change option",
+                                tint = DeepSea4,
+                                modifier = Modifier.size(14.dp)
                             )
-                        }
-                    }
-
-                    if (canEditTrip) {
-                        Surface(
-                            color = DeepSea2,
-                            shape = CircleShape,
-                            modifier = Modifier.clickable(enabled = !jiggleMode, onClick = onDeleteClick)
-                        ) {
-                            Box(modifier = Modifier.size(30.dp), contentAlignment = Alignment.Center) {
-                                Icon(
-                                    imageVector = Icons.Default.DeleteOutline,
-                                    contentDescription = "Delete plan",
-                                    tint = Color(0xFFE77D90),
-                                    modifier = Modifier.size(16.dp)
-                                )
-                            }
                         }
                     }
                 }
