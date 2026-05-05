@@ -263,7 +263,11 @@ fun LoginPage(modifier: Modifier = Modifier, navController: NavController, authV
                     fontFamily = TravelCentsFonts.Body
                 )
             }
-            TextButton(onClick = { navController.navigate("forgot_password") }) {
+            TextButton(onClick = {
+                navController.navigate("forgot_password") {
+                    launchSingleTop = true
+                }
+            }) {
                 Text(
                     text = "Forgot Password?",
                     color = DeepSea4,
