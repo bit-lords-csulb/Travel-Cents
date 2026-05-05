@@ -91,6 +91,7 @@ fun HomePage(
     onTripClick: (TripKey) -> Unit = {},
     onProfileClick: () -> Unit = {},
     onSavedPlacesClick: () -> Unit = {},
+    onDocumentsClick: () -> Unit = {},
     homeViewModel: HomeViewModel = viewModel(),
     currencyViewModel: CurrencyViewModel = viewModel()
 ) {
@@ -147,7 +148,7 @@ fun HomePage(
 
             TripStatusWidget(trip = homeUiState.trips.firstOrNull())
 
-            DocumentsWidget()
+            DocumentsWidget(onClick = onDocumentsClick)
         }
 
         Spacer(modifier = Modifier.height(24.dp))
@@ -830,13 +831,13 @@ private fun TripStatusWidget(trip: Itinerary?) {
 // ─────────────────────────────────────────────────────────────
 
 @Composable
-private fun DocumentsWidget() {
+private fun DocumentsWidget(onClick: () -> Unit = {}) {
     Box(
         modifier = Modifier
             .fillMaxWidth()
             .clip(RoundedCornerShape(24.dp))
             .background(Brush.horizontalGradient(listOf(Primary, PrimaryDim)))
-            .clickable { }
+            .clickable { onClick() }
             .padding(20.dp)
     ) {
         Row(

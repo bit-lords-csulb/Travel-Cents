@@ -59,6 +59,7 @@ import com.example.travelcents.ui.main.newTrip.TripStep2DatesPage
 import com.example.travelcents.ui.main.newTrip.TripStep3TravelersPage
 import com.example.travelcents.ui.main.newTrip.TripStep4BudgetPage
 import com.example.travelcents.ui.main.newTrip.TripStep5InterestsPage
+import com.example.travelcents.ui.main.passes.MyPassesScreen
 import com.example.travelcents.ui.main.settings.SettingsPage
 import com.example.travelcents.ui.theme.DeepSea1
 
@@ -81,6 +82,7 @@ object MainRoutes {
 
     const val AI_TRIP_CHAT = "ai_trip_chat"
     const val SAVED_PLACES = "saved_places"
+    const val DOCUMENTS = "documents"
 }
 
 private val bottomNavRoutes = setOf(
@@ -300,11 +302,17 @@ fun MainScaffold(modifier: Modifier = Modifier, onLogout: () -> Unit = {}) {
                         },
                         onSavedPlacesClick = {
                             navController.navigate(MainRoutes.SAVED_PLACES)
+                        },
+                        onDocumentsClick = {
+                            navController.navigate(MainRoutes.DOCUMENTS)
                         }
                     )
                 }
                 composable(MainRoutes.SAVED_PLACES) {
                     SavedPlacesPage(onBack = { navController.popBackStack() })
+                }
+                composable(MainRoutes.DOCUMENTS) {
+                    MyPassesScreen(onBack = { navController.popBackStack() })
                 }
                 composable(MainRoutes.CHATS) {
                     ChatsScreen(
@@ -359,6 +367,9 @@ fun MainScaffold(modifier: Modifier = Modifier, onLogout: () -> Unit = {}) {
                             pendingPreview = source
                             currentTripViewModel.loadPreview(source)
                             // Stay in chat — the banner is the user's path to the skeleton
+                        },
+                        onAddEventToPreview = { event ->
+                            currentTripViewModel.addPreviewEvent(event)
                         }
                     )
                 }
