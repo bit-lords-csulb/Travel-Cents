@@ -14,12 +14,20 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.travelcents.ui.theme.DeepSea4
 
 @Composable
-fun PreferencesTab() {
+fun PreferencesTab(viewModel: SettingsViewModel = viewModel()) {
+    val userState by viewModel.userState.collectAsStateWithLifecycle()
+
     Column(modifier = Modifier.fillMaxWidth()) {
         NotificationsSection()
+        FeaturesSection(
+            showWeeklySummary = userState.showWeeklySummary,
+            onWeeklySummaryChange = { viewModel.setShowWeeklySummary(it) }
+        )
         DisplaySection()
         AboutSection()
     }
@@ -50,6 +58,23 @@ private fun NotificationsSection() {
             subtitle = "Be notified about new features and updates",
             checked = appUpdates,
             onCheckedChange = { appUpdates = it },
+            showDivider = false
+        )
+    }
+}
+
+@Composable
+private fun FeaturesSection(
+    showWeeklySummary: Boolean,
+    onWeeklySummaryChange: (Boolean) -> Unit
+) {
+    SettingHeader("Features")
+    SettingCard {
+        SwitchSettingItem(
+            title = "Weekly Summary",
+            subtitle = "Receive a weekly summary of your events and spending",
+            checked = showWeeklySummary,
+            onCheckedChange = onWeeklySummaryChange,
             showDivider = false
         )
     }
@@ -89,4 +114,3 @@ private fun AboutSection() {
         modifier = Modifier.padding(horizontal = 4.dp)
     )
 }
-

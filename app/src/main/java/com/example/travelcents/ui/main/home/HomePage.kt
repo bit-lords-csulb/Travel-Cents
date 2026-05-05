@@ -137,6 +137,11 @@ fun HomePage(
             modifier = Modifier.padding(horizontal = 16.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
+            // Weekly Summary Feature
+            homeUiState.weeklySummary?.let { summary ->
+                WeeklySummaryWidget(summary = summary)
+            }
+
             Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                 SavedPlacesWidget(
                     bookmarks = homeUiState.bookmarks,

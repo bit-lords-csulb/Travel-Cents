@@ -13,7 +13,9 @@ import com.example.travelcents.data.trip.FirestoreTripRepository
 import com.example.travelcents.data.trip.LocalFirstTripRepository
 import com.example.travelcents.data.trip.TripKey
 import com.example.travelcents.data.trip.TripPerformanceLogger
+import com.example.travelcents.data.trip.WeeklySummaryCalculator
 import com.example.travelcents.data.trip.model.Itinerary
+import com.example.travelcents.data.trip.model.WeeklySummary
 import com.example.travelcents.data.trip.remote.DestinationImageRepository
 import com.example.travelcents.data.trip.remote.WikipediaApiService
 import com.example.travelcents.data.social.model.BookmarkedPlace
@@ -40,6 +42,7 @@ data class HomeUiState(
     val tripImages: Map<String, String> = emptyMap(),
     val profile: CurrentUserProfile = CurrentUserProfile(),
     val bookmarks: List<BookmarkedPlace> = emptyList(),
+    val weeklySummary: WeeklySummary? = null,
     val errorMessage: String? = null
 )
 
@@ -62,6 +65,7 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
         legacyRemoteRepository = remoteRepository
     )
     private var homeTripsJob: Job? = null
+    private var weeklySummaryJob: Job? = null
 
     private val wikipediaClient = OkHttpClient.Builder()
         .addInterceptor { chain ->
@@ -111,6 +115,11 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
         viewModelScope.launch {
             userProfileRepository.observeCurrentUserProfile().collect { profile ->
                 _uiState.update { currentState -> currentState.copy(profile = profile) }
+                if (profile.showWeeklySummary) {
+                    refreshWeeklySummary()
+                } else {
+                    _uiState.update { it.copy(weeklySummary = null) }
+                }
             }
         }
     }
@@ -133,6 +142,29 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
                         errorMessage = if (trips.isNotEmpty()) null else currentState.errorMessage
                     )
                 }
+                refreshWeeklySummary()
+            }
+        }
+    }
+
+    private fun refreshWeeklySummary() {
+        val profile = _uiState.value.profile
+        if (!profile.showWeeklySummary) {
+            _uiState.update { it.copy(weeklySummary = null) }
+            return
+        }
+        
+        val activeTrip = _uiState.value.trips.firstOrNull { 
+            !it.status.equals("archived", ignoreCase = true) 
+        } ?: return
+        
+        val tripKey = TripKey(ownerUid = activeTrip.ownerUid, tripId = activeTrip.itineraryId)
+        
+        weeklySummaryJob?.cancel()
+        weeklySummaryJob = viewModelScope.launch {
+            localDataSource.observeTripEvents(tripKey).collect { events ->
+                val summary = WeeklySummaryCalculator.calculate(activeTrip, events)
+                _uiState.update { it.copy(weeklySummary = summary) }
             }
         }
     }
@@ -206,7 +238,6 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
                     )
                 }
             }
-            _uiState.update { it.copy(tripImages = images.toMap()) }
         }
     }
 
