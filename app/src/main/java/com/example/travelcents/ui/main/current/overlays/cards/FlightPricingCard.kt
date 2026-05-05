@@ -15,8 +15,8 @@ import com.example.travelcents.data.trip.model.TravelEvent
 import com.example.travelcents.data.trip.model.detailValue
 
 @Composable
-fun FlightPricingCard(event: TravelEvent) {
-    val totalPrice = formatPrice(event.detailValue("total_price")) ?: return
+fun FlightPricingCard(event: TravelEvent, currencyCode: String = "USD") {
+    val totalPrice = formatPrice(event.detailValue("total_price"), currencyCode) ?: return
     val cabin = event.detailValue("cabin_class") ?: "Economy"
     val carbon = event.detailValue("carbon_diff_percent")
         ?.toIntOrNull()

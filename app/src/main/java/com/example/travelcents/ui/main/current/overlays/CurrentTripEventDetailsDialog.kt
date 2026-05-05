@@ -109,6 +109,8 @@ fun CurrentTripEventDetailsDialog(
     yelpReviews: List<YelpReview>,
     reviewsLoading: Boolean,
     canEditTrip: Boolean,
+    usesFahrenheit: Boolean = false,
+    homeCurrencyCode: String = "USD",
     canShowAlternatives: Boolean = currentOptions.size > 1,
     onDismiss: () -> Unit,
     onEdit: () -> Unit,
@@ -299,6 +301,8 @@ fun CurrentTripEventDetailsDialog(
                         yelpReviews = yelpReviews,
                         reviewsLoading = reviewsLoading,
                         reviewUrl = reviewUrl,
+                        usesFahrenheit = usesFahrenheit,
+                        homeCurrencyCode = homeCurrencyCode
                         currentOptions = currentOptions,
                         onAlternatives = onAlternatives
                     )
@@ -333,6 +337,8 @@ private fun EventDetailCardStack(
     yelpReviews: List<YelpReview>,
     reviewsLoading: Boolean,
     reviewUrl: String?,
+    usesFahrenheit: Boolean = false,
+    homeCurrencyCode: String = "USD"
     currentOptions: List<EventOption>,
     onAlternatives: (() -> Unit)?
 ) {
@@ -363,7 +369,7 @@ private fun EventDetailCardStack(
             FlightOverviewCard(event)
             FlightStatusCard(event)
             FlightLegsCard(event)
-            FlightPricingCard(event)
+            FlightPricingCard(event, currencyCode = homeCurrencyCode)
             FlightBookingOffersCard(event = event, adults = tripAdults)
             LoyaltyCard(event)
         }
@@ -373,7 +379,7 @@ private fun EventDetailCardStack(
                 event = event,
                 onOpenReviews = { uriHandler.openUri(hotelReviewsUrl) }
             )
-            HotelPricingCard(event)
+            HotelPricingCard(event, currencyCode = homeCurrencyCode)
             HotelBookingCard(event)
             HotelAmenitiesCard(event)
             if (showLocationCard) {
@@ -414,7 +420,7 @@ private fun EventDetailCardStack(
             }
             WaitTimeCard(event)
             NeighborhoodCard(event)
-            WeatherCard(event)
+            WeatherCard(event, usesFahrenheit = usesFahrenheit)
             CurrencyCostCard(event)
         }
         "activity", "tour", "event" -> {

@@ -31,6 +31,7 @@ import androidx.compose.material.icons.automirrored.filled.OpenInNew
 import androidx.compose.material.icons.filled.Bookmark
 import androidx.compose.material.icons.filled.BookmarkBorder
 import androidx.compose.material.icons.filled.ChevronRight
+import androidx.compose.material.icons.filled.Cloud
 import androidx.compose.material.icons.filled.Description
 import androidx.compose.material.icons.filled.Flight
 import androidx.compose.material.icons.filled.FlightTakeoff
@@ -71,6 +72,7 @@ import com.example.travelcents.data.social.model.BookmarkedPlace
 import com.example.travelcents.data.trip.TripKey
 import com.example.travelcents.data.trip.TripPerformanceLogger
 import com.example.travelcents.data.trip.model.Itinerary
+import com.example.travelcents.data.user.model.RegionalData
 import com.example.travelcents.notification.ChatNotificationTarget
 import com.example.travelcents.notification.NotificationHelper
 import com.example.travelcents.ui.components.ProfileAvatar
@@ -153,6 +155,13 @@ fun HomePage(
             onProfileClick = onProfileClick
         )
 
+        RegionalInfoBar(
+            city = homeUiState.profile.city,
+            time = homeUiState.localTime,
+            weather = homeUiState.localWeather,
+            countryName = homeUiState.profile.country
+        )
+
         Spacer(modifier = Modifier.height(4.dp))
 
         TripsCarousel(
@@ -170,6 +179,11 @@ fun HomePage(
             modifier = Modifier.padding(horizontal = 16.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
+            // Weekly Summary Feature
+            homeUiState.weeklySummary?.let { summary ->
+                WeeklySummaryWidget(summary = summary)
+            }
+
             Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                 SavedPlacesWidget(
                     bookmarks = homeUiState.bookmarks,
@@ -277,6 +291,74 @@ private fun HomeHeader(
                 tint = Primary,
                 modifier = Modifier.size(24.dp)
             )
+        }
+    }
+}
+
+@Composable
+private fun RegionalInfoBar(
+    city: String,
+    time: String,
+    weather: com.example.travelcents.data.trip.remote.WeatherRepository.WeatherSnapshot?,
+    countryName: String
+) {
+    val country = remember(countryName) { RegionalData.getCountry(countryName) }
+    val usesFahrenheit = country?.usesFahrenheit ?: false
+
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 16.dp, vertical = 8.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.SpaceBetween
+    ) {
+        Column {
+            Text(
+                text = city.uppercase(),
+                color = DeepSea4,
+                fontSize = 10.sp,
+                fontWeight = FontWeight.Bold,
+                letterSpacing = 1.sp
+            )
+            Text(
+                text = time,
+                color = DeepSea5,
+                fontSize = 16.sp,
+                fontWeight = FontWeight.SemiBold
+            )
+        }
+
+        if (weather != null) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                val temp = if (usesFahrenheit) {
+                    (weather.temperatureC * 9 / 5) + 32
+                } else {
+                    weather.temperatureC
+                }
+                val unit = if (usesFahrenheit) "°F" else "°C"
+
+                Column(horizontalAlignment = Alignment.End) {
+                    Text(
+                        text = weather.condition,
+                        color = DeepSea4,
+                        fontSize = 10.sp,
+                        fontWeight = FontWeight.Bold
+                    )
+                    Text(
+                        text = "$temp$unit",
+                        color = DeepSea5,
+                        fontSize = 16.sp,
+                        fontWeight = FontWeight.SemiBold
+                    )
+                }
+                Spacer(modifier = Modifier.width(12.dp))
+                Icon(
+                    imageVector = if (weather.condition.contains("Cloud", ignoreCase = true)) Icons.Default.Cloud else Icons.Default.WbSunny,
+                    contentDescription = null,
+                    tint = Primary,
+                    modifier = Modifier.size(24.dp)
+                )
+            }
         }
     }
 }

@@ -15,8 +15,8 @@ import java.time.temporal.ChronoField
 import java.util.Locale
 
 private val storageTimeFormatter: DateTimeFormatter = DateTimeFormatter.ofPattern("HH:mm", Locale.US)
-private val displayTimeFormatter: DateTimeFormatter = DateTimeFormatter.ofPattern("h:mm a", Locale.US)
-private val displayHourFormatter: DateTimeFormatter = DateTimeFormatter.ofPattern("h a", Locale.US)
+private val defaultDisplayTimeFormatter: DateTimeFormatter = DateTimeFormatter.ofPattern("h:mm a", Locale.US)
+private val defaultDisplayHourFormatter: DateTimeFormatter = DateTimeFormatter.ofPattern("h a", Locale.US)
 private val tripDateFormatter: DateTimeFormatter = DateTimeFormatter.ofPattern("MMM d", Locale.US)
 private val itineraryHeaderFormatter: DateTimeFormatter = DateTimeFormatter.ofPattern("EEEE, MMMM d", Locale.US)
 private val longDayFormatter: DateTimeFormatter = DateTimeFormatter.ofPattern("MMMM d", Locale.US)
@@ -74,13 +74,15 @@ fun normalizeTime(rawTime: String): String {
     return parseFlexibleTime(rawTime)?.format(storageTimeFormatter) ?: rawTime.trim()
 }
 
-fun formatDisplayTime(time: String): String {
-    return parseFlexibleTime(time)?.format(displayTimeFormatter) ?: time.ifBlank { "TIME TBD" }
+fun formatDisplayTime(time: String, pattern: String? = null): String {
+    val formatter = if (pattern != null) DateTimeFormatter.ofPattern(pattern, Locale.US) else defaultDisplayTimeFormatter
+    return parseFlexibleTime(time)?.format(formatter) ?: time.ifBlank { "TIME TBD" }
 }
 
-fun formatDisplayTimeRange(startTime: String, endTime: String): String {
-    val formattedStart = formatDisplayTime(startTime)
-    val formattedEnd = parseFlexibleTime(endTime)?.format(displayTimeFormatter)
+fun formatDisplayTimeRange(startTime: String, endTime: String, pattern: String? = null): String {
+    val formattedStart = formatDisplayTime(startTime, pattern)
+    val formatter = if (pattern != null) DateTimeFormatter.ofPattern(pattern, Locale.US) else defaultDisplayTimeFormatter
+    val formattedEnd = parseFlexibleTime(endTime)?.format(formatter)
 
     return when {
         formattedEnd.isNullOrBlank() -> formattedStart
@@ -89,32 +91,42 @@ fun formatDisplayTimeRange(startTime: String, endTime: String): String {
     }
 }
 
-fun formatMinutes(minutes: Int): String {
+fun formatMinutes(minutes: Int, pattern: String? = null): String {
     val clamped = minutes.coerceIn(0, (23 * 60) + 59)
-    return LocalTime.of(clamped / 60, clamped % 60).format(displayTimeFormatter)
+    val formatter = if (pattern != null) DateTimeFormatter.ofPattern(pattern, Locale.US) else defaultDisplayTimeFormatter
+    return LocalTime.of(clamped / 60, clamped % 60).format(formatter)
 }
 
 fun parseTimeToMinutes(rawTime: String): Int? {
     return parseFlexibleTime(rawTime)?.let { it.hour * 60 + it.minute }
 }
 
-fun plusMinutes(rawTime: String, minutesToAdd: Long): String {
+fun plusMinutes(rawTime: String, minutesToAdd: Long, pattern: String? = null): String {
+    val formatter = if (pattern != null) DateTimeFormatter.ofPattern(pattern, Locale.US) else defaultDisplayTimeFormatter
     return parseFlexibleTime(rawTime)
         ?.plusMinutes(minutesToAdd)
-        ?.format(displayTimeFormatter)
+        ?.format(formatter)
         ?: rawTime
 }
 
-fun hourLabel(hour: Int): String {
-    return LocalTime.of(hour.coerceIn(0, 23), 0).format(displayHourFormatter)
+fun hourLabel(hour: Int, pattern: String? = null): String {
+    val formatter = if (pattern != null) {
+        // If pattern is "HH:mm" or similar, we want just the hour part
+        val hourPattern = if (pattern.contains("H")) "HH:00" else "h a"
+        DateTimeFormatter.ofPattern(hourPattern, Locale.US)
+    } else {
+        defaultDisplayHourFormatter
+    }
+    return LocalTime.of(hour.coerceIn(0, 23), 0).format(formatter)
 }
 
 fun hourLabel24(hour: Int): String {
     return "%02d:00".format(Locale.US, hour.coerceIn(0, 23))
 }
 
-fun formatTripDate(rawDate: String): String {
-    return parseIsoDate(rawDate)?.format(tripDateFormatter) ?: rawDate
+fun formatTripDate(rawDate: String, pattern: String? = null): String {
+    val formatter = if (pattern != null) DateTimeFormatter.ofPattern(pattern, Locale.US) else tripDateFormatter
+    return parseIsoDate(rawDate)?.format(formatter) ?: rawDate
 }
 
 fun formatLongTripDateWithYear(rawDate: String): String {
@@ -134,8 +146,12 @@ fun formatLongDuration(totalMinutes: Long): String {
     }
 }
 
-fun formatItineraryHeader(rawDate: String): String {
-    return parseIsoDate(rawDate)?.format(itineraryHeaderFormatter)?.uppercase(Locale.US) ?: rawDate
+fun formatItineraryHeader(rawDate: String, pattern: String? = null): String {
+    return if (pattern != null) {
+        parseIsoDate(rawDate)?.format(DateTimeFormatter.ofPattern("EEEE, $pattern", Locale.US))?.uppercase(Locale.US) ?: rawDate
+    } else {
+        parseIsoDate(rawDate)?.format(itineraryHeaderFormatter)?.uppercase(Locale.US) ?: rawDate
+    }
 }
 
 fun formatLongDayLabel(rawDate: String): String {
@@ -154,8 +170,11 @@ fun formatMonthDayCompact(rawDate: String): String {
     return parseIsoDate(rawDate)?.format(tripDateFormatter)?.uppercase(Locale.US) ?: rawDate
 }
 
-fun formatHeroDate(rawDate: String): String {
+fun formatHeroDate(rawDate: String, pattern: String? = null): String {
     val date = parseIsoDate(rawDate) ?: return rawDate.ifBlank { "—" }
+    if (pattern != null) {
+        return date.format(DateTimeFormatter.ofPattern(pattern, Locale.US)).uppercase(Locale.US)
+    }
     val month = date.month.getDisplayName(java.time.format.TextStyle.SHORT, Locale.US).uppercase(Locale.US)
     val day = date.dayOfMonth
     val suffix = when {
@@ -168,9 +187,14 @@ fun formatHeroDate(rawDate: String): String {
     return "$month $day$suffix"
 }
 
-fun formatWeekRangeHero(startDate: String, endDate: String): String {
+fun formatWeekRangeHero(startDate: String, endDate: String, pattern: String? = null): String {
     val start = parseIsoDate(startDate) ?: return startDate.ifBlank { "—" }
     val end = parseIsoDate(endDate) ?: return startDate.ifBlank { "—" }
+    
+    if (pattern != null) {
+        return "${start.format(DateTimeFormatter.ofPattern(pattern, Locale.US))} – ${end.format(DateTimeFormatter.ofPattern(pattern, Locale.US))}".uppercase(Locale.US)
+    }
+
     val startMonth = start.month.getDisplayName(java.time.format.TextStyle.SHORT, Locale.US).uppercase(Locale.US)
     val endMonth = end.month.getDisplayName(java.time.format.TextStyle.SHORT, Locale.US).uppercase(Locale.US)
     return if (start.month == end.month) {
@@ -238,4 +262,3 @@ fun sortEventsForCalendar(events: List<TravelEvent>): List<TravelEvent> {
         )
     )
 }
-

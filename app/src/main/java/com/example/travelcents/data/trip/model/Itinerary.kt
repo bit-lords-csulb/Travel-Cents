@@ -16,6 +16,8 @@ data class Itinerary(
     val travelStyle: String,
     val adults: Int,
     val children: Int,
+    val budgetTotal: Double = 0.0,
+    val interests: List<String> = emptyList(),
     val createdAt: String,
     val status: String,
     val eventIds: List<String>,
@@ -47,6 +49,8 @@ data class Itinerary(
         "travelStyle" to travelStyle,
         "adults" to adults,
         "children" to children,
+        "budgetTotal" to budgetTotal,
+        "interests" to interests,
         "createdAt" to createdAt,
         "status" to status,
         "eventIds" to eventIds,
@@ -65,5 +69,3 @@ data class Itinerary(
         const val ACCESS_SCHEMA_VERSION = 1
     }
 }
-
-

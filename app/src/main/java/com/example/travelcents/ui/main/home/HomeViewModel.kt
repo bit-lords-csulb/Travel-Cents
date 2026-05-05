@@ -13,14 +13,18 @@ import com.example.travelcents.data.trip.FirestoreTripRepository
 import com.example.travelcents.data.trip.LocalFirstTripRepository
 import com.example.travelcents.data.trip.TripKey
 import com.example.travelcents.data.trip.TripPerformanceLogger
+import com.example.travelcents.data.trip.WeeklySummaryCalculator
 import com.example.travelcents.data.trip.model.Itinerary
+import com.example.travelcents.data.trip.model.WeeklySummary
 import com.example.travelcents.data.trip.model.TravelEvent
 import com.example.travelcents.data.trip.remote.DestinationImageRepository
+import com.example.travelcents.data.trip.remote.WeatherRepository
 import com.example.travelcents.data.trip.remote.WikipediaApiService
 import com.example.travelcents.data.social.model.BookmarkedPlace
 import com.example.travelcents.data.social.repository.BookmarksRepository
 import com.example.travelcents.data.user.UserProfileRepository
 import com.example.travelcents.data.user.model.CurrentUserProfile
+import com.example.travelcents.data.user.model.RegionalData
 import android.location.Geocoder
 import com.example.travelcents.data.trip.model.ATTR_LATITUDE
 import com.example.travelcents.data.trip.model.ATTR_LONGITUDE
@@ -30,6 +34,7 @@ import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FirebaseFirestore
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -40,6 +45,8 @@ import kotlinx.coroutines.withContext
 import okhttp3.OkHttpClient
 import retrofit2.Retrofit
 import retrofit2.converter.gson.GsonConverterFactory
+import java.time.ZonedDateTime
+import java.time.format.DateTimeFormatter
 
 data class HomeUiState(
     val isLoading: Boolean = true,
@@ -54,6 +61,9 @@ data class HomeUiState(
     val selectedTripEventsLoading: Boolean = false,
     val profile: CurrentUserProfile = CurrentUserProfile(),
     val bookmarks: List<BookmarkedPlace> = emptyList(),
+    val weeklySummary: WeeklySummary? = null,
+    val localWeather: WeatherRepository.WeatherSnapshot? = null,
+    val localTime: String = "",
     val errorMessage: String? = null
 )
 
@@ -76,6 +86,9 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
         legacyRemoteRepository = remoteRepository
     )
     private var homeTripsJob: Job? = null
+    private var weeklySummaryJob: Job? = null
+    private var timeUpdateJob: Job? = null
+    private var weatherUpdateJob: Job? = null
     private var selectedTripEventsJob: Job? = null
     private var selectedTripRefreshJob: Job? = null
 
@@ -112,6 +125,7 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
         attachBookmarksObserver(auth.currentUser?.uid)
         auth.addAuthStateListener(authStateListener)
         loadAllTrips()
+        startTimeUpdates()
     }
 
     override fun onCleared() {
@@ -245,7 +259,18 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
     private fun observeProfile() {
         viewModelScope.launch {
             userProfileRepository.observeCurrentUserProfile().collect { profile ->
+                val oldProfile = _uiState.value.profile
                 _uiState.update { currentState -> currentState.copy(profile = profile) }
+                
+                if (profile.showWeeklySummary) {
+                    refreshWeeklySummary()
+                } else {
+                    _uiState.update { it.copy(weeklySummary = null) }
+                }
+
+                if (profile.city != oldProfile.city || profile.region != oldProfile.region || profile.country != oldProfile.country) {
+                    refreshLocalWeather()
+                }
             }
         }
     }
@@ -268,6 +293,69 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
                         errorMessage = if (trips.isNotEmpty()) null else currentState.errorMessage
                     )
                 }
+                refreshWeeklySummary()
+            }
+        }
+    }
+
+    private fun refreshWeeklySummary() {
+        val profile = _uiState.value.profile
+        if (!profile.showWeeklySummary) {
+            _uiState.update { it.copy(weeklySummary = null) }
+            return
+        }
+        
+        val activeTrip = _uiState.value.trips.firstOrNull { 
+            !it.status.equals("archived", ignoreCase = true) 
+        } ?: return
+        
+        val tripKey = TripKey(ownerUid = activeTrip.ownerUid, tripId = activeTrip.itineraryId)
+        
+        weeklySummaryJob?.cancel()
+        weeklySummaryJob = viewModelScope.launch {
+            localDataSource.observeTripEvents(tripKey).collect { events ->
+                val summary = WeeklySummaryCalculator.calculate(activeTrip, events)
+                _uiState.update { it.copy(weeklySummary = summary) }
+            }
+        }
+    }
+
+    private fun refreshLocalWeather() {
+        val profile = _uiState.value.profile
+        val country = RegionalData.getCountry(profile.country) ?: return
+        val region = country.regions.find { it.name == profile.region } ?: return
+        val city = region.cities.find { it.name == profile.city } ?: return
+
+        weatherUpdateJob?.cancel()
+        weatherUpdateJob = viewModelScope.launch {
+            val weather = WeatherRepository.fetchSnapshot(
+                latitude = city.latitude,
+                longitude = city.longitude,
+                date = java.time.LocalDate.now().toString(),
+                startTime = java.time.LocalTime.now().format(DateTimeFormatter.ofPattern("HH:mm")),
+                timeZoneId = city.timeZoneId
+            )
+            _uiState.update { it.copy(localWeather = weather) }
+        }
+    }
+
+    private fun startTimeUpdates() {
+        timeUpdateJob?.cancel()
+        timeUpdateJob = viewModelScope.launch {
+            while (true) {
+                val profile = _uiState.value.profile
+                val country = RegionalData.getCountry(profile.country)
+                val region = country?.regions?.find { it.name == profile.region }
+                val city = region?.cities?.find { it.name == profile.city }
+                
+                val timeZoneId = city?.timeZoneId ?: "America/Los_Angeles"
+                val timeFormat = country?.timeFormat ?: "h:mm a"
+                
+                val now = ZonedDateTime.now(java.time.ZoneId.of(timeZoneId))
+                val formatted = now.format(DateTimeFormatter.ofPattern(timeFormat))
+                
+                _uiState.update { it.copy(localTime = formatted) }
+                delay(60000) // Update every minute
                 fetchDestinationWeather(trips)
             }
         }
@@ -402,7 +490,6 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
                     )
                 }
             }
-            _uiState.update { it.copy(tripImages = images.toMap()) }
         }
     }
 

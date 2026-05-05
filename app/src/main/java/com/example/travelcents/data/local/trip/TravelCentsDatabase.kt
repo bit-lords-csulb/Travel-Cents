@@ -34,6 +34,13 @@ abstract class TravelCentsDatabase : RoomDatabase() {
     abstract fun mediaAssetDao(): MediaAssetDao
 
     companion object {
+        private val MIGRATION_6_7 = object : Migration(6, 7) {
+            override fun migrate(database: SupportSQLiteDatabase) {
+                database.execSQL(
+                    "ALTER TABLE trip_summary ADD COLUMN budgetTotal REAL NOT NULL DEFAULT 0.0"
+                )
+                database.execSQL(
+                    "ALTER TABLE trip_summary ADD COLUMN interests TEXT NOT NULL DEFAULT ''"
         private val MIGRATION_5_6 = object : Migration(5, 6) {
             override fun migrate(db: SupportSQLiteDatabase) {
                 db.execSQL(
@@ -52,6 +59,8 @@ abstract class TravelCentsDatabase : RoomDatabase() {
                     TravelCentsDatabase::class.java,
                     "travel_cents.db"
                 )
+                    .addMigrations(MIGRATION_6_7)
+                    .fallbackToDestructiveMigration()
                     .addMigrations(MIGRATION_5_6)
                     .fallbackToDestructiveMigration(true)
                     .build()

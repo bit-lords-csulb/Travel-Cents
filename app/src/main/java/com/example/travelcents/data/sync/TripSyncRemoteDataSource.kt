@@ -82,6 +82,8 @@ class TripSyncRemoteDataSource(
                     travelStyle = document.getString("travelStyle").orEmpty(),
                     adults = (document.getLong("adults") ?: 1L).toInt(),
                     children = (document.getLong("children") ?: 0L).toInt(),
+                    budgetTotal = document.getDouble("budgetTotal") ?: 0.0,
+                    interests = (document.get("interests") as? List<*>)?.filterIsInstance<String>().orEmpty(),
                     createdAt = document.getString("createdAt").orEmpty(),
                     status = document.getString("status").orEmpty(),
                     eventIds = (document.get("eventIds") as? List<*>)?.filterIsInstance<String>().orEmpty(),
@@ -143,6 +145,8 @@ class TripSyncRemoteDataSource(
             travelStyle = snapshot.getString("travelStyle").orEmpty(),
             adults = (snapshot.getLong("adults") ?: 1L).toInt(),
             children = (snapshot.getLong("children") ?: 0L).toInt(),
+            budgetTotal = snapshot.getDouble("budgetTotal") ?: 0.0,
+            interests = (snapshot.get("interests") as? List<*>)?.filterIsInstance<String>().orEmpty(),
             createdAt = snapshot.getString("createdAt").orEmpty(),
             status = snapshot.getString("status").orEmpty(),
             eventIds = (snapshot.get("eventIds") as? List<*>)?.filterIsInstance<String>().orEmpty(),
@@ -767,6 +771,8 @@ class TripSyncRemoteDataSource(
             put("durationDays", (snapshot["durationDays"] as? Number)?.toInt() ?: 0)
             put("adults", (snapshot["adults"] as? Number)?.toInt() ?: 1)
             put("children", (snapshot["children"] as? Number)?.toInt() ?: 0)
+            put("budgetTotal", (snapshot["budgetTotal"] as? Number)?.toDouble() ?: 0.0)
+            put("interests", (snapshot["interests"] as? List<*>)?.filterIsInstance<String>().orEmpty())
             put("eventIds", (snapshot["eventIds"] as? List<*>)?.filterIsInstance<String>().orEmpty())
             put("homeImageUrl", snapshot["homeImageUrl"]?.toString().orEmpty())
             put("memberUids", memberUids)
@@ -854,6 +860,8 @@ class TripSyncRemoteDataSource(
                 travelStyle = getString("travelStyle") ?: "",
                 adults = (getLong("adults") ?: 1L).toInt(),
                 children = (getLong("children") ?: 0L).toInt(),
+                budgetTotal = getDouble("budgetTotal") ?: 0.0,
+                interests = (get("interests") as? List<*>)?.filterIsInstance<String>().orEmpty(),
                 createdAt = getString("createdAt") ?: "",
                 status = getString("status") ?: "",
                 eventIds = (get("eventIds") as? List<*>)?.filterIsInstance<String>().orEmpty(),

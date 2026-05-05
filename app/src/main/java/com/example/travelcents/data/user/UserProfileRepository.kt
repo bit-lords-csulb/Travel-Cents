@@ -122,6 +122,10 @@ class UserProfileRepository(
                 .ifBlank { authUser.googleProfilePhotoUrl().orEmpty() },
             profileImageSource = snapshot?.getString("profileImageSource").orEmpty(),
             doNotShareData = snapshot?.getBoolean("doNotShareData") ?: false,
+            showWeeklySummary = snapshot?.getBoolean("showWeeklySummary") ?: true,
+            country = snapshot?.getString("country") ?: "United States",
+            region = snapshot?.getString("region") ?: "California",
+            city = snapshot?.getString("city") ?: "Long Beach",
             isLoading = isLoading
         )
     }
@@ -152,5 +156,3 @@ class UserProfileRepository(
         private val GOOGLE_SIZE_SUFFIX = Regex("=s\\d+(-c)?$")
     }
 }
-
-

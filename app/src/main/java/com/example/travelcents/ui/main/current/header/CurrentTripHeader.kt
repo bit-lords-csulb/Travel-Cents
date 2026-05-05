@@ -99,6 +99,7 @@ fun CurrentTripHeader(
     onDeleteTrip: (String) -> Unit,
     onSwitchTrip: (TripKey) -> Unit,
     onRenameTrip: (String) -> Unit,
+    dateFormat: String = "MM/dd/yyyy",
     controlsContent: @Composable () -> Unit
 ) {
     var menuExpanded by remember { mutableStateOf(false) }
@@ -451,7 +452,7 @@ fun CurrentTripHeader(
                             fontFamily = TravelCentsFonts.Body
                         )
                         Text(
-                            text = formatHeroDate(heroDate),
+                            text = formatHeroDate(heroDate, dateFormat),
                             color = DeepSea5,
                             fontSize = 48.sp,
                             fontWeight = FontWeight.ExtraBold,

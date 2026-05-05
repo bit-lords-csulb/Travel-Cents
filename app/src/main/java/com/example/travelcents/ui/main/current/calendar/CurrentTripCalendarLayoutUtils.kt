@@ -214,13 +214,13 @@ fun eventDateTimeRange(event: TravelEvent): Pair<LocalDateTime, LocalDateTime>? 
     return startDateTime to endDateTime
 }
 
-fun renderSpanLabel(span: EventRenderSpan): String {
+fun renderSpanLabel(span: EventRenderSpan, timePattern: String? = null): String {
     val safeEndMinutes = span.endMinutes.coerceAtMost((23 * 60) + 59)
     return when {
         span.continuesBefore && span.continuesAfter -> "Continues all day"
-        span.continuesBefore -> "Until ${formatMinutes(safeEndMinutes)}"
-        span.continuesAfter -> "${formatMinutes(span.startMinutes)} onward"
-        else -> "${formatMinutes(span.startMinutes)} - ${formatMinutes(safeEndMinutes)}"
+        span.continuesBefore -> "Until ${formatMinutes(safeEndMinutes, timePattern)}"
+        span.continuesAfter -> "${formatMinutes(span.startMinutes, timePattern)} onward"
+        else -> "${formatMinutes(span.startMinutes, timePattern)} - ${formatMinutes(safeEndMinutes, timePattern)}"
     }
 }
 
@@ -276,4 +276,3 @@ fun buildScheduleWindow(
         endHour = max(endHour, startHour + 6)
     )
 }
-

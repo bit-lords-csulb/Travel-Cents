@@ -80,6 +80,9 @@ import com.example.travelcents.data.trip.remote.TransportRepository
 import com.example.travelcents.data.trip.remote.WalkScoreRepository
 import com.example.travelcents.data.trip.remote.WeatherRepository
 import com.example.travelcents.data.trip.remote.YelpRepository
+import com.example.travelcents.data.user.UserProfileRepository
+import com.example.travelcents.data.user.model.CurrentUserProfile
+import com.example.travelcents.data.user.model.RegionalData
 import com.example.travelcents.data.trip.remote.buildFlightHeroImageRepository
 import com.example.travelcents.data.trip.remote.enrichFlightHeroImages
 import com.example.travelcents.data.trip.remote.needsFlightHeroBackfill
@@ -146,7 +149,11 @@ data class CurrentTripUiState(
     val events: List<TravelEvent> = emptyList(),
     val infoMessage: String? = null,
     val errorMessage: String? = null,
-    val isPreview: Boolean = false
+    val isPreview: Boolean = false,
+    val usesFahrenheit: Boolean = false,
+    val homeCurrencyCode: String = "USD",
+    val dateFormat: String = "MM/dd/yyyy",
+    val timeFormat: String = "h:mm a"
 )
 
 sealed class PreviewSource {
@@ -249,6 +256,7 @@ class CurrentTripViewModel(application: Application) : AndroidViewModel(applicat
 
     private val db = FirebaseFirestore.getInstance()
     private val auth = FirebaseAuth.getInstance()
+    private val userProfileRepository = UserProfileRepository(auth = auth, db = db)
     private val tripRepository: TripRepository = FirestoreTripRepository(db)
     private val tripPlanActionService = TripPlanActionService()
     private val tripLocalDataSource = TripLocalDataSource(TravelCentsDatabase.getInstance(application))
@@ -271,6 +279,8 @@ class CurrentTripViewModel(application: Application) : AndroidViewModel(applicat
     private var advisoryEvaluationJob: Job? = null
     private var allTripsJob: Job? = null
     private var allTripsObserverUid: String? = null
+    private var userProfileJob: Job? = null
+    private var userProfile: CurrentUserProfile? = null
     private var currentTripKey: TripKey? = null
     private var currentTripSummary: Itinerary? = null
     private var currentTripDestination: String = ""
@@ -288,6 +298,26 @@ class CurrentTripViewModel(application: Application) : AndroidViewModel(applicat
         alternativeProvider = PineconeTripAlternativeProvider()
     )
     private var liveEventDetailOverrides: Map<String, Map<String, String>> = emptyMap()
+
+    init {
+        observeUserProfile()
+    }
+
+    private fun observeUserProfile() {
+        userProfileJob?.cancel()
+        userProfileJob = viewModelScope.launch {
+            userProfileRepository.observeCurrentUserProfile().collect { profile ->
+                userProfile = profile
+                val country = RegionalData.getCountry(profile.country)
+                _uiState.update { it.copy(
+                    usesFahrenheit = country?.usesFahrenheit ?: false,
+                    homeCurrencyCode = country?.defaultCurrency ?: "USD",
+                    dateFormat = country?.dateFormat ?: "MM/dd/yyyy",
+                    timeFormat = country?.timeFormat ?: "h:mm a"
+                ) }
+            }
+        }
+    }
 
     private fun resetTripState(
         isLoading: Boolean = false,
@@ -329,13 +359,18 @@ class CurrentTripViewModel(application: Application) : AndroidViewModel(applicat
         _shareTargets.value = emptyList()
         _tripMembers.value = emptyList()
         liveEventDetailOverrides = emptyMap()
+        val country = RegionalData.getCountry(userProfile?.country ?: "United States")
         flightHeroBackfillInFlight.clear()
         _uiState.value = CurrentTripUiState(
             isLoading = isLoading,
             tripTitle = tripTitle,
             viewerUid = auth.currentUser?.uid,
             infoMessage = infoMessage,
-            errorMessage = errorMessage
+            errorMessage = errorMessage,
+            usesFahrenheit = country?.usesFahrenheit ?: false,
+            homeCurrencyCode = country?.defaultCurrency ?: "USD",
+            dateFormat = country?.dateFormat ?: "MM/dd/yyyy",
+            timeFormat = country?.timeFormat ?: "h:mm a"
         )
     }
 
@@ -2185,6 +2220,7 @@ class CurrentTripViewModel(application: Application) : AndroidViewModel(applicat
         localEventsSnapshot = sortPlanEvents(preview.events)
         _events.value = localEventsSnapshot
         _tripTitle.value = preview.itinerary.tripName
+        val country = RegionalData.getCountry(userProfile?.country ?: "United States")
         _uiState.value = CurrentTripUiState(
             isLoading = false,
             currentTripId = preview.tripKey.tripId,
@@ -2198,7 +2234,11 @@ class CurrentTripViewModel(application: Application) : AndroidViewModel(applicat
             dateFrom = preview.itinerary.dateFrom,
             dateTo = preview.itinerary.dateTo,
             events = localEventsSnapshot,
-            isPreview = true
+            isPreview = true,
+            usesFahrenheit = country?.usesFahrenheit ?: false,
+            homeCurrencyCode = country?.defaultCurrency ?: "USD",
+            dateFormat = country?.dateFormat ?: "MM/dd/yyyy",
+            timeFormat = country?.timeFormat ?: "h:mm a"
         )
     }
 
@@ -2571,6 +2611,9 @@ class CurrentTripViewModel(application: Application) : AndroidViewModel(applicat
     }
 
     private fun resolvedHomeCurrencyCode(): String {
+        userProfile?.let { profile ->
+            RegionalData.getCountry(profile.country)?.let { return it.defaultCurrency }
+        }
         return runCatching {
             Currency.getInstance(Locale.getDefault()).currencyCode
         }.getOrDefault("USD")
@@ -2583,6 +2626,7 @@ class CurrentTripViewModel(application: Application) : AndroidViewModel(applicat
         currentTripOptionsJob?.cancel()
         advisoryEvaluationJob?.cancel()
         allTripsJob?.cancel()
+        userProfileJob?.cancel()
         super.onCleared()
     }
 }
