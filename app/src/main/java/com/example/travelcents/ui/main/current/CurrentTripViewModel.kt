@@ -6,6 +6,7 @@ import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.travelcents.data.ai.chat.AiCuratedTripStarter
 import com.example.travelcents.data.ai.chat.AiCuratedTripToItineraryMapper
+import com.example.travelcents.data.ai.chat.AiDestinationLockMapper
 import com.example.travelcents.data.ai.chat.AiTripIntakeProfile
 import com.example.travelcents.data.ai.chat.PREVIEW_TRIP_STATUS
 import com.example.travelcents.data.media.TripMediaCacheStore
@@ -138,6 +139,11 @@ data class CurrentTripUiState(
 sealed class PreviewSource {
     data class CuratedStarter(
         val starter: AiCuratedTripStarter,
+        val intakeProfile: AiTripIntakeProfile
+    ) : PreviewSource()
+
+    data class DestinationLock(
+        val destination: String,
         val intakeProfile: AiTripIntakeProfile
     ) : PreviewSource()
 }
@@ -1807,11 +1813,20 @@ class CurrentTripViewModel(application: Application) : AndroidViewModel(applicat
     }
 
     fun loadPreview(source: PreviewSource) {
+        val viewerUid = auth.currentUser?.uid
         when (source) {
             is PreviewSource.CuratedStarter -> {
-                val viewerUid = auth.currentUser?.uid
                 val preview = AiCuratedTripToItineraryMapper.map(
                     starter = source.starter,
+                    intakeProfile = source.intakeProfile,
+                    viewerUid = viewerUid
+                )
+                applyPreview(viewerUid = viewerUid, preview = preview)
+            }
+
+            is PreviewSource.DestinationLock -> {
+                val preview = AiDestinationLockMapper.map(
+                    destination = source.destination,
                     intakeProfile = source.intakeProfile,
                     viewerUid = viewerUid
                 )

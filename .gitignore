@@ -27,3 +27,4 @@ analytics.settings
 travel_cents_emulator.db
 travel_cents_emulator_latest.db
 *.db
+*.log

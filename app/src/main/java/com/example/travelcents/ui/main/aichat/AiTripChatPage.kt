@@ -58,6 +58,7 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.travelcents.data.ai.chat.AiChatCardOption
 import com.example.travelcents.data.ai.chat.AiChatItem
 import com.example.travelcents.data.ai.chat.AiCuratedTripStarter
+import com.example.travelcents.data.ai.chat.AiDestinationRecommendation
 import com.example.travelcents.data.ai.chat.AiTripIntakeProfile
 import com.example.travelcents.data.trip.TripKey
 import com.example.travelcents.ui.main.aichat.components.AddToTripBottomSheet
@@ -84,6 +85,7 @@ fun AiTripChatPage(
     onOpenTrip: (TripKey) -> Unit = {},
     onOpenPreviewTrip: () -> Unit = {},
     onCreateDraftTrip: (AiCuratedTripStarter, AiTripIntakeProfile) -> Unit = { _, _ -> },
+    onDestinationLocked: (AiDestinationRecommendation, AiTripIntakeProfile) -> Unit = { _, _ -> },
     viewModel: AiChatViewModel = viewModel()
 ) {
     val uiState by viewModel.uiState.collectAsState()
@@ -291,7 +293,10 @@ fun AiTripChatPage(
                                         item.row.recommendations
                                             .firstOrNull { recommendation -> recommendation.id == recommendationId }
                                             ?.let { recommendation ->
-                                                viewModel.selectDestinationRecommendation(recommendation)
+                                                viewModel.selectDestinationRecommendation(
+                                                    recommendation = recommendation,
+                                                    onDestinationLocked = onDestinationLocked
+                                                )
                                             }
                                     }
                                 )

@@ -36,6 +36,7 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import com.example.travelcents.data.ai.chat.AiCuratedTripStarter
+import com.example.travelcents.data.ai.chat.AiDestinationRecommendation
 import com.example.travelcents.data.ai.chat.AiTripIntakeProfile
 import com.example.travelcents.data.trip.TripKey
 import com.example.travelcents.ui.components.MainBottomNavBar
@@ -121,7 +122,7 @@ fun MainScaffold(modifier: Modifier = Modifier, onLogout: () -> Unit = {}) {
     val newTripViewModel: NewTripViewModel = viewModel()
     val currentTripViewModel: CurrentTripViewModel = viewModel()
     val navController = rememberNavController()
-    var pendingPreview by remember { mutableStateOf<PreviewSource.CuratedStarter?>(null) }
+    var pendingPreview by remember { mutableStateOf<PreviewSource?>(null) }
 
     val navBackStackEntry by navController.currentBackStackEntryAsState()
     val currentRoute = navBackStackEntry?.destination?.route ?: MainRoutes.HOME
@@ -333,6 +334,8 @@ fun MainScaffold(modifier: Modifier = Modifier, onLogout: () -> Unit = {}) {
                             }
                         },
                         onOpenPreviewTrip = {
+                            // Re-load ensures the skeleton survives clearPreview() on back-press
+                            pendingPreview?.let { currentTripViewModel.loadPreview(it) }
                             navController.navigate(MainRoutes.CURRENT_TRIP_PREVIEW) {
                                 launchSingleTop = true
                             }
@@ -347,6 +350,15 @@ fun MainScaffold(modifier: Modifier = Modifier, onLogout: () -> Unit = {}) {
                             navController.navigate(MainRoutes.CURRENT_TRIP_PREVIEW) {
                                 launchSingleTop = true
                             }
+                        },
+                        onDestinationLocked = { recommendation, intakeProfile ->
+                            val source = PreviewSource.DestinationLock(
+                                destination = recommendation.destination,
+                                intakeProfile = intakeProfile
+                            )
+                            pendingPreview = source
+                            currentTripViewModel.loadPreview(source)
+                            // Stay in chat — the banner is the user's path to the skeleton
                         }
                     )
                 }
@@ -367,8 +379,8 @@ fun MainScaffold(modifier: Modifier = Modifier, onLogout: () -> Unit = {}) {
                                 }
                             }
                         )
-                        if (previewSource != null) {
-                            PreviewActionBar(
+                        when (previewSource) {
+                            is PreviewSource.CuratedStarter -> PreviewActionBar(
                                 modifier = Modifier
                                     .align(Alignment.BottomCenter)
                                     .fillMaxWidth(),
@@ -392,10 +404,48 @@ fun MainScaffold(modifier: Modifier = Modifier, onLogout: () -> Unit = {}) {
                                     )
                                 }
                             )
+
+                            is PreviewSource.DestinationLock -> SkeletonPreviewBar(
+                                modifier = Modifier
+                                    .align(Alignment.BottomCenter)
+                                    .fillMaxWidth(),
+                                onBack = {
+                                    navController.popBackStack()
+                                }
+                            )
+
+                            null -> {}
                         }
                     }
                 }
             }
+        }
+    }
+}
+
+@Composable
+private fun SkeletonPreviewBar(
+    onBack: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    Column(
+        modifier = modifier
+            .background(TripWizardColors.ContainerLow)
+            .navigationBarsPadding()
+            .padding(horizontal = 16.dp, vertical = 12.dp)
+    ) {
+        Text(
+            text = "Draft trip — keep chatting to fill it in.",
+            color = DeepSea5.copy(alpha = 0.78f),
+            fontWeight = FontWeight.Medium
+        )
+        Spacer(Modifier.height(10.dp))
+        OutlinedButton(
+            onClick = onBack,
+            modifier = Modifier.fillMaxWidth(),
+            shape = RoundedCornerShape(14.dp)
+        ) {
+            Text(text = "← Back to Chat")
         }
     }
 }

@@ -170,7 +170,10 @@ class AiChatViewModel(application: Application) : AndroidViewModel(application) 
         generateTitleIfNeeded()
     }
 
-    fun selectDestinationRecommendation(recommendation: AiDestinationRecommendation) {
+    fun selectDestinationRecommendation(
+        recommendation: AiDestinationRecommendation,
+        onDestinationLocked: (AiDestinationRecommendation, AiTripIntakeProfile) -> Unit = { _, _ -> }
+    ) {
         val destination = recommendation.destination.trim()
         if (destination.isBlank()) return
 
@@ -179,6 +182,8 @@ class AiChatViewModel(application: Application) : AndroidViewModel(application) 
             lockedDestinationImageUrl = recommendation.imageUrl
         )
         publishUiState()
+
+        onDestinationLocked(recommendation, sessionState.intakeProfile)
 
         submitUserTurn(
             visibleMessage = "Let's plan around $destination",
