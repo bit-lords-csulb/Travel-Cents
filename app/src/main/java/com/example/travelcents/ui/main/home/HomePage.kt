@@ -606,45 +606,31 @@ private fun HomeBookmarkTile(
     modifier: Modifier = Modifier
 ) {
     Box(
-        modifier = modifier
-            .clip(RoundedCornerShape(10.dp))
-            .background(SurfaceBright)
-            .padding(8.dp)
+        modifier = modifier.clip(RoundedCornerShape(10.dp))
     ) {
-        Column(
-            modifier = Modifier.fillMaxSize(),
-            verticalArrangement = Arrangement.SpaceBetween
-        ) {
+        if (bookmark.imageUrl != null) {
+            AsyncImage(
+                model = bookmark.imageUrl,
+                contentDescription = bookmark.name,
+                modifier = Modifier.fillMaxSize(),
+                contentScale = ContentScale.Crop
+            )
+        } else {
             Box(
                 modifier = Modifier
-                    .size(34.dp)
-                    .clip(RoundedCornerShape(8.dp))
-                    .background(Primary.copy(alpha = 0.18f)),
+                    .fillMaxSize()
+                    .background(SurfaceBright),
                 contentAlignment = Alignment.Center
             ) {
                 Text(
                     text = bookmark.name.take(1).uppercase(),
                     color = Primary,
-                    fontSize = 13.sp,
+                    fontSize = 18.sp,
                     fontWeight = FontWeight.Bold
                 )
             }
-            Text(
-                text = bookmark.name,
-                color = DeepSea5,
-                fontSize = 10.sp,
-                fontWeight = FontWeight.SemiBold,
-                maxLines = 2,
-                overflow = TextOverflow.Ellipsis
-            )
-            Text(
-                text = bookmark.category.ifBlank { bookmark.area.ifBlank { "Saved place" } },
-                color = DeepSea4,
-                fontSize = 8.sp,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis
-            )
         }
+
     }
 }
 
