@@ -35,10 +35,15 @@ import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
+import com.example.travelcents.data.ai.chat.AiChatPreviewDraft
+import com.example.travelcents.data.ai.chat.AiChatPreviewDraftType
 import com.example.travelcents.data.ai.chat.AiCuratedTripStarter
 import com.example.travelcents.data.ai.chat.AiDestinationRecommendation
 import com.example.travelcents.data.ai.chat.AiTripIntakeProfile
 import com.example.travelcents.data.trip.TripKey
+import com.example.travelcents.data.trip.model.DETAIL_YELP_ID
+import com.example.travelcents.data.trip.model.TravelEvent
+import com.example.travelcents.data.trip.model.detailValue
 import com.example.travelcents.ui.components.MainBottomNavBar
 import com.example.travelcents.ui.main.aichat.AiTripChatPage
 import com.example.travelcents.ui.main.chats.chat.ChatsScreen
@@ -341,23 +346,33 @@ fun MainScaffold(modifier: Modifier = Modifier, onLogout: () -> Unit = {}) {
                                 launchSingleTop = true
                             }
                         },
-                        onOpenPreviewTrip = {
-                            // Re-load ensures the skeleton survives clearPreview() on back-press
-                            pendingPreview?.let { currentTripViewModel.loadPreview(it) }
+                        onOpenPreviewTrip = { previewDraft ->
+                            val source = pendingPreview ?: previewDraft?.toPreviewSource()
+                            if (source != null) {
+                                pendingPreview = source
+                                currentTripViewModel.loadPreview(source)
+                            }
                             navController.navigate(MainRoutes.CURRENT_TRIP_PREVIEW) {
                                 launchSingleTop = true
                             }
                         },
-                        onCreateDraftTrip = { starter, intakeProfile ->
+                        onPreviewDraftChanged = { previewDraft ->
+                            val source = previewDraft?.toPreviewSource()
+                            if (source != null) {
+                                pendingPreview = source
+                                currentTripViewModel.loadPreview(source)
+                            } else {
+                                pendingPreview = null
+                            }
+                        },
+                        onStarterSelected = { starter, intakeProfile ->
                             val source = PreviewSource.CuratedStarter(
                                 starter = starter,
                                 intakeProfile = intakeProfile
                             )
                             pendingPreview = source
                             currentTripViewModel.loadPreview(source)
-                            navController.navigate(MainRoutes.CURRENT_TRIP_PREVIEW) {
-                                launchSingleTop = true
-                            }
+                            // Stay in chat — the banner is the user's path to the curated preview
                         },
                         onDestinationLocked = { recommendation, intakeProfile ->
                             val source = PreviewSource.DestinationLock(
@@ -369,7 +384,13 @@ fun MainScaffold(modifier: Modifier = Modifier, onLogout: () -> Unit = {}) {
                             // Stay in chat — the banner is the user's path to the skeleton
                         },
                         onAddEventToPreview = { event ->
-                            currentTripViewModel.addPreviewEvent(event)
+                            val updatedPreview = pendingPreview?.withAddedPreviewEvent(event)
+                            if (updatedPreview != null) {
+                                pendingPreview = updatedPreview
+                                currentTripViewModel.loadPreview(updatedPreview)
+                            } else {
+                                currentTripViewModel.addPreviewEvent(event)
+                            }
                         }
                     )
                 }
@@ -405,6 +426,7 @@ fun MainScaffold(modifier: Modifier = Modifier, onLogout: () -> Unit = {}) {
                                     newTripViewModel.commitItinerary(
                                         starter = toCommit.starter,
                                         intakeProfile = toCommit.intakeProfile,
+                                        events = toCommit.addedEvents,
                                         onTripReady = { tripKey ->
                                             currentTripViewModel.loadTrip(tripKey)
                                             navController.navigate(MainRoutes.CURRENT_ITINERARY) {
@@ -432,6 +454,46 @@ fun MainScaffold(modifier: Modifier = Modifier, onLogout: () -> Unit = {}) {
             }
         }
     }
+}
+
+private fun PreviewSource.withAddedPreviewEvent(event: TravelEvent): PreviewSource {
+    return when (this) {
+        is PreviewSource.CuratedStarter -> copy(addedEvents = addedEvents.upsertPreviewEvent(event))
+        is PreviewSource.DestinationLock -> copy(addedEvents = addedEvents.upsertPreviewEvent(event))
+    }
+}
+
+private fun AiChatPreviewDraft.toPreviewSource(): PreviewSource? {
+    return when (type) {
+        AiChatPreviewDraftType.CURATED_STARTER -> curatedStarter?.let { starter ->
+            PreviewSource.CuratedStarter(
+                starter = starter,
+                intakeProfile = intakeProfile,
+                addedEvents = addedEvents
+            )
+        }
+
+        AiChatPreviewDraftType.DESTINATION_LOCK -> PreviewSource.DestinationLock(
+            destination = destination,
+            intakeProfile = intakeProfile,
+            addedEvents = addedEvents
+        )
+    }
+}
+
+private fun List<TravelEvent>.upsertPreviewEvent(event: TravelEvent): List<TravelEvent> {
+    val incomingKey = event.previewIdentityKey()
+    return if (any { existing -> existing.previewIdentityKey() == incomingKey }) {
+        this
+    } else {
+        this + event
+    }
+}
+
+private fun TravelEvent.previewIdentityKey(): String {
+    return detailValue(DETAIL_YELP_ID)?.takeIf(String::isNotBlank)
+        ?: selectedOptionId.takeIf(String::isNotBlank)
+        ?: eventId
 }
 
 @Composable
@@ -504,4 +566,3 @@ private fun PreviewActionBar(
         }
     }
 }
-

@@ -57,19 +57,23 @@ import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.travelcents.data.ai.chat.AiChatCardOption
 import com.example.travelcents.data.ai.chat.AiChatItem
+import com.example.travelcents.data.ai.chat.AiChatPreviewDraft
 import com.example.travelcents.data.ai.chat.AiCuratedTripStarter
 import com.example.travelcents.data.ai.chat.AiDestinationRecommendation
 import com.example.travelcents.data.ai.chat.AiTripIntakeProfile
 import com.example.travelcents.data.trip.TripKey
+import com.example.travelcents.data.trip.model.TravelEvent
 import com.example.travelcents.ui.main.aichat.components.AddToTripBottomSheet
 import com.example.travelcents.ui.main.aichat.components.AiChatLockedDestinationBanner
 import com.example.travelcents.ui.main.aichat.components.AiChatBubble
 import com.example.travelcents.ui.main.aichat.components.AiChatComposer
 import com.example.travelcents.ui.main.aichat.components.AiChatHistoryScreen
+import com.example.travelcents.ui.main.aichat.components.AiPreferenceQuestionCard
 import com.example.travelcents.ui.main.aichat.components.AiPromptCardGrid
 import com.example.travelcents.ui.main.aichat.components.AiRecommendationRow
 import com.example.travelcents.ui.main.aichat.components.AiResponseCardGroup
 import com.example.travelcents.ui.main.aichat.components.AiSingleEventCard
+import com.example.travelcents.ui.main.aichat.components.AiSuggestionCarouselCard
 import com.example.travelcents.ui.main.newTrip.TripWizardColors
 import com.example.travelcents.ui.theme.DeepSea1
 import com.example.travelcents.ui.theme.DeepSea4
@@ -83,9 +87,11 @@ fun AiTripChatPage(
     modifier: Modifier = Modifier,
     onBackClick: () -> Unit = {},
     onOpenTrip: (TripKey) -> Unit = {},
-    onOpenPreviewTrip: () -> Unit = {},
-    onCreateDraftTrip: (AiCuratedTripStarter, AiTripIntakeProfile) -> Unit = { _, _ -> },
+    onOpenPreviewTrip: (AiChatPreviewDraft?) -> Unit = {},
+    onPreviewDraftChanged: (AiChatPreviewDraft?) -> Unit = {},
+    onStarterSelected: (AiCuratedTripStarter, AiTripIntakeProfile) -> Unit = { _, _ -> },
     onDestinationLocked: (AiDestinationRecommendation, AiTripIntakeProfile) -> Unit = { _, _ -> },
+    onAddEventToPreview: (TravelEvent) -> Unit = {},
     viewModel: AiChatViewModel = viewModel()
 ) {
     val uiState by viewModel.uiState.collectAsState()
@@ -104,6 +110,10 @@ fun AiTripChatPage(
         derivedStateOf {
             !uiState.isLoading && uiState.items.none { it is AiChatItem.TextMessage }
         }
+    }
+
+    LaunchedEffect(uiState.previewDraft) {
+        onPreviewDraftChanged(uiState.previewDraft)
     }
 
     LaunchedEffect(
@@ -227,7 +237,7 @@ fun AiTripChatPage(
                 AiChatLockedDestinationBanner(
                     destination = uiState.lockedDestination,
                     imageUrl = uiState.lockedDestinationImageUrl,
-                    onOpenTrip = onOpenPreviewTrip
+                    onOpenTrip = { onOpenPreviewTrip(uiState.previewDraft) }
                 )
 
                 LazyColumn(
@@ -315,7 +325,7 @@ fun AiTripChatPage(
                                         viewModel.handleRecommendedStarterSelection(
                                             starter = starter,
                                             onOpenTrip = onOpenTrip,
-                                            onCreateDraftTrip = onCreateDraftTrip
+                                            onStarterSelected = onStarterSelected
                                         )
                                     }
                                 )
@@ -325,7 +335,14 @@ fun AiTripChatPage(
                                 val card = item.card
                                 AiSingleEventCard(
                                     suggestion = card,
-                                    onAddToTrip = { viewModel.requestAddSingleEventToTrip(card) },
+                                    onAddToTrip = {
+                                        if (uiState.lockedDestination != null) {
+                                            onAddEventToPreview(card.event)
+                                            viewModel.dismissSingleEventCard(card.id)
+                                        } else {
+                                            viewModel.requestAddSingleEventToTrip(card)
+                                        }
+                                    },
                                     onOpenTickets = {
                                         card.bookingUrl?.let { url ->
                                             val intent = android.content.Intent(
@@ -336,6 +353,34 @@ fun AiTripChatPage(
                                         }
                                     },
                                     onDismiss = { viewModel.dismissSingleEventCard(card.id) }
+                                )
+                            }
+
+                            is AiChatItem.PreferenceQuestionCard -> {
+                                AiPreferenceQuestionCard(
+                                    card = item,
+                                    enabled = !uiState.isLoading && !item.answered,
+                                    onSubmit = { answers ->
+                                        viewModel.answerPreferenceQuestion(item.id, answers)
+                                    }
+                                )
+                            }
+
+                            is AiChatItem.SuggestionCarouselCard -> {
+                                AiSuggestionCarouselCard(
+                                    card = item,
+                                    onAdd = { suggestion ->
+                                        if (uiState.lockedDestination != null) {
+                                            onAddEventToPreview(suggestion.rawEvent)
+                                            viewModel.noteSuggestionAddedToPreview(suggestion)
+                                        } else {
+                                            viewModel.requestAddSuggestionToTrip(suggestion)
+                                        }
+                                    },
+                                    onBookmark = viewModel::bookmarkSuggestion,
+                                    onSkip = viewModel::skipSuggestion,
+                                    onLoadMore = { viewModel.requestMoreSuggestions(item) },
+                                    tripDestination = uiState.lockedDestination.orEmpty()
                                 )
                             }
 
