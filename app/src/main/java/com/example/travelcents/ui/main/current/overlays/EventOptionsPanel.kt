@@ -67,8 +67,6 @@ import com.example.travelcents.ui.main.newTrip.TripWizardColors
 import com.example.travelcents.ui.theme.DeepSea5
 import com.example.travelcents.ui.main.current.overlays.cards.EventTypeChip
 import com.example.travelcents.ui.main.current.overlays.cards.eventTypeIcon
-import com.example.travelcents.ui.main.newTrip.TripWizardColors
-import com.example.travelcents.ui.theme.DeepSea5
 import com.example.travelcents.ui.modules.heroImageModel
 
 private val SurfaceHigh: Color
