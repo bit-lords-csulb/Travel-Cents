@@ -59,16 +59,17 @@ import androidx.compose.ui.unit.sp
 import com.example.travelcents.data.trip.TripKey
 import com.example.travelcents.data.trip.model.Itinerary
 import com.example.travelcents.ui.main.current.TripMemberUi
+import com.example.travelcents.ui.main.newTrip.TripWizardColors
 import com.example.travelcents.ui.modules.formatDayOfWeekFull
 import com.example.travelcents.ui.modules.formatHeroDate
 import com.example.travelcents.ui.theme.DeepSea1
-import com.example.travelcents.ui.theme.DeepSea2
-import com.example.travelcents.ui.theme.DeepSea3
 import com.example.travelcents.ui.theme.DeepSea4
 import com.example.travelcents.ui.theme.DeepSea5
 import com.example.travelcents.ui.theme.TravelCentsFonts
 
-private val SurfaceContainerHigh = Color(0xFF222A3D)
+private val SurfaceContainerHigh: Color
+    get() = TripWizardColors.ContainerHigh
+
 private val SwitcherButtonShape = RoundedCornerShape(18.dp)
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -132,7 +133,7 @@ fun CurrentTripHeader(
     if (showDeleteDialog && currentTripId != null) {
         AlertDialog(
             onDismissRequest = { showDeleteDialog = false },
-            containerColor = DeepSea2,
+            containerColor = TripWizardColors.ContainerHigh,
             title = { Text("Delete trip?", color = DeepSea5, fontWeight = FontWeight.Bold) },
             text = {
                 Text(
@@ -163,7 +164,7 @@ fun CurrentTripHeader(
                 showRenameDialog = false
                 editableTitle = tripTitle
             },
-            containerColor = DeepSea2,
+            containerColor = TripWizardColors.ContainerHigh,
             title = { Text("Rename trip", color = DeepSea5, fontWeight = FontWeight.Bold) },
             text = {
                 TextField(
@@ -185,7 +186,7 @@ fun CurrentTripHeader(
                         unfocusedContainerColor = SurfaceContainerHigh,
                         disabledContainerColor = SurfaceContainerHigh,
                         focusedIndicatorColor = CurrentTripHeroAccent,
-                        unfocusedIndicatorColor = DeepSea3,
+                        unfocusedIndicatorColor = TripWizardColors.OnSurfaceVariant.copy(alpha = 0.3f),
                         cursorColor = CurrentTripHeroAccent
                     )
                 )
@@ -244,7 +245,7 @@ fun CurrentTripHeader(
                             .widthIn(max = selectorMaxWidth)
                             .clip(SwitcherButtonShape)
                             .background(SurfaceContainerHigh.copy(alpha = 0.72f))
-                            .border(1.dp, DeepSea3.copy(alpha = 0.72f), SwitcherButtonShape)
+                            .border(1.dp, TripWizardColors.OnSurfaceVariant.copy(alpha = 0.22f), SwitcherButtonShape)
                             .clickable(
                                 role = Role.Button,
                                 onClick = { switcherExpanded = true }
@@ -294,7 +295,7 @@ fun CurrentTripHeader(
                     onDismissRequest = { switcherExpanded = false },
                     shape = SwitcherButtonShape,
                     modifier = Modifier.widthIn(min = 200.dp),
-                    containerColor = DeepSea2
+                    containerColor = TripWizardColors.ContainerHigh
                 ) {
                     allTrips.forEach { trip ->
                         val isCurrentTrip = trip.itineraryId == currentTripId && trip.ownerUid == currentTripOwnerUid
@@ -350,7 +351,7 @@ fun CurrentTripHeader(
                     expanded = menuExpanded,
                     onDismissRequest = { menuExpanded = false },
                     shape = SwitcherButtonShape,
-                    containerColor = DeepSea2
+                    containerColor = TripWizardColors.ContainerHigh
                 ) {
                     if (canAdd) {
                         DropdownMenuItem(
@@ -505,7 +506,7 @@ private fun HeaderModeButton(
                 .size(34.dp)
                 .clip(buttonShape)
                 .background(SurfaceContainerHigh)
-                .border(1.dp, DeepSea3.copy(alpha = 0.75f), buttonShape),
+                .border(1.dp, TripWizardColors.OnSurfaceVariant.copy(alpha = 0.22f), buttonShape),
             contentAlignment = Alignment.Center
         ) {
             Icon(
@@ -581,7 +582,7 @@ private fun MemberListSheet(members: List<TripMemberUi>, onDismiss: () -> Unit) 
     ModalBottomSheet(
         onDismissRequest = onDismiss,
         sheetState = sheetState,
-        containerColor = DeepSea2
+        containerColor = TripWizardColors.ContainerHigh
     ) {
         Column(
             modifier = Modifier

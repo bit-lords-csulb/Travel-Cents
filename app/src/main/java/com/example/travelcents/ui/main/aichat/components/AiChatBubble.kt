@@ -88,9 +88,9 @@ fun AiChatBubble(
             border = BorderStroke(
                 width = 1.dp,
                 color = if (isUser) {
-                    Color.White.copy(alpha = 0.04f)
+                    TripWizardColors.OnSurfaceVariant.copy(alpha = 0.12f)
                 } else {
-                    Color.White.copy(alpha = 0.08f)
+                    TripWizardColors.OnSurfaceVariant.copy(alpha = 0.16f)
                 }
             )
         ) {
@@ -101,7 +101,7 @@ fun AiChatBubble(
                         brush = if (isUser) {
                             Brush.linearGradient(
                                 colors = listOf(
-                                    Color.White.copy(alpha = 0.03f),
+                                    TripWizardColors.OnSurfaceVariant.copy(alpha = 0.05f),
                                     Color.Transparent
                                 )
                             )

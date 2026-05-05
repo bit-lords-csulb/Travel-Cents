@@ -10,10 +10,10 @@ import androidx.compose.material3.ButtonColors
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.unit.dp
-import com.example.travelcents.ui.theme.DeepSea2
+import com.example.travelcents.ui.main.newTrip.TripWizardColors
+import com.example.travelcents.ui.theme.DeepSea5
 
 @Composable
 fun TcButton(
@@ -22,10 +22,10 @@ fun TcButton(
     enabled: Boolean = true,
     shape: Shape = RoundedCornerShape(12.dp),
     colors: ButtonColors = ButtonDefaults.buttonColors(
-        containerColor = DeepSea2,
-        contentColor = Color.White,
-        disabledContainerColor = DeepSea2.copy(alpha = 0.45f),
-        disabledContentColor = Color.White.copy(alpha = 0.7f)
+        containerColor = TripWizardColors.ContainerHigh,
+        contentColor = DeepSea5,
+        disabledContainerColor = TripWizardColors.ContainerHigh.copy(alpha = 0.45f),
+        disabledContentColor = DeepSea5.copy(alpha = 0.7f)
     ),
     border: BorderStroke? = null,
     contentPadding: PaddingValues = ButtonDefaults.ContentPadding,

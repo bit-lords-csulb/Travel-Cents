@@ -63,17 +63,30 @@ import com.example.travelcents.data.trip.model.EventOption
 import com.example.travelcents.data.trip.model.TravelEvent
 import com.example.travelcents.data.trip.model.displayName
 import com.example.travelcents.data.trip.model.firstNonBlank
+import com.example.travelcents.ui.main.newTrip.TripWizardColors
+import com.example.travelcents.ui.theme.DeepSea5
 import com.example.travelcents.ui.main.current.overlays.cards.EventTypeChip
 import com.example.travelcents.ui.main.current.overlays.cards.eventTypeIcon
 import com.example.travelcents.ui.modules.heroImageModel
 
-private val BgColor = Color(0xFF010E24)
-private val SurfaceHigh = Color(0xFF0B203D)
-private val SurfaceHighest = Color(0xFF102645)
-private val BlueAccent = Color(0xFF64B5F6)
-private val OnSurface = Color(0xFFDBE6FF)
-private val OnSurfaceVar = Color(0xFF9EABC8)
-private val OutlineVar = Color(0xFF3B4861)
+private val SurfaceHigh: Color
+    get() = TripWizardColors.ContainerHigh
+
+private val SurfaceHighest: Color
+    get() = TripWizardColors.ContainerHighest
+
+private val BlueAccent: Color
+    get() = TripWizardColors.Blue
+
+private val OnSurface: Color
+    get() = DeepSea5
+
+private val OnSurfaceVar: Color
+    get() = TripWizardColors.OnSurfaceVariant
+
+private val OutlineVar: Color
+    get() = TripWizardColors.OnSurfaceVariant
+
 private val ErrorRed = Color(0xFFFF716C)
 private val TertiaryPurple = Color(0xFFB5A0FF)
 

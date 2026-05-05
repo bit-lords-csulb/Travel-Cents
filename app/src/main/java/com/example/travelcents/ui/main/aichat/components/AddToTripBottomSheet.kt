@@ -190,7 +190,7 @@ private fun TripRow(
                 if (trip.dateWindow.isNotBlank()) {
                     Text(
                         text = trip.dateWindow,
-                        color = Color.White.copy(alpha = 0.4f),
+                        color = DeepSea4,
                         fontSize = 11.sp,
                         fontFamily = TravelCentsFonts.Body,
                         maxLines = 1

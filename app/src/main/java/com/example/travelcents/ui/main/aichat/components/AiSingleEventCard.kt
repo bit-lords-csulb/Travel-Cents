@@ -49,7 +49,7 @@ fun AiSingleEventCard(
         color = TripWizardColors.ContainerLow,
         border = BorderStroke(
             width = 1.dp,
-            color = Color.White.copy(alpha = 0.08f)
+            color = TripWizardColors.OnSurfaceVariant.copy(alpha = 0.16f)
         )
     ) {
         Column(modifier = Modifier.fillMaxWidth()) {
@@ -203,7 +203,7 @@ fun AiSingleEventCard(
                             color = TripWizardColors.ContainerHighest,
                             border = BorderStroke(
                                 width = 1.dp,
-                                color = Color.White.copy(alpha = 0.12f)
+                                color = TripWizardColors.OnSurfaceVariant.copy(alpha = 0.16f)
                             )
                         ) {
                             Box(

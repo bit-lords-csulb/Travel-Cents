@@ -7,8 +7,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.unit.dp
-import com.example.travelcents.ui.theme.DeepSea2
-import com.example.travelcents.ui.theme.DeepSea3
+import com.example.travelcents.ui.main.newTrip.TripWizardColors
 
 internal val CurrentTripPageShape = RoundedCornerShape(24.dp)
 internal val CurrentTripInnerShape = RoundedCornerShape(18.dp)
@@ -22,8 +21,8 @@ internal fun CurrentTripPageSurface(
     Surface(
         modifier = modifier,
         shape = shape,
-        color = DeepSea2.copy(alpha = 0.92f),
-        border = BorderStroke(1.dp, DeepSea3.copy(alpha = 0.75f))
+        color = TripWizardColors.ContainerLow.copy(alpha = 0.96f),
+        border = BorderStroke(1.dp, TripWizardColors.OnSurfaceVariant.copy(alpha = 0.18f))
     ) {
         content()
     }

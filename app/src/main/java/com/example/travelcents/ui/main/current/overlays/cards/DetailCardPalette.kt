@@ -2,14 +2,31 @@ package com.example.travelcents.ui.main.current.overlays.cards
 
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import com.example.travelcents.ui.main.newTrip.TripWizardColors
+import com.example.travelcents.ui.theme.DeepSea1
+import com.example.travelcents.ui.theme.DeepSea5
 
-internal val CardBackground = Color(0xFF091121)
-internal val CardSurface = Color(0xFF121D31)
-internal val CardSurfaceHigh = Color(0xFF1A2740)
-internal val CardSurfaceHighest = Color(0xFF233555)
-internal val CardOutline = Color(0xFF33415F)
-internal val CardText = Color(0xFFE8EEFF)
-internal val CardTextMuted = Color(0xFFAFBDD9)
+internal val CardBackground: Color
+    get() = DeepSea1
+
+internal val CardSurface: Color
+    get() = TripWizardColors.ContainerLow
+
+internal val CardSurfaceHigh: Color
+    get() = TripWizardColors.ContainerHigh
+
+internal val CardSurfaceHighest: Color
+    get() = TripWizardColors.ContainerHighest
+
+internal val CardOutline: Color
+    get() = TripWizardColors.OnSurfaceVariant
+
+internal val CardText: Color
+    get() = DeepSea5
+
+internal val CardTextMuted: Color
+    get() = TripWizardColors.OnSurfaceVariant
+
 internal val CardLavender = Color(0xFFC8B9FF)
 internal val CardLavenderStrong = Color(0xFF9E87F5)
 internal val CardGold = Color(0xFFF1CB77)

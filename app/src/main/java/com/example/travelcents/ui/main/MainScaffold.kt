@@ -646,7 +646,7 @@ private fun PreviewActionBar(
                 shape = RoundedCornerShape(14.dp),
                 colors = ButtonDefaults.buttonColors(
                     containerColor = TripWizardColors.Blue,
-                    contentColor = Color.White
+                    contentColor = DeepSea5
                 )
             ) {
                 Text(text = "Use this trip")

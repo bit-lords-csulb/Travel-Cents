@@ -50,14 +50,18 @@ import com.example.travelcents.data.trip.model.ATTR_CATEGORIES
 import com.example.travelcents.data.trip.model.ATTR_YELP_URL
 import com.example.travelcents.data.trip.model.TravelEvent
 import com.example.travelcents.ui.main.current.CurrentTripEventDetailsDialog
+import com.example.travelcents.ui.main.newTrip.TripWizardColors
 import com.example.travelcents.ui.theme.DeepSea1
 import com.example.travelcents.ui.theme.DeepSea2
 import com.example.travelcents.ui.theme.DeepSea3
 import com.example.travelcents.ui.theme.DeepSea4
 import com.example.travelcents.ui.theme.DeepSea5
 
-private val Primary = Color(0xFF64B5F6)
-private val SurfaceBright = Color(0xFF243447)
+private val Primary: Color
+    get() = TripWizardColors.Blue
+
+private val SurfaceBright: Color
+    get() = TripWizardColors.SurfaceBright
 
 @Composable
 fun SavedPlacesPage(

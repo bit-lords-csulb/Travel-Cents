@@ -41,9 +41,7 @@ import com.example.travelcents.ui.main.current.calendar.visibleWeekDatesForSelec
 import com.example.travelcents.ui.modules.formatDayOfWeekShort
 import com.example.travelcents.ui.modules.formatDisplayTimeRange
 import com.example.travelcents.ui.modules.formatMonthDayCompact
-import com.example.travelcents.ui.theme.DeepSea1
-import com.example.travelcents.ui.theme.DeepSea2
-import com.example.travelcents.ui.theme.DeepSea3
+import com.example.travelcents.ui.main.newTrip.TripWizardColors
 import com.example.travelcents.ui.theme.DeepSea4
 import com.example.travelcents.ui.theme.DeepSea5
 
@@ -116,10 +114,17 @@ private fun WeekOverviewDayRow(
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .background(if (selected) DeepSea3.copy(alpha = 0.88f) else DeepSea1.copy(alpha = 0.42f), CurrentTripInnerShape)
+            .background(
+                if (selected) TripWizardColors.ContainerHighest else TripWizardColors.ContainerLow,
+                CurrentTripInnerShape
+            )
             .border(
                 width = 1.dp,
-                color = if (selected) DeepSea4.copy(alpha = 0.45f) else DeepSea3.copy(alpha = 0.6f),
+                color = if (selected) {
+                    TripWizardColors.Blue.copy(alpha = 0.28f)
+                } else {
+                    TripWizardColors.OnSurfaceVariant.copy(alpha = 0.18f)
+                },
                 shape = CurrentTripInnerShape
             )
             .padding(horizontal = 12.dp, vertical = 10.dp),
@@ -180,7 +185,10 @@ private fun WeekOverviewDayRow(
 
         Box(
             modifier = Modifier
-                .background(if (canAddPlan) DeepSea2 else DeepSea2.copy(alpha = 0.45f), RoundedCornerShape(12.dp))
+                .background(
+                    if (canAddPlan) TripWizardColors.ContainerHighest else TripWizardColors.ContainerHigh.copy(alpha = 0.55f),
+                    RoundedCornerShape(12.dp)
+                )
                 .then(if (canAddPlan) Modifier.clickable(onClick = onAddClick) else Modifier)
                 .padding(horizontal = 10.dp, vertical = 8.dp),
             contentAlignment = Alignment.Center

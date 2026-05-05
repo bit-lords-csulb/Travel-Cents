@@ -38,15 +38,28 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.travelcents.data.trip.TripKey
 import com.example.travelcents.ui.components.TcButton
+import com.example.travelcents.ui.theme.DeepSea1
+import com.example.travelcents.ui.theme.DeepSea5
 import com.example.travelcents.ui.theme.TravelCentsFonts
 
-private val GenBackground = Color(0xFF010E24)
-private val GenSurface = Color(0xFF0B203D)
-private val GenBlue = Color(0xFF64B5F6)
+private val GenBackground: Color
+    get() = DeepSea1
+
+private val GenSurface: Color
+    get() = TripWizardColors.ContainerHigh
+
+private val GenBlue: Color
+    get() = TripWizardColors.Blue
+
 private val GenGreen = Color(0xFF4CAF50)
-private val GenPending = Color(0xFF3B4861)
-private val GenOnSurface = Color(0xFFDBE6FF)
-private val GenOnSurfaceVariant = Color(0xFF9EABC8)
+private val GenPending: Color
+    get() = TripWizardColors.ContainerHighest
+
+private val GenOnSurface: Color
+    get() = DeepSea5
+
+private val GenOnSurfaceVariant: Color
+    get() = TripWizardColors.OnSurfaceVariant
 
 private val generationSteps = listOf(
     GenerationStep.CRAFTING_ITINERARY to "Crafting your itinerary",

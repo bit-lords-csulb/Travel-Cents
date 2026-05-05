@@ -9,6 +9,9 @@ import com.example.travelcents.data.trip.model.ATTR_HOTEL_RATING
 import com.example.travelcents.data.trip.model.TravelEvent
 import com.example.travelcents.data.trip.model.displayName
 import com.example.travelcents.data.trip.model.firstNonBlank
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.compositeOver
+import com.example.travelcents.ui.main.newTrip.TripWizardColors
 import com.example.travelcents.ui.modules.defaultPlanTimeZoneId
 import com.example.travelcents.ui.modules.formatDisplayTime
 import com.example.travelcents.ui.modules.formatMinutes
@@ -19,6 +22,10 @@ data class EventPalette(
     val container: androidx.compose.ui.graphics.Color,
     val accent: androidx.compose.ui.graphics.Color
 )
+
+private fun tintedEventContainer(accent: Color): Color {
+    return accent.copy(alpha = 0.18f).compositeOver(TripWizardColors.SurfaceBright)
+}
 
 private fun formatFlightDuration(minStr: String?): String? {
     val min = minStr?.toIntOrNull() ?: return null
@@ -133,28 +140,28 @@ fun editableNotes(event: TravelEvent): String {
 fun eventPalette(event: TravelEvent): EventPalette {
     return when ((event.details["colorKey"] ?: defaultColorKeyForType(event.type)).lowercase(Locale.US)) {
         "rose", "flight" -> EventPalette(
-            container = androidx.compose.ui.graphics.Color(0xFF3B2637),
-            accent = androidx.compose.ui.graphics.Color(0xFFFF677C)
+            container = tintedEventContainer(Color(0xFFFF677C)),
+            accent = Color(0xFFFF677C)
         )
         "teal", "hotel" -> EventPalette(
-            container = androidx.compose.ui.graphics.Color(0xFF193744),
-            accent = androidx.compose.ui.graphics.Color(0xFF4CA7C5)
+            container = tintedEventContainer(Color(0xFF4CA7C5)),
+            accent = Color(0xFF4CA7C5)
         )
         "olive", "restaurant" -> EventPalette(
-            container = androidx.compose.ui.graphics.Color(0xFF343D2F),
-            accent = androidx.compose.ui.graphics.Color(0xFF8A9365)
+            container = tintedEventContainer(Color(0xFF8A9365)),
+            accent = Color(0xFF8A9365)
         )
         "cyan" -> EventPalette(
-            container = androidx.compose.ui.graphics.Color(0xFF12353D),
-            accent = androidx.compose.ui.graphics.Color(0xFF268C95)
+            container = tintedEventContainer(Color(0xFF268C95)),
+            accent = Color(0xFF268C95)
         )
         "lavender" -> EventPalette(
-            container = androidx.compose.ui.graphics.Color(0xFF302B45),
-            accent = androidx.compose.ui.graphics.Color(0xFF7B6D9C)
+            container = tintedEventContainer(Color(0xFF7B6D9C)),
+            accent = Color(0xFF7B6D9C)
         )
         else -> EventPalette(
-            container = androidx.compose.ui.graphics.Color(0xFF2B233B),
-            accent = androidx.compose.ui.graphics.Color(0xFF5A2A7B)
+            container = tintedEventContainer(Color(0xFF5A2A7B)),
+            accent = Color(0xFF5A2A7B)
         )
     }
 }

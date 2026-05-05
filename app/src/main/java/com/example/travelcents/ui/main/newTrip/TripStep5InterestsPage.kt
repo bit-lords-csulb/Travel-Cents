@@ -129,7 +129,7 @@ fun TripStep5InterestsPage(
         Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .background(Color(0xFF010E24))
+                .background(TripWizardColors.ContainerLow)
                 .statusBarsPadding()
         ) {
             Row(
@@ -391,7 +391,7 @@ private fun S5ProgressWidget() {
             .fillMaxWidth()
             .clip(RoundedCornerShape(16.dp))
             .background(TripWizardColors.ContainerHigh.copy(alpha = 0.5f))
-            .border(1.dp, Color.White.copy(alpha = 0.05f), RoundedCornerShape(16.dp))
+            .border(1.dp, TripWizardColors.OnSurfaceVariant.copy(alpha = 0.14f), RoundedCornerShape(16.dp))
             .padding(12.dp)
     ) {
         Column {
@@ -516,12 +516,12 @@ private fun S5InterestCard(
                 .padding(8.dp)
                 .size(22.dp)
                 .clip(CircleShape)
-                .background(if (selected) TripWizardColors.Blue else Color.White.copy(alpha = 0.1f))
-                .border(1.5.dp, if (selected) TripWizardColors.Blue else Color.White.copy(alpha = 0.3f), CircleShape),
+                .background(if (selected) TripWizardColors.Blue else TripWizardColors.ContainerHighest)
+                .border(1.5.dp, if (selected) TripWizardColors.Blue else TripWizardColors.OnSurfaceVariant.copy(alpha = 0.3f), CircleShape),
             contentAlignment = Alignment.Center
         ) {
             if (selected) {
-                Icon(Icons.Default.Check, null, tint = Color(0xFF001627), modifier = Modifier.size(12.dp))
+                Icon(Icons.Default.Check, null, tint = DeepSea5, modifier = Modifier.size(12.dp))
             }
         }
     }

@@ -17,10 +17,16 @@ import androidx.compose.ui.unit.sp
 import com.example.travelcents.ui.theme.DeepSea4
 
 @Composable
-fun PreferencesTab() {
+fun PreferencesTab(
+    darkModeEnabled: Boolean,
+    onDarkModeChanged: (Boolean) -> Unit
+) {
     Column(modifier = Modifier.fillMaxWidth()) {
         NotificationsSection()
-        DisplaySection()
+        DisplaySection(
+            darkModeEnabled = darkModeEnabled,
+            onDarkModeChanged = onDarkModeChanged
+        )
         AboutSection()
     }
 }
@@ -56,16 +62,17 @@ private fun NotificationsSection() {
 }
 
 @Composable
-private fun DisplaySection() {
-    var darkMode by remember { mutableStateOf(true) }
-
+private fun DisplaySection(
+    darkModeEnabled: Boolean,
+    onDarkModeChanged: (Boolean) -> Unit
+) {
     SettingHeader("Display")
     SettingCard {
         SwitchSettingItem(
             title = "Dark Mode",
-            subtitle = "Use the DeepSea dark theme throughout the app",
-            checked = darkMode,
-            onCheckedChange = { darkMode = it },
+            subtitle = "Turn this off to use the light theme throughout the app",
+            checked = darkModeEnabled,
+            onCheckedChange = onDarkModeChanged,
             showDivider = false
         )
     }
