@@ -30,10 +30,12 @@ import com.example.travelcents.ui.modules.formatDisplayTime
 import com.example.travelcents.ui.modules.formatDisplayTimeRange
 import com.example.travelcents.ui.modules.formatTimeZoneLabel
 import com.example.travelcents.ui.modules.formatTripDate
+import com.example.travelcents.ui.modules.parseIsoDate
 import com.example.travelcents.ui.modules.parseFlexibleTime
 import com.example.travelcents.ui.modules.todayIsoDate
 import java.time.Duration
 import java.time.ZoneId
+import java.time.format.DateTimeFormatter
 import java.util.Locale
 
 internal fun eventOfficialUrl(event: TravelEvent): String? {
@@ -133,6 +135,29 @@ internal fun eventDurationSummary(event: TravelEvent): String {
     } else {
         "Starts ${formatDisplayTime(event.startTime)}"
     }
+}
+
+internal fun ticketmasterEventDateSummary(event: TravelEvent): String? {
+    val date = parseIsoDate(event.date) ?: return null
+    val day = date.dayOfMonth
+    val suffix = when {
+        day in 11..13 -> "th"
+        day % 10 == 1 -> "st"
+        day % 10 == 2 -> "nd"
+        day % 10 == 3 -> "rd"
+        else -> "th"
+    }
+    return date.format(DateTimeFormatter.ofPattern("MMM ", Locale.US)) + day + suffix
+}
+
+internal fun ticketmasterEventTimeSummary(event: TravelEvent): String {
+    val timeRange = formatDisplayTimeRange(event.startTime, event.endTime)
+    val duration = eventDurationSummary(event)
+        .takeIf { it.isNotBlank() && !it.startsWith("Starts ", ignoreCase = true) }
+    return listOfNotNull(
+        timeRange.takeIf { it.isNotBlank() && it != "TIME TBD" },
+        duration?.let { "($it)" }
+    ).joinToString(" ").ifBlank { "Time TBD" }
 }
 
 internal fun eventRatingLabel(event: TravelEvent, reviews: List<YelpReview>): String {

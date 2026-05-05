@@ -45,6 +45,7 @@ import com.example.travelcents.data.trip.model.ATTR_RIDESHARE_ESTIMATE_USD
 import com.example.travelcents.data.trip.model.ATTR_RIDESHARE_MIN
 import com.example.travelcents.data.trip.model.ATTR_TRANSIT_MIN
 import com.example.travelcents.data.trip.model.ATTR_TRANSIT_SCORE
+import com.example.travelcents.data.trip.model.ATTR_TICKETMASTER_EVENT_ID
 import com.example.travelcents.data.trip.model.ATTR_TRANSPORT_ANCHOR_LABEL
 import com.example.travelcents.data.trip.model.ATTR_UBER_DEEPLINK
 import com.example.travelcents.data.trip.model.ATTR_WALK_MIN
@@ -865,11 +866,13 @@ class CurrentTripViewModel(application: Application) : AndroidViewModel(applicat
         refreshCurrentTripInBackground(tripKey)
     }
 
-    fun refreshRestaurantLiveContext(eventId: String) {
+    fun refreshEventLiveContext(eventId: String) {
         val event = _uiState.value.events.firstOrNull { it.eventId == eventId } ?: return
-        if (!isRestaurantEvent(event) || eventId in _restaurantLiveContextInFlight.value) return
+        val isRestaurant = isRestaurantEvent(event)
+        val isTicketmasterBacked = isTicketmasterBackedEvent(event)
+        if ((!isRestaurant && !isTicketmasterBacked) || eventId in _restaurantLiveContextInFlight.value) return
 
-        val venueName = event.displayName()?.takeIf { it.isNotBlank() } ?: return
+        val venueName = event.displayName()?.takeIf { it.isNotBlank() }
         val venueAddress = event.detailValue(ATTR_BUSINESS_ADDRESS, "address")
             ?.takeIf { it.isNotBlank() }
         val transportAnchor = resolveTransportAnchor(event)
@@ -887,19 +890,24 @@ class CurrentTripViewModel(application: Application) : AndroidViewModel(applicat
             ?: transportDestination?.address
             ?: event.details["location"]?.takeIf { it.isNotBlank() }
 
-        if (
+        val lacksRestaurantInputs =
             venueAddress == null &&
-            (transportAnchor == null || transportDestination == null) &&
-            (!hasOutdoorSeating || latitude == null || longitude == null) &&
-            (latitude == null || longitude == null || walkScoreAddress == null) &&
-            (tripCurrency == null || usdAnchorAmount == null)
+                (transportAnchor == null || transportDestination == null) &&
+                (!hasOutdoorSeating || latitude == null || longitude == null) &&
+                (latitude == null || longitude == null || walkScoreAddress == null) &&
+                (tripCurrency == null || usdAnchorAmount == null)
+        val lacksTicketmasterTransport = transportAnchor == null || transportDestination == null
+
+        if (
+            (isRestaurant && lacksRestaurantInputs) ||
+            (isTicketmasterBacked && !isRestaurant && lacksTicketmasterTransport)
         ) return
 
         viewModelScope.launch {
             _restaurantLiveContextInFlight.update { it + eventId }
             try {
                 val overrides = buildMap {
-                    if (venueAddress != null) {
+                    if (isRestaurant && venueName != null && venueAddress != null) {
                         PopularTimesRepository.fetchSnapshot(
                             venueName = venueName,
                             venueAddress = venueAddress,
@@ -942,7 +950,7 @@ class CurrentTripViewModel(application: Application) : AndroidViewModel(applicat
                         }
                     }
 
-                    if (hasOutdoorSeating && latitude != null && longitude != null) {
+                    if (isRestaurant && hasOutdoorSeating && latitude != null && longitude != null) {
                         WeatherRepository.fetchSnapshot(
                             latitude = latitude,
                             longitude = longitude,
@@ -962,7 +970,7 @@ class CurrentTripViewModel(application: Application) : AndroidViewModel(applicat
                         }
                     }
 
-                    if (latitude != null && longitude != null && walkScoreAddress != null) {
+                    if (isRestaurant && latitude != null && longitude != null && walkScoreAddress != null) {
                         WalkScoreRepository.fetchSnapshot(
                             latitude = latitude,
                             longitude = longitude,
@@ -989,7 +997,7 @@ class CurrentTripViewModel(application: Application) : AndroidViewModel(applicat
                         }
                     }
 
-                    if (tripCurrency != null && usdAnchorAmount != null) {
+                    if (isRestaurant && tripCurrency != null && usdAnchorAmount != null) {
                         currencyPreviewRepository.buildPreview(
                             localCurrency = tripCurrency,
                             homeCurrency = homeCurrency,
@@ -1014,11 +1022,15 @@ class CurrentTripViewModel(application: Application) : AndroidViewModel(applicat
 
                 replaceLiveDetailOverrides(eventId, overrides)
             } catch (e: Exception) {
-                Log.w("CurrentTripViewModel", "Failed to refresh restaurant live context", e)
+                Log.w("CurrentTripViewModel", "Failed to refresh event live context", e)
             } finally {
                 _restaurantLiveContextInFlight.update { it - eventId }
             }
         }
+    }
+
+    fun refreshRestaurantLiveContext(eventId: String) {
+        refreshEventLiveContext(eventId)
     }
 
     fun ensureEventOptionsLoaded(eventId: String) {
@@ -1962,6 +1974,10 @@ class CurrentTripViewModel(application: Application) : AndroidViewModel(applicat
             "restaurant", "dining", "food" -> true
             else -> false
         }
+    }
+
+    private fun isTicketmasterBackedEvent(event: TravelEvent): Boolean {
+        return !event.detailValue(ATTR_TICKETMASTER_EVENT_ID).isNullOrBlank()
     }
 
     private fun resolveTransportAnchor(event: TravelEvent): TransportRepository.TransportAnchor? {

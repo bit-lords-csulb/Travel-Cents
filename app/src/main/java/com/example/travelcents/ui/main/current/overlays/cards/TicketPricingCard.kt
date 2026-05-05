@@ -12,6 +12,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.example.travelcents.data.trip.model.ATTR_TICKETMASTER_EVENT_ID
 import com.example.travelcents.data.trip.model.ATTR_TICKET_CURRENCY
 import com.example.travelcents.data.trip.model.ATTR_TICKET_PRICE_MAX
 import com.example.travelcents.data.trip.model.ATTR_TICKET_PRICE_MIN
@@ -19,12 +20,26 @@ import com.example.travelcents.data.trip.model.TravelEvent
 import com.example.travelcents.data.trip.model.detailValue
 import java.util.Locale
 
+enum class TicketPricingMode {
+    STANDARD,
+    TICKETMASTER
+}
+
 @Composable
-fun TicketPricingCard(event: TravelEvent) {
+fun TicketPricingCard(
+    event: TravelEvent,
+    mode: TicketPricingMode = if (!event.detailValue(ATTR_TICKETMASTER_EVENT_ID).isNullOrBlank()) {
+        TicketPricingMode.TICKETMASTER
+    } else {
+        TicketPricingMode.STANDARD
+    }
+) {
     val minimum = event.detailValue(ATTR_TICKET_PRICE_MIN)?.toDoubleOrNull()
     val maximum = event.detailValue(ATTR_TICKET_PRICE_MAX)?.toDoubleOrNull()
     val currency = event.detailValue(ATTR_TICKET_CURRENCY)?.takeIf { it.isNotBlank() }
     val title = formatTicketPriceRange(minimum, maximum, currency) ?: return
+    val minimumLabel = if (mode == TicketPricingMode.TICKETMASTER) "General admission" else "Lowest listed"
+    val maximumLabel = if (mode == TicketPricingMode.TICKETMASTER) "VIP" else "Highest listed"
 
     DetailCardFrame(accent = CardMint) {
         DetailCardHeader(
@@ -38,14 +53,14 @@ fun TicketPricingCard(event: TravelEvent) {
         minimum?.let {
             Spacer(modifier = Modifier.height(12.dp))
             TicketPriceRow(
-                label = "Lowest listed",
+                label = minimumLabel,
                 value = formatTicketAmount(it, currency)
             )
         }
         maximum?.let {
             Spacer(modifier = Modifier.height(10.dp))
             TicketPriceRow(
-                label = if (minimum == null) "Highest listed" else "Highest listed",
+                label = maximumLabel,
                 value = formatTicketAmount(it, currency)
             )
         }

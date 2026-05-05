@@ -8,6 +8,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
@@ -52,6 +53,8 @@ import com.example.travelcents.ui.main.current.overlays.cards.CardText
 import com.example.travelcents.ui.main.current.overlays.cards.CardTextMuted
 import com.example.travelcents.ui.main.current.overlays.cards.CurrencyCostCard
 import com.example.travelcents.ui.main.current.overlays.cards.DetailActionRow
+import com.example.travelcents.ui.main.current.overlays.cards.DetailCardFrame
+import com.example.travelcents.ui.main.current.overlays.cards.DetailCardHeader
 import com.example.travelcents.ui.main.current.overlays.cards.EventSummaryCard
 import com.example.travelcents.ui.main.current.overlays.cards.FlightActionRow
 import com.example.travelcents.ui.main.current.overlays.cards.FlightBookingOffersCard
@@ -77,6 +80,8 @@ import com.example.travelcents.ui.main.current.overlays.cards.TransportCard
 import com.example.travelcents.ui.main.current.overlays.cards.WaitTimeCard
 import com.example.travelcents.ui.main.current.overlays.cards.WeatherCard
 import com.example.travelcents.ui.main.current.overlays.cards.TicketPricingCard
+import com.example.travelcents.ui.main.current.overlays.cards.TicketPricingMode
+import com.example.travelcents.ui.main.current.overlays.cards.TicketmasterActionRow
 import com.example.travelcents.ui.main.current.overlays.cards.compactHostLabel
 import com.example.travelcents.ui.main.current.overlays.cards.eventDurationSummary
 import com.example.travelcents.ui.main.current.overlays.cards.eventLocationLabel
@@ -111,6 +116,7 @@ fun CurrentTripEventDetailsDialog(
 ) {
     val context = LocalContext.current
     val uriHandler = LocalUriHandler.current
+    val isTicketmasterBacked = remember(event) { !event.detailValue(ATTR_TICKETMASTER_EVENT_ID).isNullOrBlank() }
     val photos = remember(event, context) { event.galleryPhotoModels(context) }
     val heroImage = remember(event, context) { event.heroImageModel(context) }
     val officialUrl = remember(event) { eventOfficialUrl(event) }
@@ -250,6 +256,16 @@ fun CurrentTripEventDetailsDialog(
                                 uriHandler.openUri(url)
                             }
                         )
+                    } else if (isTicketmasterBacked) {
+                        TicketmasterActionRow(
+                            onDirections = { uriHandler.openUri(directionsUrl) },
+                            onBook = {
+                                val bookingUrl = officialUrl ?: event.detailValue("tickets_url")
+                                if (bookingUrl != null) {
+                                    uriHandler.openUri(bookingUrl)
+                                }
+                            }
+                        )
                     } else if (event.type.lowercase() in setOf("activity", "tour", "event")) {
                         ActivityActionRow(
                             event = event,
@@ -323,6 +339,17 @@ private fun EventDetailCardStack(
         yelpReviews.isNotEmpty() ||
         reviewCountLabel.isNotBlank() ||
         (ratingLabel.isNotBlank() && ratingLabel != "N/A")
+
+    if (isTicketmasterBacked) {
+        TicketmasterEventDetailCardStack(
+            event = event,
+            locationLabel = locationLabel,
+            mapsUrl = mapsUrl,
+            websiteLabel = websiteLabel,
+            officialUrl = officialUrl
+        )
+        return
+    }
 
     when (event.type.lowercase()) {
         "flight" -> {
@@ -440,5 +467,63 @@ private fun EventDetailCardStack(
                 )
             }
         }
+    }
+}
+
+@Composable
+private fun TicketmasterEventDetailCardStack(
+    event: TravelEvent,
+    locationLabel: String,
+    mapsUrl: String,
+    websiteLabel: String,
+    officialUrl: String?
+) {
+    val uriHandler = LocalUriHandler.current
+    val showLocationCard = event.hasStaticMapSource() ||
+        locationLabel != "Location information unavailable"
+
+    EventSynopsisCard(event)
+    TransportCard(
+        event = event,
+        titleOverride = "From ${event.detailValue(com.example.travelcents.data.trip.model.ATTR_TRANSPORT_ANCHOR_LABEL)?.takeIf { it.isNotBlank() } ?: "your current stop"}",
+        eyebrowOverride = "How to get there",
+        showDirectionsLink = false,
+        prioritizeRideshare = true
+    )
+    ActivityContactCard(
+        event = event,
+        websiteLabel = websiteLabel,
+        onOpenWebsite = officialUrl?.let { { uriHandler.openUri(it) } },
+        ticketmasterMode = true
+    )
+    TicketPricingCard(
+        event = event,
+        mode = TicketPricingMode.TICKETMASTER
+    )
+    if (showLocationCard) {
+        LocationMapCard(
+            event = event,
+            locationLabel = locationLabel,
+            onOpenMaps = { uriHandler.openUri(mapsUrl) }
+        )
+    }
+}
+
+@Composable
+private fun EventSynopsisCard(event: TravelEvent) {
+    val synopsis = event.details["description"]?.trim()?.takeIf { it.isNotBlank() } ?: return
+
+    DetailCardFrame(accent = CardLavender) {
+        DetailCardHeader(
+            eyebrow = "Event synopsis",
+            title = "What to expect"
+        )
+        Spacer(modifier = Modifier.height(12.dp))
+        Text(
+            text = synopsis,
+            color = CardText,
+            fontSize = 14.sp,
+            lineHeight = 20.sp
+        )
     }
 }

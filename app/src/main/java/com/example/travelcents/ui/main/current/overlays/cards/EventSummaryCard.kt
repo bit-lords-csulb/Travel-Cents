@@ -24,17 +24,14 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImage
+import com.example.travelcents.data.trip.model.ATTR_TICKETMASTER_EVENT_ID
 import com.example.travelcents.data.trip.model.ATTR_BUSINESS_ADDRESS
 import com.example.travelcents.data.trip.model.TravelEvent
 import com.example.travelcents.data.trip.model.firstNonBlank
+import com.example.travelcents.data.trip.model.detailValue
 import com.example.travelcents.ui.main.current.eventSubtitle
 import com.example.travelcents.ui.main.current.eventTitle
 import com.example.travelcents.ui.modules.PhotoGalleryButton
-import com.example.travelcents.ui.modules.formatDisplayTimeRange
-import com.example.travelcents.ui.modules.formatLongDuration
-import com.example.travelcents.ui.modules.formatLongTripDateWithYear
-import com.example.travelcents.ui.modules.parseFlexibleTime
-import java.time.Duration
 import java.util.Locale
 
 @Composable
@@ -48,8 +45,19 @@ fun EventSummaryCard(
 ) {
     val accent = accentForType(event.type)
     val title = eventTitle(event)
+    val isTicketmasterBacked = !event.detailValue(ATTR_TICKETMASTER_EVENT_ID).isNullOrBlank()
     if (event.type.equals("hotel", ignoreCase = true)) {
         HotelSummaryCard(
+            event = event,
+            heroImage = heroImage,
+            photoCount = photoCount,
+            title = title,
+            onOpenGallery = onOpenGallery
+        )
+        return
+    }
+    if (isTicketmasterBacked) {
+        TicketmasterSummaryCard(
             event = event,
             heroImage = heroImage,
             photoCount = photoCount,
@@ -194,6 +202,114 @@ fun EventSummaryCard(
             }
         }
     }
+}
+
+@Composable
+private fun TicketmasterSummaryCard(
+    event: TravelEvent,
+    heroImage: String?,
+    photoCount: Int,
+    title: String,
+    onOpenGallery: (() -> Unit)?
+) {
+    val dateSummary = ticketmasterEventDateSummary(event) ?: event.date.ifBlank { "Date TBD" }
+    val timeSummary = ticketmasterEventTimeSummary(event)
+    val titleFontSize = when {
+        title.length >= 80 -> 20.sp
+        title.length >= 54 -> 22.sp
+        else -> 25.sp
+    }
+    val titleLineHeight = when {
+        title.length >= 80 -> 24.sp
+        title.length >= 54 -> 27.sp
+        else -> 29.sp
+    }
+
+    DetailCardFrame(accent = CardLavender) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(16.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Box(
+                modifier = Modifier
+                    .weight(0.42f)
+                    .aspectRatio(0.92f)
+                    .clip(RoundedCornerShape(24.dp))
+                    .background(CardSurfaceHighest)
+                    .then(if (onOpenGallery != null) Modifier.clickable(onClick = onOpenGallery) else Modifier)
+            ) {
+                if (!heroImage.isNullOrBlank()) {
+                    AsyncImage(
+                        model = heroImage,
+                        contentDescription = title,
+                        modifier = Modifier.matchParentSize(),
+                        contentScale = ContentScale.Crop
+                    )
+                    Box(
+                        modifier = Modifier
+                            .matchParentSize()
+                            .background(
+                                Brush.verticalGradient(
+                                    colors = listOf(
+                                        androidx.compose.ui.graphics.Color.Transparent,
+                                        CardBackground.copy(alpha = 0.12f),
+                                        CardBackground.copy(alpha = 0.42f)
+                                    )
+                                )
+                            )
+                    )
+                } else {
+                    Box(
+                        modifier = Modifier
+                            .matchParentSize()
+                            .background(accentGradientForType(event.type))
+                    )
+                }
+
+                if (photoCount > 1 && onOpenGallery != null) {
+                    PhotoGalleryButton(
+                        photoCount = photoCount,
+                        onClick = onOpenGallery,
+                        modifier = Modifier
+                            .align(Alignment.TopEnd)
+                            .padding(10.dp)
+                    )
+                }
+            }
+
+            Column(
+                modifier = Modifier.weight(0.58f),
+                verticalArrangement = Arrangement.spacedBy(10.dp)
+            ) {
+                Text(
+                    text = title,
+                    color = CardText,
+                    fontSize = titleFontSize,
+                    lineHeight = titleLineHeight,
+                    fontWeight = FontWeight.ExtraBold,
+                    maxLines = 4,
+                    overflow = TextOverflow.Ellipsis
+                )
+                TicketmasterSummaryMetaRow(label = "Date", value = dateSummary)
+                TicketmasterSummaryMetaRow(label = "Time", value = timeSummary)
+            }
+        }
+    }
+}
+
+@Composable
+private fun TicketmasterSummaryMetaRow(
+    label: String,
+    value: String
+) {
+    Text(
+        text = "$label: $value",
+        color = CardText,
+        fontSize = 14.sp,
+        lineHeight = 18.sp,
+        fontWeight = FontWeight.SemiBold
+    )
 }
 
 @Composable

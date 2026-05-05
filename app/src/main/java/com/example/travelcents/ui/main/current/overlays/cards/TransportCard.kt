@@ -30,7 +30,13 @@ import com.example.travelcents.data.trip.model.TravelEvent
 import com.example.travelcents.data.trip.model.detailValue
 
 @Composable
-fun TransportCard(event: TravelEvent) {
+fun TransportCard(
+    event: TravelEvent,
+    titleOverride: String? = null,
+    eyebrowOverride: String = "Getting there",
+    showDirectionsLink: Boolean = true,
+    prioritizeRideshare: Boolean = false
+) {
     val uriHandler = LocalUriHandler.current
     val anchorLabel = event.detailValue(ATTR_TRANSPORT_ANCHOR_LABEL)?.takeIf { it.isNotBlank() }
         ?: "From your current stop"
@@ -50,11 +56,21 @@ fun TransportCard(event: TravelEvent) {
 
     DetailCardFrame(accent = CardCoral) {
         DetailCardHeader(
-            eyebrow = "Getting there",
-            title = anchorLabel
+            eyebrow = eyebrowOverride,
+            title = titleOverride ?: anchorLabel
         )
         Spacer(modifier = Modifier.height(12.dp))
         Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+            if (prioritizeRideshare && hasRideshare) {
+                TransportRideshareRow(
+                    rideshareMin = rideshareMin,
+                    rideshareEstimate = rideshareEstimate,
+                    uberDeeplink = uberDeeplink,
+                    lyftDeeplink = lyftDeeplink,
+                    onOpenUber = uberDeeplink?.let { { uriHandler.openUri(it) } },
+                    onOpenLyft = lyftDeeplink?.let { { uriHandler.openUri(it) } }
+                )
+            }
             walkMin?.let {
                 TransportModeRow(
                     label = "Walk",
@@ -67,7 +83,7 @@ fun TransportCard(event: TravelEvent) {
                     value = "$it min"
                 )
             }
-            if (hasRideshare) {
+            if (hasRideshare && !prioritizeRideshare) {
                 TransportRideshareRow(
                     rideshareMin = rideshareMin,
                     rideshareEstimate = rideshareEstimate,
@@ -78,13 +94,15 @@ fun TransportCard(event: TravelEvent) {
                 )
             }
         }
-        Spacer(modifier = Modifier.height(14.dp))
-        DetailLinkRow(
-            label = "Directions",
-            value = "Open Google Maps",
-            onClick = { uriHandler.openUri(googleMapsDirectionsUrl(eventMapsQuery(event))) },
-            accent = CardCoral
-        )
+        if (showDirectionsLink) {
+            Spacer(modifier = Modifier.height(14.dp))
+            DetailLinkRow(
+                label = "Directions",
+                value = "Open Google Maps",
+                onClick = { uriHandler.openUri(googleMapsDirectionsUrl(eventMapsQuery(event))) },
+                accent = CardCoral
+            )
+        }
     }
 }
 

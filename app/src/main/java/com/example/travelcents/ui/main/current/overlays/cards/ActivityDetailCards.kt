@@ -24,6 +24,7 @@ import com.example.travelcents.data.trip.model.ATTR_HOURS_RAW
 import com.example.travelcents.data.trip.model.ATTR_HOURS_SUMMARY
 import com.example.travelcents.data.trip.model.ATTR_PHONE
 import com.example.travelcents.data.trip.model.ATTR_PRICE_TIER
+import com.example.travelcents.data.trip.model.ATTR_TICKETMASTER_EVENT_ID
 import com.example.travelcents.data.trip.model.ATTR_VENUE_NAME
 import com.example.travelcents.data.trip.model.TravelEvent
 import com.example.travelcents.data.trip.model.detailValue
@@ -33,7 +34,8 @@ import java.util.Locale
 internal fun ActivityContactCard(
     event: TravelEvent,
     websiteLabel: String,
-    onOpenWebsite: (() -> Unit)? = null
+    onOpenWebsite: (() -> Unit)? = null,
+    ticketmasterMode: Boolean = false
 ) {
     val title = event.detailValue(
         ATTR_BUSINESS_NAME,
@@ -44,36 +46,56 @@ internal fun ActivityContactCard(
     )
     val address = event.detailValue(ATTR_BUSINESS_ADDRESS, "address", "location")
     val phone = event.detailValue(ATTR_PHONE, "phone")
-    val badges = buildActivityBadges(event)
+    val email = event.detailValue("email", "contact_email")
+    val isTicketmasterBacked = ticketmasterMode || !event.detailValue(ATTR_TICKETMASTER_EVENT_ID).isNullOrBlank()
+    val badges = if (isTicketmasterBacked) emptyList() else buildActivityBadges(event)
+    val hasWebsite = onOpenWebsite != null
+    val shouldShowAddress = !isTicketmasterBacked && !address.isNullOrBlank()
+    val shouldShowPhone = !phone.isNullOrBlank()
+    val shouldShowEmail = !email.isNullOrBlank()
 
-    if (title.isNullOrBlank() && address.isNullOrBlank() && phone.isNullOrBlank() &&
+    if (isTicketmasterBacked) {
+        if (!hasWebsite && !shouldShowPhone && !shouldShowEmail) return
+    } else if (title.isNullOrBlank() && address.isNullOrBlank() && phone.isNullOrBlank() &&
         onOpenWebsite == null && badges.isEmpty()
     ) return
 
     DetailCardFrame(accent = CardMint) {
         DetailCardHeader(
             eyebrow = "Contact",
-            title = title ?: "Activity details"
+            title = if (isTicketmasterBacked) {
+                title ?: "Ticketing details"
+            } else {
+                title ?: "Activity details"
+            }
         )
 
         Spacer(modifier = Modifier.padding(top = 10.dp))
 
-        if (!address.isNullOrBlank()) {
+        if (shouldShowAddress) {
             ActivityInfoRow(
                 label = "Address",
-                value = address
+                value = address.orEmpty()
             )
         }
 
-        if (!phone.isNullOrBlank()) {
+        if (shouldShowPhone) {
             Spacer(modifier = Modifier.padding(top = 8.dp))
             ActivityInfoRow(
                 label = "Phone",
-                value = phone
+                value = phone.orEmpty()
             )
         }
 
-        if (onOpenWebsite != null) {
+        if (shouldShowEmail) {
+            Spacer(modifier = Modifier.padding(top = 8.dp))
+            ActivityInfoRow(
+                label = "Email",
+                value = email.orEmpty()
+            )
+        }
+
+        if (hasWebsite) {
             Spacer(modifier = Modifier.padding(top = 8.dp))
             ActivityInfoRow(
                 label = "Website",
