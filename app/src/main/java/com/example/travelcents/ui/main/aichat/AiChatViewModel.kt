@@ -37,6 +37,7 @@ import com.example.travelcents.data.ai.chat.AiTripIntakeOrchestrator
 import com.example.travelcents.data.ai.chat.AiTripIntakeTurnResult
 import com.example.travelcents.data.ai.chat.PersistedAiChatMessage
 import com.example.travelcents.data.ai.chat.PersistedAiChatSnapshot
+import com.example.travelcents.data.ai.chat.SuggestionItem
 import com.example.travelcents.data.ai.chat.mergeIntakeProfile
 import com.example.travelcents.data.ai.chat.mergePatch
 import com.example.travelcents.data.ai.chat.toCardGroup
@@ -49,6 +50,7 @@ import com.example.travelcents.data.media.ImageCacheManager
 import com.example.travelcents.data.media.UnsplashImageRepository
 import com.example.travelcents.data.media.UnsplashSearchParams
 import com.example.travelcents.data.ai.remote.LlmClient
+import com.example.travelcents.data.social.model.BookmarkedPlace
 import com.example.travelcents.data.social.repository.BookmarksRepository
 import com.example.travelcents.data.sync.TripSyncRemoteDataSource
 import com.example.travelcents.data.trip.TripKey
@@ -106,10 +108,117 @@ class AiChatViewModel(application: Application) : AndroidViewModel(application) 
         toggleDraftOption(option, allowMultiple = group.allowMultiple)
     }
 
+    fun submitPreferenceQuestionAnswer(
+        card: AiChatItem.PreferenceQuestionCard,
+        answers: List<String>
+    ) {
+        if (isLoading || card.answered) return
+        val selectedAnswers = answers
+            .map(String::trim)
+            .filter(String::isNotBlank)
+            .distinct()
+        if (selectedAnswers.isEmpty()) return
+
+        val answerText = selectedAnswers.joinToString(", ")
+        submitUserTurn(
+            visibleMessage = answerText,
+            llmUserMessage = "${card.question}\nAnswer: $answerText",
+            visibleTags = selectedAnswers
+        )
+    }
+
+    fun noteSuggestionAddedToPreview(suggestion: SuggestionItem) {
+        conversationItems += AiChatItem.TextMessage(
+            text = "Added \"${suggestion.name}\" to the preview trip.",
+            sender = AiChatSender.ASSISTANT
+        )
+        persistLastSession()
+        publishUiState()
+    }
+
+    fun bookmarkSuggestion(suggestion: SuggestionItem) {
+        val uid = currentUserId().orEmpty()
+        if (uid.isBlank()) {
+            conversationItems += AiChatItem.TextMessage(
+                text = "Sign in to save places.",
+                sender = AiChatSender.SYSTEM
+            )
+            publishUiState()
+            return
+        }
+
+        val bookmark = BookmarkedPlace(
+            id = suggestion.providerId.ifBlank { suggestion.id },
+            name = suggestion.name,
+            category = suggestion.subtitle.ifBlank { suggestion.rawEvent.type },
+            area = suggestion.address,
+            imageUrl = suggestion.imageUrl,
+            yelpUrl = suggestion.detailUrl,
+            savedAtEpochMs = System.currentTimeMillis()
+        )
+
+        viewModelScope.launch {
+            val result = runCatching {
+                bookmarksRepository.addBookmark(uid, bookmark)
+            }.onFailure { error ->
+                Log.w(TAG, "Failed to bookmark AI suggestion: ${error.message}", error)
+            }
+
+            conversationItems += AiChatItem.TextMessage(
+                text = if (result.isSuccess) {
+                    "Saved \"${suggestion.name}\" to your bookmarks."
+                } else {
+                    "I could not save \"${suggestion.name}\" right now."
+                },
+                sender = AiChatSender.ASSISTANT
+            )
+            persistLastSession()
+            publishUiState()
+        }
+    }
+
+    fun skipSuggestion(suggestion: SuggestionItem) {
+        if (isLoading) return
+        submitUserTurn(
+            visibleMessage = "Skip ${suggestion.name}",
+            llmUserMessage = "Skip this suggested option for ${suggestion.slotId}: ${suggestion.name}. Suggest a better alternative."
+        )
+    }
+
+    fun requestMoreSuggestions(card: AiChatItem.SuggestionCarouselCard) {
+        if (isLoading || !card.hasMore || card.exhausted) return
+        val shownNames = card.suggestions.joinToString { suggestion -> suggestion.name }
+        submitUserTurn(
+            visibleMessage = "Show more options",
+            llmUserMessage = "Show more options for ${card.label}. Avoid repeating these suggestions: $shownNames."
+        )
+    }
+
+    fun requestAddSuggestionToTrip(suggestion: SuggestionItem) {
+        val dateLine = listOf(suggestion.rawEvent.date, suggestion.rawEvent.startTime)
+            .filter(String::isNotBlank)
+            .joinToString(" ")
+        requestAddSingleEventToTrip(
+            AiSingleEventSuggestion(
+                id = suggestion.id,
+                headline = suggestion.name,
+                venue = suggestion.address,
+                cityLine = suggestion.address,
+                dateLine = dateLine,
+                priceLine = "",
+                category = suggestion.subtitle.ifBlank { suggestion.rawEvent.type.ifBlank { "Suggestion" } },
+                imageUrl = suggestion.imageUrl,
+                bookingUrl = suggestion.detailUrl,
+                source = suggestion.source,
+                event = suggestion.rawEvent
+            )
+        )
+    }
+
     fun handleRecommendedStarterSelection(
         starter: AiCuratedTripStarter,
         onOpenTrip: (TripKey) -> Unit,
-        onCreateDraftTrip: (AiCuratedTripStarter, AiTripIntakeProfile) -> Unit
+        onStarterSelected: (AiCuratedTripStarter, AiTripIntakeProfile) -> Unit
     ) {
         selectCuratedTrip(starter)
 
@@ -120,7 +229,7 @@ class AiChatViewModel(application: Application) : AndroidViewModel(application) 
 
             AiCuratedTripSource.SEEDED,
             AiCuratedTripSource.GENERATED -> {
-                onCreateDraftTrip(starter, sessionState.intakeProfile)
+                onStarterSelected(starter, sessionState.intakeProfile)
             }
         }
     }
@@ -162,6 +271,8 @@ class AiChatViewModel(application: Application) : AndroidViewModel(application) 
             activeCuratedTripRow = null,
             activePlaceRecommendationRow = null,
             activeSingleEventCard = null,
+            lockedDestination = starter.destination,
+            lockedDestinationImageUrl = starter.heroImageUrl,
             anchorMessageId = userMessage.id
         )
 

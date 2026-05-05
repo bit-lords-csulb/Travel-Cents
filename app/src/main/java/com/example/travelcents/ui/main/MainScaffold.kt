@@ -348,16 +348,14 @@ fun MainScaffold(modifier: Modifier = Modifier, onLogout: () -> Unit = {}) {
                                 launchSingleTop = true
                             }
                         },
-                        onCreateDraftTrip = { starter, intakeProfile ->
+                        onStarterSelected = { starter, intakeProfile ->
                             val source = PreviewSource.CuratedStarter(
                                 starter = starter,
                                 intakeProfile = intakeProfile
                             )
                             pendingPreview = source
                             currentTripViewModel.loadPreview(source)
-                            navController.navigate(MainRoutes.CURRENT_TRIP_PREVIEW) {
-                                launchSingleTop = true
-                            }
+                            // Stay in chat — the banner is the user's path to the curated preview
                         },
                         onDestinationLocked = { recommendation, intakeProfile ->
                             val source = PreviewSource.DestinationLock(
@@ -504,4 +502,3 @@ private fun PreviewActionBar(
         }
     }
 }
-
