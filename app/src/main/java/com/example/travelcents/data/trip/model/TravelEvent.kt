@@ -1,5 +1,6 @@
 package com.example.travelcents.data.trip.model
 
+import com.google.firebase.firestore.PropertyName
 import java.util.UUID
 
 data class TravelEvent(
@@ -14,6 +15,12 @@ data class TravelEvent(
     val localImagePath: String = "",
     val photoUrls: List<String> = emptyList(),
     val selectedOptionId: String = "",
+    @get:PropertyName("isNativeBookable")
+    @field:PropertyName("isNativeBookable")
+    val isNativeBookable: String? = null,
+    @get:PropertyName("booking_url")
+    @field:PropertyName("booking_url")
+    val bookingUrl: String? = null,
     val details: Map<String, String> = emptyMap(),
     // options are stored as a Firestore subcollection; populated in-memory only
     val options: List<EventOption> = emptyList()
@@ -31,6 +38,8 @@ data class TravelEvent(
         put("photoUrls", photoUrls)
         if (selectedOptionId.isNotBlank()) put("selectedOptionId", selectedOptionId)
         putAll(details)
+        isNativeBookable?.let { put("isNativeBookable", it) }
+        bookingUrl?.let { put("booking_url", it) }
     }
 
     // cache map strips itineraryId but serializes options inline
@@ -45,7 +54,8 @@ data class TravelEvent(
         private val RESERVED = setOf(
             "eventId", "type", "itineraryId", "tz", "date",
             "startTime", "endTime", "imageUrl", "localImagePath", "photoUrls",
-            "selectedOptionId", "options"
+            "selectedOptionId", "isNativeBookable", "nativeBookable",
+            "bookingUrl", "booking_url", "options"
         )
 
         fun fromFirestoreMap(
@@ -101,6 +111,10 @@ data class TravelEvent(
                 localImagePath = localImagePath,
                 photoUrls = photos,
                 selectedOptionId = map["selectedOptionId"] as? String ?: "",
+                isNativeBookable = map["isNativeBookable"]?.toString()
+                    ?: map["nativeBookable"]?.toString(),
+                bookingUrl = map["bookingUrl"]?.toString()
+                    ?: map["booking_url"]?.toString(),
                 details = map.filterKeys { it !in RESERVED }.mapValues { it.value.toString() },
                 options = options
             )

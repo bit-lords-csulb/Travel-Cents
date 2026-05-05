@@ -597,4 +597,3 @@ private fun S2MonthYearPickerDialog(
         }
     )
 }
-
