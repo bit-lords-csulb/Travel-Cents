@@ -48,6 +48,7 @@ import com.example.travelcents.ui.main.current.overlays.cards.ActivityContactCar
 import com.example.travelcents.ui.main.current.overlays.cards.CardBackground
 import com.example.travelcents.ui.main.current.overlays.cards.CardCoral
 import com.example.travelcents.ui.main.current.overlays.cards.CardLavender
+import com.example.travelcents.ui.main.current.overlays.cards.CardMint
 import com.example.travelcents.ui.main.current.overlays.cards.CardSurface
 import com.example.travelcents.ui.main.current.overlays.cards.CardText
 import com.example.travelcents.ui.main.current.overlays.cards.CardTextMuted
@@ -297,7 +298,9 @@ fun CurrentTripEventDetailsDialog(
                         reviewCountLabel = reviewCountLabel,
                         yelpReviews = yelpReviews,
                         reviewsLoading = reviewsLoading,
-                        reviewUrl = reviewUrl
+                        reviewUrl = reviewUrl,
+                        currentOptions = currentOptions,
+                        onAlternatives = onAlternatives
                     )
 
                     Spacer(modifier = Modifier.padding(bottom = 12.dp))
@@ -329,7 +332,9 @@ private fun EventDetailCardStack(
     reviewCountLabel: String,
     yelpReviews: List<YelpReview>,
     reviewsLoading: Boolean,
-    reviewUrl: String?
+    reviewUrl: String?,
+    currentOptions: List<EventOption>,
+    onAlternatives: (() -> Unit)?
 ) {
     val uriHandler = LocalUriHandler.current
     val showLocationCard = event.hasStaticMapSource() ||
@@ -346,7 +351,9 @@ private fun EventDetailCardStack(
             locationLabel = locationLabel,
             mapsUrl = mapsUrl,
             websiteLabel = websiteLabel,
-            officialUrl = officialUrl
+            officialUrl = officialUrl,
+            currentOptions = currentOptions,
+            onAlternatives = onAlternatives
         )
         return
     }
@@ -476,19 +483,29 @@ private fun TicketmasterEventDetailCardStack(
     locationLabel: String,
     mapsUrl: String,
     websiteLabel: String,
-    officialUrl: String?
+    officialUrl: String?,
+    currentOptions: List<EventOption>,
+    onAlternatives: (() -> Unit)?
 ) {
     val uriHandler = LocalUriHandler.current
     val showLocationCard = event.hasStaticMapSource() ||
         locationLabel != "Location information unavailable"
+    val alternateShowtimes = currentOptions.filter { option ->
+        !option.selected && option.source.equals("ticketmaster", ignoreCase = true)
+    }
 
+    TicketmasterAlternatesCard(
+        alternateCount = alternateShowtimes.size,
+        onAlternatives = onAlternatives
+    )
     EventSynopsisCard(event)
     TransportCard(
         event = event,
         titleOverride = "From ${event.detailValue(com.example.travelcents.data.trip.model.ATTR_TRANSPORT_ANCHOR_LABEL)?.takeIf { it.isNotBlank() } ?: "your current stop"}",
         eyebrowOverride = "How to get there",
         showDirectionsLink = false,
-        prioritizeRideshare = true
+        prioritizeRideshare = true,
+        accentOverride = CardMint
     )
     ActivityContactCard(
         event = event,
@@ -505,6 +522,32 @@ private fun TicketmasterEventDetailCardStack(
             event = event,
             locationLabel = locationLabel,
             onOpenMaps = { uriHandler.openUri(mapsUrl) }
+        )
+    }
+}
+
+@Composable
+private fun TicketmasterAlternatesCard(
+    alternateCount: Int,
+    onAlternatives: (() -> Unit)?
+) {
+    if (alternateCount <= 0 || onAlternatives == null) return
+
+    DetailCardFrame(accent = CardMint) {
+        DetailCardHeader(
+            eyebrow = "Other times available",
+            title = if (alternateCount == 1) {
+                "This event has 1 alternate showtime."
+            } else {
+                "This event has $alternateCount alternate showtimes."
+            }
+        )
+        Spacer(modifier = Modifier.height(12.dp))
+        com.example.travelcents.ui.main.current.overlays.cards.DetailLinkRow(
+            label = "Change",
+            value = "Compare times",
+            onClick = onAlternatives,
+            accent = CardMint
         )
     }
 }

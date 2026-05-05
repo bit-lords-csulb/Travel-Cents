@@ -88,4 +88,38 @@ class TravelEventSelectionTest {
             result.photoUrls
         )
     }
+
+    @Test
+    fun withSelectedOption_appliesScheduledVariantFields() {
+        val event = TravelEvent(
+            eventId = "event-1",
+            type = "activity",
+            itineraryId = "trip-1",
+            date = "2026-06-03",
+            startTime = "18:00",
+            endTime = "20:00",
+            tz = "America/Los_Angeles",
+            details = mapOf("title" to "Show")
+        )
+        val option = EventOption(
+            optionId = "option-2",
+            eventId = "event-1",
+            source = "ticketmaster",
+            selected = true,
+            details = mapOf(
+                ATTR_OPTION_DATE to "2026-06-04",
+                ATTR_OPTION_START_TIME to "21:00",
+                ATTR_OPTION_END_TIME to "23:00",
+                ATTR_OPTION_TZ to "America/New_York",
+                ATTR_BUSINESS_NAME to "Show"
+            )
+        )
+
+        val result = event.withSelectedOption(option)
+
+        assertEquals("2026-06-04", result.date)
+        assertEquals("21:00", result.startTime)
+        assertEquals("23:00", result.endTime)
+        assertEquals("America/New_York", result.tz)
+    }
 }

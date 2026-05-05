@@ -36,7 +36,6 @@ object TicketmasterRepository {
 
     private const val BASE_URL = "https://app.ticketmaster.com/"
     private const val MAX_PAGE_SIZE = 200
-    private const val DESCRIPTION_LIMIT = 200
     private val isoDateFormatter: DateTimeFormatter = DateTimeFormatter.ISO_LOCAL_DATE
     private val seasonYearRangeRegex = Regex("""\b\d{4}/\d{2}\b""")
     private val excludedInventoryTerms = listOf(
@@ -206,9 +205,10 @@ object TicketmasterRepository {
 
     private fun TmEvent.ticketDescription(): String? {
         return listOf(info, pleaseNote)
-            .firstOrNull { !it.isNullOrBlank() }
-            ?.trim()
-            ?.take(DESCRIPTION_LIMIT)
+            .mapNotNull { it?.trim()?.takeIf(String::isNotBlank) }
+            .distinct()
+            .joinToString(separator = "\n\n")
+            .ifBlank { null }
     }
 
     private fun TmEvent.classificationLabel(): String? {

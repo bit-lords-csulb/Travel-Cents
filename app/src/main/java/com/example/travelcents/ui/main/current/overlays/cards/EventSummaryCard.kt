@@ -21,6 +21,7 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImage
@@ -60,7 +61,6 @@ fun EventSummaryCard(
         TicketmasterSummaryCard(
             event = event,
             heroImage = heroImage,
-            photoCount = photoCount,
             title = title,
             onOpenGallery = onOpenGallery
         )
@@ -208,21 +208,20 @@ fun EventSummaryCard(
 private fun TicketmasterSummaryCard(
     event: TravelEvent,
     heroImage: String?,
-    photoCount: Int,
     title: String,
     onOpenGallery: (() -> Unit)?
 ) {
     val dateSummary = ticketmasterEventDateSummary(event) ?: event.date.ifBlank { "Date TBD" }
     val timeSummary = ticketmasterEventTimeSummary(event)
     val titleFontSize = when {
-        title.length >= 80 -> 20.sp
-        title.length >= 54 -> 22.sp
-        else -> 25.sp
+        title.length >= 80 -> 18.sp
+        title.length >= 54 -> 20.sp
+        else -> 22.sp
     }
     val titleLineHeight = when {
-        title.length >= 80 -> 24.sp
-        title.length >= 54 -> 27.sp
-        else -> 29.sp
+        title.length >= 80 -> 22.sp
+        title.length >= 54 -> 24.sp
+        else -> 26.sp
     }
 
     DetailCardFrame(accent = CardLavender) {
@@ -246,19 +245,6 @@ private fun TicketmasterSummaryCard(
                         modifier = Modifier.matchParentSize(),
                         contentScale = ContentScale.Crop
                     )
-                    Box(
-                        modifier = Modifier
-                            .matchParentSize()
-                            .background(
-                                Brush.verticalGradient(
-                                    colors = listOf(
-                                        androidx.compose.ui.graphics.Color.Transparent,
-                                        CardBackground.copy(alpha = 0.12f),
-                                        CardBackground.copy(alpha = 0.42f)
-                                    )
-                                )
-                            )
-                    )
                 } else {
                     Box(
                         modifier = Modifier
@@ -267,15 +253,6 @@ private fun TicketmasterSummaryCard(
                     )
                 }
 
-                if (photoCount > 1 && onOpenGallery != null) {
-                    PhotoGalleryButton(
-                        photoCount = photoCount,
-                        onClick = onOpenGallery,
-                        modifier = Modifier
-                            .align(Alignment.TopEnd)
-                            .padding(10.dp)
-                    )
-                }
             }
 
             Column(
@@ -303,13 +280,31 @@ private fun TicketmasterSummaryMetaRow(
     label: String,
     value: String
 ) {
-    Text(
-        text = "$label: $value",
-        color = CardText,
-        fontSize = 14.sp,
-        lineHeight = 18.sp,
-        fontWeight = FontWeight.SemiBold
-    )
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Text(
+            text = "$label:",
+            color = CardTextMuted,
+            fontSize = 13.sp,
+            lineHeight = 16.sp,
+            fontWeight = FontWeight.SemiBold,
+            textAlign = TextAlign.Start,
+            modifier = Modifier.weight(0.24f)
+        )
+        Text(
+            text = value,
+            color = CardText,
+            fontSize = 13.sp,
+            lineHeight = 16.sp,
+            fontWeight = FontWeight.SemiBold,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+            modifier = Modifier.weight(0.76f)
+        )
+    }
 }
 
 @Composable

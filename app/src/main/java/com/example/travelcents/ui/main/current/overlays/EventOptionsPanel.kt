@@ -55,10 +55,15 @@ import com.example.travelcents.data.trip.model.ATTR_AVERAGE_RATING
 import com.example.travelcents.data.trip.model.ATTR_BUSINESS_NAME
 import com.example.travelcents.data.trip.model.ATTR_HOTEL_NAME
 import com.example.travelcents.data.trip.model.ATTR_HOTEL_RATING
+import com.example.travelcents.data.trip.model.ATTR_OPTION_DATE
+import com.example.travelcents.data.trip.model.ATTR_OPTION_END_TIME
+import com.example.travelcents.data.trip.model.ATTR_OPTION_START_TIME
+import com.example.travelcents.data.trip.model.ATTR_OPTION_TIME_LABEL
 import com.example.travelcents.data.trip.model.ATTR_PRICE_TIER
 import com.example.travelcents.data.trip.model.ATTR_RATE_PER_NIGHT
 import com.example.travelcents.data.trip.model.ATTR_REVIEW_COUNT
 import com.example.travelcents.data.trip.model.ATTR_ROOMS_NEEDED
+import com.example.travelcents.data.trip.model.ATTR_TICKETMASTER_EVENT_ID
 import com.example.travelcents.data.trip.model.EventOption
 import com.example.travelcents.data.trip.model.TravelEvent
 import com.example.travelcents.data.trip.model.displayName
@@ -123,6 +128,21 @@ private fun formatOptionSubtitle(event: TravelEvent, opt: EventOption): String {
             ).joinToString(" · ")
         }
         else -> {
+            val isTicketmasterOption = opt.source.equals("ticketmaster", ignoreCase = true) ||
+                !opt.details[ATTR_TICKETMASTER_EVENT_ID].isNullOrBlank()
+            if (isTicketmasterOption) {
+                val date = opt.details[ATTR_OPTION_DATE].orEmpty()
+                val time = opt.details[ATTR_OPTION_TIME_LABEL]
+                    ?.takeIf { it.isNotBlank() }
+                    ?: listOfNotNull(
+                        opt.details[ATTR_OPTION_START_TIME]?.takeIf { it.isNotBlank() },
+                        opt.details[ATTR_OPTION_END_TIME]?.takeIf { it.isNotBlank() }
+                    ).joinToString(" - ")
+                return listOfNotNull(
+                    date.takeIf { it.isNotBlank() },
+                    time.takeIf { it.isNotBlank() }
+                ).joinToString(" · ")
+            }
             val isFree = opt.details["is_free"] == "true"
             val cost = opt.details["cost"] ?: ""
             val costMax = opt.details["cost_max"] ?: ""

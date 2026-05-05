@@ -1,5 +1,9 @@
 package com.example.travelcents.ui.main.current.overlays.cards
 
+import android.content.ActivityNotFoundException
+import android.content.Context
+import android.content.Intent
+import android.net.Uri
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -15,6 +19,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -35,8 +40,10 @@ fun TransportCard(
     titleOverride: String? = null,
     eyebrowOverride: String = "Getting there",
     showDirectionsLink: Boolean = true,
-    prioritizeRideshare: Boolean = false
+    prioritizeRideshare: Boolean = false,
+    accentOverride: androidx.compose.ui.graphics.Color = CardCoral
 ) {
+    val context = LocalContext.current
     val uriHandler = LocalUriHandler.current
     val anchorLabel = event.detailValue(ATTR_TRANSPORT_ANCHOR_LABEL)?.takeIf { it.isNotBlank() }
         ?: "From your current stop"
@@ -54,7 +61,7 @@ fun TransportCard(
 
     if (walkMin == null && transitMin == null && !hasRideshare) return
 
-    DetailCardFrame(accent = CardCoral) {
+    DetailCardFrame(accent = accentOverride) {
         DetailCardHeader(
             eyebrow = eyebrowOverride,
             title = titleOverride ?: anchorLabel
@@ -67,8 +74,9 @@ fun TransportCard(
                     rideshareEstimate = rideshareEstimate,
                     uberDeeplink = uberDeeplink,
                     lyftDeeplink = lyftDeeplink,
-                    onOpenUber = uberDeeplink?.let { { uriHandler.openUri(it) } },
-                    onOpenLyft = lyftDeeplink?.let { { uriHandler.openUri(it) } }
+                    accent = accentOverride,
+                    onOpenUber = uberDeeplink?.let { { openTransportProvider(context, "com.ubercab", it) } },
+                    onOpenLyft = lyftDeeplink?.let { { openTransportProvider(context, "me.lyft.android", it) } }
                 )
             }
             walkMin?.let {
@@ -89,8 +97,9 @@ fun TransportCard(
                     rideshareEstimate = rideshareEstimate,
                     uberDeeplink = uberDeeplink,
                     lyftDeeplink = lyftDeeplink,
-                    onOpenUber = uberDeeplink?.let { { uriHandler.openUri(it) } },
-                    onOpenLyft = lyftDeeplink?.let { { uriHandler.openUri(it) } }
+                    accent = accentOverride,
+                    onOpenUber = uberDeeplink?.let { { openTransportProvider(context, "com.ubercab", it) } },
+                    onOpenLyft = lyftDeeplink?.let { { openTransportProvider(context, "me.lyft.android", it) } }
                 )
             }
         }
@@ -100,7 +109,7 @@ fun TransportCard(
                 label = "Directions",
                 value = "Open Google Maps",
                 onClick = { uriHandler.openUri(googleMapsDirectionsUrl(eventMapsQuery(event))) },
-                accent = CardCoral
+                accent = accentOverride
             )
         }
     }
@@ -143,6 +152,7 @@ private fun TransportRideshareRow(
     rideshareEstimate: String?,
     uberDeeplink: String?,
     lyftDeeplink: String?,
+    accent: androidx.compose.ui.graphics.Color,
     onOpenUber: (() -> Unit)?,
     onOpenLyft: (() -> Unit)?
 ) {
@@ -176,6 +186,7 @@ private fun TransportRideshareRow(
             if (uberDeeplink != null && onOpenUber != null) {
                 TransportActionChip(
                     label = "Uber",
+                    accent = accent,
                     modifier = Modifier.fillMaxWidth(),
                     onClick = onOpenUber
                 )
@@ -183,6 +194,7 @@ private fun TransportRideshareRow(
             if (lyftDeeplink != null && onOpenLyft != null) {
                 TransportActionChip(
                     label = "Lyft",
+                    accent = accent,
                     modifier = Modifier.fillMaxWidth(),
                     onClick = onOpenLyft
                 )
@@ -194,21 +206,48 @@ private fun TransportRideshareRow(
 @Composable
 private fun TransportActionChip(
     label: String,
+    accent: androidx.compose.ui.graphics.Color,
     modifier: Modifier = Modifier,
     onClick: () -> Unit
 ) {
     Box(
         modifier = modifier
-            .background(CardCoral.copy(alpha = 0.16f), RoundedCornerShape(14.dp))
+            .background(accent.copy(alpha = 0.16f), RoundedCornerShape(14.dp))
             .clickable(onClick = onClick)
             .padding(horizontal = 14.dp, vertical = 10.dp),
         contentAlignment = Alignment.Center
     ) {
         Text(
             text = label,
-            color = CardCoral,
+            color = accent,
             fontSize = 13.sp,
             fontWeight = FontWeight.Bold
         )
+    }
+}
+
+private fun openTransportProvider(
+    context: Context,
+    packageName: String,
+    uri: String
+) {
+    val parsedUri = runCatching { Uri.parse(uri) }.getOrNull() ?: return
+    val packageManager = context.packageManager
+    val fallbackIntent = Intent(Intent.ACTION_VIEW, parsedUri).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+    val appIntent = Intent(fallbackIntent).setPackage(packageName)
+
+    try {
+        when {
+            appIntent.resolveActivity(packageManager) != null -> context.startActivity(appIntent)
+            fallbackIntent.resolveActivity(packageManager) != null -> context.startActivity(fallbackIntent)
+        }
+    } catch (_: ActivityNotFoundException) {
+        if (fallbackIntent.resolveActivity(packageManager) != null) {
+            runCatching { context.startActivity(fallbackIntent) }
+        }
+    } catch (_: Exception) {
+        if (fallbackIntent.resolveActivity(packageManager) != null) {
+            runCatching { context.startActivity(fallbackIntent) }
+        }
     }
 }

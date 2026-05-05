@@ -37,7 +37,10 @@ fun TicketPricingCard(
     val minimum = event.detailValue(ATTR_TICKET_PRICE_MIN)?.toDoubleOrNull()
     val maximum = event.detailValue(ATTR_TICKET_PRICE_MAX)?.toDoubleOrNull()
     val currency = event.detailValue(ATTR_TICKET_CURRENCY)?.takeIf { it.isNotBlank() }
-    val title = formatTicketPriceRange(minimum, maximum, currency) ?: return
+    val title = when (mode) {
+        TicketPricingMode.TICKETMASTER -> "Available tiers"
+        TicketPricingMode.STANDARD -> formatTicketPriceRange(minimum, maximum, currency)
+    } ?: return
     val minimumLabel = if (mode == TicketPricingMode.TICKETMASTER) "General admission" else "Lowest listed"
     val maximumLabel = if (mode == TicketPricingMode.TICKETMASTER) "VIP" else "Highest listed"
 
@@ -46,7 +49,7 @@ fun TicketPricingCard(
             eyebrow = "Ticket pricing",
             title = title
         )
-        currency?.let {
+        if (mode != TicketPricingMode.TICKETMASTER) currency?.let {
             Spacer(modifier = Modifier.height(12.dp))
             DetailBadgeRow(badges = listOf(it.uppercase(Locale.US)), accent = CardMint)
         }

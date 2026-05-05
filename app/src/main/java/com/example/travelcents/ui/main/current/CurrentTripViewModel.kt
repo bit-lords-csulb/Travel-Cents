@@ -38,6 +38,9 @@ import com.example.travelcents.data.trip.model.ATTR_LONGITUDE
 import com.example.travelcents.data.trip.model.ATTR_LYFT_DEEPLINK
 import com.example.travelcents.data.trip.model.ATTR_NEAR_CATEGORIES
 import com.example.travelcents.data.trip.model.ATTR_NEIGHBORHOOD_NOTE
+import com.example.travelcents.data.trip.model.ATTR_OPTION_DATE
+import com.example.travelcents.data.trip.model.ATTR_OPTION_END_TIME
+import com.example.travelcents.data.trip.model.ATTR_OPTION_START_TIME
 import com.example.travelcents.data.trip.model.ATTR_POPULAR_TIMES_JSON
 import com.example.travelcents.data.trip.model.ATTR_PRICE_LEVEL_USD
 import com.example.travelcents.data.trip.model.ATTR_PRICE_TIER
@@ -1475,12 +1478,13 @@ class CurrentTripViewModel(application: Application) : AndroidViewModel(applicat
                 )
                 val updatedEvent = actionResult.event ?: return@launch
                 val updatedOptions = actionResult.options
-
-                localEventsSnapshot = sortPlanEvents(
-                    localEventsSnapshot.map {
-                        if (it.eventId == eventId) updatedEvent else it
-                    }
+                val conflictResolution = resolveTicketmasterConflicts(
+                    originalEvent = event,
+                    updatedEvent = updatedEvent,
+                    updatedOptions = updatedOptions,
+                    allEvents = localEventsSnapshot
                 )
+                localEventsSnapshot = sortPlanEvents(conflictResolution.events)
 
                 val updatedOptionsByEvent = _eventOptions.value + (eventId to updatedOptions)
                 _eventOptions.value = updatedOptionsByEvent
@@ -1495,6 +1499,25 @@ class CurrentTripViewModel(application: Application) : AndroidViewModel(applicat
                     persistOptions = !isYelpSelectionEvent
                 )
                 prefetchSharedEventMedia(listOf(updatedEvent))
+                if (conflictResolution.removedEventIds.isNotEmpty()) {
+                    _uiState.update {
+                        it.copy(
+                            infoMessage = if (conflictResolution.removedEventIds.size == 1) {
+                                "Updated showtime and removed 1 conflicting flexible event."
+                            } else {
+                                "Updated showtime and removed ${conflictResolution.removedEventIds.size} conflicting flexible events."
+                            },
+                            errorMessage = null
+                        )
+                    }
+                    conflictResolution.removedEventIds.forEach { removedEventId ->
+                        runCatching {
+                            tripSyncRemoteDataSource.deleteEvent(tripKey = tripKey, eventId = removedEventId)
+                        }.onFailure { error ->
+                            Log.w("CurrentTripViewModel", "Failed to remove conflicting event", error)
+                        }
+                    }
+                }
             } catch (e: Exception) {
                 Log.e("CurrentTripViewModel", "Failed to select option", e)
                 _uiState.update { it.copy(errorMessage = e.message ?: "Failed to update selection.") }
@@ -1978,6 +2001,78 @@ class CurrentTripViewModel(application: Application) : AndroidViewModel(applicat
 
     private fun isTicketmasterBackedEvent(event: TravelEvent): Boolean {
         return !event.detailValue(ATTR_TICKETMASTER_EVENT_ID).isNullOrBlank()
+    }
+
+    private data class TicketmasterConflictResolution(
+        val events: List<TravelEvent>,
+        val removedEventIds: List<String>
+    )
+
+    private fun resolveTicketmasterConflicts(
+        originalEvent: TravelEvent,
+        updatedEvent: TravelEvent,
+        updatedOptions: List<EventOption>,
+        allEvents: List<TravelEvent>
+    ): TicketmasterConflictResolution {
+        val replacedEvents = allEvents.map { existing ->
+            if (existing.eventId == updatedEvent.eventId) updatedEvent else existing
+        }
+        if (!isTicketmasterBackedEvent(updatedEvent)) {
+            return TicketmasterConflictResolution(
+                events = replacedEvents,
+                removedEventIds = emptyList()
+            )
+        }
+
+        val selectedOption = updatedOptions.firstOrNull { it.selected }
+        val scheduleChanged = selectedOption?.detailValue(
+            ATTR_OPTION_DATE,
+            ATTR_OPTION_START_TIME,
+            ATTR_OPTION_END_TIME
+        ) != null && (
+            normalizeDate(originalEvent.date) != normalizeDate(updatedEvent.date) ||
+                normalizeTime(originalEvent.startTime) != normalizeTime(updatedEvent.startTime) ||
+                normalizeTime(originalEvent.endTime) != normalizeTime(updatedEvent.endTime)
+            )
+
+        if (!scheduleChanged) {
+            return TicketmasterConflictResolution(
+                events = replacedEvents,
+                removedEventIds = emptyList()
+            )
+        }
+
+        val conflictingIds = replacedEvents
+            .filter { candidate ->
+                candidate.eventId != updatedEvent.eventId &&
+                    isFlexibleEvent(candidate) &&
+                    eventsOverlap(candidate, updatedEvent)
+            }
+            .map(TravelEvent::eventId)
+
+        return TicketmasterConflictResolution(
+            events = replacedEvents.filterNot { it.eventId in conflictingIds },
+            removedEventIds = conflictingIds
+        )
+    }
+
+    private fun isFlexibleEvent(event: TravelEvent): Boolean {
+        return when (event.type.lowercase(Locale.US)) {
+            "flight", "hotel" -> false
+            else -> true
+        }
+    }
+
+    private fun eventsOverlap(
+        first: TravelEvent,
+        second: TravelEvent
+    ): Boolean {
+        if (normalizeDate(first.date) != normalizeDate(second.date)) return false
+        if (first.startTime.isBlank() || first.endTime.isBlank()) return false
+        if (second.startTime.isBlank() || second.endTime.isBlank()) return false
+
+        return normalizeTime(first.startTime) < normalizeTime(second.endTime) &&
+            normalizeTime(second.startTime) < normalizeTime(first.endTime)
     }
 
     private fun resolveTransportAnchor(event: TravelEvent): TransportRepository.TransportAnchor? {
