@@ -1904,6 +1904,35 @@ class CurrentTripViewModel(application: Application) : AndroidViewModel(applicat
         }
     }
 
+    fun addPreviewEvent(event: TravelEvent) {
+        val summary = currentTripSummary ?: return
+        if (!_uiState.value.isPreview) return
+
+        val normalizedEvent = event.copy(
+            itineraryId = summary.itineraryId,
+            eventId = event.eventId.ifBlank { UUID.randomUUID().toString() }
+        )
+        val incomingYelpId = normalizedEvent.detailValue(DETAIL_YELP_ID).orEmpty()
+        val duplicate = localEventsSnapshot.any { existing ->
+            existing.eventId == normalizedEvent.eventId ||
+                (
+                    incomingYelpId.isNotBlank() &&
+                        existing.type.equals(normalizedEvent.type, ignoreCase = true) &&
+                        existing.date == normalizedEvent.date &&
+                        existing.detailValue(DETAIL_YELP_ID) == incomingYelpId
+                    )
+        }
+        if (duplicate) return
+
+        localEventsSnapshot = sortPlanEvents(localEventsSnapshot + normalizedEvent)
+        currentTripSummary = summary.copy(eventIds = localEventsSnapshot.map(TravelEvent::eventId))
+        _events.value = localEventsSnapshot
+        _uiState.value = _uiState.value.copy(
+            events = localEventsSnapshot,
+            infoMessage = if (localEventsSnapshot.isEmpty()) EMPTY_PLANS_MESSAGE else null
+        )
+    }
+
     fun loadTrip(tripId: String? = null) {
         val uid = auth.currentUser?.uid
 

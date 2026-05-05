@@ -68,6 +68,10 @@ data class AiTripIntakeProfile(
     val destinationStyle: List<String> = emptyList(),
     @SerializedName("origin")
     val origin: String = "",
+    @SerializedName("date_from")
+    val dateFrom: String = "",
+    @SerializedName("date_to")
+    val dateTo: String = "",
     @SerializedName("date_window")
     val dateWindow: String = "",
     @SerializedName("duration_days")
@@ -109,6 +113,8 @@ data class AiTripIntakeProfile(
                 "destination" to destination,
                 "destination_style" to destinationStyle.map { style -> style.lowercase(Locale.US) },
                 "origin" to origin,
+                "date_from" to dateFrom,
+                "date_to" to dateTo,
                 "date_window" to dateWindow,
                 "budget_level" to budgetLevel.promptValue(),
                 "pace" to pace.promptValue(),
@@ -281,6 +287,8 @@ fun AiTravelerProfile.toIntakeProfile(): AiTripIntakeProfile {
         destination = destination,
         destinationStyle = inferDestinationStyle(),
         origin = origin,
+        dateFrom = "",
+        dateTo = "",
         dateWindow = dateWindow,
         budgetLevel = inferBudgetLevel(),
         budgetTotal = inferBudgetTotal(),
@@ -302,6 +310,8 @@ fun AiTripIntakeProfile.mergePatch(patch: AiTripIntakeProfile?): AiTripIntakePro
         destination = patch.destination.ifBlank { destination },
         destinationStyle = (destinationStyle + patch.destinationStyle).distinct(),
         origin = patch.origin.ifBlank { origin },
+        dateFrom = patch.dateFrom.ifBlank { dateFrom },
+        dateTo = patch.dateTo.ifBlank { dateTo },
         dateWindow = patch.dateWindow.ifBlank { dateWindow },
         durationDays = patch.durationDays ?: durationDays,
         budgetLevel = patch.budgetLevel.takeUnless { it == AiBudgetLevel.UNKNOWN } ?: budgetLevel,
