@@ -18,6 +18,9 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.TextStyle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.travelcents.data.trip.TripPerformanceLogger
+import com.example.travelcents.data.trip.advisory.TripAdvisory
+import com.example.travelcents.data.trip.model.ATTR_ADVISORY_REASON
+import com.example.travelcents.data.trip.model.EventOption
 import com.example.travelcents.ui.main.current.calendar.buildTripDateRange
 import com.example.travelcents.ui.main.current.header.CurrentTripHeader
 import com.example.travelcents.ui.modules.buildCalendarDates
@@ -40,6 +43,9 @@ fun CurrentTripScreen(
     val eventOptions by viewModel.eventOptions.collectAsState()
     val rejectedOptions by viewModel.rejectedOptions.collectAsState()
     val optionsLoading by viewModel.optionsLoading.collectAsState()
+    val advisories by viewModel.advisories.collectAsState()
+    val advisoryEvaluationInProgress by viewModel.advisoryEvaluationInProgress.collectAsState()
+    val advisoryDemoModeEnabled by viewModel.isAdvisoryDemoModeEnabled.collectAsState()
     val yelpReviews by viewModel.yelpReviews.collectAsState()
     val reviewsLoading by viewModel.reviewsLoading.collectAsState()
     val shareTargets by viewModel.shareTargets.collectAsState()
@@ -66,8 +72,13 @@ fun CurrentTripScreen(
     var deleteCandidate by remember { mutableStateOf<EditablePlan?>(null) }
     var jiggleMode by remember { mutableStateOf(false) }
     var optionsPanelEventId by remember { mutableStateOf<String?>(null) }
+    var advisorySheetId by remember { mutableStateOf<String?>(null) }
     var showShareSheet by remember { mutableStateOf(false) }
     var shareConfirmation by remember { mutableStateOf<String?>(null) }
+    val activeAdvisory = remember(advisorySheetId, advisories, eventOptions) {
+        advisories.firstOrNull { it.advisoryId == advisorySheetId }
+            ?.withLatestAdvisoryOptions(eventOptions)
+    }
 
     val tripDateRange = remember(uiState.dateFrom, uiState.dateTo, calendarDates) {
         buildTripDateRange(
@@ -120,6 +131,23 @@ fun CurrentTripScreen(
 
     LaunchedEffect(optionsPanelEventId) {
         optionsPanelEventId?.let(viewModel::ensureEventOptionsLoaded)
+    }
+
+    LaunchedEffect(
+        displayMode,
+        advisoryDemoModeEnabled,
+        uiState.isLoading,
+        uiState.currentTripId,
+        uiState.events.size
+    ) {
+        if (
+            displayMode == CurrentDisplayMode.ITINERARY &&
+            advisoryDemoModeEnabled &&
+            !uiState.isLoading &&
+            uiState.currentTripId != null
+        ) {
+            viewModel.onItineraryVisible()
+        }
     }
 
     LaunchedEffect(uiState.isLoading, uiState.currentTripId, uiState.events.size) {
@@ -205,6 +233,7 @@ fun CurrentTripScreen(
                         jiggleMode = false
                         selectedEventId = null
                         optionsPanelEventId = null
+                        advisorySheetId = null
                         editorPlan = null
                         deleteCandidate = null
                         viewModel.loadTrip(tripKey)
@@ -220,6 +249,13 @@ fun CurrentTripScreen(
                         )
                     }
                 )
+
+                if (uiState.currentTripId != null) {
+                    CurrentTripDemoAdvisoryToggle(
+                        enabled = advisoryDemoModeEnabled,
+                        onEnabledChange = viewModel::setAdvisoryDemoModeEnabled
+                    )
+                }
 
                 if (uiState.infoMessage != null || uiState.errorMessage != null) {
                     CurrentTripMessageCard(
@@ -242,6 +278,7 @@ fun CurrentTripScreen(
                         )
                         displayMode == CurrentDisplayMode.ITINERARY -> CurrentTripItineraryContent(
                             events = events,
+                            advisories = advisories,
                             eventOptions = eventOptions,
                             rejectedOptions = rejectedOptions,
                             canEditTrip = uiState.canEditTrip,
@@ -261,6 +298,17 @@ fun CurrentTripScreen(
                                     viewModel.postError("Shared trips are read-only for now.")
                                 }
                             },
+                            onReviewAdvisory = { advisory ->
+                                if (uiState.canEditTrip) {
+                                    if (advisory.suggestedOptions.isEmpty() && !advisoryEvaluationInProgress) {
+                                        viewModel.onItineraryVisible()
+                                    }
+                                    advisorySheetId = advisory.advisoryId
+                                } else {
+                                    viewModel.postError("Shared trips are read-only for now.")
+                                }
+                            },
+                            onDismissAdvisory = viewModel::dismissAdvisory,
                             onMoveEvent = viewModel::moveEventLocally,
                             onPersistEventPlacements = viewModel::persistEventPlacements,
                             onVisibleDateChange = { itineraryVisibleDate = it }
@@ -348,6 +396,60 @@ fun CurrentTripScreen(
                 onRejectOption = viewModel::rejectOption,
                 onLoadMoreOptions = viewModel::loadMoreOptions
             )
+
+            activeAdvisory?.let { advisory ->
+                val event = uiState.events.firstOrNull { it.eventId == advisory.eventId }
+                if (event != null) {
+                    TripAdvisoryReviewSheet(
+                        advisory = advisory,
+                        event = event,
+                        canEditTrip = uiState.canEditTrip,
+                        isLoadingSuggestions = advisoryEvaluationInProgress && advisory.suggestedOptions.isEmpty(),
+                        onReplaceOption = { optionId ->
+                            viewModel.replaceAdvisoryOption(
+                                advisoryId = advisory.advisoryId,
+                                eventId = advisory.eventId,
+                                optionId = optionId
+                            )
+                        },
+                        onSaveOption = { optionId ->
+                            viewModel.saveAdvisoryOption(
+                                advisoryId = advisory.advisoryId,
+                                eventId = advisory.eventId,
+                                optionId = optionId
+                            )
+                        },
+                        onDismissAdvisory = { viewModel.dismissAdvisory(advisory.advisoryId) },
+                        onDismiss = { advisorySheetId = null }
+                    )
+                }
+            }
         }
     }
 }
+
+private fun TripAdvisory.withLatestAdvisoryOptions(
+    optionsByEvent: Map<String, List<EventOption>>
+): TripAdvisory {
+    if (suggestedOptions.isNotEmpty()) return this
+
+    val latestSuggestions = optionsByEvent[eventId].orEmpty()
+        .filter { option -> option.isAdvisorySuggestionFor(reason.name) }
+        .take(3)
+
+    return if (latestSuggestions.isEmpty()) {
+        this
+    } else {
+        copy(suggestedOptions = latestSuggestions)
+    }
+}
+
+private fun EventOption.isAdvisorySuggestionFor(reasonName: String): Boolean {
+    val isAdvisorySource = source.equals("dummy_advisory", ignoreCase = true) ||
+        source.equals("pinecone_advisory", ignoreCase = true)
+    if (!isAdvisorySource) return false
+
+    val optionReason = details[ATTR_ADVISORY_REASON]
+    return optionReason.isNullOrBlank() || optionReason.equals(reasonName, ignoreCase = true)
+}
+

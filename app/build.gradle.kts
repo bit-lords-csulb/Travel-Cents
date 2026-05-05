@@ -39,7 +39,7 @@ android {
         )
         buildConfigField(
             "String", "LLM_INTAKE_MODEL",
-            "\"${localProperties.getProperty("LLM_INTAKE_MODEL") ?: "llama-3.3-70b-versatile"}\""
+            "\"${localProperties.getProperty("LLM_INTAKE_MODEL") ?: "llama-3.1-8b-instant"}\""
         )
         buildConfigField(
             "String", "SERP_API_KEY",

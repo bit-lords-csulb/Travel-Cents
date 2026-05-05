@@ -6,7 +6,7 @@ import re
 import requests
 import json
 import unicodedata
-from groq import Groq
+from groq import APIStatusError, Groq
 from pinecone import Pinecone
 from dotenv import load_dotenv
 
@@ -61,7 +61,103 @@ CITY_ALIASES = {
 
 MATCH_SCORE_THRESHOLD = 0.5
 PINECONE_OPTION_COUNT = 6
+PINECONE_INDEX_NAME = "travel-cents-inventory"
+HF_EMBEDDING_URL = "https://router.huggingface.co/hf-inference/models/BAAI/bge-base-en-v1.5/pipeline/feature-extraction"
+ADVISORY_MATCH_SCORE_THRESHOLD = 0.35
 VIATOR_PRODUCT_DETAIL_URL = "https://api.viator.com/partner/products/{product_code}"
+WEATHER_SAFE_ACTIVITY_QUERIES = {
+    "rain": "rain safe indoor covered museum gallery theater aquarium market activity in {city}",
+    "wind": "wind safe indoor protected museum gallery theater aquarium market activity in {city}",
+    "heat": "air-conditioned indoor museum gallery theater aquarium market activity in {city}",
+}
+WEATHER_SAFE_TERMS = (
+    "indoor",
+    "covered",
+    "museum",
+    "gallery",
+    "theater",
+    "theatre",
+    "aquarium",
+    "market",
+    "food hall",
+    "mall",
+    "arcade",
+    "studio",
+    "workshop",
+    "library",
+    "exhibition",
+    "opera house",
+)
+WEATHER_UNSAFE_TERMS = (
+    "kayak",
+    "kayaking",
+    "paddle",
+    "boat",
+    "boating",
+    "sailing",
+    "cruise",
+    "ferry",
+    "surf",
+    "snorkel",
+    "swim",
+    "beach",
+    "hike",
+    "hiking",
+    "walking tour",
+    "bike tour",
+    "bicycle",
+    "outdoor",
+    "rooftop",
+    "bridge climb",
+    "harbour tour",
+    "harbor tour",
+)
+ADVISORY_DIVERSITY_TERMS = (
+    "aquarium",
+    "museum",
+    "gallery",
+    "theater",
+    "theatre",
+    "market",
+    "food hall",
+    "mall",
+    "arcade",
+    "studio",
+    "workshop",
+    "library",
+    "exhibition",
+    "opera house",
+    "temple",
+    "shrine",
+    "spa",
+    "cooking class",
+    "class",
+    "tour",
+)
+ADVISORY_COMMON_TOKENS = {
+    "a",
+    "an",
+    "and",
+    "at",
+    "by",
+    "for",
+    "from",
+    "in",
+    "inside",
+    "into",
+    "near",
+    "of",
+    "on",
+    "the",
+    "to",
+    "tokyo",
+    "sydney",
+    "london",
+    "paris",
+    "new",
+    "york",
+    "city",
+}
 
 
 def normalize_string_list(value):
@@ -137,6 +233,108 @@ def hydrate_option_images(option, viator_key):
     return option
 
 
+def build_fallback_raw_itinerary(req_data, target_city):
+    activity_dates = req_data.get("activityDates") or []
+    day_count = len(activity_dates) if isinstance(activity_dates, list) else 0
+    target_count = max(4, min(8, day_count * 2 if day_count else 5))
+    templates = [
+        (
+            "Covered Market and Food Hall in {city}",
+            "Sample local food stalls and protected market spaces that still work when the weather turns.",
+            "10:00",
+            "12:00",
+            "indoor",
+            "none",
+            "medium",
+        ),
+        (
+            "{city} Museum or Gallery Afternoon",
+            "Spend time inside a highly rated museum or gallery that fits the trip interests.",
+            "13:30",
+            "15:30",
+            "indoor",
+            "none",
+            "medium",
+        ),
+        (
+            "{city} Waterfront Walk",
+            "Take a scenic outdoor walk near the water with flexible timing and easy cancellation if rain arrives.",
+            "16:00",
+            "17:30",
+            "outdoor",
+            "rain",
+            "medium",
+        ),
+        (
+            "{city} Architecture and Local Design Stop",
+            "Visit a design-forward indoor landmark, cultural center, or historic interior.",
+            "11:00",
+            "12:30",
+            "indoor",
+            "none",
+            "medium",
+        ),
+        (
+            "{city} Garden or Viewpoint",
+            "Add a lighter outdoor stop for views, photos, and a change of pace.",
+            "15:00",
+            "16:30",
+            "outdoor",
+            "rain",
+            "medium",
+        ),
+        (
+            "{city} Theater or Performance Night",
+            "End the day with an indoor show, performance, or live cultural event.",
+            "19:00",
+            "21:00",
+            "indoor",
+            "none",
+            "medium",
+        ),
+        (
+            "{city} Neighborhood Street Art Walk",
+            "Explore a walkable neighborhood with cafes and public art, best kept flexible in poor weather.",
+            "10:30",
+            "12:00",
+            "mixed",
+            "rain",
+            "medium",
+        ),
+        (
+            "{city} Workshop or Hands-On Class",
+            "Book a protected class or studio experience for a slower indoor block.",
+            "14:00",
+            "16:00",
+            "indoor",
+            "none",
+            "medium",
+        ),
+    ]
+
+    return {
+        "itinerary": [
+            {
+                "title": title.format(city=target_city),
+                "description": description,
+                "start_time": start_time,
+                "end_time": end_time,
+                "activity_environment": environment,
+                "weather_sensitivity": sensitivity,
+                "environment_confidence": confidence,
+            }
+            for title, description, start_time, end_time, environment, sensitivity, confidence
+            in templates[:target_count]
+        ]
+    }
+
+
+def mark_activity_without_inventory_match(activity):
+    activity["isNativeBookable"] = "false"
+    activity["options"] = []
+    return activity
+
+
 def normalize_city_key(value):
     normalized = unicodedata.normalize("NFKD", str(value or ""))
     ascii_text = normalized.encode("ascii", "ignore").decode("ascii")
@@ -206,14 +404,186 @@ def match_to_activity_option(match):
     }
 
 
-@https_fn.on_call()
-def generate_itinerary(req: https_fn.CallableRequest):
-    # 1. Extract all the travel details sent from the Android app's TravelRequest model
+def callable_payload(req):
     req_data = req.data or {}
     if not isinstance(req_data, dict):
         req_data = {"destination": str(req_data)}
     if isinstance(req_data.get("data"), dict):
         req_data = req_data["data"]
+    return req_data
+
+
+def coerce_embedding_vector(value):
+    if not isinstance(value, list) or not value:
+        return value
+    if all(isinstance(item, (int, float)) for item in value):
+        return value
+    rows = [row for row in value if isinstance(row, list) and row]
+    if not rows:
+        return value
+    width = len(rows[0])
+    if width == 0:
+        return value
+    averaged = []
+    for index in range(width):
+        column = [row[index] for row in rows if len(row) > index and isinstance(row[index], (int, float))]
+        averaged.append(sum(column) / len(column) if column else 0.0)
+    return averaged
+
+
+def metadata_text(metadata, *keys):
+    for key in keys:
+        value = metadata.get(key)
+        if isinstance(value, list):
+            value = ", ".join(str(item) for item in value if item is not None)
+        if value is not None and str(value).strip():
+            return str(value).strip()
+    return ""
+
+
+def advisory_reason_key(reason):
+    key = normalize_city_key(reason)
+    if "rain" in key:
+        return "rain"
+    if "wind" in key:
+        return "wind"
+    if "heat" in key:
+        return "heat"
+    return ""
+
+
+def normalized_contains_any(text, terms):
+    normalized_text = normalize_city_key(text)
+    return any(normalize_city_key(term) in normalized_text for term in terms)
+
+
+def advisory_match_text(metadata):
+    fields = (
+        "title",
+        "name",
+        "activity_name",
+        "description",
+        "summary",
+        "categories",
+        "category",
+        "activity_environment",
+        "environment",
+        "weather_sensitivity",
+    )
+    return " ".join(metadata_text(metadata, field) for field in fields)
+
+
+def advisory_diversity_signature(alternative):
+    text = " ".join(
+        str(alternative.get(field, ""))
+        for field in ("title", "description", "address")
+    )
+    normalized_text = normalize_city_key(text)
+    matched_terms = [
+        normalize_city_key(term)
+        for term in ADVISORY_DIVERSITY_TERMS
+        if normalize_city_key(term) in normalized_text
+    ]
+    if matched_terms:
+        return sorted(matched_terms, key=len, reverse=True)[0]
+
+    tokens = advisory_diversity_tokens(alternative)
+    return next(iter(tokens), "")
+
+
+def advisory_diversity_tokens(alternative):
+    text = " ".join(
+        str(alternative.get(field, ""))
+        for field in ("title", "description")
+    )
+    return {
+        token
+        for token in normalize_city_key(text).split()
+        if len(token) >= 4 and token not in ADVISORY_COMMON_TOKENS
+    }
+
+
+def is_distinct_advisory_alternative(alternative, selected_alternatives):
+    signature = advisory_diversity_signature(alternative)
+    tokens = advisory_diversity_tokens(alternative)
+    if not tokens:
+        return False
+
+    for selected in selected_alternatives:
+        selected_signature = advisory_diversity_signature(selected)
+        if signature and signature == selected_signature:
+            return False
+
+        selected_tokens = advisory_diversity_tokens(selected)
+        overlap = len(tokens & selected_tokens)
+        smaller_size = max(1, min(len(tokens), len(selected_tokens)))
+        if overlap / smaller_size >= 0.45:
+            return False
+
+    return True
+
+
+def advisory_alternative_query(req_data, target_city):
+    reason_key = advisory_reason_key(req_data.get("reason", ""))
+    safe_query = WEATHER_SAFE_ACTIVITY_QUERIES.get(reason_key)
+    if safe_query:
+        return safe_query.format(city=target_city)
+
+    explicit_query = req_data.get("query")
+    if explicit_query:
+        return str(explicit_query)
+
+    return f"nearby indoor activity in {target_city}"
+
+
+def is_weather_safe_advisory_match(match, reason):
+    reason_key = advisory_reason_key(reason)
+    if reason_key not in WEATHER_SAFE_ACTIVITY_QUERIES:
+        return True
+
+    metadata = match_field(match, "metadata", {}) or {}
+    text = advisory_match_text(metadata)
+    environment = normalize_city_key(metadata_text(metadata, "activity_environment", "environment"))
+    sensitivity = normalize_city_key(metadata_text(metadata, "weather_sensitivity"))
+
+    if normalized_contains_any(text, WEATHER_UNSAFE_TERMS):
+        return False
+    if environment in ("indoor", "covered") or sensitivity in ("none", "low"):
+        return True
+    if normalized_contains_any(text, WEATHER_SAFE_TERMS):
+        return True
+    if environment in ("outdoor", "mixed") or sensitivity in ("rain", "wind", "heat"):
+        return False
+    return False
+
+
+def match_to_advisory_alternative(match, reason):
+    metadata = match_field(match, "metadata", {}) or {}
+    title = metadata_text(metadata, "title", "name", "activity_name")
+    description = metadata_text(metadata, "description", "summary", "categories", "category")
+    address = metadata_text(metadata, "address", "formatted_address", "location")
+    fallback_environment = "indoor" if "rain" in str(reason).lower() else "mixed"
+    return {
+        "source_id": str(match_field(match, "id", "")),
+        "score": match_field(match, "score", 0.0),
+        "title": title,
+        "description": description,
+        "booking_url": metadata_text(metadata, "booking_url", "url", "website"),
+        "address": address,
+        "city": metadata_text(metadata, "city"),
+        "price_tier": metadata_text(metadata, "price_tier", "price", "price_level"),
+        "latitude": metadata_text(metadata, "latitude", "lat"),
+        "longitude": metadata_text(metadata, "longitude", "lng", "lon", "longitude"),
+        "activity_environment": metadata_text(metadata, "activity_environment", "environment") or fallback_environment,
+        "weather_sensitivity": metadata_text(metadata, "weather_sensitivity") or "none",
+        "environment_confidence": metadata_text(metadata, "environment_confidence") or "medium",
+    }
+
+
+@https_fn.on_call()
+def generate_itinerary(req: https_fn.CallableRequest):
+    # 1. Extract all the travel details sent from the Android app's TravelRequest model
+    req_data = callable_payload(req)
 
     destination = req_data.get("destination") or req_data.get("city") or "London"
     target_city = resolve_inventory_city(destination)
@@ -239,8 +609,6 @@ def generate_itinerary(req: https_fn.CallableRequest):
     hf_token = os.getenv("HF_TOKEN")
     pinecone_key = os.getenv("PINECONE_API_KEY")
     viator_key = os.getenv("VIATOR_API_KEY")
-
-    client = Groq(api_key=groq_key)
 
     # Format the interests list into a readable string
     interests_str = ", ".join(interests) if interests else "general exploring"
@@ -274,6 +642,9 @@ def generate_itinerary(req: https_fn.CallableRequest):
     - Use the hotel location as the daily planning anchor when hotel coordinates or city are available.
     - Account for hotel check-in/check-out timing when choosing first-day and last-day activities.
     - Return start_time and end_time for every activity in 24-hour HH:MM format.
+    - For each activity, classify whether it is indoor, outdoor, mixed, or unknown.
+    - For each activity, classify weather_sensitivity as rain, heat, wind, or none.
+    - For each activity, set environment_confidence to high, medium, or low.
 
     Skip the generic tourist traps. Based strictly on the traveler profile above, focus on hidden gems, enchanting local experiences, and highly creative activities that fit their specific vibe, budget, and age group.
 
@@ -282,24 +653,66 @@ def generate_itinerary(req: https_fn.CallableRequest):
     Return ONLY a JSON object with this exact structure:
     {{
       "itinerary": [
-        {{ "title": "Activity Name", "description": "A short, captivating description that highlights why this experience is magical and why it perfectly fits their specific interests.", "start_time": "10:00", "end_time": "12:00" }}
+        {{
+          "title": "Activity Name",
+          "description": "A short, captivating description that highlights why this experience is magical and why it perfectly fits their specific interests.",
+          "start_time": "10:00",
+          "end_time": "12:00",
+          "activity_environment": "outdoor",
+          "weather_sensitivity": "rain",
+          "environment_confidence": "high"
+        }}
       ]
     }}
     """
 
-    chat_completion = client.chat.completions.create(
-        messages=[{"role": "user", "content": prompt}],
-        model="llama-3.1-8b-instant",
-        response_format={"type": "json_object"},
-        temperature=0.85, # Pushed higher for a more imaginative, creative response
-        top_p=0.9         # Wide enough to allow unique vocabulary, but grounded enough to stay coherent
-    )
+    raw_itinerary = None
+    if groq_key:
+        try:
+            client = Groq(api_key=groq_key)
+            chat_completion = client.chat.completions.create(
+                messages=[{"role": "user", "content": prompt}],
+                model="llama-3.1-8b-instant",
+                response_format={"type": "json_object"},
+                temperature=0.85,
+                top_p=0.9,
+                max_tokens=1800
+            )
+            raw_itinerary = json.loads(chat_completion.choices[0].message.content)
+        except APIStatusError as error:
+            if getattr(error, "status_code", None) == 429:
+                print("Groq itinerary generation rate limited; using local fallback activities.", flush=True)
+            else:
+                print(f"Groq itinerary generation failed; using local fallback activities: {error}", flush=True)
+        except Exception as error:
+            print(f"Groq itinerary generation failed; using local fallback activities: {error}", flush=True)
+    else:
+        print("GROQ_API_KEY missing; using local fallback activities.", flush=True)
 
-    raw_itinerary = json.loads(chat_completion.choices[0].message.content)
+    if raw_itinerary is None:
+        raw_itinerary = build_fallback_raw_itinerary(req_data, target_city)
+
+    if not hf_token or not pinecone_key:
+        print("Activity matchmaking unavailable: missing HF_TOKEN or PINECONE_API_KEY.", flush=True)
+        return {
+            "itinerary": [
+                mark_activity_without_inventory_match(activity)
+                for activity in raw_itinerary.get("itinerary", [])
+            ]
+        }
 
     # 4. Setup Pinecone
-    pc = Pinecone(api_key=pinecone_key)
-    index = pc.Index("travel-cents-inventory")
+    try:
+        pc = Pinecone(api_key=pinecone_key)
+        index = pc.Index(PINECONE_INDEX_NAME)
+    except Exception as error:
+        print(f"Pinecone setup failed; returning unmatched activities: {error}", flush=True)
+        return {
+            "itinerary": [
+                mark_activity_without_inventory_match(activity)
+                for activity in raw_itinerary.get("itinerary", [])
+            ]
+        }
 
     final_itinerary = []
 
@@ -314,15 +727,14 @@ def generate_itinerary(req: https_fn.CallableRequest):
         # Hybrid search query
         search_query = f"{activity_title}: {activity_desc}"
 
-        hf_api_url = "https://router.huggingface.co/hf-inference/models/BAAI/bge-base-en-v1.5/pipeline/feature-extraction"
         headers = {"Authorization": f"Bearer {hf_token}"}
         hf_payload = {"inputs": search_query}
 
         try:
-            hf_response = requests.post(hf_api_url, headers=headers, json=hf_payload)
+            hf_response = requests.post(HF_EMBEDDING_URL, headers=headers, json=hf_payload)
 
             if hf_response.status_code == 200:
-                vector = hf_response.json()
+                vector = coerce_embedding_vector(hf_response.json())
 
                 # Query Pinecone with the cleaned target_city
                 search_result = index.query(
@@ -384,3 +796,74 @@ def generate_itinerary(req: https_fn.CallableRequest):
 
     print("--- ✅ MATCHMAKING COMPLETE ---", flush=True)
     return {"itinerary": final_itinerary}
+
+
+@https_fn.on_call()
+def search_activity_alternatives(req: https_fn.CallableRequest):
+    req_data = callable_payload(req)
+    destination = req_data.get("destination") or req_data.get("city") or "London"
+    target_city = resolve_inventory_city(destination)
+    reason = req_data.get("reason", "")
+    limit = req_data.get("limit", 9)
+    try:
+        limit = max(1, min(int(limit), 12))
+    except (TypeError, ValueError):
+        limit = 9
+
+    hf_token = os.getenv("HF_TOKEN")
+    pinecone_key = os.getenv("PINECONE_API_KEY")
+    if not hf_token or not pinecone_key:
+        print("Activity alternatives unavailable: missing HF_TOKEN or PINECONE_API_KEY.", flush=True)
+        return {"alternatives": []}
+
+    query = advisory_alternative_query(req_data, target_city)
+    current_title_key = normalize_city_key(req_data.get("currentActivityTitle", ""))
+    headers = {"Authorization": f"Bearer {hf_token}"}
+
+    try:
+        hf_response = requests.post(HF_EMBEDDING_URL, headers=headers, json={"inputs": query})
+        if hf_response.status_code != 200:
+            print(f"Activity alternatives embedding failed: {hf_response.status_code}", flush=True)
+            return {"alternatives": []}
+
+        vector = coerce_embedding_vector(hf_response.json())
+        pc = Pinecone(api_key=pinecone_key)
+        index = pc.Index(PINECONE_INDEX_NAME)
+        search_result = index.query(
+            vector=vector,
+            top_k=max(limit * 4, 12),
+            include_metadata=True,
+            filter={"city": {"$eq": target_city}}
+        )
+
+        matches = search_result.get("matches", []) if hasattr(search_result, "get") else search_result["matches"]
+        alternatives = []
+        seen_titles = set()
+        overflow_alternatives = []
+        for match in matches:
+            score = float(match_field(match, "score", 0.0) or 0.0)
+            if score < ADVISORY_MATCH_SCORE_THRESHOLD:
+                continue
+            if not is_weather_safe_advisory_match(match, reason):
+                continue
+            alternative = match_to_advisory_alternative(match, reason)
+            title_key = normalize_city_key(alternative.get("title", ""))
+            if not title_key or title_key == current_title_key or title_key in seen_titles:
+                continue
+            seen_titles.add(title_key)
+            if is_distinct_advisory_alternative(alternative, alternatives):
+                alternatives.append(alternative)
+            else:
+                overflow_alternatives.append(alternative)
+            if len(alternatives) >= limit:
+                break
+
+        if len(alternatives) < min(limit, 3):
+            needed = min(limit, 3) - len(alternatives)
+            alternatives.extend(overflow_alternatives[:needed])
+
+        print(f"Found {len(alternatives)} advisory alternatives for {target_city}.", flush=True)
+        return {"alternatives": alternatives}
+    except Exception as e:
+        print(f"Activity alternatives search failed: {e}", flush=True)
+        return {"alternatives": []}
