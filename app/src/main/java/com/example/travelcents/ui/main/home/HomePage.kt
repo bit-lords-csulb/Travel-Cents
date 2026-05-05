@@ -11,7 +11,6 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -20,6 +19,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.rememberScrollState
@@ -88,6 +88,7 @@ private val PrimaryDim = Color(0xFF54A7E7)
 private val SurfaceBright = Color(0xFF243447)
 private const val TEST_GROUP_CHAT_ID = "EL4UgmxgFgVPLwkxudK4"
 
+
 // ─────────────────────────────────────────────────────────────
 // Entry point
 // ─────────────────────────────────────────────────────────────
@@ -98,6 +99,7 @@ fun HomePage(
     onTripClick: (TripKey) -> Unit = {},
     onProfileClick: () -> Unit = {},
     onSavedPlacesClick: () -> Unit = {},
+    onDocumentsClick: () -> Unit = {},
     homeViewModel: HomeViewModel = viewModel(),
     currencyViewModel: CurrencyViewModel = viewModel()
 ) {
@@ -185,7 +187,7 @@ fun HomePage(
                 onTripClick = onTripClick
             )
 
-            DocumentsWidget()
+            DocumentsWidget(onClick = onDocumentsClick)
         }
 
         Spacer(modifier = Modifier.height(24.dp))
@@ -601,8 +603,7 @@ private fun SavedPlacesWidget(
                     }
                 }
             } else {
-                val extraCount = bookmarks.size - 3
-                // 2 × 2 photo grid
+                val extraCount = (bookmarks.size - 3).coerceAtLeast(0)
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -615,13 +616,13 @@ private fun SavedPlacesWidget(
                             .fillMaxHeight(),
                         verticalArrangement = Arrangement.spacedBy(6.dp)
                     ) {
-                        BookmarkPhotoCell(
+                        BookmarkSlot(
                             bookmark = bookmarks.getOrNull(0),
                             modifier = Modifier
                                 .weight(1f)
                                 .fillMaxWidth()
                         )
-                        BookmarkPhotoCell(
+                        BookmarkSlot(
                             bookmark = bookmarks.getOrNull(1),
                             modifier = Modifier
                                 .weight(1f)
@@ -634,27 +635,19 @@ private fun SavedPlacesWidget(
                             .fillMaxHeight(),
                         verticalArrangement = Arrangement.spacedBy(6.dp)
                     ) {
-                        BookmarkPhotoCell(
+                        BookmarkSlot(
                             bookmark = bookmarks.getOrNull(2),
                             modifier = Modifier
                                 .weight(1f)
                                 .fillMaxWidth()
                         )
                         if (extraCount > 0) {
-                            Box(
+                            MoreSavedPlacesTile(
+                                count = extraCount,
                                 modifier = Modifier
                                     .weight(1f)
                                     .fillMaxWidth()
-                                    .background(SurfaceBright, RoundedCornerShape(10.dp)),
-                                contentAlignment = Alignment.Center
-                            ) {
-                                Text(
-                                    text = "+$extraCount",
-                                    color = Primary,
-                                    fontSize = 13.sp,
-                                    fontWeight = FontWeight.Bold
-                                )
-                            }
+                            )
                         } else {
                             Spacer(modifier = Modifier.weight(1f))
                         }
@@ -666,20 +659,67 @@ private fun SavedPlacesWidget(
 }
 
 @Composable
-private fun BookmarkPhotoCell(
+private fun BookmarkSlot(
     bookmark: BookmarkedPlace?,
     modifier: Modifier = Modifier
 ) {
-    if (bookmark?.imageUrl != null) {
-        AsyncImage(
-            model = bookmark.imageUrl,
-            contentDescription = bookmark.name,
-            contentScale = ContentScale.Crop,
-            modifier = modifier.clip(RoundedCornerShape(10.dp))
-        )
+    if (bookmark != null) {
+        HomeBookmarkTile(bookmark = bookmark, modifier = modifier)
     } else {
-        Box(
-            modifier = modifier.background(SurfaceBright, RoundedCornerShape(10.dp))
+        Box(modifier = modifier.background(SurfaceBright, RoundedCornerShape(10.dp)))
+    }
+}
+
+@Composable
+private fun HomeBookmarkTile(
+    bookmark: BookmarkedPlace,
+    modifier: Modifier = Modifier
+) {
+    Box(
+        modifier = modifier.clip(RoundedCornerShape(10.dp))
+    ) {
+        if (bookmark.imageUrl != null) {
+            AsyncImage(
+                model = bookmark.imageUrl,
+                contentDescription = bookmark.name,
+                modifier = Modifier.fillMaxSize(),
+                contentScale = ContentScale.Crop
+            )
+        } else {
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .background(SurfaceBright),
+                contentAlignment = Alignment.Center
+            ) {
+                Text(
+                    text = bookmark.name.take(1).uppercase(),
+                    color = Primary,
+                    fontSize = 18.sp,
+                    fontWeight = FontWeight.Bold
+                )
+            }
+        }
+
+    }
+}
+
+@Composable
+private fun MoreSavedPlacesTile(
+    count: Int,
+    modifier: Modifier = Modifier
+) {
+    Box(
+        modifier = modifier
+            .clip(RoundedCornerShape(10.dp))
+            .background(Primary.copy(alpha = 0.14f)),
+        contentAlignment = Alignment.Center
+    ) {
+        Text(
+            text = "+$count",
+            color = Primary,
+            fontSize = 18.sp,
+            fontWeight = FontWeight.Bold
         )
     }
 }
@@ -1014,13 +1054,13 @@ private fun Itinerary.destinationLabel(): String {
 // ─────────────────────────────────────────────────────────────
 
 @Composable
-private fun DocumentsWidget() {
+private fun DocumentsWidget(onClick: () -> Unit = {}) {
     Box(
         modifier = Modifier
             .fillMaxWidth()
             .clip(RoundedCornerShape(24.dp))
             .background(Brush.horizontalGradient(listOf(Primary, PrimaryDim)))
-            .clickable { }
+            .clickable { onClick() }
             .padding(20.dp)
     ) {
         Row(

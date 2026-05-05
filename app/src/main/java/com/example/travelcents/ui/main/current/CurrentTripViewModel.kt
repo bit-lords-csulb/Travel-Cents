@@ -6,6 +6,7 @@ import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.travelcents.data.ai.chat.AiCuratedTripStarter
 import com.example.travelcents.data.ai.chat.AiCuratedTripToItineraryMapper
+import com.example.travelcents.data.ai.chat.AiDestinationLockMapper
 import com.example.travelcents.data.ai.chat.AiTripIntakeProfile
 import com.example.travelcents.data.ai.repository.PineconeTripAlternativeProvider
 import com.example.travelcents.data.media.TripMediaCacheStore
@@ -41,6 +42,9 @@ import com.example.travelcents.data.trip.model.ATTR_LONGITUDE
 import com.example.travelcents.data.trip.model.ATTR_LYFT_DEEPLINK
 import com.example.travelcents.data.trip.model.ATTR_NEAR_CATEGORIES
 import com.example.travelcents.data.trip.model.ATTR_NEIGHBORHOOD_NOTE
+import com.example.travelcents.data.trip.model.ATTR_OPTION_DATE
+import com.example.travelcents.data.trip.model.ATTR_OPTION_END_TIME
+import com.example.travelcents.data.trip.model.ATTR_OPTION_START_TIME
 import com.example.travelcents.data.trip.model.ATTR_POPULAR_TIMES_JSON
 import com.example.travelcents.data.trip.model.ATTR_PRICE_LEVEL_USD
 import com.example.travelcents.data.trip.model.ATTR_PRICE_TIER
@@ -48,6 +52,7 @@ import com.example.travelcents.data.trip.model.ATTR_RIDESHARE_ESTIMATE_USD
 import com.example.travelcents.data.trip.model.ATTR_RIDESHARE_MIN
 import com.example.travelcents.data.trip.model.ATTR_TRANSIT_MIN
 import com.example.travelcents.data.trip.model.ATTR_TRANSIT_SCORE
+import com.example.travelcents.data.trip.model.ATTR_TICKETMASTER_EVENT_ID
 import com.example.travelcents.data.trip.model.ATTR_TRANSPORT_ANCHOR_LABEL
 import com.example.travelcents.data.trip.model.ATTR_UBER_DEEPLINK
 import com.example.travelcents.data.trip.model.ATTR_WALK_MIN
@@ -69,11 +74,15 @@ import com.example.travelcents.data.trip.model.detailValue
 import com.example.travelcents.data.trip.model.displayName
 import com.example.travelcents.data.trip.model.resolveTripName
 import com.example.travelcents.data.trip.remote.CurrencyPreviewRepository
+import com.example.travelcents.data.trip.remote.FlightHeroImageRepository
 import com.example.travelcents.data.trip.remote.PopularTimesRepository
 import com.example.travelcents.data.trip.remote.TransportRepository
 import com.example.travelcents.data.trip.remote.WalkScoreRepository
 import com.example.travelcents.data.trip.remote.WeatherRepository
 import com.example.travelcents.data.trip.remote.YelpRepository
+import com.example.travelcents.data.trip.remote.buildFlightHeroImageRepository
+import com.example.travelcents.data.trip.remote.enrichFlightHeroImages
+import com.example.travelcents.data.trip.remote.needsFlightHeroBackfill
 import com.example.travelcents.ui.main.shared.TripMediaDetailPipeline
 import com.example.travelcents.ui.modules.defaultPlanTimeZoneId
 import com.example.travelcents.ui.modules.normalizeDate
@@ -143,7 +152,14 @@ data class CurrentTripUiState(
 sealed class PreviewSource {
     data class CuratedStarter(
         val starter: AiCuratedTripStarter,
-        val intakeProfile: AiTripIntakeProfile
+        val intakeProfile: AiTripIntakeProfile,
+        val addedEvents: List<TravelEvent> = emptyList()
+    ) : PreviewSource()
+
+    data class DestinationLock(
+        val destination: String,
+        val intakeProfile: AiTripIntakeProfile,
+        val addedEvents: List<TravelEvent> = emptyList()
     ) : PreviewSource()
 }
 
@@ -264,6 +280,8 @@ class CurrentTripViewModel(application: Application) : AndroidViewModel(applicat
     private val sharedYelpWindowBoost = mutableMapOf<String, Int>()
     private val mediaDetailPipeline = TripMediaDetailPipeline(application)
     private val currencyPreviewRepository = CurrencyPreviewRepository(application)
+    private val flightHeroImages: FlightHeroImageRepository by lazy { buildFlightHeroImageRepository() }
+    private val flightHeroBackfillInFlight = mutableSetOf<String>()
     private val demoAdvisoryEngine = TripAdvisoryEngine(
         weatherProvider = DummyTripWeatherContextProvider(),
         transportProvider = DummyTripTransportContextProvider(),
@@ -311,6 +329,7 @@ class CurrentTripViewModel(application: Application) : AndroidViewModel(applicat
         _shareTargets.value = emptyList()
         _tripMembers.value = emptyList()
         liveEventDetailOverrides = emptyMap()
+        flightHeroBackfillInFlight.clear()
         _uiState.value = CurrentTripUiState(
             isLoading = isLoading,
             tripTitle = tripTitle,
@@ -340,6 +359,7 @@ class CurrentTripViewModel(application: Application) : AndroidViewModel(applicat
             tripLocalDataSource.observeTripEvents(tripKey).collect { events ->
                 localEventsSnapshot = sortPlanEvents(events)
                 publishCurrentEvents(localEventsSnapshot, _eventOptions.value)
+                backfillFlightHeroesIfNeeded(tripKey, localEventsSnapshot)
             }
         }
 
@@ -425,6 +445,7 @@ class CurrentTripViewModel(application: Application) : AndroidViewModel(applicat
             resolvedItinerary = effectiveItinerary,
             canManageTrip = canManageTrip
         )
+        backfillFlightHeroesIfNeeded(tripKey, localEventsSnapshot)
 
         if (canManageTrip && nextTripTitle != storedTripTitle.trim()) {
             viewModelScope.launch {
@@ -540,6 +561,74 @@ class CurrentTripViewModel(application: Application) : AndroidViewModel(applicat
             }
         }
         publishCurrentEvents(localEventsSnapshot, _eventOptions.value)
+    }
+
+    private fun backfillFlightHeroesIfNeeded(
+        tripKey: TripKey,
+        events: List<TravelEvent>
+    ) {
+        if (!_uiState.value.canEditTrip) return
+
+        val candidates = events.filter { event ->
+            event.type.equals("flight", ignoreCase = true) &&
+                event.eventId !in flightHeroBackfillInFlight &&
+                event.needsFlightHeroBackfill()
+        }
+        if (candidates.isEmpty()) return
+
+        val candidateIds = candidates.mapTo(mutableSetOf()) { it.eventId }
+        flightHeroBackfillInFlight.addAll(candidateIds)
+
+        viewModelScope.launch {
+            try {
+                var enrichedCandidates = enrichFlightHeroImages(candidates, flightHeroImages)
+                val heroUrls = enrichedCandidates
+                    .map { it.imageUrl }
+                    .filter { it.isNotBlank() }
+                    .distinct()
+                if (heroUrls.isNotEmpty()) {
+                    val localPaths = runCatching {
+                        TripMediaCacheStore.cacheTripMedia(
+                            context = getApplication(),
+                            tripKey = tripKey,
+                            urls = heroUrls
+                        )
+                    }.onFailure { error ->
+                        Log.w("CurrentTripViewModel", "Failed to cache flight hero media", error)
+                    }.getOrDefault(emptyMap())
+                    if (localPaths.isNotEmpty()) {
+                        enrichedCandidates = enrichedCandidates.map { event ->
+                            localPaths[event.imageUrl]
+                                ?.let { localPath -> event.copy(localImagePath = localPath) }
+                                ?: event
+                        }
+                    }
+                }
+                val changedById = enrichedCandidates
+                    .zip(candidates)
+                    .mapNotNull { (updated, original) ->
+                        updated.takeIf { it != original }?.let { it.eventId to it }
+                    }
+                    .toMap()
+                if (changedById.isEmpty()) return@launch
+
+                localEventsSnapshot = sortPlanEvents(
+                    localEventsSnapshot.map { event -> changedById[event.eventId] ?: event }
+                )
+                publishCurrentEvents(localEventsSnapshot, _eventOptions.value)
+                persistLocalTripSnapshot(events = localEventsSnapshot)
+
+                changedById.values.forEach { event ->
+                    runCatching {
+                        tripSyncRemoteDataSource.upsertEvent(tripKey = tripKey, event = event)
+                    }.onFailure { error ->
+                        Log.w("CurrentTripViewModel", "Failed to backfill flight hero image", error)
+                    }
+                }
+            } finally {
+                flightHeroBackfillInFlight.removeAll(candidateIds)
+            }
+        }
     }
 
     private suspend fun persistWeatherDetailOverrides(
@@ -1051,9 +1140,9 @@ class CurrentTripViewModel(application: Application) : AndroidViewModel(applicat
 
     fun refreshEventLiveContext(eventId: String) {
         val event = _uiState.value.events.firstOrNull { it.eventId == eventId } ?: return
-        if (eventId in _eventLiveContextInFlight.value) return
-
         val isRestaurant = isRestaurantEvent(event)
+        val isTicketmasterBacked = isTicketmasterBackedEvent(event)
+        if (eventId in _eventLiveContextInFlight.value) return
         val latitude = event.detailValue(ATTR_LATITUDE)?.toDoubleOrNull()
         val longitude = event.detailValue(ATTR_LONGITUDE)?.toDoubleOrNull()
         val canFetchWeather = isWeatherEligiblePlaceEvent(event) && latitude != null && longitude != null
@@ -1079,12 +1168,18 @@ class CurrentTripViewModel(application: Application) : AndroidViewModel(applicat
             null
         }
 
-        if (
+        val lacksRestaurantInputs =
             venueAddress == null &&
-            (transportAnchor == null || transportDestination == null) &&
-            !canFetchWeather &&
-            (latitude == null || longitude == null || walkScoreAddress == null) &&
-            (tripCurrency == null || usdAnchorAmount == null)
+                (transportAnchor == null || transportDestination == null) &&
+                !canFetchWeather &&
+                (latitude == null || longitude == null || walkScoreAddress == null) &&
+                (tripCurrency == null || usdAnchorAmount == null)
+        val lacksTicketmasterTransport = transportAnchor == null || transportDestination == null
+
+        if (
+            (isRestaurant && lacksRestaurantInputs) ||
+            (isTicketmasterBacked && !isRestaurant && lacksTicketmasterTransport && !canFetchWeather) ||
+            (!isRestaurant && !isTicketmasterBacked && !canFetchWeather)
         ) return
 
         viewModelScope.launch {
@@ -1136,7 +1231,7 @@ class CurrentTripViewModel(application: Application) : AndroidViewModel(applicat
 
                     val isFlight = event.type.equals("flight", ignoreCase = true)
                     val hasOutdoorSeating = event.detailValue(ATTR_HAS_OUTDOOR_SEATING)?.toBoolean() ?: false
-                    
+
                     if ((hasOutdoorSeating || isFlight) && latitude != null && longitude != null) {
                         WeatherRepository.fetchSnapshot(
                             latitude = latitude,
@@ -1157,7 +1252,7 @@ class CurrentTripViewModel(application: Application) : AndroidViewModel(applicat
                         }
                     }
 
-                    if (latitude != null && longitude != null && walkScoreAddress != null) {
+                    if (isRestaurant && latitude != null && longitude != null && walkScoreAddress != null) {
                         WalkScoreRepository.fetchSnapshot(
                             latitude = latitude,
                             longitude = longitude,
@@ -1184,7 +1279,7 @@ class CurrentTripViewModel(application: Application) : AndroidViewModel(applicat
                         }
                     }
 
-                    if (tripCurrency != null && usdAnchorAmount != null) {
+                    if (isRestaurant && tripCurrency != null && usdAnchorAmount != null) {
                         currencyPreviewRepository.buildPreview(
                             localCurrency = tripCurrency,
                             homeCurrency = homeCurrency,
@@ -1216,6 +1311,10 @@ class CurrentTripViewModel(application: Application) : AndroidViewModel(applicat
                 _eventLiveContextInFlight.update { it - eventId }
             }
         }
+    }
+
+    fun refreshRestaurantLiveContext(eventId: String) {
+        refreshEventLiveContext(eventId)
     }
 
     fun ensureEventOptionsLoaded(eventId: String) {
@@ -1659,12 +1758,13 @@ class CurrentTripViewModel(application: Application) : AndroidViewModel(applicat
                 )
                 val updatedEvent = actionResult.event ?: return@launch
                 val updatedOptions = actionResult.options
-
-                localEventsSnapshot = sortPlanEvents(
-                    localEventsSnapshot.map {
-                        if (it.eventId == eventId) updatedEvent else it
-                    }
+                val conflictResolution = resolveTicketmasterConflicts(
+                    originalEvent = event,
+                    updatedEvent = updatedEvent,
+                    updatedOptions = updatedOptions,
+                    allEvents = localEventsSnapshot
                 )
+                localEventsSnapshot = sortPlanEvents(conflictResolution.events)
 
                 val updatedOptionsByEvent = _eventOptions.value + (eventId to updatedOptions)
                 _eventOptions.value = updatedOptionsByEvent
@@ -1679,6 +1779,25 @@ class CurrentTripViewModel(application: Application) : AndroidViewModel(applicat
                     persistOptions = !isYelpSelectionEvent
                 )
                 prefetchSharedEventMedia(listOf(updatedEvent))
+                if (conflictResolution.removedEventIds.isNotEmpty()) {
+                    _uiState.update {
+                        it.copy(
+                            infoMessage = if (conflictResolution.removedEventIds.size == 1) {
+                                "Updated showtime and removed 1 conflicting flexible event."
+                            } else {
+                                "Updated showtime and removed ${conflictResolution.removedEventIds.size} conflicting flexible events."
+                            },
+                            errorMessage = null
+                        )
+                    }
+                    conflictResolution.removedEventIds.forEach { removedEventId ->
+                        runCatching {
+                            tripSyncRemoteDataSource.deleteEvent(tripKey = tripKey, eventId = removedEventId)
+                        }.onFailure { error ->
+                            Log.w("CurrentTripViewModel", "Failed to remove conflicting event", error)
+                        }
+                    }
+                }
             } catch (e: Exception) {
                 Log.e("CurrentTripViewModel", "Failed to select option", e)
                 _uiState.update { it.copy(errorMessage = e.message ?: "Failed to update selection.") }
@@ -2012,17 +2131,47 @@ class CurrentTripViewModel(application: Application) : AndroidViewModel(applicat
     }
 
     fun loadPreview(source: PreviewSource) {
+        val viewerUid = auth.currentUser?.uid
         when (source) {
             is PreviewSource.CuratedStarter -> {
-                val viewerUid = auth.currentUser?.uid
                 val preview = AiCuratedTripToItineraryMapper.map(
                     starter = source.starter,
                     intakeProfile = source.intakeProfile,
                     viewerUid = viewerUid
                 )
-                applyPreview(viewerUid = viewerUid, preview = preview)
+                applyPreview(viewerUid = viewerUid, preview = preview.withAddedEvents(source.addedEvents))
+            }
+
+            is PreviewSource.DestinationLock -> {
+                val preview = AiDestinationLockMapper.map(
+                    destination = source.destination,
+                    intakeProfile = source.intakeProfile,
+                    viewerUid = viewerUid
+                )
+                applyPreview(viewerUid = viewerUid, preview = preview.withAddedEvents(source.addedEvents))
             }
         }
+    }
+
+    private fun com.example.travelcents.data.ai.chat.PreviewTrip.withAddedEvents(
+        addedEvents: List<TravelEvent>
+    ): com.example.travelcents.data.ai.chat.PreviewTrip {
+        if (addedEvents.isEmpty()) return this
+        val normalizedAddedEvents = addedEvents.map { event ->
+            event.copy(
+                itineraryId = itinerary.itineraryId,
+                eventId = event.eventId.ifBlank { UUID.randomUUID().toString() }
+            )
+        }
+        val mergedEvents = (events + normalizedAddedEvents).distinctBy { event ->
+            event.detailValue(DETAIL_YELP_ID)?.takeIf(String::isNotBlank)
+                ?: event.selectedOptionId.takeIf(String::isNotBlank)
+                ?: event.eventId
+        }
+        return copy(
+            itinerary = itinerary.copy(eventIds = mergedEvents.map(TravelEvent::eventId)),
+            events = mergedEvents
+        )
     }
 
     private fun applyPreview(
@@ -2057,6 +2206,35 @@ class CurrentTripViewModel(application: Application) : AndroidViewModel(applicat
         if (_uiState.value.isPreview) {
             resetTripState()
         }
+    }
+
+    fun addPreviewEvent(event: TravelEvent) {
+        val summary = currentTripSummary ?: return
+        if (!_uiState.value.isPreview) return
+
+        val normalizedEvent = event.copy(
+            itineraryId = summary.itineraryId,
+            eventId = event.eventId.ifBlank { UUID.randomUUID().toString() }
+        )
+        val incomingYelpId = normalizedEvent.detailValue(DETAIL_YELP_ID).orEmpty()
+        val duplicate = localEventsSnapshot.any { existing ->
+            existing.eventId == normalizedEvent.eventId ||
+                (
+                    incomingYelpId.isNotBlank() &&
+                        existing.type.equals(normalizedEvent.type, ignoreCase = true) &&
+                        existing.date == normalizedEvent.date &&
+                        existing.detailValue(DETAIL_YELP_ID) == incomingYelpId
+                    )
+        }
+        if (duplicate) return
+
+        localEventsSnapshot = sortPlanEvents(localEventsSnapshot + normalizedEvent)
+        currentTripSummary = summary.copy(eventIds = localEventsSnapshot.map(TravelEvent::eventId))
+        _events.value = localEventsSnapshot
+        _uiState.value = _uiState.value.copy(
+            events = localEventsSnapshot,
+            infoMessage = if (localEventsSnapshot.isEmpty()) EMPTY_PLANS_MESSAGE else null
+        )
     }
 
     fun loadTrip(tripId: String? = null) {
@@ -2246,9 +2424,84 @@ class CurrentTripViewModel(application: Application) : AndroidViewModel(applicat
         }
     }
 
+    private fun isTicketmasterBackedEvent(event: TravelEvent): Boolean {
+        return !event.detailValue(ATTR_TICKETMASTER_EVENT_ID).isNullOrBlank()
+    }
+
     private fun isWeatherEligiblePlaceEvent(event: TravelEvent): Boolean {
-        // Allowed for all events including flights to show destination weather
         return true
+    }
+
+    private data class TicketmasterConflictResolution(
+        val events: List<TravelEvent>,
+        val removedEventIds: List<String>
+    )
+
+    private fun resolveTicketmasterConflicts(
+        originalEvent: TravelEvent,
+        updatedEvent: TravelEvent,
+        updatedOptions: List<EventOption>,
+        allEvents: List<TravelEvent>
+    ): TicketmasterConflictResolution {
+        val replacedEvents = allEvents.map { existing ->
+            if (existing.eventId == updatedEvent.eventId) updatedEvent else existing
+        }
+        if (!isTicketmasterBackedEvent(updatedEvent)) {
+            return TicketmasterConflictResolution(
+                events = replacedEvents,
+                removedEventIds = emptyList()
+            )
+        }
+
+        val selectedOption = updatedOptions.firstOrNull { it.selected }
+        val scheduleChanged = selectedOption?.detailValue(
+            ATTR_OPTION_DATE,
+            ATTR_OPTION_START_TIME,
+            ATTR_OPTION_END_TIME
+        ) != null && (
+            normalizeDate(originalEvent.date) != normalizeDate(updatedEvent.date) ||
+                normalizeTime(originalEvent.startTime) != normalizeTime(updatedEvent.startTime) ||
+                normalizeTime(originalEvent.endTime) != normalizeTime(updatedEvent.endTime)
+            )
+
+        if (!scheduleChanged) {
+            return TicketmasterConflictResolution(
+                events = replacedEvents,
+                removedEventIds = emptyList()
+            )
+        }
+
+        val conflictingIds = replacedEvents
+            .filter { candidate ->
+                candidate.eventId != updatedEvent.eventId &&
+                    isFlexibleEvent(candidate) &&
+                    eventsOverlap(candidate, updatedEvent)
+            }
+            .map(TravelEvent::eventId)
+
+        return TicketmasterConflictResolution(
+            events = replacedEvents.filterNot { it.eventId in conflictingIds },
+            removedEventIds = conflictingIds
+        )
+    }
+
+    private fun isFlexibleEvent(event: TravelEvent): Boolean {
+        return when (event.type.lowercase(Locale.US)) {
+            "flight", "hotel" -> false
+            else -> true
+        }
+    }
+
+    private fun eventsOverlap(
+        first: TravelEvent,
+        second: TravelEvent
+    ): Boolean {
+        if (normalizeDate(first.date) != normalizeDate(second.date)) return false
+        if (first.startTime.isBlank() || first.endTime.isBlank()) return false
+        if (second.startTime.isBlank() || second.endTime.isBlank()) return false
+
+        return normalizeTime(first.startTime) < normalizeTime(second.endTime) &&
+            normalizeTime(second.startTime) < normalizeTime(first.endTime)
     }
 
     private fun resolveTransportAnchor(event: TravelEvent): TransportRepository.TransportAnchor? {

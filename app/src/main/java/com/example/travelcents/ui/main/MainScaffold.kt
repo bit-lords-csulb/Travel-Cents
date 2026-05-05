@@ -39,11 +39,19 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import com.example.travelcents.MainActivity
+import com.example.travelcents.data.ai.chat.AiChatPreviewDraft
+import com.example.travelcents.data.ai.chat.AiChatPreviewDraftType
+import com.example.travelcents.data.ai.chat.AiCuratedTripStarter
+import com.example.travelcents.data.ai.chat.AiDestinationRecommendation
+import com.example.travelcents.data.ai.chat.AiTripIntakeProfile
 import com.example.travelcents.data.trip.TripKey
 import com.example.travelcents.data.social.model.DirectChatPreview
 import com.example.travelcents.data.social.model.Friend
 import com.example.travelcents.data.social.model.Group
+import com.example.travelcents.data.trip.model.DETAIL_YELP_ID
 import com.example.travelcents.data.trip.model.Event
+import com.example.travelcents.data.trip.model.TravelEvent
+import com.example.travelcents.data.trip.model.detailValue
 import com.example.travelcents.notification.ChatNotificationTarget
 import com.example.travelcents.notification.NotificationHelper
 import com.example.travelcents.ui.components.MainBottomNavBar
@@ -69,6 +77,7 @@ import com.example.travelcents.ui.main.newTrip.TripStep2DatesPage
 import com.example.travelcents.ui.main.newTrip.TripStep3TravelersPage
 import com.example.travelcents.ui.main.newTrip.TripStep4BudgetPage
 import com.example.travelcents.ui.main.newTrip.TripStep5InterestsPage
+import com.example.travelcents.ui.main.passes.MyPassesScreen
 import com.example.travelcents.ui.main.settings.SettingsPage
 import com.example.travelcents.ui.theme.DeepSea1
 import com.google.firebase.firestore.FirebaseFirestore
@@ -92,6 +101,7 @@ object MainRoutes {
 
     const val AI_TRIP_CHAT = "ai_trip_chat"
     const val SAVED_PLACES = "saved_places"
+    const val DOCUMENTS = "documents"
 }
 
 private val bottomNavRoutes = setOf(
@@ -139,7 +149,7 @@ fun MainScaffold(modifier: Modifier = Modifier, onLogout: () -> Unit = {}) {
     val groupsRepository = remember { com.example.travelcents.data.social.repository.GroupsRepository() }
     val socialUserRepository = remember { com.example.travelcents.data.social.repository.SocialUserRepository() }
 
-    var pendingPreview by remember { mutableStateOf<PreviewSource.CuratedStarter?>(null) }
+    var pendingPreview by remember { mutableStateOf<PreviewSource?>(null) }
 
     // Chat navigation states
     var selectedGroup   by remember { mutableStateOf<Group?>(null) }
@@ -415,11 +425,17 @@ fun MainScaffold(modifier: Modifier = Modifier, onLogout: () -> Unit = {}) {
                         },
                         onSavedPlacesClick = {
                             navController.navigate(MainRoutes.SAVED_PLACES)
+                        },
+                        onDocumentsClick = {
+                            navController.navigate(MainRoutes.DOCUMENTS)
                         }
                     )
                 }
                 composable(MainRoutes.SAVED_PLACES) {
                     SavedPlacesPage(onBack = { navController.popBackStack() })
+                }
+                composable(MainRoutes.DOCUMENTS) {
+                    MyPassesScreen(onBack = { navController.popBackStack() })
                 }
                 composable(MainRoutes.CHATS) {
                     val onTripCardClick: (String, String) -> Unit = { tripId, ownerUid ->
@@ -548,15 +564,50 @@ fun MainScaffold(modifier: Modifier = Modifier, onLogout: () -> Unit = {}) {
                                 launchSingleTop = true
                             }
                         },
-                        onCreateDraftTrip = { starter, intakeProfile ->
+                        onOpenPreviewTrip = { previewDraft ->
+                            val source = pendingPreview ?: previewDraft?.toPreviewSource()
+                            if (source != null) {
+                                pendingPreview = source
+                                currentTripViewModel.loadPreview(source)
+                            }
+                            navController.navigate(MainRoutes.CURRENT_TRIP_PREVIEW) {
+                                launchSingleTop = true
+                            }
+                        },
+                        onPreviewDraftChanged = { previewDraft ->
+                            val source = previewDraft?.toPreviewSource()
+                            if (source != null) {
+                                pendingPreview = source
+                                currentTripViewModel.loadPreview(source)
+                            } else {
+                                pendingPreview = null
+                            }
+                        },
+                        onStarterSelected = { starter, intakeProfile ->
                             val source = PreviewSource.CuratedStarter(
                                 starter = starter,
                                 intakeProfile = intakeProfile
                             )
                             pendingPreview = source
                             currentTripViewModel.loadPreview(source)
-                            navController.navigate(MainRoutes.CURRENT_TRIP_PREVIEW) {
-                                launchSingleTop = true
+                            // Stay in chat — the banner is the user's path to the curated preview
+                        },
+                        onDestinationLocked = { recommendation, intakeProfile ->
+                            val source = PreviewSource.DestinationLock(
+                                destination = recommendation.destination,
+                                intakeProfile = intakeProfile
+                            )
+                            pendingPreview = source
+                            currentTripViewModel.loadPreview(source)
+                            // Stay in chat — the banner is the user's path to the skeleton
+                        },
+                        onAddEventToPreview = { event ->
+                            val updatedPreview = pendingPreview?.withAddedPreviewEvent(event)
+                            if (updatedPreview != null) {
+                                pendingPreview = updatedPreview
+                                currentTripViewModel.loadPreview(updatedPreview)
+                            } else {
+                                currentTripViewModel.addPreviewEvent(event)
                             }
                         }
                     )
@@ -578,8 +629,8 @@ fun MainScaffold(modifier: Modifier = Modifier, onLogout: () -> Unit = {}) {
                                 }
                             }
                         )
-                        if (previewSource != null) {
-                            PreviewActionBar(
+                        when (previewSource) {
+                            is PreviewSource.CuratedStarter -> PreviewActionBar(
                                 modifier = Modifier
                                     .align(Alignment.BottomCenter)
                                     .fillMaxWidth(),
@@ -593,6 +644,7 @@ fun MainScaffold(modifier: Modifier = Modifier, onLogout: () -> Unit = {}) {
                                     newTripViewModel.commitItinerary(
                                         starter = toCommit.starter,
                                         intakeProfile = toCommit.intakeProfile,
+                                        events = toCommit.addedEvents,
                                         onTripReady = { tripKey ->
                                             currentTripViewModel.loadTrip(tripKey)
                                             navController.navigate(MainRoutes.CURRENT_ITINERARY) {
@@ -603,10 +655,88 @@ fun MainScaffold(modifier: Modifier = Modifier, onLogout: () -> Unit = {}) {
                                     )
                                 }
                             )
+
+                            is PreviewSource.DestinationLock -> SkeletonPreviewBar(
+                                modifier = Modifier
+                                    .align(Alignment.BottomCenter)
+                                    .fillMaxWidth(),
+                                onBack = {
+                                    navController.popBackStack()
+                                }
+                            )
+
+                            null -> {}
                         }
                     }
                 }
             }
+        }
+    }
+}
+
+private fun PreviewSource.withAddedPreviewEvent(event: TravelEvent): PreviewSource {
+    return when (this) {
+        is PreviewSource.CuratedStarter -> copy(addedEvents = addedEvents.upsertPreviewEvent(event))
+        is PreviewSource.DestinationLock -> copy(addedEvents = addedEvents.upsertPreviewEvent(event))
+    }
+}
+
+private fun AiChatPreviewDraft.toPreviewSource(): PreviewSource? {
+    return when (type) {
+        AiChatPreviewDraftType.CURATED_STARTER -> curatedStarter?.let { starter ->
+            PreviewSource.CuratedStarter(
+                starter = starter,
+                intakeProfile = intakeProfile,
+                addedEvents = addedEvents
+            )
+        }
+
+        AiChatPreviewDraftType.DESTINATION_LOCK -> PreviewSource.DestinationLock(
+            destination = destination,
+            intakeProfile = intakeProfile,
+            addedEvents = addedEvents
+        )
+    }
+}
+
+private fun List<TravelEvent>.upsertPreviewEvent(event: TravelEvent): List<TravelEvent> {
+    val incomingKey = event.previewIdentityKey()
+    return if (any { existing -> existing.previewIdentityKey() == incomingKey }) {
+        this
+    } else {
+        this + event
+    }
+}
+
+private fun TravelEvent.previewIdentityKey(): String {
+    return detailValue(DETAIL_YELP_ID)?.takeIf(String::isNotBlank)
+        ?: selectedOptionId.takeIf(String::isNotBlank)
+        ?: eventId
+}
+
+@Composable
+private fun SkeletonPreviewBar(
+    onBack: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    Column(
+        modifier = modifier
+            .background(TripWizardColors.ContainerLow)
+            .navigationBarsPadding()
+            .padding(horizontal = 16.dp, vertical = 12.dp)
+    ) {
+        Text(
+            text = "Draft trip — keep chatting to fill it in.",
+            color = DeepSea5.copy(alpha = 0.78f),
+            fontWeight = FontWeight.Medium
+        )
+        Spacer(Modifier.height(10.dp))
+        OutlinedButton(
+            onClick = onBack,
+            modifier = Modifier.fillMaxWidth(),
+            shape = RoundedCornerShape(14.dp)
+        ) {
+            Text(text = "← Back to Chat")
         }
     }
 }

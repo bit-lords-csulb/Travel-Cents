@@ -109,6 +109,10 @@ service cloud.firestore {
           (request.auth.uid == userUid || request.auth.uid == friendUid);
       }
 
+      match /bookmarks/{bookmarkId} {
+        allow read, create, update, delete: if isSelf(userUid);
+      }
+
       match /trips/{tripId} {
         allow get, list: if canReadTrip(userUid, tripId);
         allow create: if isSelf(userUid) &&

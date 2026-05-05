@@ -10,6 +10,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.ConfirmationNumber
 import androidx.compose.material.icons.filled.Directions
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material3.Icon
@@ -48,6 +49,34 @@ fun DetailActionRow(
             type = type,
             icon = Icons.Default.Edit,
             onClick = onEdit
+        )
+    }
+}
+
+@Composable
+fun TicketmasterActionRow(
+    onDirections: () -> Unit,
+    onBook: () -> Unit
+) {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.spacedBy(12.dp)
+    ) {
+        DetailActionChip(
+            modifier = Modifier.weight(1f),
+            label = "Directions",
+            filled = true,
+            type = "activity",
+            icon = Icons.Default.Directions,
+            onClick = onDirections
+        )
+        DetailActionChip(
+            modifier = Modifier.weight(1f),
+            label = "Book",
+            filled = false,
+            type = "activity",
+            icon = Icons.Default.ConfirmationNumber,
+            onClick = onBook
         )
     }
 }

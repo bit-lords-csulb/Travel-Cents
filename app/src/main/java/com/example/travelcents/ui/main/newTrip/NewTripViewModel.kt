@@ -19,6 +19,12 @@ import com.example.travelcents.data.sync.TripSyncRemoteDataSource
 import com.example.travelcents.data.trip.TripAccessRole
 import com.example.travelcents.data.trip.TripKey
 import com.example.travelcents.data.trip.local.DestinationTimeZones
+import com.example.travelcents.data.trip.model.ATTR_OPTION_DATE
+import com.example.travelcents.data.trip.model.ATTR_OPTION_END_TIME
+import com.example.travelcents.data.trip.model.ATTR_OPTION_START_TIME
+import com.example.travelcents.data.trip.model.ATTR_OPTION_TIME_LABEL
+import com.example.travelcents.data.trip.model.ATTR_OPTION_TZ
+import com.example.travelcents.data.trip.model.ATTR_OPTION_VARIANT_KIND
 import com.example.travelcents.data.trip.model.Itinerary
 import com.example.travelcents.data.trip.model.TravelEvent
 import com.example.travelcents.data.trip.model.TravelRequest
@@ -35,14 +41,17 @@ import com.example.travelcents.data.trip.model.ATTR_LATITUDE
 import com.example.travelcents.data.trip.model.ATTR_LONGITUDE
 import com.example.travelcents.data.trip.model.ATTR_TICKETMASTER_EVENT_ID
 import com.example.travelcents.data.trip.model.ATTR_VENUE_NAME
+import com.example.travelcents.data.trip.model.EventOption
 import com.example.travelcents.data.trip.model.YelpOptionPoolItem
 import com.example.travelcents.data.trip.remote.FlightHeroImageRepository
 import com.example.travelcents.data.trip.remote.SerpRepository
-import com.example.travelcents.data.trip.model.detailValue
+import com.example.travelcents.data.trip.remote.buildFlightHeroImageRepository
+import com.example.travelcents.data.trip.remote.enrichFlightHeroImages
 import com.example.travelcents.data.trip.remote.TicketmasterRepository
 import com.example.travelcents.data.trip.remote.YelpRepository
 import com.example.travelcents.data.trip.model.YELP_POOL_TYPE_ACTIVITIES
 import com.example.travelcents.data.trip.model.YELP_POOL_TYPE_RESTAURANTS
+import com.example.travelcents.data.trip.model.detailValue
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FirebaseFirestore
 import kotlinx.coroutines.async
@@ -50,11 +59,12 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
-import java.time.Duration
 import java.time.Instant
 import java.time.LocalDate
+import java.time.Duration
 import java.time.LocalDateTime
 import java.time.LocalTime
+import java.time.temporal.ChronoUnit
 import java.time.format.DateTimeFormatter
 import java.util.Locale
 import java.util.UUID
@@ -163,19 +173,7 @@ class NewTripViewModel(application: Application) : AndroidViewModel(application)
     val skippedSteps: StateFlow<Set<GenerationStep>> = _skippedSteps.asStateFlow()
 
     private val flightHeroImages: FlightHeroImageRepository by lazy {
-        val wikipediaClient = okhttp3.OkHttpClient.Builder()
-            .connectTimeout(20, java.util.concurrent.TimeUnit.SECONDS)
-            .readTimeout(20, java.util.concurrent.TimeUnit.SECONDS)
-            .build()
-        val wikipedia = retrofit2.Retrofit.Builder()
-            .baseUrl("https://en.wikipedia.org/")
-            .client(wikipediaClient)
-            .addConverterFactory(retrofit2.converter.gson.GsonConverterFactory.create())
-            .build()
-            .create(com.example.travelcents.data.trip.remote.WikipediaApiService::class.java)
-        FlightHeroImageRepository(
-            destinationImages = com.example.travelcents.data.trip.remote.DestinationImageRepository(wikipedia)
-        )
+        buildFlightHeroImageRepository()
     }
 
     fun generateTrip() {
@@ -247,7 +245,6 @@ class NewTripViewModel(application: Application) : AndroidViewModel(application)
                 val flightContext = buildFlightContext(realFlights)
                 val hotelContext = buildHotelContext(realHotels.firstOrNull())
                 val yelpOptionPools = linkedMapOf<String, List<YelpOptionPoolItem>>()
-
                 // Step 3: Yelp restaurants — fetch a compact shared pool and only persist the selected daily event.
                 _generationStep.value = GenerationStep.FINDING_RESTAURANTS
                 _uiState.value = TripUiState.Loading(YELP_RESTAURANTS_MESSAGES.random())
@@ -376,9 +373,10 @@ class NewTripViewModel(application: Application) : AndroidViewModel(application)
                         yelpCandidate.isNotEmpty() -> yelpCandidate
                         else -> emptyList()
                     }
-                    val mergedLocalEvents = mergeLocalActivityEvents(
+                    val mergedLocalEvents = assembleLocalActivityEvents(
                         yelpEvents = yelpEventsDeferred.await(),
-                        ticketmasterEvents = ticketmasterEventsDeferred.await()
+                        ticketmasterEvents = ticketmasterEventsDeferred.await(),
+                        tripStartDate = tripDates.firstOrNull() ?: flightArrivalDate(outboundFlight) ?: request.dateFrom
                     )
                     localEvents = filterEventsAfterTime(
                         filterEventsBeforeWindow(
@@ -886,17 +884,103 @@ class NewTripViewModel(application: Application) : AndroidViewModel(application)
         }
     }
 
-    private fun mergeLocalActivityEvents(
+    private fun assembleLocalActivityEvents(
         yelpEvents: List<TravelEvent>,
-        ticketmasterEvents: List<TravelEvent>
+        ticketmasterEvents: List<TravelEvent>,
+        tripStartDate: String
     ): List<TravelEvent> {
-        if (yelpEvents.isEmpty()) return ticketmasterEvents
-        if (ticketmasterEvents.isEmpty()) return yelpEvents
+        val ticketmasterSelections = ticketmasterEvents.normalizeTicketmasterEvents(tripStartDate)
+        if (yelpEvents.isEmpty()) return ticketmasterSelections
+        if (ticketmasterSelections.isEmpty()) return yelpEvents
 
-        return (yelpEvents + ticketmasterEvents)
+        return (yelpEvents + ticketmasterSelections)
             .groupBy(::localActivityDedupKey)
             .values
             .map(::preferredLocalActivityEvent)
+    }
+
+    private fun List<TravelEvent>.normalizeTicketmasterEvents(
+        tripStartDate: String
+    ): List<TravelEvent> {
+        if (isEmpty()) return emptyList()
+        val parsedTripStart = parseTripDate(tripStartDate) ?: return emptyList()
+        return groupBy(::ticketmasterIdentityKey)
+            .values
+            .map(::canonicalTicketmasterEvent)
+            .groupBy { event ->
+                val eventDate = parseTripDate(event.date) ?: parsedTripStart
+                (ChronoUnit.DAYS.between(parsedTripStart, eventDate).coerceAtLeast(0) / 7L).toInt()
+            }
+            .values
+            .flatMap { weekEvents ->
+                weekEvents.sortedWith(
+                    compareByDescending<TravelEvent> { localActivitySignalScore(it) }
+                        .thenBy { it.date.ifBlank { "9999-12-31" } }
+                        .thenBy { it.startTime.ifBlank { "99:99" } }
+                        .thenBy { it.details["title"].orEmpty() }
+                ).take(1)
+            }
+    }
+
+    private fun canonicalTicketmasterEvent(events: List<TravelEvent>): TravelEvent {
+        val canonical = events.sortedWith(
+            compareBy<TravelEvent>(
+                { it.date.ifBlank { "9999-12-31" } },
+                { it.startTime.ifBlank { "99:99" } },
+                { -localActivitySignalScore(it) }
+            )
+        ).first()
+        val selectedOption = canonical.toTicketmasterOption(selected = true)
+        val alternateOptions = events
+            .filterNot { it.eventId == canonical.eventId }
+            .sortedWith(compareBy({ it.date.ifBlank { "9999-12-31" } }, { it.startTime.ifBlank { "99:99" } }))
+            .map { it.toTicketmasterOption(selected = false) }
+
+        return canonical.copy(
+            selectedOptionId = selectedOption.optionId,
+            options = listOf(selectedOption) + alternateOptions
+        )
+    }
+
+    private fun TravelEvent.toTicketmasterOption(selected: Boolean): EventOption {
+        val optionId = listOf(
+            detailValue(ATTR_TICKETMASTER_EVENT_ID).orEmpty().ifBlank { eventId },
+            date.ifBlank { "date_tbd" },
+            startTime.ifBlank { "time_tbd" }
+        ).joinToString("|")
+
+        return EventOption(
+            optionId = optionId,
+            eventId = eventId,
+            source = "ticketmaster",
+            selected = selected,
+            imageUrl = imageUrl,
+            localImagePath = localImagePath,
+            photoUrls = photoUrls,
+            details = details + mapOf(
+                ATTR_OPTION_DATE to date,
+                ATTR_OPTION_START_TIME to startTime,
+                ATTR_OPTION_END_TIME to endTime,
+                ATTR_OPTION_TZ to tz,
+                ATTR_OPTION_TIME_LABEL to listOfNotNull(
+                    startTime.takeIf { it.isNotBlank() },
+                    endTime.takeIf { it.isNotBlank() }
+                ).joinToString(" - ").ifBlank { "Time TBD" },
+                ATTR_OPTION_VARIANT_KIND to "ticketmaster_showtime"
+            )
+        )
+    }
+
+    private fun ticketmasterIdentityKey(event: TravelEvent): String {
+        val titleToken = event.detailValue(ATTR_BUSINESS_NAME, "activity_name", "title", "name")
+            .normalizedDedupToken()
+        val venueToken = event.detailValue(
+            ATTR_VENUE_NAME,
+            ATTR_BUSINESS_ADDRESS,
+            "location",
+            "address"
+        ).normalizedDedupToken()
+        return "$titleToken|$venueToken"
     }
 
     private fun preferredLocalActivityEvent(events: List<TravelEvent>): TravelEvent {
@@ -1031,23 +1115,7 @@ class NewTripViewModel(application: Application) : AndroidViewModel(application)
     }
 
     private suspend fun enrichFlightsWithHeroImages(flights: List<TravelEvent>): List<TravelEvent> {
-        if (flights.isEmpty()) return flights
-        return flights.map { event ->
-            if (!event.type.equals("flight", ignoreCase = true)) return@map event
-            val destinationCity = event.details[ATTR_DESTINATION_CITY]
-                ?.takeIf { it.isNotBlank() }
-                .orEmpty()
-            val airlineIata = FlightHeroImageRepository.extractAirlineIata(event.details["flight_number"])
-            val resolved = flightHeroImages.resolveFlightHero(destinationCity, airlineIata)
-                ?: return@map event
-            event.copy(
-                imageUrl = resolved.imageUrl,
-                details = event.details + buildMap {
-                    put(ATTR_HERO_IMAGE_URL, resolved.imageUrl)
-                    resolved.attribution?.let { put(ATTR_HERO_IMAGE_ATTRIBUTION, it) }
-                }
-            )
-        }
+        return enrichFlightHeroImages(flights, flightHeroImages)
     }
 
     private fun inferTravelerCounts(intakeProfile: AiTripIntakeProfile): Pair<Int, Int> {

@@ -9,6 +9,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.unit.dp
 import com.example.travelcents.data.trip.model.ATTR_BOOKING_URL
+import com.example.travelcents.data.trip.model.ATTR_HOTEL_DETAIL_URL
 import com.example.travelcents.data.trip.model.ATTR_OFFER_COUNT
 import com.example.travelcents.data.trip.model.TravelEvent
 import com.example.travelcents.data.trip.model.detailValue
@@ -24,7 +25,7 @@ private data class HotelBookingOffer(
 fun HotelBookingCard(event: TravelEvent) {
     val uriHandler = LocalUriHandler.current
     val offers = readBookingOffers(event)
-    val fallbackBookingUrl = event.detailValue(ATTR_BOOKING_URL, "booking_url")
+    val fallbackBookingUrl = event.detailValue(ATTR_BOOKING_URL, ATTR_HOTEL_DETAIL_URL, "booking_url")
 
     if (offers.isEmpty() && fallbackBookingUrl.isNullOrBlank()) return
 
