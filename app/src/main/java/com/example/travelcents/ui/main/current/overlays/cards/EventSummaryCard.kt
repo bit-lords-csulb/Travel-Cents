@@ -33,10 +33,8 @@ import com.example.travelcents.data.trip.model.ATTR_TICKETMASTER_EVENT_ID
 import com.example.travelcents.data.trip.model.TravelEvent
 import com.example.travelcents.data.trip.model.detailValue
 import com.example.travelcents.data.trip.model.firstNonBlank
-import com.example.travelcents.ui.main.current.eventSubtitle
 import com.example.travelcents.ui.main.current.eventTitle
 import com.example.travelcents.ui.modules.PhotoGalleryButton
-import com.example.travelcents.ui.modules.formatLongTripDateWithYear
 
 @Composable
 fun EventSummaryCard(
@@ -70,11 +68,8 @@ fun EventSummaryCard(
         )
         return
     }
-    if (event.type.equals("restaurant", ignoreCase = true) ||
-        event.type.equals("dining", ignoreCase = true) ||
-        event.type.equals("food", ignoreCase = true)
-    ) {
-        RestaurantSummaryVariant(
+    if (isYelpBackedSummaryEvent(event)) {
+        YelpSummaryCard(
             event = event,
             heroImage = heroImage,
             photoCount = photoCount,
@@ -141,38 +136,20 @@ fun EventSummaryCard(
                 )
                 CompactSummaryMetaRow(
                     label = "Date",
-                    value = formatLongTripDateWithYear(event.date).ifBlank { "Date TBD" },
+                    value = eventDisplayDateSummary(event),
                     accent = accent
                 )
                 CompactSummaryMetaRow(
                     label = "Time",
-                    value = compactTime,
+                    value = eventDisplayTimeSummary(event).ifBlank { compactTime },
                     accent = accent,
                     maxLines = 2
                 )
-                eventSubtitle(event)
-                    .takeIf { it.isNotBlank() }
-                    ?.let { subtitle ->
-                        Row(
-                            horizontalArrangement = Arrangement.spacedBy(8.dp),
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Box(
-                                modifier = Modifier
-                                    .size(6.dp)
-                                    .clip(RoundedCornerShape(999.dp))
-                                    .background(accent)
-                            )
-                            Text(
-                                text = subtitle,
-                                color = CardTextMuted,
-                                fontSize = 11.sp,
-                                lineHeight = 15.sp,
-                                maxLines = 2,
-                                overflow = TextOverflow.Ellipsis
-                            )
-                        }
-                    }
+                CompactSummaryMetaRow(
+                    label = "Duration",
+                    value = eventDisplayDurationSummary(event),
+                    accent = accent
+                )
             }
         }
     }
@@ -186,8 +163,9 @@ private fun TicketmasterSummaryCard(
     title: String,
     onOpenGallery: (() -> Unit)?
 ) {
-    val dateSummary = ticketmasterEventDateSummary(event) ?: event.date.ifBlank { "Date TBD" }
+    val dateSummary = eventDisplayDateSummary(event)
     val timeSummary = ticketmasterEventTimeSummary(event)
+    val durationSummary = eventDisplayDurationSummary(event)
     val (titleFontSize, titleLineHeight) = compactSummaryTitleMetrics(title)
 
     DetailCardFrame(accent = CardLavender) {
@@ -239,6 +217,11 @@ private fun TicketmasterSummaryCard(
                     value = timeSummary,
                     accent = CardLavender,
                     maxLines = 2
+                )
+                CompactSummaryMetaRow(
+                    label = "Duration",
+                    value = durationSummary,
+                    accent = CardLavender
                 )
             }
         }
@@ -334,20 +317,20 @@ private fun HotelSummaryCard(
 }
 
 @Composable
-private fun RestaurantSummaryVariant(
+private fun YelpSummaryCard(
     event: TravelEvent,
     heroImage: String?,
     photoCount: Int,
     title: String,
     onOpenGallery: (() -> Unit)?
 ) {
-    val cuisine = event.details.firstNonBlank("cuisine", "category")
-        ?.takeIf { it.isNotBlank() }
-    val priceLevel = event.details["price_level"]?.takeIf { it.isNotBlank() }
-    val rating = event.details["rating"]?.takeIf { it.isNotBlank() }
-    val subtitle = listOfNotNull(cuisine, priceLevel, rating?.let { "★$it" }).joinToString(" • ")
+    val accent = if (
+        event.type.equals("restaurant", ignoreCase = true) ||
+        event.type.equals("dining", ignoreCase = true) ||
+        event.type.equals("food", ignoreCase = true)
+    ) CardCoral else CardMint
 
-    DetailCardFrame(accent = CardCoral) {
+    DetailCardFrame(accent = accent) {
         Row(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.spacedBy(16.dp),
@@ -367,25 +350,33 @@ private fun RestaurantSummaryVariant(
 
             Column(
                 modifier = Modifier.weight(0.58f),
-                verticalArrangement = Arrangement.spacedBy(10.dp)
+                verticalArrangement = Arrangement.spacedBy(6.dp)
             ) {
                 Text(
                     text = title,
                     color = CardText,
-                    fontSize = 26.sp,
-                    lineHeight = 30.sp,
-                    fontWeight = FontWeight.ExtraBold
+                    fontSize = 22.sp,
+                    lineHeight = 26.sp,
+                    fontWeight = FontWeight.ExtraBold,
+                    maxLines = 4,
+                    overflow = TextOverflow.Ellipsis
                 )
-                if (subtitle.isNotBlank()) {
-                    Text(
-                        text = subtitle,
-                        color = CardTextMuted,
-                        fontSize = 12.sp,
-                        lineHeight = 16.sp,
-                        maxLines = 2,
-                        overflow = TextOverflow.Ellipsis
-                    )
-                }
+                CompactSummaryMetaRow(
+                    label = "Date",
+                    value = eventDisplayDateSummary(event),
+                    accent = accent
+                )
+                CompactSummaryMetaRow(
+                    label = "Time",
+                    value = eventDisplayTimeSummary(event),
+                    accent = accent,
+                    maxLines = 2
+                )
+                CompactSummaryMetaRow(
+                    label = "Duration",
+                    value = eventDisplayDurationSummary(event),
+                    accent = accent
+                )
             }
         }
     }
@@ -453,7 +444,7 @@ private fun SummaryHeroMedia(
             )
         }
 
-        if (showCountPill && photoCount > 0 && onOpenGallery != null) {
+        if (showCountPill && photoCount > 1 && onOpenGallery != null) {
             HeroImageCountPill(
                 photoCount = photoCount,
                 modifier = Modifier

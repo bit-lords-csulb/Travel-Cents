@@ -7,6 +7,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ConfirmationNumber
 import androidx.compose.material.icons.filled.Directions
 import androidx.compose.material.icons.filled.Edit
+import androidx.compose.material.icons.filled.Hotel
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
@@ -63,6 +64,33 @@ fun TicketmasterActionRow(
             icon = Icons.Default.ConfirmationNumber,
             emphasis = ItineraryActionEmphasis.Secondary,
             accent = CardMint
+        )
+    }
+}
+
+@Composable
+fun HotelActionRow(
+    onDirections: () -> Unit,
+    onBook: () -> Unit
+) {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.spacedBy(12.dp)
+    ) {
+        ItineraryActionButton(
+            label = "Directions",
+            onClick = onDirections,
+            modifier = Modifier.weight(1f),
+            icon = Icons.Default.Directions,
+            accent = CardLavender
+        )
+        ItineraryActionButton(
+            label = "Book",
+            onClick = onBook,
+            modifier = Modifier.weight(1f),
+            icon = Icons.Default.Hotel,
+            emphasis = ItineraryActionEmphasis.Secondary,
+            accent = CardLavender
         )
     }
 }

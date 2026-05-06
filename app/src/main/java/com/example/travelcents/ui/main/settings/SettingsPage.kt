@@ -31,6 +31,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
+import com.example.travelcents.ui.main.current.CurrentTripViewModel
 import com.example.travelcents.ui.components.ProfileAvatar
 import com.example.travelcents.ui.main.newTrip.TripWizardColors
 import com.example.travelcents.ui.theme.DeepSea1
@@ -44,6 +45,7 @@ private val tabs = listOf("Account", "Security", "Preferences")
 @Composable
 fun SettingsPage(
     modifier: Modifier = Modifier,
+    currentTripViewModel: CurrentTripViewModel? = null,
     onLoggedOut: () -> Unit = {}
 ) {
     val viewModel: SettingsViewModel = viewModel()
@@ -85,7 +87,11 @@ fun SettingsPage(
 
         // Tab content
         when (selectedTab) {
-            "Account" -> AccountTab(viewModel = viewModel, onLoggedOut = onLoggedOut)
+            "Account" -> AccountTab(
+                viewModel = viewModel,
+                currentTripViewModel = currentTripViewModel,
+                onLoggedOut = onLoggedOut
+            )
             "Security" -> SecurityTab(viewModel = viewModel)
             "Preferences" -> PreferencesTab()
         }

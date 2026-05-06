@@ -1920,47 +1920,15 @@ class CurrentTripViewModel(application: Application) : AndroidViewModel(applicat
         }
     }
 
-    fun moveEventLocally(
-        eventId: String,
-        fromDate: String,
-        toDate: String,
-        toIndex: Int
-    ) {
-        val currentEvents = localEventsSnapshot
-        val movingEvent = currentEvents.firstOrNull { it.eventId == eventId } ?: return
-        val normalizedFromDate = normalizeDate(fromDate)
-        val normalizedToDate = normalizeDate(toDate)
-
-        val grouped = currentEvents
+    fun applyCommittedEventOrder(events: List<TravelEvent>) {
+        localEventsSnapshot = events
             .groupBy { normalizeDate(it.date) }
-            .mapValues { (_, events) ->
-                events.sortedWith(
-                    compareBy(
-                        { it.details["sortOrder"]?.toIntOrNull() ?: 0 },
-                        { normalizeTime(it.startTime) }
-                    )
-                ).toMutableList()
-            }
-            .toMutableMap()
-
-        val sourceList = grouped[normalizedFromDate] ?: mutableListOf()
-        sourceList.removeAll { it.eventId == eventId }
-
-        val targetList = if (normalizedToDate == normalizedFromDate) {
-            sourceList
-        } else {
-            grouped.getOrPut(normalizedToDate) { mutableListOf() }
-        }
-
-        val insertionIndex = toIndex.coerceIn(0, targetList.size)
-        targetList.add(insertionIndex, movingEvent.copy(date = normalizedToDate))
-
-        localEventsSnapshot = grouped
             .toSortedMap(compareBy<String> { if (it.isBlank()) "9999-12-31" else it })
             .values
             .flatMap { dayEvents ->
                 dayEvents.mapIndexed { index, event ->
                     event.copy(
+                        date = normalizeDate(event.date),
                         details = event.details.toMutableMap().apply {
                             put("sortOrder", index.toString())
                         }

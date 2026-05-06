@@ -4,8 +4,10 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.sp
+import com.example.travelcents.ui.modules.parseIsoDate
 import com.example.travelcents.ui.modules.formatDayOfWeekFull
 import com.example.travelcents.ui.modules.formatHeroDate
+import com.example.travelcents.ui.modules.todayIsoDate
 import com.example.travelcents.ui.theme.DeepSea4
 import com.example.travelcents.ui.theme.DeepSea5
 import com.example.travelcents.ui.theme.TravelCentsFonts
@@ -16,19 +18,19 @@ fun DayDateHero(
     sortedDates: List<String>,
     onDateSelected: (String) -> Unit
 ) {
-    val activeDate = selectedDate.takeIf { it.isNotBlank() } ?: sortedDates.firstOrNull().orEmpty()
-    val activeIndex = sortedDates.indexOf(activeDate).coerceAtLeast(0)
-    val previousDate = sortedDates.getOrNull(activeIndex - 1)
-    val nextDate = sortedDates.getOrNull(activeIndex + 1)
+    val activeDate = selectedDate.takeIf { it.isNotBlank() } ?: sortedDates.firstOrNull() ?: todayIsoDate()
+    val parsedActiveDate = parseIsoDate(activeDate)
+    val previousDate = parsedActiveDate?.minusDays(1)?.toString()
+    val nextDate = parsedActiveDate?.plusDays(1)?.toString()
 
     CurrentTripHeroLayout(
         previousAction = CurrentTripHeroNavAction(
-            enabled = previousDate != null,
+            enabled = parsedActiveDate != null,
             contentDescription = "Previous day",
             onClick = { previousDate?.let(onDateSelected) }
         ),
         nextAction = CurrentTripHeroNavAction(
-            enabled = nextDate != null,
+            enabled = parsedActiveDate != null,
             contentDescription = "Next day",
             onClick = { nextDate?.let(onDateSelected) }
         )

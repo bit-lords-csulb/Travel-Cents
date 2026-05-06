@@ -551,6 +551,7 @@ fun MainScaffold(modifier: Modifier = Modifier, onLogout: () -> Unit = {}) {
                 composable(MainRoutes.SETTINGS) {
                     SettingsPage(
                         modifier = Modifier.fillMaxSize(),
+                        currentTripViewModel = currentTripViewModel,
                         onLoggedOut = onLogout
                     )
                 }

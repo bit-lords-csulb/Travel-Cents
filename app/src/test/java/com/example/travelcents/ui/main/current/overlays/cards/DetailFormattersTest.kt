@@ -1,5 +1,8 @@
 package com.example.travelcents.ui.main.current.overlays.cards
 
+import com.example.travelcents.data.trip.model.ATTR_BOOKING_URL
+import com.example.travelcents.data.trip.model.ATTR_HOTEL_DETAIL_URL
+import com.example.travelcents.data.trip.model.ATTR_OFFER_COUNT
 import com.example.travelcents.data.trip.model.TravelEvent
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
@@ -59,5 +62,39 @@ class DetailFormattersTest {
             "Restaurant local time zone unavailable",
             restaurantHoursTimeZoneLabel(event)
         )
+    }
+
+    @Test
+    fun preferredHotelBookingUrl_prefersBookingDotComOffer() {
+        val event = TravelEvent(
+            eventId = "hotel-1",
+            type = "hotel",
+            itineraryId = "trip-1",
+            details = mapOf(
+                ATTR_OFFER_COUNT to "2",
+                "offer_0_source" to "Expedia",
+                "offer_0_link" to "https://www.expedia.com/hotel",
+                "offer_1_source" to "Booking.com",
+                "offer_1_link" to "https://www.booking.com/hotel"
+            ),
+            bookingUrl = "https://fallback.example.com/hotel"
+        )
+
+        assertEquals("https://www.booking.com/hotel", preferredHotelBookingUrl(event))
+    }
+
+    @Test
+    fun preferredHotelBookingUrl_fallsBackToStoredUrls() {
+        val event = TravelEvent(
+            eventId = "hotel-1",
+            type = "hotel",
+            itineraryId = "trip-1",
+            details = mapOf(
+                ATTR_BOOKING_URL to "https://book.example.com/hotel",
+                ATTR_HOTEL_DETAIL_URL to "https://detail.example.com/hotel"
+            )
+        )
+
+        assertEquals("https://book.example.com/hotel", preferredHotelBookingUrl(event))
     }
 }

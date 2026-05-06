@@ -330,7 +330,7 @@ internal fun FlightHeroMedia(
             )
         }
 
-        if (photoCount > 0 && onOpenGallery != null) {
+        if (photoCount > 1 && onOpenGallery != null) {
             HeroImageCountPill(
                 photoCount = photoCount,
                 modifier = Modifier

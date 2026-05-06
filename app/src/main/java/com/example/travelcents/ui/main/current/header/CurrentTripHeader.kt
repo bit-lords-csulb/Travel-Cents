@@ -20,6 +20,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.DateRange
 import androidx.compose.material.icons.filled.DeleteOutline
 import androidx.compose.material.icons.filled.DragHandle
@@ -92,6 +93,7 @@ fun CurrentTripHeader(
     members: List<TripMemberUi>,
     onCalendarClick: () -> Unit,
     onBackClick: () -> Unit,
+    onDoneReordering: () -> Unit,
     onAddClick: () -> Unit,
     onShareClick: () -> Unit,
     onToggleReorder: () -> Unit,
@@ -330,11 +332,29 @@ fun CurrentTripHeader(
                 }
             }
 
+            val showDoneButton = !isInCalendarMode && isReorderActive
             HeaderModeButton(
-                icon = if (isInCalendarMode) Icons.AutoMirrored.Filled.ArrowBack else Icons.Default.DateRange,
-                label = if (isInCalendarMode) "Itinerary" else "Calendar",
-                contentDescription = if (isInCalendarMode) "Back to itinerary" else "Open calendar view",
-                onClick = if (isInCalendarMode) onBackClick else onCalendarClick,
+                icon = when {
+                    showDoneButton -> Icons.Default.CheckCircle
+                    isInCalendarMode -> Icons.AutoMirrored.Filled.ArrowBack
+                    else -> Icons.Default.DateRange
+                },
+                label = when {
+                    showDoneButton -> "Done"
+                    isInCalendarMode -> "Itinerary"
+                    else -> "Calendar"
+                },
+                contentDescription = when {
+                    showDoneButton -> "Finish reordering"
+                    isInCalendarMode -> "Back to itinerary"
+                    else -> "Open calendar view"
+                },
+                onClick = when {
+                    showDoneButton -> onDoneReordering
+                    isInCalendarMode -> onBackClick
+                    else -> onCalendarClick
+                },
+                highlightColor = if (showDoneButton) Color(0xFF79E2A0) else CurrentTripHeroAccent,
                 modifier = Modifier.align(Alignment.TopStart)
             )
 
@@ -488,6 +508,7 @@ private fun HeaderModeButton(
     label: String,
     contentDescription: String,
     onClick: () -> Unit,
+    highlightColor: Color,
     modifier: Modifier = Modifier
 ) {
     val buttonShape = RoundedCornerShape(14.dp)
@@ -505,19 +526,19 @@ private fun HeaderModeButton(
                 .size(34.dp)
                 .clip(buttonShape)
                 .background(SurfaceContainerHigh)
-                .border(1.dp, DeepSea3.copy(alpha = 0.75f), buttonShape),
+                .border(1.dp, highlightColor.copy(alpha = 0.45f), buttonShape),
             contentAlignment = Alignment.Center
         ) {
             Icon(
                 imageVector = icon,
                 contentDescription = contentDescription,
-                tint = CurrentTripHeroAccent,
+                tint = highlightColor,
                 modifier = Modifier.size(18.dp)
             )
         }
         Text(
             text = label,
-            color = DeepSea4,
+            color = highlightColor,
             fontSize = 10.sp,
             lineHeight = 10.sp,
             fontWeight = FontWeight.SemiBold,

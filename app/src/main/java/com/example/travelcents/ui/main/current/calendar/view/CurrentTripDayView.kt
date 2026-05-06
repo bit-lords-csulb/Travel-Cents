@@ -22,12 +22,8 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.DeleteOutline
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
-import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -70,18 +66,9 @@ fun CurrentTripDayView(
     selectedDate: String,
     onDateSelected: (String) -> Unit,
     onEventClick: (TravelEvent) -> Unit,
-    onDeleteClick: (TravelEvent) -> Unit,
     onCreatePlan: (String, Int) -> Unit
 ) {
-    if (sortedDates.isEmpty()) {
-        CurrentTripEmptyState(
-            title = "No Calendar Dates",
-            body = "Set trip dates first so you can add plans to the calendar."
-        )
-        return
-    }
-
-    val activeDate = selectedDate.takeIf { it.isNotBlank() } ?: sortedDates.firstOrNull().orEmpty()
+    val activeDate = selectedDate.takeIf { it.isNotBlank() } ?: sortedDates.firstOrNull() ?: todayIsoDate()
     val dayEvents = remember(events, activeDate) { eventsForDate(events, activeDate) }
     val scheduleWindow = remember(dayEvents, activeDate) {
         buildScheduleWindow(dayEvents, listOf(activeDate))
@@ -131,7 +118,6 @@ fun CurrentTripDayView(
                         scheduleWindow = scheduleWindow,
                         hourHeight = hourHeight,
                         onEventClick = onEventClick,
-                        onDeleteClick = onDeleteClick,
                         onEmptySlotClick = { startMinutes -> onCreatePlan(activeDate, startMinutes) },
                         showCurrentTimeIndicator = activeDate == todayIsoDate()
                     )
@@ -174,7 +160,6 @@ private fun ScheduleDayColumn(
     scheduleWindow: ScheduleWindow,
     hourHeight: Dp,
     onEventClick: (TravelEvent) -> Unit,
-    onDeleteClick: (TravelEvent) -> Unit,
     onEmptySlotClick: (Int) -> Unit,
     showCurrentTimeIndicator: Boolean = false
 ) {
@@ -237,8 +222,7 @@ private fun ScheduleDayColumn(
                 maxWidth = maxWidth,
                 scheduleWindow = scheduleWindow,
                 hourHeight = hourHeight,
-                onClick = { onEventClick(layout.span.event) },
-                onDeleteClick = { onDeleteClick(layout.span.event) }
+                onClick = { onEventClick(layout.span.event) }
             )
         }
     }
@@ -303,8 +287,7 @@ private fun BoxScope.ScheduleEventCard(
     maxWidth: Dp,
     scheduleWindow: ScheduleWindow,
     hourHeight: Dp,
-    onClick: () -> Unit,
-    onDeleteClick: () -> Unit
+    onClick: () -> Unit
 ) {
     val span = layout.span
     val startMinutes = span.startMinutes
@@ -353,23 +336,10 @@ private fun BoxScope.ScheduleEventCard(
                         fontSize = 10.sp,
                         modifier = Modifier.weight(1f)
                     )
-                    if (canEditTrip) {
-                        IconButton(
-                            onClick = onDeleteClick,
-                            modifier = Modifier.size(24.dp)
-                        ) {
-                            Icon(
-                                imageVector = Icons.Default.DeleteOutline,
-                                contentDescription = "Delete plan",
-                                tint = Color(0xFFE77D90),
-                                modifier = Modifier.size(14.dp)
-                            )
-                        }
-                    }
                 }
                 Spacer(modifier = Modifier.height(2.dp))
                 Text(
-                    text = eventTitle(span.event),
+                    text = span.titleOverride ?: eventTitle(span.event),
                     color = DeepSea5,
                     fontSize = 14.sp,
                     fontWeight = FontWeight.SemiBold,
