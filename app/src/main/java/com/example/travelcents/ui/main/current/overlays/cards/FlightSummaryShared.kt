@@ -20,7 +20,6 @@ import androidx.compose.material.icons.filled.AirplanemodeActive
 import androidx.compose.material.icons.filled.ConfirmationNumber
 import androidx.compose.material.icons.filled.Language
 import androidx.compose.material.icons.filled.Search
-import androidx.compose.material3.Icon
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -49,7 +48,6 @@ import com.example.travelcents.data.trip.model.ATTR_WEBSITE_URL
 import com.example.travelcents.data.trip.model.TravelEvent
 import com.example.travelcents.data.trip.model.detailValue
 import com.example.travelcents.data.trip.model.firstNonBlank
-import com.example.travelcents.ui.modules.PhotoGalleryButton
 import com.example.travelcents.ui.modules.formatDisplayTime
 import java.time.ZoneId
 import java.time.ZonedDateTime
@@ -258,71 +256,32 @@ internal fun FlightActionRow(
         modifier = Modifier.fillMaxWidth(),
         horizontalArrangement = Arrangement.spacedBy(12.dp)
     ) {
-        DetailActionChip(
-            modifier = Modifier.weight(1f),
+        ItineraryActionButton(
             label = "Track",
-            filled = true,
-            type = "flight",
+            onClick = onTrack,
+            modifier = Modifier.weight(1f),
             icon = Icons.Default.Search,
-            onClick = onTrack
+            accent = CardSky
         )
         if (!summary.bookingUrl.isNullOrBlank()) {
-            DetailActionChip(
-                modifier = Modifier.weight(1f),
+            ItineraryActionButton(
                 label = "Book",
-                filled = false,
-                type = "flight",
-                icon = Icons.Default.ConfirmationNumber,
-                onClick = onBook
-            )
-        } else {
-            DetailActionChip(
+                onClick = onBook,
                 modifier = Modifier.weight(1f),
+                icon = Icons.Default.ConfirmationNumber,
+                emphasis = ItineraryActionEmphasis.Secondary,
+                accent = CardSky
+            )
+        } else {
+            ItineraryActionButton(
                 label = "Official Site",
-                filled = false,
-                type = "flight",
+                onClick = onBook,
+                modifier = Modifier.weight(1f),
                 icon = Icons.Default.Language,
-                onClick = onBook
+                emphasis = ItineraryActionEmphasis.Secondary,
+                accent = CardSky
             )
         }
-    }
-}
-
-@Composable
-private fun DetailActionChip(
-    modifier: Modifier,
-    label: String,
-    filled: Boolean,
-    type: String,
-    icon: androidx.compose.ui.graphics.vector.ImageVector,
-    onClick: () -> Unit
-) {
-    val accent = CardSky
-    val baseModifier = modifier
-        .clip(RoundedCornerShape(999.dp))
-        .clickable(onClick = onClick)
-    Row(
-        modifier = if (filled) {
-            baseModifier.background(accentGradientForType(type), RoundedCornerShape(999.dp))
-        } else {
-            baseModifier.background(CardSurfaceHigh, RoundedCornerShape(999.dp))
-        }
-            .padding(horizontal = 14.dp, vertical = 14.dp),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.Center
-    ) {
-        Icon(
-            imageVector = icon,
-            contentDescription = null,
-            tint = if (filled) CardBackground else accent
-        )
-        Spacer(modifier = Modifier.width(8.dp))
-        Text(
-            text = label,
-            color = if (filled) CardBackground else CardText,
-            fontSize = 13.sp,
-            fontWeight = FontWeight.Bold
-        )
     }
 }
 
@@ -371,12 +330,11 @@ internal fun FlightHeroMedia(
             )
         }
 
-        if (photoCount > 1 && onOpenGallery != null) {
-            PhotoGalleryButton(
+        if (photoCount > 0 && onOpenGallery != null) {
+            HeroImageCountPill(
                 photoCount = photoCount,
-                onClick = onOpenGallery,
                 modifier = Modifier
-                    .align(Alignment.TopEnd)
+                    .align(Alignment.BottomEnd)
                     .padding(10.dp)
             )
         }
@@ -674,30 +632,28 @@ internal fun ActivityActionRow(
         horizontalArrangement = Arrangement.spacedBy(12.dp)
     ) {
         if (ticketsUrl != null) {
-            DetailActionChip(
-                modifier = Modifier.weight(1f),
+            ItineraryActionButton(
                 label = "Tickets",
-                filled = true,
-                type = "activity",
-                icon = Icons.Default.ConfirmationNumber,
-                onClick = onBook
-            )
-            DetailActionChip(
+                onClick = onBook,
                 modifier = Modifier.weight(1f),
+                icon = Icons.Default.ConfirmationNumber,
+                accent = CardMint
+            )
+            ItineraryActionButton(
                 label = "Official Site",
-                filled = false,
-                type = "activity",
+                onClick = onBook,
+                modifier = Modifier.weight(1f),
                 icon = Icons.Default.Language,
-                onClick = onBook
+                emphasis = ItineraryActionEmphasis.Secondary,
+                accent = CardMint
             )
         } else {
-            DetailActionChip(
-                modifier = Modifier.weight(1f),
+            ItineraryActionButton(
                 label = "Official Site",
-                filled = true,
-                type = "activity",
+                onClick = onBook,
+                modifier = Modifier.weight(1f),
                 icon = Icons.Default.Language,
-                onClick = onBook
+                accent = CardMint
             )
             Spacer(modifier = Modifier.weight(1f))
         }

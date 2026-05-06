@@ -29,7 +29,7 @@ fun FlightBookingOffersCard(event: TravelEvent, adults: Int) {
                     subtitle = offer.subtitle,
                     onClick = { uriHandler.openUri(offer.link) },
                     accent = CardSky,
-                    actionLabel = "Search",
+                    actionLabel = "Book",
                     logoUrl = offer.logoUrl
                 )
             }

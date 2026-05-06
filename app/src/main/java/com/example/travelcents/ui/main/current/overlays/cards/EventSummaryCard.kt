@@ -10,6 +10,7 @@ import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -18,28 +19,24 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
-import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.unit.TextUnit
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImage
 import com.example.travelcents.data.trip.model.ATTR_AIRLINE_LOGO_URL
-import com.example.travelcents.data.trip.model.ATTR_TICKETMASTER_EVENT_ID
 import com.example.travelcents.data.trip.model.ATTR_BUSINESS_ADDRESS
+import com.example.travelcents.data.trip.model.ATTR_TICKETMASTER_EVENT_ID
 import com.example.travelcents.data.trip.model.TravelEvent
-import com.example.travelcents.data.trip.model.firstNonBlank
 import com.example.travelcents.data.trip.model.detailValue
+import com.example.travelcents.data.trip.model.firstNonBlank
 import com.example.travelcents.ui.main.current.eventSubtitle
 import com.example.travelcents.ui.main.current.eventTitle
 import com.example.travelcents.ui.modules.PhotoGalleryButton
-import com.example.travelcents.ui.modules.formatDisplayTimeRange
-import com.example.travelcents.ui.modules.formatLongDuration
 import com.example.travelcents.ui.modules.formatLongTripDateWithYear
-import com.example.travelcents.ui.modules.parseFlexibleTime
-import java.time.Duration
-import java.util.Locale
 
 @Composable
 fun EventSummaryCard(
@@ -67,6 +64,7 @@ fun EventSummaryCard(
         TicketmasterSummaryCard(
             event = event,
             heroImage = heroImage,
+            photoCount = photoCount,
             title = title,
             onOpenGallery = onOpenGallery
         )
@@ -98,85 +96,63 @@ fun EventSummaryCard(
         return
     }
 
+    val compactTime = listOfNotNull(
+        timeSummary.takeIf { it.isNotBlank() },
+        durationSummary.takeIf { it.isNotBlank() }
+    ).joinToString(" • ").ifBlank { "Time TBD" }
+
     DetailCardFrame(accent = accent) {
         Row(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.spacedBy(16.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            Box(
+            SummaryHeroMedia(
+                heroImage = heroImage,
+                title = title,
+                accentGradient = accentGradientForType(event.type),
+                photoCount = photoCount,
+                onOpenGallery = onOpenGallery,
                 modifier = Modifier
                     .weight(0.38f)
                     .aspectRatio(0.9f)
-                    .clip(RoundedCornerShape(22.dp))
-                    .background(CardSurfaceHighest)
-                    .then(if (onOpenGallery != null) Modifier.clickable(onClick = onOpenGallery) else Modifier)
-            ) {
-                if (!heroImage.isNullOrBlank()) {
-                    AsyncImage(
-                        model = heroImage,
-                        contentDescription = title,
-                        modifier = Modifier.matchParentSize(),
-                        contentScale = ContentScale.Crop
+                    .clip(RoundedCornerShape(22.dp)),
+                scrim = Brush.verticalGradient(
+                    colors = listOf(
+                        Color.Transparent,
+                        CardBackground.copy(alpha = 0.18f),
+                        CardBackground.copy(alpha = 0.72f)
                     )
-                    Box(
-                        modifier = Modifier
-                            .matchParentSize()
-                            .background(
-                                Brush.verticalGradient(
-                                    colors = listOf(
-                                        androidx.compose.ui.graphics.Color.Transparent,
-                                        CardBackground.copy(alpha = 0.18f),
-                                        CardBackground.copy(alpha = 0.72f)
-                                    )
-                                )
-                            )
-                    )
-                } else {
-                    Box(
-                        modifier = Modifier
-                            .matchParentSize()
-                            .background(accentGradientForType(event.type))
-                    )
-                }
-
-                EventTypeChip(
-                    type = event.type,
-                    accent = accent,
-                    modifier = Modifier
-                        .align(Alignment.TopStart)
-                        .padding(10.dp)
                 )
-
-                if (photoCount > 1 && onOpenGallery != null) {
-                    PhotoGalleryButton(
-                        photoCount = photoCount,
-                        onClick = onOpenGallery,
-                        modifier = Modifier
-                            .align(Alignment.TopEnd)
-                            .padding(10.dp)
-                    )
-                }
-            }
+            )
 
             Column(
                 modifier = Modifier.weight(0.62f),
-                verticalArrangement = Arrangement.spacedBy(8.dp)
+                verticalArrangement = Arrangement.spacedBy(6.dp)
             ) {
                 Text(
                     text = title,
                     color = CardText,
-                    fontSize = 24.sp,
-                    lineHeight = 28.sp,
-                    fontWeight = FontWeight.ExtraBold
+                    fontSize = 22.sp,
+                    lineHeight = 26.sp,
+                    fontWeight = FontWeight.ExtraBold,
+                    maxLines = 3,
+                    overflow = TextOverflow.Ellipsis
                 )
-                DetailBadgeRow(
-                    badges = listOf(timeSummary, durationSummary),
+                CompactSummaryMetaRow(
+                    label = "Date",
+                    value = formatLongTripDateWithYear(event.date).ifBlank { "Date TBD" },
                     accent = accent
                 )
-                if (!event.type.equals("flight", ignoreCase = true)) {
-                    val subtitle = eventSubtitle(event)
-                    if (subtitle.isNotBlank()) {
+                CompactSummaryMetaRow(
+                    label = "Time",
+                    value = compactTime,
+                    accent = accent,
+                    maxLines = 2
+                )
+                eventSubtitle(event)
+                    .takeIf { it.isNotBlank() }
+                    ?.let { subtitle ->
                         Row(
                             horizontalArrangement = Arrangement.spacedBy(8.dp),
                             verticalAlignment = Alignment.CenterVertically
@@ -191,11 +167,12 @@ fun EventSummaryCard(
                                 text = subtitle,
                                 color = CardTextMuted,
                                 fontSize = 11.sp,
-                                lineHeight = 15.sp
+                                lineHeight = 15.sp,
+                                maxLines = 2,
+                                overflow = TextOverflow.Ellipsis
                             )
                         }
                     }
-                }
             }
         }
     }
@@ -205,21 +182,13 @@ fun EventSummaryCard(
 private fun TicketmasterSummaryCard(
     event: TravelEvent,
     heroImage: String?,
+    photoCount: Int,
     title: String,
     onOpenGallery: (() -> Unit)?
 ) {
     val dateSummary = ticketmasterEventDateSummary(event) ?: event.date.ifBlank { "Date TBD" }
     val timeSummary = ticketmasterEventTimeSummary(event)
-    val titleFontSize = when {
-        title.length >= 80 -> 18.sp
-        title.length >= 54 -> 20.sp
-        else -> 22.sp
-    }
-    val titleLineHeight = when {
-        title.length >= 80 -> 22.sp
-        title.length >= 54 -> 24.sp
-        else -> 26.sp
-    }
+    val (titleFontSize, titleLineHeight) = compactSummaryTitleMetrics(title)
 
     DetailCardFrame(accent = CardLavender) {
         Row(
@@ -227,34 +196,29 @@ private fun TicketmasterSummaryCard(
             horizontalArrangement = Arrangement.spacedBy(16.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            Box(
+            SummaryHeroMedia(
+                heroImage = heroImage,
+                title = title,
+                accentGradient = accentGradientForType(event.type),
+                photoCount = photoCount,
+                onOpenGallery = onOpenGallery,
                 modifier = Modifier
                     .weight(0.42f)
                     .aspectRatio(0.92f)
-                    .clip(RoundedCornerShape(24.dp))
-                    .background(CardSurfaceHighest)
-                    .then(if (onOpenGallery != null) Modifier.clickable(onClick = onOpenGallery) else Modifier)
-            ) {
-                if (!heroImage.isNullOrBlank()) {
-                    AsyncImage(
-                        model = heroImage,
-                        contentDescription = title,
-                        modifier = Modifier.matchParentSize(),
-                        contentScale = ContentScale.Crop
+                    .clip(RoundedCornerShape(24.dp)),
+                showCountPill = false,
+                scrim = Brush.verticalGradient(
+                    colors = listOf(
+                        Color.Transparent,
+                        CardBackground.copy(alpha = 0.1f),
+                        CardBackground.copy(alpha = 0.32f)
                     )
-                } else {
-                    Box(
-                        modifier = Modifier
-                            .matchParentSize()
-                            .background(accentGradientForType(event.type))
-                    )
-                }
-
-            }
+                )
+            )
 
             Column(
                 modifier = Modifier.weight(0.58f),
-                verticalArrangement = Arrangement.spacedBy(10.dp)
+                verticalArrangement = Arrangement.spacedBy(6.dp)
             ) {
                 Text(
                     text = title,
@@ -265,41 +229,51 @@ private fun TicketmasterSummaryCard(
                     maxLines = 4,
                     overflow = TextOverflow.Ellipsis
                 )
-                TicketmasterSummaryMetaRow(label = "Date", value = dateSummary)
-                TicketmasterSummaryMetaRow(label = "Time", value = timeSummary)
+                CompactSummaryMetaRow(
+                    label = "Date",
+                    value = dateSummary,
+                    accent = CardLavender
+                )
+                CompactSummaryMetaRow(
+                    label = "Time",
+                    value = timeSummary,
+                    accent = CardLavender,
+                    maxLines = 2
+                )
             }
         }
     }
 }
 
 @Composable
-private fun TicketmasterSummaryMetaRow(
+internal fun CompactSummaryMetaRow(
     label: String,
-    value: String
+    value: String,
+    accent: Color,
+    maxLines: Int = 1
 ) {
     Row(
         modifier = Modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.spacedBy(8.dp),
-        verticalAlignment = Alignment.CenterVertically
+        horizontalArrangement = Arrangement.spacedBy(6.dp),
+        verticalAlignment = Alignment.Top
     ) {
         Text(
             text = "$label:",
             color = CardTextMuted,
-            fontSize = 13.sp,
-            lineHeight = 16.sp,
+            fontSize = 12.sp,
+            lineHeight = 15.sp,
             fontWeight = FontWeight.SemiBold,
-            textAlign = TextAlign.Start,
-            modifier = Modifier.weight(0.24f)
+            modifier = Modifier.width(42.dp)
         )
         Text(
             text = value,
-            color = CardText,
-            fontSize = 13.sp,
-            lineHeight = 16.sp,
+            color = accent,
+            fontSize = 12.sp,
+            lineHeight = 15.sp,
             fontWeight = FontWeight.SemiBold,
-            maxLines = 1,
+            maxLines = maxLines,
             overflow = TextOverflow.Ellipsis,
-            modifier = Modifier.weight(0.76f)
+            modifier = Modifier.weight(1f)
         )
     }
 }
@@ -321,77 +295,17 @@ private fun HotelSummaryCard(
             horizontalArrangement = Arrangement.spacedBy(16.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            Box(
+            SummaryHeroMedia(
+                heroImage = heroImage,
+                title = title,
+                accentGradient = accentGradientForType(event.type),
+                photoCount = photoCount,
+                onOpenGallery = onOpenGallery,
                 modifier = Modifier
                     .weight(0.42f)
                     .aspectRatio(0.92f)
                     .clip(RoundedCornerShape(24.dp))
-                    .background(CardSurfaceHighest)
-                    .then(if (onOpenGallery != null) Modifier.clickable(onClick = onOpenGallery) else Modifier)
-            ) {
-                if (!heroImage.isNullOrBlank()) {
-                    AsyncImage(
-                        model = heroImage,
-                        contentDescription = title,
-                        modifier = Modifier.matchParentSize(),
-                        contentScale = ContentScale.Crop
-                    )
-                    Box(
-                        modifier = Modifier
-                            .matchParentSize()
-                            .background(
-                                Brush.verticalGradient(
-                                    colors = listOf(
-                                        androidx.compose.ui.graphics.Color.Transparent,
-                                        CardBackground.copy(alpha = 0.12f),
-                                        CardBackground.copy(alpha = 0.42f)
-                                    )
-                                )
-                            )
-                    )
-                } else {
-                    Box(
-                        modifier = Modifier
-                            .matchParentSize()
-                            .background(accentGradientForType(event.type))
-                    )
-                }
-
-                EventTypeChip(
-                    type = event.type,
-                    accent = CardLavender,
-                    modifier = Modifier
-                        .align(Alignment.TopStart)
-                        .padding(10.dp)
-                )
-
-                if (photoCount > 0 && onOpenGallery != null) {
-                    PhotoGalleryButton(
-                        photoCount = photoCount,
-                        onClick = onOpenGallery,
-                        modifier = Modifier
-                            .align(Alignment.TopEnd)
-                            .padding(10.dp)
-                    )
-                }
-
-                Surface(
-                    color = CardBackground.copy(alpha = 0.62f),
-                    shape = RoundedCornerShape(999.dp),
-                    modifier = Modifier
-                        .align(Alignment.BottomStart)
-                        .padding(10.dp)
-                ) {
-                    Text(
-                        text = "HOTEL",
-                        color = CardLavender,
-                        fontSize = 9.sp,
-                        fontWeight = FontWeight.Bold,
-                        letterSpacing = 1.3.sp,
-                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp)
-                    )
-                }
-            }
+            )
 
             Column(
                 modifier = Modifier.weight(0.58f),
@@ -439,77 +353,17 @@ private fun RestaurantSummaryVariant(
             horizontalArrangement = Arrangement.spacedBy(16.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            Box(
+            SummaryHeroMedia(
+                heroImage = heroImage,
+                title = title,
+                accentGradient = accentGradientForType("restaurant"),
+                photoCount = photoCount,
+                onOpenGallery = onOpenGallery,
                 modifier = Modifier
                     .weight(0.42f)
                     .aspectRatio(0.92f)
                     .clip(RoundedCornerShape(24.dp))
-                    .background(CardSurfaceHighest)
-                    .then(if (onOpenGallery != null) Modifier.clickable(onClick = onOpenGallery) else Modifier)
-            ) {
-                if (!heroImage.isNullOrBlank()) {
-                    AsyncImage(
-                        model = heroImage,
-                        contentDescription = title,
-                        modifier = Modifier.matchParentSize(),
-                        contentScale = ContentScale.Crop
-                    )
-                    Box(
-                        modifier = Modifier
-                            .matchParentSize()
-                            .background(
-                                Brush.verticalGradient(
-                                    colors = listOf(
-                                        androidx.compose.ui.graphics.Color.Transparent,
-                                        CardBackground.copy(alpha = 0.12f),
-                                        CardBackground.copy(alpha = 0.42f)
-                                    )
-                                )
-                            )
-                    )
-                } else {
-                    Box(
-                        modifier = Modifier
-                            .matchParentSize()
-                            .background(accentGradientForType("restaurant"))
-                    )
-                }
-
-                EventTypeChip(
-                    type = event.type,
-                    accent = CardCoral,
-                    modifier = Modifier
-                        .align(Alignment.TopStart)
-                        .padding(10.dp)
-                )
-
-                if (photoCount > 1 && onOpenGallery != null) {
-                    PhotoGalleryButton(
-                        photoCount = photoCount,
-                        onClick = onOpenGallery,
-                        modifier = Modifier
-                            .align(Alignment.TopEnd)
-                            .padding(10.dp)
-                    )
-                }
-
-                Surface(
-                    color = CardBackground.copy(alpha = 0.62f),
-                    shape = RoundedCornerShape(999.dp),
-                    modifier = Modifier
-                        .align(Alignment.BottomStart)
-                        .padding(10.dp)
-                ) {
-                    Text(
-                        text = "RESTAURANT",
-                        color = CardCoral,
-                        fontSize = 9.sp,
-                        fontWeight = FontWeight.Bold,
-                        letterSpacing = 1.3.sp,
-                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp)
-                    )
-                }
-            }
+            )
 
             Column(
                 modifier = Modifier.weight(0.58f),
@@ -534,6 +388,87 @@ private fun RestaurantSummaryVariant(
                 }
             }
         }
+    }
+}
+
+@Composable
+internal fun HeroImageCountPill(
+    photoCount: Int,
+    modifier: Modifier = Modifier
+) {
+    Surface(
+        color = CardBackground.copy(alpha = 0.58f),
+        shape = RoundedCornerShape(999.dp),
+        modifier = modifier
+    ) {
+        Text(
+            text = "1/$photoCount",
+            color = CardText,
+            fontSize = 10.sp,
+            fontWeight = FontWeight.Bold,
+            modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp)
+        )
+    }
+}
+
+@Composable
+private fun SummaryHeroMedia(
+    heroImage: String?,
+    title: String,
+    accentGradient: Brush,
+    photoCount: Int,
+    onOpenGallery: (() -> Unit)?,
+    modifier: Modifier = Modifier,
+    showCountPill: Boolean = true,
+    scrim: Brush = Brush.verticalGradient(
+        colors = listOf(
+            Color.Transparent,
+            CardBackground.copy(alpha = 0.12f),
+            CardBackground.copy(alpha = 0.42f)
+        )
+    )
+) {
+    Box(
+        modifier = modifier
+            .background(CardSurfaceHighest)
+            .then(if (onOpenGallery != null) Modifier.clickable(onClick = onOpenGallery) else Modifier)
+    ) {
+        if (!heroImage.isNullOrBlank()) {
+            AsyncImage(
+                model = heroImage,
+                contentDescription = title,
+                modifier = Modifier.matchParentSize(),
+                contentScale = ContentScale.Crop
+            )
+            Box(
+                modifier = Modifier
+                    .matchParentSize()
+                    .background(scrim)
+            )
+        } else {
+            Box(
+                modifier = Modifier
+                    .matchParentSize()
+                    .background(accentGradient)
+            )
+        }
+
+        if (showCountPill && photoCount > 0 && onOpenGallery != null) {
+            HeroImageCountPill(
+                photoCount = photoCount,
+                modifier = Modifier
+                    .align(Alignment.BottomStart)
+                    .padding(10.dp)
+            )
+        }
+    }
+}
+
+private fun compactSummaryTitleMetrics(title: String): Pair<TextUnit, TextUnit> {
+    return when {
+        title.length >= 80 -> 18.sp to 22.sp
+        title.length >= 54 -> 19.sp to 23.sp
+        else -> 21.sp to 25.sp
     }
 }
 
@@ -578,7 +513,7 @@ private fun FlightSummaryVariant(
                             .background(
                                 Brush.verticalGradient(
                                     colors = listOf(
-                                        androidx.compose.ui.graphics.Color.Transparent,
+                                        Color.Transparent,
                                         CardBackground.copy(alpha = 0.18f),
                                         CardBackground.copy(alpha = 0.72f)
                                     )
@@ -613,7 +548,7 @@ private fun FlightSummaryVariant(
 
                 if (airlineLogo != null) {
                     Surface(
-                        color = androidx.compose.ui.graphics.Color.White,
+                        color = Color.White,
                         shape = RoundedCornerShape(999.dp),
                         modifier = Modifier
                             .align(Alignment.BottomStart)
@@ -623,8 +558,7 @@ private fun FlightSummaryVariant(
                         AsyncImage(
                             model = airlineLogo,
                             contentDescription = null,
-                            modifier = Modifier
-                                .padding(6.dp),
+                            modifier = Modifier.padding(6.dp),
                             contentScale = ContentScale.Fit
                         )
                     }
@@ -642,10 +576,10 @@ private fun FlightSummaryVariant(
                     lineHeight = 30.sp,
                     fontWeight = FontWeight.ExtraBold
                 )
-                
+
                 if (summary != null) {
                     Text(
-                        text = "${summary.originCode} \u2192 ${summary.destinationCode}",
+                        text = "${summary.originCode} → ${summary.destinationCode}",
                         color = CardSky,
                         fontSize = 15.sp,
                         fontWeight = FontWeight.Bold

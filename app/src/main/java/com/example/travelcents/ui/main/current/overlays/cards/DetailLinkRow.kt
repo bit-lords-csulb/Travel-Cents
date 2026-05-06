@@ -3,13 +3,15 @@ package com.example.travelcents.ui.main.current.overlays.cards
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.OpenInNew
-import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
@@ -25,7 +27,8 @@ fun DetailLinkRow(
     value: String,
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
-    accent: Color = CardLavender
+    accent: Color = CardLavender,
+    actionLabel: String = "Open"
 ) {
     Row(
         modifier = modifier
@@ -53,10 +56,14 @@ fun DetailLinkRow(
                 fontWeight = FontWeight.SemiBold
             )
         }
-        Icon(
-            imageVector = Icons.AutoMirrored.Filled.OpenInNew,
-            contentDescription = null,
-            tint = accent
+        Spacer(modifier = Modifier.width(12.dp))
+        ItineraryActionButton(
+            label = actionLabel,
+            onClick = onClick,
+            icon = Icons.AutoMirrored.Filled.OpenInNew,
+            emphasis = ItineraryActionEmphasis.Secondary,
+            accent = accent,
+            contentPadding = PaddingValues(horizontal = 14.dp, vertical = 10.dp)
         )
     }
 }
