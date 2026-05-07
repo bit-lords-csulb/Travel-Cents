@@ -71,6 +71,7 @@ import com.example.travelcents.data.social.model.BookmarkedPlace
 import com.example.travelcents.data.trip.TripKey
 import com.example.travelcents.data.trip.TripPerformanceLogger
 import com.example.travelcents.data.trip.model.Itinerary
+import com.example.travelcents.data.trip.model.isAiChatDraftStatus
 import com.example.travelcents.notification.ChatNotificationTarget
 import com.example.travelcents.notification.NotificationHelper
 import com.example.travelcents.ui.components.ProfileAvatar
@@ -472,6 +473,7 @@ private fun TripCard(
         val isSharedTrip = trip.ownerUid.isNotBlank() && trip.ownerUid != viewerUid
         val statusBadge = when {
             trip.status.equals("archived", ignoreCase = true) -> "Archived"
+            isAiChatDraftStatus(trip.status) -> "Draft"
             isSharedTrip -> "Shared"
             else -> null
         }

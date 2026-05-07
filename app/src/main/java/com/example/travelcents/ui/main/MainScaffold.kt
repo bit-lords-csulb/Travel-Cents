@@ -631,22 +631,18 @@ fun MainScaffold(modifier: Modifier = Modifier, onLogout: () -> Unit = {}) {
                             }
                         )
                         when (previewSource) {
-                            is PreviewSource.CuratedStarter -> PreviewActionBar(
+                            is PreviewSource.CuratedStarter,
+                            is PreviewSource.DestinationLock -> PreviewDraftActionBar(
                                 modifier = Modifier
                                     .align(Alignment.BottomCenter)
                                     .fillMaxWidth(),
-                                onDiscard = {
-                                    pendingPreview = null
+                                onBack = {
                                     navController.popBackStack()
                                 },
-                                onCommit = {
-                                    val toCommit = previewSource
-                                    pendingPreview = null
-                                    newTripViewModel.commitItinerary(
-                                        starter = toCommit.starter,
-                                        intakeProfile = toCommit.intakeProfile,
-                                        events = toCommit.addedEvents,
+                                onSave = {
+                                    currentTripViewModel.saveCurrentPreviewAsDraft(
                                         onTripReady = { tripKey ->
+                                            pendingPreview = null
                                             currentTripViewModel.loadTrip(tripKey)
                                             navController.navigate(MainRoutes.CURRENT_ITINERARY) {
                                                 popUpTo(MainRoutes.HOME) { inclusive = false }
@@ -654,15 +650,6 @@ fun MainScaffold(modifier: Modifier = Modifier, onLogout: () -> Unit = {}) {
                                             }
                                         }
                                     )
-                                }
-                            )
-
-                            is PreviewSource.DestinationLock -> SkeletonPreviewBar(
-                                modifier = Modifier
-                                    .align(Alignment.BottomCenter)
-                                    .fillMaxWidth(),
-                                onBack = {
-                                    navController.popBackStack()
                                 }
                             )
 
@@ -716,8 +703,9 @@ private fun TravelEvent.previewIdentityKey(): String {
 }
 
 @Composable
-private fun SkeletonPreviewBar(
+private fun PreviewDraftActionBar(
     onBack: () -> Unit,
+    onSave: () -> Unit,
     modifier: Modifier = Modifier
 ) {
     Column(
@@ -727,35 +715,7 @@ private fun SkeletonPreviewBar(
             .padding(horizontal = 16.dp, vertical = 12.dp)
     ) {
         Text(
-            text = "Draft trip — keep chatting to fill it in.",
-            color = DeepSea5.copy(alpha = 0.78f),
-            fontWeight = FontWeight.Medium
-        )
-        Spacer(Modifier.height(10.dp))
-        OutlinedButton(
-            onClick = onBack,
-            modifier = Modifier.fillMaxWidth(),
-            shape = RoundedCornerShape(14.dp)
-        ) {
-            Text(text = "← Back to Chat")
-        }
-    }
-}
-
-@Composable
-private fun PreviewActionBar(
-    onDiscard: () -> Unit,
-    onCommit: () -> Unit,
-    modifier: Modifier = Modifier
-) {
-    Column(
-        modifier = modifier
-            .background(TripWizardColors.ContainerLow)
-            .navigationBarsPadding()
-            .padding(horizontal = 16.dp, vertical = 12.dp)
-    ) {
-        Text(
-            text = "Preview only — nothing is saved yet.",
+            text = "Draft preview — nothing is saved yet.",
             color = DeepSea5.copy(alpha = 0.78f),
             fontWeight = FontWeight.Medium
         )
@@ -765,14 +725,14 @@ private fun PreviewActionBar(
             horizontalArrangement = Arrangement.spacedBy(12.dp)
         ) {
             OutlinedButton(
-                onClick = onDiscard,
+                onClick = onBack,
                 modifier = Modifier.weight(1f),
                 shape = RoundedCornerShape(14.dp)
             ) {
-                Text(text = "Discard")
+                Text(text = "Go back to chat")
             }
             Button(
-                onClick = onCommit,
+                onClick = onSave,
                 modifier = Modifier.weight(1f),
                 shape = RoundedCornerShape(14.dp),
                 colors = ButtonDefaults.buttonColors(
@@ -780,7 +740,7 @@ private fun PreviewActionBar(
                     contentColor = Color.White
                 )
             ) {
-                Text(text = "Use this trip")
+                Text(text = "Save")
             }
         }
     }

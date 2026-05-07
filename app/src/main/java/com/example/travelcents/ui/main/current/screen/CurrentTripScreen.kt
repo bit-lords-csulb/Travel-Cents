@@ -189,6 +189,7 @@ fun CurrentTripScreen(
             ) {
                 CurrentTripHeader(
                     tripTitle = uiState.tripTitle,
+                    tripStatus = uiState.tripStatus,
                     heroDate = itineraryVisibleDate.ifBlank { uiState.dateFrom },
                     currentTripId = uiState.currentTripId,
                     currentTripOwnerUid = uiState.currentTripOwnerUid,

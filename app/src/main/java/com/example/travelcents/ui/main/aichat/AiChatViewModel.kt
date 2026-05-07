@@ -589,10 +589,11 @@ class AiChatViewModel(application: Application) : AndroidViewModel(application) 
             AiCuratedTripSource.SEEDED,
             AiCuratedTripSource.GENERATED -> {
                 onStarterSelected(starter, sessionState.intakeProfile)
-                if (startDiscoveryIfEligibleInternal()) {
-                    persistLastSession()
-                    publishUiState()
-                }
+                // Phase 1 v10: keep food discovery logic available, but stop auto-starting it.
+                // if (startDiscoveryIfEligibleInternal()) {
+                //     persistLastSession()
+                //     publishUiState()
+                // }
             }
         }
     }
@@ -1734,7 +1735,8 @@ class AiChatViewModel(application: Application) : AndroidViewModel(application) 
                 activeSingleEventCard = singleEventCard
             )
             isLoading = false
-            startDiscoveryIfEligibleInternal()
+            // Phase 1 v10: keep food discovery logic available, but stop auto-starting it.
+            // startDiscoveryIfEligibleInternal()
             persistLastSession()
             publishUiState()
             generateTitleIfNeeded()

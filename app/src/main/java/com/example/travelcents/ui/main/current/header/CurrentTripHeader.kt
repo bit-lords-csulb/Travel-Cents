@@ -59,6 +59,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.travelcents.data.trip.TripKey
 import com.example.travelcents.data.trip.model.Itinerary
+import com.example.travelcents.data.trip.model.isAiChatDraftStatus
 import com.example.travelcents.ui.main.current.TripMemberUi
 import com.example.travelcents.ui.modules.formatDayOfWeekFull
 import com.example.travelcents.ui.modules.formatHeroDate
@@ -76,6 +77,7 @@ private val SwitcherButtonShape = RoundedCornerShape(18.dp)
 @Composable
 fun CurrentTripHeader(
     tripTitle: String,
+    tripStatus: String,
     heroDate: String,
     currentTripId: String?,
     currentTripOwnerUid: String?,
@@ -110,6 +112,8 @@ fun CurrentTripHeader(
     var showMembersSheet by remember { mutableStateOf(false) }
     var editableTitle by remember { mutableStateOf(tripTitle) }
     val displayTitle = tripTitle.ifBlank { "My Trip" }
+    val showDraftBadge = isAiChatDraftStatus(tripStatus) ||
+        tripStatus.equals("preview", ignoreCase = true)
     val titleSidePadding = if (allTrips.size > 1) 60.dp else 64.dp
 
     LaunchedEffect(tripTitle, showRenameDialog) {
@@ -267,6 +271,9 @@ fun CurrentTripHeader(
                             textAlign = TextAlign.Center,
                             modifier = Modifier.weight(1f, fill = false)
                         )
+                        if (showDraftBadge) {
+                            TripStatusPill(label = "Draft")
+                        }
                         Icon(
                             imageVector = Icons.Default.KeyboardArrowDown,
                             contentDescription = "Switch trip",
@@ -275,20 +282,30 @@ fun CurrentTripHeader(
                         )
                     }
                 } else {
-                    Text(
-                        text = displayTitle,
-                        color = CurrentTripHeroAccent,
-                        fontSize = 18.sp,
-                        fontWeight = FontWeight.ExtraBold,
-                        fontFamily = TravelCentsFonts.Headline,
-                        maxLines = 1,
-                        softWrap = false,
-                        overflow = TextOverflow.Ellipsis,
-                        textAlign = TextAlign.Center,
+                    Row(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .widthIn(max = selectorMaxWidth)
-                    )
+                            .widthIn(max = selectorMaxWidth),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.Center
+                    ) {
+                        Text(
+                            text = displayTitle,
+                            color = CurrentTripHeroAccent,
+                            fontSize = 18.sp,
+                            fontWeight = FontWeight.ExtraBold,
+                            fontFamily = TravelCentsFonts.Headline,
+                            maxLines = 1,
+                            softWrap = false,
+                            overflow = TextOverflow.Ellipsis,
+                            textAlign = TextAlign.Center,
+                            modifier = Modifier.weight(1f, fill = false)
+                        )
+                        if (showDraftBadge) {
+                            Spacer(modifier = Modifier.width(6.dp))
+                            TripStatusPill(label = "Draft")
+                        }
+                    }
                 }
 
                 DropdownMenu(
@@ -300,21 +317,30 @@ fun CurrentTripHeader(
                 ) {
                     allTrips.forEach { trip ->
                         val isCurrentTrip = trip.itineraryId == currentTripId && trip.ownerUid == currentTripOwnerUid
-                        val tripLabel = buildString {
-                            append(trip.tripName)
-                            if (trip.status.equals("archived", ignoreCase = true)) {
-                                append(" · Archived")
-                            } else if (!viewerUid.isNullOrBlank() && trip.ownerUid != viewerUid) {
-                                append(" · Shared")
-                            }
+                        val tripBadges = buildList {
+                            if (isAiChatDraftStatus(trip.status)) add("Draft")
+                            if (trip.status.equals("archived", ignoreCase = true)) add("Archived")
+                            if (!viewerUid.isNullOrBlank() && trip.ownerUid != viewerUid) add("Shared")
                         }
                         DropdownMenuItem(
                             text = {
-                                Text(
-                                    text = tripLabel,
-                                    color = if (isCurrentTrip) DeepSea5 else DeepSea4,
-                                    fontWeight = if (isCurrentTrip) FontWeight.Bold else FontWeight.Normal
-                                )
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                ) {
+                                    Text(
+                                        text = trip.tripName,
+                                        color = if (isCurrentTrip) DeepSea5 else DeepSea4,
+                                        fontWeight = if (isCurrentTrip) FontWeight.Bold else FontWeight.Normal,
+                                        maxLines = 1,
+                                        overflow = TextOverflow.Ellipsis,
+                                        modifier = Modifier.weight(1f)
+                                    )
+                                    tripBadges.forEach { badge ->
+                                        TripStatusPill(label = badge)
+                                    }
+                                }
                             },
                             onClick = {
                                 switcherExpanded = false
@@ -499,6 +525,32 @@ fun CurrentTripHeader(
         } else {
             Spacer(modifier = Modifier.height(8.dp))
         }
+    }
+}
+
+@Composable
+private fun TripStatusPill(label: String) {
+    val accent = when (label.lowercase()) {
+        "draft" -> CurrentTripHeroAccent
+        "archived" -> Color(0xFFE7A36A)
+        else -> DeepSea4
+    }
+    Box(
+        modifier = Modifier
+            .clip(RoundedCornerShape(50.dp))
+            .background(accent.copy(alpha = 0.14f))
+            .border(1.dp, accent.copy(alpha = 0.32f), RoundedCornerShape(50.dp))
+            .padding(horizontal = 8.dp, vertical = 3.dp),
+        contentAlignment = Alignment.Center
+    ) {
+        Text(
+            text = label,
+            color = accent,
+            fontSize = 10.sp,
+            lineHeight = 10.sp,
+            fontWeight = FontWeight.Bold,
+            fontFamily = TravelCentsFonts.Body
+        )
     }
 }
 
