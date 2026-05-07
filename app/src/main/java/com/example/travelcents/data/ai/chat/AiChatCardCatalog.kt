@@ -6,6 +6,7 @@ object AiChatCardCatalog {
     private const val STARTER_GROUP_ID = "starter_grid"
     private const val STARTER_CARD_COUNT = 6
     const val DEAD_END_GROUP_ID = "next_step_actions"
+    const val DISCOVERY_GROUP_ID = "discovery_help"
 
     private val starterPool = listOf(
         starterOption("beach_getaway", "Beach Getaway", "I want to plan a beach getaway."),

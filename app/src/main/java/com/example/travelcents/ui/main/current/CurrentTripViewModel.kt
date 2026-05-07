@@ -1695,6 +1695,9 @@ class CurrentTripViewModel(application: Application) : AndroidViewModel(applicat
         val uid = auth.currentUser?.uid ?: return
         val tripKey = requireOwnerTripKey("share this trip") ?: return
 
+        // Fire-and-forget: grant access so recipients can open the trip.
+        // This uses a Firestore transaction which requires network; keep it
+        // out of the send path so an offline device can still share.
         viewModelScope.launch {
             try {
                 tripRepository.ensureTripAccess(
@@ -1702,7 +1705,13 @@ class CurrentTripViewModel(application: Application) : AndroidViewModel(applicat
                     memberUids = target.memberUids,
                     defaultRole = TripAccessRole.EDITOR
                 )
+            } catch (e: Exception) {
+                Log.w("CurrentTripViewModel", "Trip access grant failed; will retry when recipient opens trip", e)
+            }
+        }
 
+        viewModelScope.launch {
+            try {
                 val senderName = resolveSenderDisplayName()
                 val container = if (target.isGroup) "groups" else "directChats"
                 val chatRef = db.collection(container).document(target.id)

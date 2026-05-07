@@ -6,6 +6,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.ConfirmationNumber
 import androidx.compose.material.icons.filled.FlightTakeoff
 import androidx.compose.material.icons.filled.Hotel
 import androidx.compose.material.icons.filled.Place
@@ -28,6 +29,7 @@ internal fun eventTypeIcon(type: String): ImageVector {
         "flight" -> Icons.Filled.FlightTakeoff
         "hotel" -> Icons.Filled.Hotel
         "restaurant", "dining", "food" -> Icons.Filled.Restaurant
+        "concert" -> Icons.Filled.ConfirmationNumber
         else -> Icons.Filled.Place
     }
 }

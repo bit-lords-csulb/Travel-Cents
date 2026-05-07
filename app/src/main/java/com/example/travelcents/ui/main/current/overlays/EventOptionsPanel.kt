@@ -68,6 +68,7 @@ import com.example.travelcents.data.trip.model.EventOption
 import com.example.travelcents.data.trip.model.TravelEvent
 import com.example.travelcents.data.trip.model.displayName
 import com.example.travelcents.data.trip.model.firstNonBlank
+import com.example.travelcents.ui.main.current.eventDisplayType
 import com.example.travelcents.ui.main.current.overlays.cards.EventTypeChip
 import com.example.travelcents.ui.main.current.overlays.cards.eventTypeIcon
 import com.example.travelcents.ui.modules.heroImageModel
@@ -184,6 +185,7 @@ private fun eventTypeColor(type: String): Color = when (type.lowercase()) {
     "flight" -> BlueAccent
     "hotel" -> TertiaryPurple
     "restaurant", "dining", "food" -> ErrorRed
+    "concert" -> Color(0xFFFFA3D7)
     else -> Color(0xFFD5E3FB)
 }
 
@@ -201,7 +203,7 @@ fun EventOptionsPanel(
     selectedNamesElsewhere: Set<String> = emptySet()
 ) {
     val context = LocalContext.current
-    val typeColor = eventTypeColor(event.type)
+    val typeColor = eventTypeColor(eventDisplayType(event))
     val activeOptions = options.filter { opt ->
         opt.optionId !in rejectedIds && !opt.selected
     }
@@ -240,7 +242,7 @@ fun EventOptionsPanel(
                     .padding(horizontal = 20.dp, vertical = 12.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                EventTypeChip(type = event.type, accent = typeColor)
+                EventTypeChip(type = eventDisplayType(event), accent = typeColor)
                 Spacer(modifier = Modifier.width(10.dp))
                 Text(
                     text = "Choose an option",
@@ -439,8 +441,8 @@ private fun OptionRow(
                 )
             } else {
                 Icon(
-                    imageVector = eventTypeIcon(event.type),
-                    contentDescription = event.type,
+                    imageVector = eventTypeIcon(eventDisplayType(event)),
+                    contentDescription = eventDisplayType(event),
                     tint = typeColor,
                     modifier = Modifier.size(20.dp)
                 )
@@ -513,4 +515,3 @@ private fun OptionRow(
         }
     }
 }
-

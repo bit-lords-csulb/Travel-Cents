@@ -760,6 +760,15 @@ class AiChatViewModel(application: Application) : AndroidViewModel(application) 
             return
         }
 
+        // Discovery cards (restaurants / activities / both) bypass the LLM and call Yelp directly.
+        if (trimmedText.isBlank() &&
+            selectedOptions.size == 1 &&
+            selectedOptions.first().groupId == AiChatCardCatalog.DISCOVERY_GROUP_ID
+        ) {
+            dispatchDiscoveryAction(selectedOptions.first())
+            return
+        }
+
         val activeQuestionTitle = sessionState.activeResponseCardGroup?.title.orEmpty()
 
         submitUserTurn(
@@ -1016,11 +1025,175 @@ class AiChatViewModel(application: Application) : AndroidViewModel(application) 
         }
     }
 
+    private fun dispatchDiscoveryAction(option: AiChatCardOption) {
+        val submittedMessage = AiChatItem.TextMessage(
+            text = "",
+            sender = AiChatSender.USER,
+            tags = listOf(option.label)
+        )
+        conversationItems += submittedMessage
+
+        sessionState = sessionState.copy(
+            llmHistory = sessionState.llmHistory + LlmMessage(role = "user", content = option.message),
+            draftText = "",
+            selectedDraftOptions = emptyList(),
+            activeResponseCardGroup = null,
+            activeDestinationRecommendationRow = null,
+            activeCuratedTripRow = null,
+            activePlaceRecommendationRow = null,
+            pendingPlaceRecommendationRow = null,
+            donePlaceRecommendationRows = emptyList(),
+            activeSingleEventCard = null,
+            anchorMessageId = submittedMessage.id
+        )
+        isLoading = true
+        persistLastSession()
+        publishUiState()
+
+        when (option.id) {
+            "discovery_restaurants" -> handleDiscoveryRestaurants()
+            "discovery_activities" -> handleDiscoveryActivities()
+            "discovery_both" -> handleDiscoveryBoth()
+            "discovery_skip" -> handleDiscoverySkip()
+            else -> {
+                Log.w(TAG, "Unknown discovery option id=${option.id}")
+                finishDeadEndAction(
+                    assistantText = "Not sure what to find. Pick an option below.",
+                    followUpGroup = AiChatCardCatalog.postDestinationDeadEndGroup()
+                )
+            }
+        }
+    }
+
+    private fun handleDiscoveryRestaurants() {
+        val destination = sessionState.intakeProfile.destination.ifBlank { sessionState.lockedDestination.orEmpty() }
+        viewModelScope.launch {
+            val row = runCatching {
+                placeRecommendationCoordinator.recommendRowForToolCall(
+                    toolCall = AiToolCall.SearchRestaurants(
+                        city = destination,
+                        cuisines = sessionState.intakeProfile.cuisinePreferences
+                    ),
+                    intakeProfile = sessionState.intakeProfile,
+                    profile = sessionState.profile
+                )
+            }.onFailure { error ->
+                Log.w(TAG, "Discovery restaurants failed: ${error.message}", error)
+            }.getOrNull()
+
+            if (row != null) {
+                finishDeadEndAction(
+                    assistantText = "Here are some restaurant options in $destination.",
+                    placeRecommendationRow = row
+                )
+            } else {
+                finishDeadEndAction(
+                    assistantText = "I couldn't find restaurant options right now.",
+                    followUpGroup = AiChatCardCatalog.postDestinationDeadEndGroup()
+                )
+            }
+        }
+    }
+
+    private fun handleDiscoveryActivities() {
+        val destination = sessionState.intakeProfile.destination.ifBlank { sessionState.lockedDestination.orEmpty() }
+        viewModelScope.launch {
+            val row = runCatching {
+                placeRecommendationCoordinator.recommendRowForToolCall(
+                    toolCall = AiToolCall.SearchActivities(
+                        city = destination,
+                        categories = sessionState.intakeProfile.activitySubCategories
+                            .ifEmpty { sessionState.intakeProfile.interests }
+                    ),
+                    intakeProfile = sessionState.intakeProfile,
+                    profile = sessionState.profile
+                )
+            }.onFailure { error ->
+                Log.w(TAG, "Discovery activities failed: ${error.message}", error)
+            }.getOrNull()
+
+            if (row != null) {
+                finishDeadEndAction(
+                    assistantText = "Here are some activity options in $destination.",
+                    placeRecommendationRow = row
+                )
+            } else {
+                finishDeadEndAction(
+                    assistantText = "I couldn't find activity options right now.",
+                    followUpGroup = AiChatCardCatalog.postDestinationDeadEndGroup()
+                )
+            }
+        }
+    }
+
+    private fun handleDiscoveryBoth() {
+        val destination = sessionState.intakeProfile.destination.ifBlank { sessionState.lockedDestination.orEmpty() }
+        viewModelScope.launch {
+            val restaurantRow = runCatching {
+                placeRecommendationCoordinator.recommendRowForToolCall(
+                    toolCall = AiToolCall.SearchRestaurants(
+                        city = destination,
+                        cuisines = sessionState.intakeProfile.cuisinePreferences
+                    ),
+                    intakeProfile = sessionState.intakeProfile,
+                    profile = sessionState.profile
+                )
+            }.onFailure { error ->
+                Log.w(TAG, "Discovery restaurants (both) failed: ${error.message}", error)
+            }.getOrNull()
+
+            val activityRow = runCatching {
+                placeRecommendationCoordinator.recommendRowForToolCall(
+                    toolCall = AiToolCall.SearchActivities(
+                        city = destination,
+                        categories = sessionState.intakeProfile.activitySubCategories
+                            .ifEmpty { sessionState.intakeProfile.interests }
+                    ),
+                    intakeProfile = sessionState.intakeProfile,
+                    profile = sessionState.profile
+                )
+            }.onFailure { error ->
+                Log.w(TAG, "Discovery activities (both) failed: ${error.message}", error)
+            }.getOrNull()
+
+            val primaryRow = restaurantRow ?: activityRow
+            val secondaryRow = if (restaurantRow != null) activityRow else null
+
+            if (primaryRow != null) {
+                val assistantText = when {
+                    restaurantRow != null && activityRow != null ->
+                        "Here are restaurant and activity options in $destination."
+                    restaurantRow != null -> "Here are some restaurant options in $destination."
+                    else -> "Here are some activity options in $destination."
+                }
+                finishDeadEndAction(
+                    assistantText = assistantText,
+                    placeRecommendationRow = primaryRow,
+                    pendingPlaceRecommendationRow = secondaryRow
+                )
+            } else {
+                finishDeadEndAction(
+                    assistantText = "I couldn't find options right now.",
+                    followUpGroup = AiChatCardCatalog.postDestinationDeadEndGroup()
+                )
+            }
+        }
+    }
+
+    private fun handleDiscoverySkip() {
+        finishDeadEndAction(
+            assistantText = "No problem. What would you like to do next?",
+            followUpGroup = AiChatCardCatalog.postDestinationDeadEndGroup()
+        )
+    }
+
     private fun finishDeadEndAction(
         assistantText: String,
         followUpGroup: AiChatCardGroup? = null,
         destinationRow: AiDestinationRecommendationRow? = null,
-        curatedTripRow: AiCuratedTripRow? = null
+        curatedTripRow: AiCuratedTripRow? = null,
+        placeRecommendationRow: AiPlaceRecommendationRow? = null,
+        pendingPlaceRecommendationRow: AiPlaceRecommendationRow? = null
     ) {
         if (assistantText.isNotBlank()) {
             conversationItems += AiChatItem.TextMessage(
@@ -1036,8 +1209,8 @@ class AiChatViewModel(application: Application) : AndroidViewModel(application) 
             activeResponseCardGroup = followUpGroup,
             activeDestinationRecommendationRow = destinationRow,
             activeCuratedTripRow = curatedTripRow,
-            activePlaceRecommendationRow = null,
-            pendingPlaceRecommendationRow = null,
+            activePlaceRecommendationRow = placeRecommendationRow,
+            pendingPlaceRecommendationRow = pendingPlaceRecommendationRow,
             donePlaceRecommendationRows = emptyList(),
             activeSingleEventCard = null
         )

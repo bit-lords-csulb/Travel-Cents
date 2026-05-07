@@ -16,11 +16,13 @@ internal val CardGold = Color(0xFFF1CB77)
 internal val CardMint = Color(0xFF8CD7BE)
 internal val CardCoral = Color(0xFFFF8E7A)
 internal val CardSky = Color(0xFF7BC5FF)
+internal val CardConcert = Color(0xFFFFA3D7)
 
 internal fun accentForType(type: String): Color = when (type.lowercase()) {
     "flight" -> CardSky
     "hotel" -> CardLavender
     "restaurant", "dining", "food" -> CardCoral
+    "concert" -> CardConcert
     else -> CardMint
 }
 
@@ -29,6 +31,7 @@ internal fun accentGradientForType(type: String): Brush = Brush.linearGradient(
         "flight" -> listOf(CardSky, Color(0xFF4E86D9))
         "hotel" -> listOf(CardLavender, CardLavenderStrong)
         "restaurant", "dining", "food" -> listOf(CardCoral, Color(0xFFD35E58))
+        "concert" -> listOf(CardConcert, Color(0xFFD25DA9))
         else -> listOf(CardMint, Color(0xFF4CA88C))
     }
 )

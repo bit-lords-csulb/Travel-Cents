@@ -63,6 +63,7 @@ import coil.compose.AsyncImage
 import com.example.travelcents.data.trip.advisory.TripAdvisory
 import com.example.travelcents.data.trip.model.EventOption
 import com.example.travelcents.data.trip.model.TravelEvent
+import com.example.travelcents.ui.main.current.eventDisplayType
 import com.example.travelcents.ui.main.current.overlays.cards.CompactFlightSummaryContent
 import com.example.travelcents.ui.main.current.overlays.cards.EventTypeChip
 import com.example.travelcents.ui.main.current.overlays.cards.FlightHeroMedia
@@ -400,7 +401,7 @@ internal fun TripEventCard(
                         CompactFlightCardContent(accent = accent, summary = flightSummary)
                     } else {
                         Row(verticalAlignment = Alignment.CenterVertically) {
-                            EventTypeChip(type = event.type, accent = accent)
+                            EventTypeChip(type = eventDisplayType(event), accent = accent)
                             if (event.startTime.isNotBlank()) {
                                 Spacer(modifier = Modifier.width(8.dp))
                                 Text(
@@ -561,8 +562,8 @@ internal fun CurrentTripItineraryCard(
                             contentAlignment = Alignment.Center
                         ) {
                             Icon(
-                                imageVector = eventTypeIcon(event.type),
-                                contentDescription = event.type,
+                                imageVector = eventTypeIcon(eventDisplayType(event)),
+                                contentDescription = eventDisplayType(event),
                                 tint = accent,
                                 modifier = Modifier.size(28.dp)
                             )
@@ -575,7 +576,7 @@ internal fun CurrentTripItineraryCard(
                             .padding(horizontal = 14.dp, vertical = 14.dp)
                     ) {
                         Row(verticalAlignment = Alignment.CenterVertically) {
-                            EventTypeChip(type = event.type, accent = accent)
+                            EventTypeChip(type = eventDisplayType(event), accent = accent)
                             if (event.startTime.isNotBlank()) {
                                 Spacer(modifier = Modifier.width(8.dp))
                                 Text(

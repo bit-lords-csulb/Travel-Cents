@@ -33,6 +33,7 @@ import com.example.travelcents.data.trip.model.ATTR_TICKETMASTER_EVENT_ID
 import com.example.travelcents.data.trip.model.TravelEvent
 import com.example.travelcents.data.trip.model.detailValue
 import com.example.travelcents.data.trip.model.firstNonBlank
+import com.example.travelcents.ui.main.current.eventDisplayType
 import com.example.travelcents.ui.main.current.eventTitle
 import com.example.travelcents.ui.modules.PhotoGalleryButton
 
@@ -45,7 +46,8 @@ fun EventSummaryCard(
     durationSummary: String,
     onOpenGallery: (() -> Unit)? = null
 ) {
-    val accent = accentForType(event.type)
+    val displayType = eventDisplayType(event)
+    val accent = accentForType(displayType)
     val title = eventTitle(event)
     val isTicketmasterBacked = !event.detailValue(ATTR_TICKETMASTER_EVENT_ID).isNullOrBlank()
     if (event.type.equals("hotel", ignoreCase = true)) {
@@ -105,7 +107,7 @@ fun EventSummaryCard(
             SummaryHeroMedia(
                 heroImage = heroImage,
                 title = title,
-                accentGradient = accentGradientForType(event.type),
+                accentGradient = accentGradientForType(displayType),
                 photoCount = photoCount,
                 onOpenGallery = onOpenGallery,
                 modifier = Modifier
@@ -168,7 +170,7 @@ private fun TicketmasterSummaryCard(
     val durationSummary = eventDisplayDurationSummary(event)
     val (titleFontSize, titleLineHeight) = compactSummaryTitleMetrics(title)
 
-    DetailCardFrame(accent = CardLavender) {
+    DetailCardFrame(accent = CardConcert) {
         Row(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.spacedBy(16.dp),
@@ -177,7 +179,7 @@ private fun TicketmasterSummaryCard(
             SummaryHeroMedia(
                 heroImage = heroImage,
                 title = title,
-                accentGradient = accentGradientForType(event.type),
+                accentGradient = accentGradientForType("concert"),
                 photoCount = photoCount,
                 onOpenGallery = onOpenGallery,
                 modifier = Modifier
@@ -198,6 +200,7 @@ private fun TicketmasterSummaryCard(
                 modifier = Modifier.weight(0.58f),
                 verticalArrangement = Arrangement.spacedBy(6.dp)
             ) {
+                EventTypeChip(type = "concert", accent = CardConcert)
                 Text(
                     text = title,
                     color = CardText,
@@ -210,18 +213,18 @@ private fun TicketmasterSummaryCard(
                 CompactSummaryMetaRow(
                     label = "Date",
                     value = dateSummary,
-                    accent = CardLavender
+                    accent = CardConcert
                 )
                 CompactSummaryMetaRow(
                     label = "Time",
                     value = timeSummary,
-                    accent = CardLavender,
+                    accent = CardConcert,
                     maxLines = 2
                 )
                 CompactSummaryMetaRow(
                     label = "Duration",
                     value = durationSummary,
-                    accent = CardLavender
+                    accent = CardConcert
                 )
             }
         }
@@ -246,7 +249,7 @@ internal fun CompactSummaryMetaRow(
             fontSize = 12.sp,
             lineHeight = 15.sp,
             fontWeight = FontWeight.SemiBold,
-            modifier = Modifier.width(42.dp)
+            modifier = Modifier.width(56.dp)
         )
         Text(
             text = value,
@@ -515,13 +518,13 @@ private fun FlightSummaryVariant(
                     Box(
                         modifier = Modifier
                             .matchParentSize()
-                            .background(accentGradientForType(event.type))
+                            .background(accentGradientForType(eventDisplayType(event)))
                     )
                 }
 
                 EventTypeChip(
-                    type = event.type,
-                    accent = CardSky,
+                    type = eventDisplayType(event),
+                    accent = accentForType(eventDisplayType(event)),
                     modifier = Modifier
                         .align(Alignment.TopStart)
                         .padding(10.dp)
