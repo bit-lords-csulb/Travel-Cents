@@ -128,7 +128,8 @@ data class EditablePlan(
 data class TripMemberUi(
     val uid: String,
     val displayName: String,
-    val initial: Char
+    val initial: Char,
+    val avatarUrl: String
 )
 
 data class CurrentTripUiState(
@@ -376,7 +377,8 @@ class CurrentTripViewModel(application: Application) : AndroidViewModel(applicat
                         TripMemberUi(
                             uid = member.memberUid,
                             displayName = displayName,
-                            initial = displayName.firstOrNull { it.isLetter() } ?: '?'
+                            initial = displayName.firstOrNull { it.isLetter() } ?: '?',
+                            avatarUrl = member.avatarUrl
                         )
                     }
             }
@@ -1697,7 +1699,8 @@ class CurrentTripViewModel(application: Application) : AndroidViewModel(applicat
             try {
                 tripRepository.ensureTripAccess(
                     key = tripKey,
-                    memberUids = target.memberUids
+                    memberUids = target.memberUids,
+                    defaultRole = TripAccessRole.EDITOR
                 )
 
                 val senderName = resolveSenderDisplayName()

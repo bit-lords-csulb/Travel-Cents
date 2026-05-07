@@ -60,6 +60,7 @@ import androidx.compose.ui.unit.sp
 import com.example.travelcents.data.trip.TripKey
 import com.example.travelcents.data.trip.model.Itinerary
 import com.example.travelcents.data.trip.model.isAiChatDraftStatus
+import com.example.travelcents.ui.components.ProfileAvatar
 import com.example.travelcents.ui.main.current.TripMemberUi
 import com.example.travelcents.ui.modules.formatDayOfWeekFull
 import com.example.travelcents.ui.modules.formatHeroDate
@@ -611,21 +612,17 @@ private fun MemberAvatarRow(members: List<TripMemberUi>, onClick: () -> Unit) {
         verticalAlignment = Alignment.CenterVertically
     ) {
         display.forEach { member ->
-            Box(
+            ProfileAvatar(
+                photoUrl = member.avatarUrl,
+                contentDescription = "${member.displayName} profile picture",
                 modifier = Modifier
-                    .size(40.dp)
-                    .border(2.dp, DeepSea1, CircleShape)
-                    .clip(CircleShape)
-                    .background(SurfaceContainerHigh),
-                contentAlignment = Alignment.Center
-            ) {
-                Text(
-                    text = member.initial.uppercaseChar().toString(),
-                    color = CurrentTripHeroAccent,
-                    fontSize = 15.sp,
-                    fontWeight = FontWeight.Bold
-                )
-            }
+                    .size(40.dp),
+                borderColor = DeepSea1,
+                backgroundColor = SurfaceContainerHigh,
+                placeholderTint = CurrentTripHeroAccent,
+                borderWidth = 2.dp,
+                iconSize = 18.dp
+            )
         }
         if (overflow > 0) {
             Box(
@@ -677,20 +674,16 @@ private fun MemberListSheet(members: List<TripMemberUi>, onDismiss: () -> Unit) 
                         .padding(vertical = 8.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Box(
-                        modifier = Modifier
-                            .size(36.dp)
-                            .clip(CircleShape)
-                            .background(SurfaceContainerHigh),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Text(
-                            text = member.initial.uppercaseChar().toString(),
-                            color = CurrentTripHeroAccent,
-                            fontSize = 14.sp,
-                            fontWeight = FontWeight.Bold
-                        )
-                    }
+                    ProfileAvatar(
+                        photoUrl = member.avatarUrl,
+                        contentDescription = "${member.displayName} profile picture",
+                        modifier = Modifier.size(36.dp),
+                        borderColor = DeepSea3.copy(alpha = 0.6f),
+                        backgroundColor = SurfaceContainerHigh,
+                        placeholderTint = CurrentTripHeroAccent,
+                        borderWidth = 1.dp,
+                        iconSize = 17.dp
+                    )
                     Spacer(modifier = Modifier.width(12.dp))
                     Text(
                         text = member.displayName,

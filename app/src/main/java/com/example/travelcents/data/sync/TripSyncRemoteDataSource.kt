@@ -10,6 +10,7 @@ import com.example.travelcents.data.trip.model.YELP_POOL_TYPE_ACTIVITIES
 import com.example.travelcents.data.trip.model.YELP_POOL_TYPE_RESTAURANTS
 import com.example.travelcents.data.trip.model.YelpOptionPoolItem
 import com.example.travelcents.data.trip.model.resolveTripName
+import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.DocumentReference
 import com.google.firebase.firestore.DocumentSnapshot
 import com.google.firebase.firestore.FieldValue
@@ -595,9 +596,13 @@ class TripSyncRemoteDataSource(
             }
         }.await()
 
-        (currentMembers + removedViewerUids).distinct().forEach { viewerUid ->
-            refreshManifest(viewerUid)
-        }
+        val signedInUid = FirebaseAuth.getInstance().currentUser?.uid
+        (currentMembers + removedViewerUids)
+            .distinct()
+            .filter { viewerUid -> viewerUid == signedInUid }
+            .forEach { viewerUid ->
+                refreshManifest(viewerUid)
+            }
     }
 
     override suspend fun backfillTripRefsForViewer(

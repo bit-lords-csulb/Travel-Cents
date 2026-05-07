@@ -77,10 +77,10 @@ class AiToolRouterOrchestrator {
                         "For search_restaurants, set cuisines to Yelp-compatible category aliases derived from the user's food preferences. " +
                         "Examples: Italian → [\"italian\"], Sushi → [\"sushi\", \"japanese\"], Ramen → [\"ramen\"], Mexican → [\"mexican\"], Seafood → [\"seafood\"], Indian → [\"indpak\"], American → [\"newamerican\"]. " +
                         "For dietary restrictions (vegan, halal, gluten-free), leave cuisines empty — the app handles them as a term filter. " +
-                        "Emit search_restaurants when the user message asks for restaurant options or their food preferences make it clearly relevant. " +
+                        "Emit search_restaurants when: (a) the user message asks for restaurant options, OR (b) the destination is known AND cuisine_preferences are non-empty in the profile AND search_restaurants has not been emitted in recent history. " +
                         "For search_activities, set categories to Yelp aliases. " +
                         "Examples: Museum → [\"museums\"], Hiking → [\"hiking\", \"parks\"], Nightlife → [\"nightlife\"], Jazz → [\"jazzandblues\"], Theater → [\"theater\"], Tours → [\"tours\"], Galleries → [\"galleries\", \"artmuseums\"]. " +
-                        "Emit search_activities when the user message asks for activities or their interest preferences make it relevant. Both search_restaurants and search_activities can be emitted together. " +
+                        "Emit search_activities when: (a) the user message asks for activities, OR (b) the destination is known AND interests are non-empty in the profile AND search_activities has not been emitted in recent history. Both search_restaurants and search_activities can be emitted together. " +
                         "If a field does not apply to a tool call, leave string fields empty and array fields empty."
             ),
             LlmMessage(

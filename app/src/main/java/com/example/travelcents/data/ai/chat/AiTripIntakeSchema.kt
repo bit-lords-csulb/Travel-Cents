@@ -508,11 +508,11 @@ fun AiTripIntakeTurnResult.toPlaceRecommendationRow(): AiPlaceRecommendationRow?
 }
 
 fun List<AiTripIntakeAnswerOption>.hasPlannerAnswerOptionCount(): Boolean {
-    return size == 4 || size == 6
+    return size in 4..6
 }
 
 fun List<AiChatCardOption>.hasPlannerCardOptionCount(): Boolean {
-    return size == 4 || size == 6
+    return size in 4..6
 }
 
 fun String.toPlannerTopicPath(): String {
@@ -535,9 +535,10 @@ fun String.isPlannerTopicPath(): Boolean {
 
 fun AiTripIntakeProfile.isReadyForDestinationRecommendations(): Boolean {
     val hasTravelerContext = tripType != AiTripType.UNKNOWN || partySummary.isNotBlank()
-    val hasStyleDirection = destinationStyle.isNotEmpty() || interests.size >= 2
+    val hasStyleDirection = destinationStyle.isNotEmpty() || interests.size >= 3
     val hasBudget = budgetLevel != AiBudgetLevel.UNKNOWN || budgetTotal != null
-    return hasTravelerContext && hasStyleDirection && hasBudget
+    val hasPace = pace != AiTripPacePreference.UNKNOWN
+    return hasTravelerContext && hasStyleDirection && hasBudget && hasPace
 }
 
 fun PlannerContext.shouldForceVisualAction(): Boolean {
@@ -570,7 +571,7 @@ fun PlannerContext.repairPrompt(rejectionReason: String): String {
         appendLine("Current planner phase: $phase")
         appendLine("Allowed topic roots: ${allowedTopicPathSummary()}")
         appendLine("Already asked topic paths: ${askedTopicSummary()}")
-        appendLine("If you ask a card question, topic_path is required and options must contain exactly 4 or exactly 6 objects.")
+        appendLine("If you ask a card question, topic_path is required and options must contain between 4 and 6 objects (4, 5, or 6).")
         appendLine("Use a child topic only when parent_topic_path and parent_answer_id justify a narrower drill-down.")
         if (shouldForceVisualAction()) {
             append("The app says visual recommendations are due now, so do not ask another question.")
@@ -642,12 +643,12 @@ fun AiTripIntakeTurnResult.validatePlannerTurn(
 
     val question = followUpQuestion ?: return PlannerValidationResult(
         accepted = false,
-        rejectionReason = "next_action=ask_more requires topic_path, question_id, title, and exactly 4 or 6 valid options"
+        rejectionReason = "next_action=ask_more requires topic_path, question_id, title, and 4–6 valid options"
     )
 
     val group = question.toCardGroup() ?: return PlannerValidationResult(
         accepted = false,
-        rejectionReason = "card question is malformed or does not have exactly 4 or 6 usable options"
+        rejectionReason = "card question is malformed or does not have 4–6 usable options"
     )
 
     val topicPath = group.topicPath.toPlannerTopicPath()
@@ -817,7 +818,7 @@ private fun topicPathTargetsKnownProfileField(
         "destination_style" -> profile.destinationStyle.isNotEmpty()
         "interests" -> profile.interests.size >= 2
         "food_preferences" -> profile.cuisinePreferences.isNotEmpty()
-        "activity_preferences" -> profile.interests.size >= 2
+        "activity_preferences" -> profile.activitySubCategories.isNotEmpty()
         "budget" -> profile.budgetLevel != AiBudgetLevel.UNKNOWN || profile.budgetTotal != null
         "pace" -> profile.pace != AiTripPacePreference.UNKNOWN
         "duration" -> profile.durationDays != null
