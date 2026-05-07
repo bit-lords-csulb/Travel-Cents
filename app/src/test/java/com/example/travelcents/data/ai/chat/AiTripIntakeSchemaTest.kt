@@ -14,6 +14,7 @@ class AiTripIntakeSchemaTest {
     fun toCardGroup_addsOtherOptionAndCapsVisibleOptionsAtSix() {
         val question = AiTripIntakeFollowUpQuestion(
             id = "food preferences",
+            topicPath = "food_preferences",
             title = "What food sounds right?",
             allowMultiple = true,
             allowOther = true,
@@ -32,6 +33,9 @@ class AiTripIntakeSchemaTest {
 
         assertNotNull(group)
         assertEquals("food_preferences", group?.id)
+        assertEquals("food_preferences", group?.topicPath)
+        assertEquals("food_preferences", group?.questionId)
+        assertEquals(PlannerQuestionSource.LLM, group?.source)
         assertEquals(6, group?.options?.size)
         assertTrue(group?.allowOther == true)
         assertTrue(group?.options?.lastOrNull()?.requiresText == true)
@@ -42,23 +46,30 @@ class AiTripIntakeSchemaTest {
     fun toCardGroup_keepsLabelsWithinFourWords() {
         val question = AiTripIntakeFollowUpQuestion(
             id = "party_shape",
+            topicPath = "traveler_context",
             title = "Who is going?",
             options = listOf(
                 option("family_with_kids", "Family with kids"),
-                option("group_of_friends", "Group of friends")
+                option("group_of_friends", "Group of friends"),
+                option("couple", "Couple trip"),
+                option("solo", "Solo trip")
             )
         )
 
         val group = question.toCardGroup()
 
         assertNotNull(group)
-        assertEquals(listOf("Family with kids", "Group of friends"), group?.options?.map { option -> option.label })
+        assertEquals(
+            listOf("Family with kids", "Group of friends", "Couple trip", "Solo trip"),
+            group?.options?.map { option -> option.label }
+        )
     }
 
     @Test
     fun toCardGroup_returnsNullWhenNotEnoughUsableOptionsRemain() {
         val question = AiTripIntakeFollowUpQuestion(
             id = "pace",
+            topicPath = "pace",
             title = "Pick a pace",
             allowOther = false,
             options = listOf(
@@ -74,10 +85,13 @@ class AiTripIntakeSchemaTest {
     fun toCardGroup_marksModelSuppliedOtherAsRequiresText() {
         val question = AiTripIntakeFollowUpQuestion(
             id = "hotel_area",
+            topicPath = "hotel_preferences.area",
             title = "Which area?",
             allowOther = true,
             options = listOf(
                 option("beachfront", "Beachfront"),
+                option("downtown", "Downtown"),
+                option("quiet", "Quiet area"),
                 option("other", "Other")
             )
         )
@@ -131,12 +145,16 @@ class AiTripIntakeSchemaTest {
     fun assistantMessage_returnsAckOnlyEvenWithCardPayload() {
         val result = AiTripIntakeTurnResult(
             ackKey = AiTripIntakeAckKey.UNDERSTOOD,
+            assistantMessageText = "Understood.",
             nextAction = AiTripIntakeNextAction.ASK_MORE,
+            topicPath = "traveler_context",
             questionId = "trip_type",
             questionTitle = "What type of trip are you planning?",
             options = listOf(
                 option("romantic", "Romantic"),
-                option("family", "Family")
+                option("family", "Family"),
+                option("solo", "Solo"),
+                option("friends", "Friends")
             )
         )
 
@@ -147,12 +165,14 @@ class AiTripIntakeSchemaTest {
     fun followUpQuestion_isDerivedFromMinimalAskMorePayload() {
         val result = AiTripIntakeTurnResult(
             nextAction = AiTripIntakeNextAction.ASK_MORE,
+            topicPath = "destination_style",
             questionId = "destination_type",
             questionTitle = "What kind of destination?",
             options = listOf(
                 option("tropical", "Tropical"),
                 option("coastal_town", "Coastal town"),
-                option("beach_resort", "Beach resort")
+                option("beach_resort", "Beach resort"),
+                option("hidden_cove", "Hidden cove")
             )
         )
 
@@ -160,14 +180,16 @@ class AiTripIntakeSchemaTest {
 
         assertNotNull(followUpQuestion)
         assertEquals("destination_type", followUpQuestion?.id)
+        assertEquals("destination_style", followUpQuestion?.topicPath)
         assertEquals("What kind of destination?", followUpQuestion?.title)
-        assertEquals(3, followUpQuestion?.options?.size)
+        assertEquals(4, followUpQuestion?.options?.size)
     }
 
     @Test
     fun assistantMessage_ignoresLegacyTextPromptWithoutCardPayload() {
         val result = AiTripIntakeTurnResult(
             ackKey = AiTripIntakeAckKey.PERFECT,
+            assistantMessageText = "Perfect.",
             nextAction = AiTripIntakeNextAction.ASK_MORE,
             textPrompt = "Tell me more about your dates."
         )
@@ -179,12 +201,16 @@ class AiTripIntakeSchemaTest {
     @Test
     fun followUpQuestion_isSuppressedWhenNextActionIsNotAskMore() {
         val result = AiTripIntakeTurnResult(
+            assistantMessageText = "Got it!",
             nextAction = AiTripIntakeNextAction.BUILD_TRIP,
             questionKind = AiTripIntakeQuestionKind.CARDS,
+            topicPath = "budget",
             questionId = "budget",
             questionTitle = "What's your budget?",
             options = listOf(
                 option("budget", "Budget"),
+                option("comfort", "Comfort"),
+                option("splurge", "Some splurges"),
                 option("luxury", "Luxury")
             )
         )

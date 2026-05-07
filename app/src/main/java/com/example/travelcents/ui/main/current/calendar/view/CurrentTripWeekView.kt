@@ -13,33 +13,26 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.DeleteOutline
-import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.travelcents.data.trip.model.TravelEvent
+import com.example.travelcents.ui.main.current.calendar.EventRenderSpan
 import com.example.travelcents.ui.main.current.calendar.defaultStartMinutesForDate
-import com.example.travelcents.ui.main.current.calendar.eventSpanForDate
-import com.example.travelcents.ui.main.current.calendar.eventsForDate
+import com.example.travelcents.ui.main.current.calendar.eventSpansForDate
 import com.example.travelcents.ui.main.current.calendar.renderSpanLabel
 import com.example.travelcents.ui.main.current.calendar.visibleWeekDatesForSelection
 import com.example.travelcents.ui.modules.formatDayOfWeekShort
-import com.example.travelcents.ui.modules.formatDisplayTimeRange
 import com.example.travelcents.ui.modules.formatMonthDayCompact
 import com.example.travelcents.ui.theme.DeepSea1
 import com.example.travelcents.ui.theme.DeepSea2
@@ -55,17 +48,8 @@ fun CurrentTripWeekView(
     selectedDate: String,
     onDateSelected: (String) -> Unit,
     onEventClick: (TravelEvent) -> Unit,
-    onDeleteClick: (TravelEvent) -> Unit,
     onCreatePlan: (String, Int) -> Unit
 ) {
-    if (sortedDates.isEmpty()) {
-        CurrentTripEmptyState(
-            title = "No Calendar Dates",
-            body = "Set trip dates first so you can add plans to the calendar."
-        )
-        return
-    }
-
     val visibleWeekDates = remember(sortedDates, selectedDate) {
         visibleWeekDatesForSelection(sortedDates, selectedDate)
     }
@@ -89,11 +73,10 @@ fun CurrentTripWeekView(
                     WeekOverviewDayRow(
                         date = date,
                         selected = date == selectedDate,
-                        events = eventsForDate(events, date),
-                        canAddPlan = canEditTrip && date in sortedDates,
-                        canEditTrip = canEditTrip,
+                        spans = eventSpansForDate(events, date),
+                        canAddPlan = canEditTrip,
+                        onClick = { onDateSelected(date) },
                         onEventClick = onEventClick,
-                        onDeleteClick = onDeleteClick,
                         onAddClick = { onCreatePlan(date, defaultStartMinutesForDate(events, date)) }
                     )
                 }
@@ -106,11 +89,10 @@ fun CurrentTripWeekView(
 private fun WeekOverviewDayRow(
     date: String,
     selected: Boolean,
-    events: List<TravelEvent>,
+    spans: List<EventRenderSpan>,
     canAddPlan: Boolean,
-    canEditTrip: Boolean,
+    onClick: () -> Unit,
     onEventClick: (TravelEvent) -> Unit,
-    onDeleteClick: (TravelEvent) -> Unit,
     onAddClick: () -> Unit
 ) {
     Row(
@@ -122,6 +104,7 @@ private fun WeekOverviewDayRow(
                 color = if (selected) DeepSea4.copy(alpha = 0.45f) else DeepSea3.copy(alpha = 0.6f),
                 shape = CurrentTripInnerShape
             )
+            .clickable(onClick = onClick)
             .padding(horizontal = 12.dp, vertical = 10.dp),
         horizontalArrangement = Arrangement.spacedBy(12.dp),
         verticalAlignment = Alignment.Top
@@ -145,7 +128,7 @@ private fun WeekOverviewDayRow(
                 maxLines = 1
             )
             Text(
-                text = if (events.isEmpty()) "Open day" else "${events.size} plan${if (events.size == 1) "" else "s"}",
+                text = if (spans.isEmpty()) "Open day" else "${spans.size} plan${if (spans.size == 1) "" else "s"}",
                 color = DeepSea4,
                 fontSize = 11.sp
             )
@@ -157,7 +140,7 @@ private fun WeekOverviewDayRow(
                 .heightIn(min = 44.dp),
             verticalArrangement = Arrangement.spacedBy(6.dp)
         ) {
-            if (events.isEmpty()) {
+            if (spans.isEmpty()) {
                 Text(
                     text = "No plans yet",
                     color = DeepSea4,
@@ -166,13 +149,10 @@ private fun WeekOverviewDayRow(
                     overflow = TextOverflow.Ellipsis
                 )
             } else {
-                events.forEach { event ->
+                spans.forEach { span ->
                     WeekOverviewEventRow(
-                        event = event,
-                        date = date,
-                        canEditTrip = canEditTrip,
-                        onClick = { onEventClick(event) },
-                        onDeleteClick = { onDeleteClick(event) }
+                        span = span,
+                        onClick = { onEventClick(span.event) }
                     )
                 }
             }
@@ -197,14 +177,10 @@ private fun WeekOverviewDayRow(
 
 @Composable
 private fun WeekOverviewEventRow(
-    event: TravelEvent,
-    date: String,
-    canEditTrip: Boolean,
-    onClick: () -> Unit,
-    onDeleteClick: () -> Unit
+    span: EventRenderSpan,
+    onClick: () -> Unit
 ) {
-    val span = remember(event, date) { eventSpanForDate(event, date) }
-    val palette = eventPalette(event)
+    val palette = eventPalette(span.event)
 
     Row(
         modifier = Modifier
@@ -222,7 +198,7 @@ private fun WeekOverviewEventRow(
         )
 
         Text(
-            text = span?.let(::renderSpanLabel) ?: formatDisplayTimeRange(event.startTime, event.endTime),
+            text = renderSpanLabel(span),
             color = DeepSea4,
             fontSize = 10.sp,
             maxLines = 1,
@@ -233,7 +209,7 @@ private fun WeekOverviewEventRow(
         )
 
         Text(
-            text = eventTitle(event),
+            text = span.titleOverride ?: eventTitle(span.event),
             color = DeepSea5,
             fontSize = 12.sp,
             fontWeight = FontWeight.SemiBold,
@@ -241,20 +217,5 @@ private fun WeekOverviewEventRow(
             overflow = TextOverflow.Ellipsis,
             modifier = Modifier.weight(1f)
         )
-
-        if (canEditTrip) {
-            IconButton(
-                onClick = onDeleteClick,
-                modifier = Modifier.size(20.dp)
-            ) {
-                Icon(
-                    imageVector = Icons.Default.DeleteOutline,
-                    contentDescription = "Delete plan",
-                    tint = Color(0xFFE77D90),
-                    modifier = Modifier.size(12.dp)
-                )
-            }
-        }
     }
 }
-

@@ -25,8 +25,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Check
-import androidx.compose.material.icons.filled.KeyboardArrowDown
-import androidx.compose.material.icons.filled.KeyboardArrowUp
+import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.LocationOn
 import androidx.compose.material.icons.filled.Schedule
 import androidx.compose.material.icons.outlined.ChatBubbleOutline
@@ -66,6 +65,7 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import coil.compose.AsyncImage
 import com.example.travelcents.data.social.model.Group
 import com.example.travelcents.data.trip.model.Event
+import com.example.travelcents.ui.components.ProfileAvatar
 import com.example.travelcents.ui.theme.DeepSea1
 import com.example.travelcents.ui.theme.DeepSea2
 import com.example.travelcents.ui.theme.DeepSea3
@@ -87,6 +87,7 @@ fun EventsPage(
     val events by viewModel.events.collectAsState()
     val isLoading by viewModel.isLoading.collectAsState()
     val canWriteLinkedTrip by viewModel.canWriteLinkedTrip.collectAsState()
+    val creatorProfiles by viewModel.creatorProfiles.collectAsState()
 
     LaunchedEffect(group) {
         viewModel.updateGroup(group)
@@ -353,13 +354,13 @@ fun EventsPage(
                         EventCard(
                             event = event,
                             currentUid = viewModel.currentUid,
+                            creatorProfile = creatorProfiles[event.createdBy],
                             showVoting = selectedTab == 0,
                             onClick = {
                                 selectedEventForDetails = event
                                 showSheet = true
                             },
                             onUpvote = { viewModel.upvote(event) },
-                            onDownvote = { viewModel.downvote(event) },
                             onCommentClick = { onEventClick(event) },
                             onLongPress = {
                                 eventToDelete = event.takeIf(viewModel::canDeleteEvent)
@@ -378,16 +379,15 @@ fun EventsPage(
 fun EventCard(
     event: Event,
     currentUid: String,
+    creatorProfile: Pair<String, String>?,
     showVoting: Boolean = true,
     onClick: () -> Unit,
     onUpvote: () -> Unit,
-    onDownvote: () -> Unit,
     onCommentClick: () -> Unit,
     onLongPress: () -> Unit
 ) {
-    val score = event.upvotes.size - event.downvotes.size
+    val score = event.upvotes.size
     val hasUpvoted = event.upvotes.contains(currentUid)
-    val hasDownvoted = event.downvotes.contains(currentUid)
 
     Card(
         modifier = Modifier
@@ -416,12 +416,15 @@ fun EventCard(
                             .background(DeepSea3)
                     )
                 }
-                UserOverlayTag(event.createdByName)
+                UserOverlayTag(
+                    name = creatorProfile?.first ?: event.createdByName,
+                    photoUrl = creatorProfile?.second.orEmpty()
+                )
             }
 
             Row(modifier = Modifier.padding(16.dp), verticalAlignment = Alignment.Top) {
                 if (showVoting) {
-                    VotingSideBar(score, hasUpvoted, hasDownvoted, onUpvote, onDownvote)
+                    VotingSideBar(score, hasUpvoted, onUpvote)
                     Spacer(modifier = Modifier.width(16.dp))
                 }
 
@@ -544,7 +547,7 @@ fun formatEventDateTime(event: Event): String {
 }
 
 @Composable
-fun UserOverlayTag(name: String) {
+fun UserOverlayTag(name: String, photoUrl: String) {
     Row(
         modifier = Modifier
             .padding(12.dp)
@@ -553,11 +556,15 @@ fun UserOverlayTag(name: String) {
             .padding(horizontal = 10.dp, vertical = 6.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        Box(
-            modifier = Modifier
-                .size(18.dp)
-                .clip(CircleShape)
-                .background(Color.Gray)
+        ProfileAvatar(
+            photoUrl = photoUrl,
+            contentDescription = name,
+            modifier = Modifier.size(18.dp),
+            borderColor = Color.White.copy(alpha = 0.25f),
+            backgroundColor = Color.White.copy(alpha = 0.16f),
+            placeholderTint = Color.White,
+            borderWidth = 0.dp,
+            iconSize = 12.dp
         )
         Spacer(modifier = Modifier.width(8.dp))
         Text(
@@ -573,10 +580,10 @@ fun UserOverlayTag(name: String) {
 fun VotingSideBar(
     score: Int,
     upvoted: Boolean,
-    downvoted: Boolean,
-    onUp: () -> Unit,
-    onDown: () -> Unit
+    onUp: () -> Unit
 ) {
+    val heartColor = if (upvoted) Color(0xFFE53935) else DeepSea5.copy(alpha = 0.4f)
+
     Column(
         modifier = Modifier
             .width(40.dp)
@@ -594,10 +601,10 @@ fun VotingSideBar(
             contentAlignment = Alignment.Center
         ) {
             Icon(
-                Icons.Default.KeyboardArrowUp,
-                null,
-                tint = if (upvoted) Color(0xFF81C784) else DeepSea5.copy(alpha = 0.4f),
-                modifier = Modifier.size(24.dp)
+                Icons.Default.Favorite,
+                contentDescription = "Like event",
+                tint = heartColor,
+                modifier = Modifier.size(22.dp)
             )
         }
         Text(
@@ -607,20 +614,5 @@ fun VotingSideBar(
             fontSize = 15.sp,
             modifier = Modifier.padding(vertical = 2.dp)
         )
-        Box(
-            modifier = Modifier
-                .size(32.dp)
-                .clip(CircleShape)
-                .clickable { onDown() },
-            contentAlignment = Alignment.Center
-        ) {
-            Icon(
-                Icons.Default.KeyboardArrowDown,
-                null,
-                tint = if (downvoted) Color(0xFFE57373) else DeepSea5.copy(alpha = 0.4f),
-                modifier = Modifier.size(24.dp)
-            )
-        }
     }
 }
-

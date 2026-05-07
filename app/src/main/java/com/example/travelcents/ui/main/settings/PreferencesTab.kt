@@ -7,6 +7,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -14,6 +15,8 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.example.travelcents.BuildConfig
+import com.example.travelcents.data.debug.DebugPreferencesRepository
 import com.example.travelcents.ui.theme.DeepSea4
 
 @Composable
@@ -21,6 +24,7 @@ fun PreferencesTab() {
     Column(modifier = Modifier.fillMaxWidth()) {
         NotificationsSection()
         DisplaySection()
+        if (BuildConfig.DEBUG) DeveloperSection()
         AboutSection()
     }
 }
@@ -66,6 +70,22 @@ private fun DisplaySection() {
             subtitle = "Use the DeepSea dark theme throughout the app",
             checked = darkMode,
             onCheckedChange = { darkMode = it },
+            showDivider = false
+        )
+    }
+}
+
+@Composable
+private fun DeveloperSection() {
+    val showAiDebugUi by DebugPreferencesRepository.showAiDebugUi.collectAsState()
+
+    SettingHeader("Developer")
+    SettingCard {
+        SwitchSettingItem(
+            title = "AI Debug Overlay",
+            subtitle = "Show source tags and decision logs in AI chat",
+            checked = showAiDebugUi,
+            onCheckedChange = { DebugPreferencesRepository.setShowAiDebugUi(it) },
             showDivider = false
         )
     }

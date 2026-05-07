@@ -19,8 +19,11 @@ import com.example.travelcents.data.trip.model.ATTR_IS_CLOSED
 import com.example.travelcents.data.trip.model.ATTR_LATITUDE
 import com.example.travelcents.data.trip.model.ATTR_LONGITUDE
 import com.example.travelcents.data.trip.model.ATTR_MENU_URL
+import com.example.travelcents.data.trip.model.ATTR_OFFER_COUNT
 import com.example.travelcents.data.trip.model.ATTR_REVIEW_COUNT
+import com.example.travelcents.data.trip.model.ATTR_TICKETMASTER_EVENT_ID
 import com.example.travelcents.data.trip.model.ATTR_YELP_URL
+import com.example.travelcents.data.trip.model.DETAIL_YELP_ID
 import com.example.travelcents.data.trip.model.TravelEvent
 import com.example.travelcents.data.trip.model.YelpReview
 import com.example.travelcents.data.trip.model.detailValue
@@ -28,6 +31,7 @@ import com.example.travelcents.ui.main.current.eventSubtitle
 import com.example.travelcents.ui.main.current.eventTitle
 import com.example.travelcents.ui.modules.formatDisplayTime
 import com.example.travelcents.ui.modules.formatDisplayTimeRange
+import com.example.travelcents.ui.modules.formatLongTripDateWithYear
 import com.example.travelcents.ui.modules.formatTimeZoneLabel
 import com.example.travelcents.ui.modules.formatTripDate
 import com.example.travelcents.ui.modules.parseIsoDate
@@ -40,6 +44,7 @@ import java.util.Locale
 
 internal fun eventOfficialUrl(event: TravelEvent): String? {
     return listOf(
+        event.bookingUrl,
         event.detailValue(ATTR_BOOKING_URL, "booking_url"),
         event.detailValue(ATTR_HOTEL_DETAIL_URL),
         event.details["tickets_url"],
@@ -111,6 +116,23 @@ internal fun eventTimeSummary(event: TravelEvent): String {
     return datePrefix + formatDisplayTimeRange(event.startTime, event.endTime)
 }
 
+internal fun eventDisplayDateSummary(event: TravelEvent): String {
+    return ticketmasterEventDateSummary(event)
+        ?: formatLongTripDateWithYear(event.date).ifBlank { "Date TBD" }
+}
+
+internal fun eventDisplayTimeSummary(event: TravelEvent): String {
+    return if (!event.detailValue(ATTR_TICKETMASTER_EVENT_ID).isNullOrBlank()) {
+        formatDisplayTimeRange(event.startTime, event.endTime).takeIf { it.isNotBlank() } ?: "Time TBD"
+    } else {
+        formatDisplayTimeRange(event.startTime, event.endTime).takeIf { it.isNotBlank() } ?: "Time TBD"
+    }
+}
+
+internal fun eventDisplayDurationSummary(event: TravelEvent): String {
+    return eventDurationSummary(event).takeUnless { it.startsWith("Starts ", ignoreCase = true) } ?: "Duration TBD"
+}
+
 internal fun eventDurationSummary(event: TravelEvent): String {
     val explicitDuration = formatDuration(
         event.details["flight_duration_min"]
@@ -151,13 +173,7 @@ internal fun ticketmasterEventDateSummary(event: TravelEvent): String? {
 }
 
 internal fun ticketmasterEventTimeSummary(event: TravelEvent): String {
-    val timeRange = formatDisplayTimeRange(event.startTime, event.endTime)
-    val duration = eventDurationSummary(event)
-        .takeIf { it.isNotBlank() && !it.startsWith("Starts ", ignoreCase = true) }
-    return listOfNotNull(
-        timeRange.takeIf { it.isNotBlank() && it != "TIME TBD" },
-        duration?.let { "($it)" }
-    ).joinToString(" ").ifBlank { "Time TBD" }
+    return eventDisplayTimeSummary(event)
 }
 
 internal fun eventRatingLabel(event: TravelEvent, reviews: List<YelpReview>): String {
@@ -323,4 +339,29 @@ internal fun googleMapsDirectionsUrl(query: String): String =
 internal fun compactHostLabel(url: String): String {
     val host = url.toUri().host.orEmpty().removePrefix("www.")
     return host.ifBlank { "Open Link" }
+}
+
+internal fun isYelpBackedSummaryEvent(event: TravelEvent): Boolean {
+    if (event.detailValue(DETAIL_YELP_ID).isNullOrBlank()) return false
+    if (event.type.equals("restaurant", ignoreCase = true) ||
+        event.type.equals("dining", ignoreCase = true) ||
+        event.type.equals("food", ignoreCase = true)
+    ) {
+        return true
+    }
+    return event.type.equals("activity", ignoreCase = true) ||
+        event.type.equals("tour", ignoreCase = true) ||
+        event.type.equals("event", ignoreCase = true)
+}
+
+internal fun preferredHotelBookingUrl(event: TravelEvent): String? {
+    val offers = (0 until (event.detailValue(ATTR_OFFER_COUNT)?.toIntOrNull() ?: 0)).mapNotNull { index ->
+        val source = event.details["offer_${index}_source"]?.trim().orEmpty()
+        val link = event.details["offer_${index}_link"]?.trim().orEmpty()
+        link.takeIf { it.isNotBlank() }?.let { source to it }
+    }
+    offers.firstOrNull { (source, link) ->
+        source.contains("booking.com", ignoreCase = true) || link.contains("booking.com", ignoreCase = true)
+    }?.second?.let { return it }
+    return event.bookingUrl ?: event.detailValue(ATTR_BOOKING_URL, "booking_url", ATTR_HOTEL_DETAIL_URL)
 }

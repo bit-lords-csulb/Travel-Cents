@@ -6,7 +6,9 @@ import com.example.travelcents.data.trip.model.ATTR_BUSINESS_NAME
 import com.example.travelcents.data.trip.model.ATTR_CUISINE
 import com.example.travelcents.data.trip.model.ATTR_HOTEL_NAME
 import com.example.travelcents.data.trip.model.ATTR_HOTEL_RATING
+import com.example.travelcents.data.trip.model.ATTR_TICKETMASTER_EVENT_ID
 import com.example.travelcents.data.trip.model.TravelEvent
+import com.example.travelcents.data.trip.model.detailValue
 import com.example.travelcents.data.trip.model.displayName
 import com.example.travelcents.data.trip.model.firstNonBlank
 import com.example.travelcents.ui.modules.defaultPlanTimeZoneId
@@ -131,6 +133,12 @@ fun editableNotes(event: TravelEvent): String {
 }
 
 fun eventPalette(event: TravelEvent): EventPalette {
+    if (event.isTicketmasterBacked()) {
+        return EventPalette(
+            container = androidx.compose.ui.graphics.Color(0xFF3A2445),
+            accent = androidx.compose.ui.graphics.Color(0xFFFFA3D7)
+        )
+    }
     return when ((event.details["colorKey"] ?: defaultColorKeyForType(event.type)).lowercase(Locale.US)) {
         "rose", "flight" -> EventPalette(
             container = androidx.compose.ui.graphics.Color(0xFF3B2637),
@@ -159,6 +167,14 @@ fun eventPalette(event: TravelEvent): EventPalette {
     }
 }
 
+fun eventDisplayType(event: TravelEvent): String {
+    return if (event.isTicketmasterBacked()) "concert" else event.type
+}
+
+fun TravelEvent.isTicketmasterBacked(): Boolean {
+    return !detailValue(ATTR_TICKETMASTER_EVENT_ID).isNullOrBlank()
+}
+
 fun defaultColorKeyForType(type: String): String {
     return when (type.lowercase(Locale.US)) {
         "flight" -> "rose"
@@ -167,4 +183,3 @@ fun defaultColorKeyForType(type: String): String {
         else -> "plum"
     }
 }
-

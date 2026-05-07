@@ -32,6 +32,11 @@ class DirectChatViewModel(
     private val _chatId       = MutableStateFlow("")
     val chatId: StateFlow<String> = _chatId.asStateFlow()
 
+    private val _senderProfiles = MutableStateFlow<Map<String, ChatSenderProfile>>(emptyMap())
+    val senderProfiles: StateFlow<Map<String, ChatSenderProfile>> = _senderProfiles.asStateFlow()
+
+    private val requestedProfileUids = mutableSetOf<String>()
+
     private val _isOnline = MutableStateFlow(friend.isOnline)
     val isOnline: StateFlow<Boolean> = _isOnline.asStateFlow()
 
@@ -46,6 +51,7 @@ class DirectChatViewModel(
 
     private fun fetchCurrentUserName() {
         if (currentUid.isEmpty()) return
+        fetchSenderProfile(currentUid)
         userRepository.fetchUserDisplayName(currentUid) { name -> _currentName.value = name }
     }
 
@@ -72,6 +78,17 @@ class DirectChatViewModel(
         messagesListener?.remove()
         messagesListener = directMessagesRepository.listenToDirectMessages(chatId) { messages ->
             _messages.value = messages
+            messages.map { it.senderId }
+                .filter(String::isNotBlank)
+                .distinct()
+                .forEach(::fetchSenderProfile)
+        }
+    }
+
+    private fun fetchSenderProfile(uid: String) {
+        if (!requestedProfileUids.add(uid)) return
+        userRepository.fetchUserFullProfile(uid) { name, photoUrl ->
+            _senderProfiles.value = _senderProfiles.value + (uid to ChatSenderProfile(name, photoUrl))
         }
     }
 

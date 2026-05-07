@@ -112,12 +112,15 @@ object YelpRepository {
     // Single pooled fetch for restaurants. Size the pool to the itinerary, paging as needed.
     suspend fun fetchRestaurantPool(
         location: String,
-        targetCount: Int = OPTIONS_PER_EVENT
+        targetCount: Int = OPTIONS_PER_EVENT,
+        yelpCategories: String? = null,
+        term: String? = null
     ): List<YelpBusiness> {
         return try {
             fetchBusinessPool(
                 location = location,
-                categories = "restaurants",
+                categories = yelpCategories?.takeIf { it.isNotBlank() } ?: "restaurants",
+                term = term,
                 targetCount = targetCount,
                 sortBy = "rating"
             )
@@ -129,12 +132,15 @@ object YelpRepository {
     // Single pooled fetch for activities. Size the pool to the itinerary, paging as needed.
     suspend fun fetchActivityPool(
         location: String,
-        targetCount: Int = OPTIONS_PER_EVENT
+        targetCount: Int = OPTIONS_PER_EVENT,
+        yelpCategories: String? = null
     ): List<YelpBusiness> {
         return try {
             fetchBusinessPool(
                 location = location,
-                categories = "arts,museums,tours,landmarks",
+                categories = yelpCategories?.takeIf { it.isNotBlank() }
+                    ?: "arts,museums,tours,landmarks",
+                term = null,
                 targetCount = targetCount,
                 sortBy = "rating"
             )
@@ -165,6 +171,7 @@ object YelpRepository {
     private suspend fun fetchBusinessPool(
         location: String,
         categories: String,
+        term: String? = null,
         targetCount: Int,
         sortBy: String
     ): List<YelpBusiness> {
@@ -182,13 +189,14 @@ object YelpRepository {
             if (limit <= 0) break
 
             val page = api.searchBusinesses(
-                mapOf(
-                    "location" to location,
-                    "categories" to categories,
-                    "limit" to limit.toString(),
-                    "offset" to offset.toString(),
-                    "sort_by" to sortBy
-                )
+                buildMap {
+                    put("location", location)
+                    put("categories", categories)
+                    put("limit", limit.toString())
+                    put("offset", offset.toString())
+                    put("sort_by", sortBy)
+                    term?.takeIf { it.isNotBlank() }?.let { put("term", it) }
+                }
             ).businesses
 
             if (page.isEmpty()) break

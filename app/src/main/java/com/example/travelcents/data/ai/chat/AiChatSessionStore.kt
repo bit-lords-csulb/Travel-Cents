@@ -21,11 +21,15 @@ data class PersistedAiChatSnapshot(
     val discoverySlots: List<DiscoverySlot>? = null,
     val discoverySuggestionPool: List<SuggestionItem>? = null,
     val llmHistory: List<LlmMessage> = emptyList(),
-    val askedFollowUpGroupIds: List<String> = emptyList(),
+    val askedQuestionRecords: List<AskedQuestionRecord> = emptyList(),
+    val plannerPhase: PlannerPhase = PlannerPhase.PRE_DESTINATION,
+    val preDestinationQuestionCount: Int = 0,
     val activeResponseCardGroup: PersistedAiChatCardGroup? = null,
     val activeDestinationRecommendationRow: PersistedAiDestinationRecommendationRow? = null,
     val activeCuratedTripRow: PersistedAiCuratedTripRow? = null,
     val activePlaceRecommendationRow: PersistedAiPlaceRecommendationRow? = null,
+    val pendingPlaceRecommendationRow: PersistedAiPlaceRecommendationRow? = null,
+    val donePlaceRecommendationRows: List<PersistedAiPlaceRecommendationRow>? = null,
     val activePreferenceQuestionCard: AiChatItem.PreferenceQuestionCard? = null,
     val activeSuggestionCarouselCard: AiChatItem.SuggestionCarouselCard? = null,
     val anchorMessageId: String? = null,
@@ -55,7 +59,12 @@ data class PersistedAiChatCardGroup(
     val options: List<PersistedAiChatCardOption>,
     val allowMultiple: Boolean,
     val allowOther: Boolean = false,
-    val otherPromptHint: String = ""
+    val otherPromptHint: String = "",
+    val topicPath: String = "",
+    val questionId: String = id,
+    val source: PlannerQuestionSource = PlannerQuestionSource.LLM,
+    val parentTopicPath: String = "",
+    val parentAnswerId: String = ""
 )
 
 data class PersistedAiCuratedTripStarter(
@@ -115,7 +124,8 @@ data class PersistedAiPlaceRecommendationRow(
     val recommendations: List<PersistedAiPlaceRecommendation>,
     val rowType: String = AiPlaceRecommendationRowType.GENERAL.name,
     val actionLabels: List<String> = emptyList(),
-    val actionsEnabled: Boolean = false
+    val actionsEnabled: Boolean = false,
+    val isDone: Boolean = false
 )
 
 data class PersistedAiChatStoreState(
@@ -325,7 +335,12 @@ fun AiChatCardGroup.toPersisted(): PersistedAiChatCardGroup {
         },
         allowMultiple = allowMultiple,
         allowOther = allowOther,
-        otherPromptHint = otherPromptHint
+        otherPromptHint = otherPromptHint,
+        topicPath = topicPath,
+        questionId = questionId,
+        source = source,
+        parentTopicPath = parentTopicPath,
+        parentAnswerId = parentAnswerId
     )
 }
 
@@ -345,7 +360,12 @@ fun PersistedAiChatCardGroup.toModel(): AiChatCardGroup {
         },
         allowMultiple = allowMultiple,
         allowOther = allowOther,
-        otherPromptHint = otherPromptHint
+        otherPromptHint = otherPromptHint,
+        topicPath = topicPath,
+        questionId = questionId,
+        source = source,
+        parentTopicPath = parentTopicPath,
+        parentAnswerId = parentAnswerId
     )
 }
 
@@ -463,7 +483,8 @@ fun AiPlaceRecommendationRow.toPersisted(): PersistedAiPlaceRecommendationRow {
         },
         rowType = rowType.name,
         actionLabels = actionLabels,
-        actionsEnabled = actionsEnabled
+        actionsEnabled = actionsEnabled,
+        isDone = isDone
     )
 }
 
@@ -487,6 +508,7 @@ fun PersistedAiPlaceRecommendationRow.toModel(): AiPlaceRecommendationRow {
             AiPlaceRecommendationRowType.valueOf(rowType)
         }.getOrDefault(AiPlaceRecommendationRowType.GENERAL),
         actionLabels = actionLabels,
-        actionsEnabled = actionsEnabled
+        actionsEnabled = actionsEnabled,
+        isDone = isDone
     )
 }

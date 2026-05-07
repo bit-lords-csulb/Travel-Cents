@@ -66,6 +66,7 @@ import com.example.travelcents.data.trip.model.DETAIL_YELP_ID
 import com.example.travelcents.data.trip.model.EventOption
 import com.example.travelcents.data.trip.model.Itinerary
 import com.example.travelcents.data.trip.model.TravelEvent
+import com.example.travelcents.data.trip.model.TRIP_STATUS_AI_CHAT_DRAFT
 import com.example.travelcents.data.trip.model.YELP_POOL_TYPE_ACTIVITIES
 import com.example.travelcents.data.trip.model.YELP_POOL_TYPE_RESTAURANTS
 import com.example.travelcents.data.trip.model.YelpOptionPoolItem
@@ -99,6 +100,7 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.tasks.await
+import java.time.Instant
 import java.time.Duration
 import java.time.LocalDate
 import java.time.LocalDateTime
@@ -126,7 +128,8 @@ data class EditablePlan(
 data class TripMemberUi(
     val uid: String,
     val displayName: String,
-    val initial: Char
+    val initial: Char,
+    val avatarUrl: String
 )
 
 data class CurrentTripUiState(
@@ -138,6 +141,7 @@ data class CurrentTripUiState(
     val canEditTrip: Boolean = false,
     val canManageTrip: Boolean = false,
     val tripTitle: String = "Loading Trip...",
+    val tripStatus: String = "",
     val destination: String = "",
     val dateFrom: String = "",
     val dateTo: String = "",
@@ -373,7 +377,8 @@ class CurrentTripViewModel(application: Application) : AndroidViewModel(applicat
                         TripMemberUi(
                             uid = member.memberUid,
                             displayName = displayName,
-                            initial = displayName.firstOrNull { it.isLetter() } ?: '?'
+                            initial = displayName.firstOrNull { it.isLetter() } ?: '?',
+                            avatarUrl = member.avatarUrl
                         )
                     }
             }
@@ -428,6 +433,7 @@ class CurrentTripViewModel(application: Application) : AndroidViewModel(applicat
                 canEditTrip = canEditTrip,
                 canManageTrip = canManageTrip,
                 tripTitle = nextTripTitle,
+                tripStatus = effectiveItinerary.status,
                 destination = currentTripDestination,
                 dateFrom = effectiveItinerary.dateFrom,
                 dateTo = effectiveItinerary.dateTo,
@@ -1689,13 +1695,23 @@ class CurrentTripViewModel(application: Application) : AndroidViewModel(applicat
         val uid = auth.currentUser?.uid ?: return
         val tripKey = requireOwnerTripKey("share this trip") ?: return
 
+        // Fire-and-forget: grant access so recipients can open the trip.
+        // This uses a Firestore transaction which requires network; keep it
+        // out of the send path so an offline device can still share.
         viewModelScope.launch {
             try {
                 tripRepository.ensureTripAccess(
                     key = tripKey,
-                    memberUids = target.memberUids
+                    memberUids = target.memberUids,
+                    defaultRole = TripAccessRole.EDITOR
                 )
+            } catch (e: Exception) {
+                Log.w("CurrentTripViewModel", "Trip access grant failed; will retry when recipient opens trip", e)
+            }
+        }
 
+        viewModelScope.launch {
+            try {
                 val senderName = resolveSenderDisplayName()
                 val container = if (target.isGroup) "groups" else "directChats"
                 val chatRef = db.collection(container).document(target.id)
@@ -1920,47 +1936,15 @@ class CurrentTripViewModel(application: Application) : AndroidViewModel(applicat
         }
     }
 
-    fun moveEventLocally(
-        eventId: String,
-        fromDate: String,
-        toDate: String,
-        toIndex: Int
-    ) {
-        val currentEvents = localEventsSnapshot
-        val movingEvent = currentEvents.firstOrNull { it.eventId == eventId } ?: return
-        val normalizedFromDate = normalizeDate(fromDate)
-        val normalizedToDate = normalizeDate(toDate)
-
-        val grouped = currentEvents
+    fun applyCommittedEventOrder(events: List<TravelEvent>) {
+        localEventsSnapshot = events
             .groupBy { normalizeDate(it.date) }
-            .mapValues { (_, events) ->
-                events.sortedWith(
-                    compareBy(
-                        { it.details["sortOrder"]?.toIntOrNull() ?: 0 },
-                        { normalizeTime(it.startTime) }
-                    )
-                ).toMutableList()
-            }
-            .toMutableMap()
-
-        val sourceList = grouped[normalizedFromDate] ?: mutableListOf()
-        sourceList.removeAll { it.eventId == eventId }
-
-        val targetList = if (normalizedToDate == normalizedFromDate) {
-            sourceList
-        } else {
-            grouped.getOrPut(normalizedToDate) { mutableListOf() }
-        }
-
-        val insertionIndex = toIndex.coerceIn(0, targetList.size)
-        targetList.add(insertionIndex, movingEvent.copy(date = normalizedToDate))
-
-        localEventsSnapshot = grouped
             .toSortedMap(compareBy<String> { if (it.isBlank()) "9999-12-31" else it })
             .values
             .flatMap { dayEvents ->
                 dayEvents.mapIndexed { index, event ->
                     event.copy(
+                        date = normalizeDate(event.date),
                         details = event.details.toMutableMap().apply {
                             put("sortOrder", index.toString())
                         }
@@ -2028,7 +2012,7 @@ class CurrentTripViewModel(application: Application) : AndroidViewModel(applicat
                         isCurrentCandidate = true
                     )
                 }
-                _uiState.update { it.copy(infoMessage = "Trip archived.", errorMessage = null) }
+                _uiState.update { it.copy(tripStatus = "archived", infoMessage = "Trip archived.", errorMessage = null) }
                 refreshHomeTripCacheInBackground()
 
                 if (currentTripId == tripId) {
@@ -2194,6 +2178,7 @@ class CurrentTripViewModel(application: Application) : AndroidViewModel(applicat
             canEditTrip = false,
             canManageTrip = false,
             tripTitle = preview.itinerary.tripName,
+            tripStatus = preview.itinerary.status,
             destination = preview.itinerary.destination,
             dateFrom = preview.itinerary.dateFrom,
             dateTo = preview.itinerary.dateTo,
@@ -2235,6 +2220,67 @@ class CurrentTripViewModel(application: Application) : AndroidViewModel(applicat
             events = localEventsSnapshot,
             infoMessage = if (localEventsSnapshot.isEmpty()) EMPTY_PLANS_MESSAGE else null
         )
+    }
+
+    fun saveCurrentPreviewAsDraft(
+        onTripReady: (TripKey) -> Unit = {}
+    ) {
+        val uid = auth.currentUser?.uid
+        if (uid.isNullOrBlank()) {
+            postError("Sign in to save this draft trip.")
+            return
+        }
+
+        val previewSummary = currentTripSummary
+        if (!_uiState.value.isPreview || previewSummary == null) {
+            postError("Open a trip preview before saving.")
+            return
+        }
+
+        val tripKey = TripKey(ownerUid = uid, tripId = UUID.randomUUID().toString())
+        val draftEvents = localEventsSnapshot.map { event ->
+            event.copy(
+                itineraryId = tripKey.tripId,
+                eventId = event.eventId.ifBlank { UUID.randomUUID().toString() }
+            )
+        }
+        val draftSummary = previewSummary.copy(
+            itineraryId = tripKey.tripId,
+            userId = uid,
+            ownerUid = uid,
+            memberUids = listOf(uid),
+            roleByUid = mapOf(uid to TripAccessRole.OWNER.wireValue),
+            createdAt = Instant.now().toString(),
+            status = TRIP_STATUS_AI_CHAT_DRAFT,
+            eventIds = draftEvents.map(TravelEvent::eventId)
+        )
+
+        _uiState.update {
+            it.copy(infoMessage = "Saving draft trip...", errorMessage = null)
+        }
+
+        viewModelScope.launch {
+            try {
+                tripSyncRemoteDataSource.createTrip(
+                    ownerUid = uid,
+                    itinerary = draftSummary,
+                    events = draftEvents
+                )
+                refreshHomeTripCacheInBackground()
+                _uiState.update {
+                    it.copy(infoMessage = "Draft trip saved.", errorMessage = null)
+                }
+                onTripReady(tripKey)
+            } catch (e: Exception) {
+                Log.e("CurrentTripViewModel", "Failed to save preview draft", e)
+                _uiState.update {
+                    it.copy(
+                        infoMessage = null,
+                        errorMessage = e.message ?: "Failed to save draft trip."
+                    )
+                }
+            }
+        }
     }
 
     fun loadTrip(tripId: String? = null) {

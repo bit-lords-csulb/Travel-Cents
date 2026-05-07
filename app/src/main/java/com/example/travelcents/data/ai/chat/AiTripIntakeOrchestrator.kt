@@ -25,6 +25,8 @@ private val SUPPORTED_INTAKE_PROFILE_PATCH_FIELDS = listOf(
     "pace",
     "interests",
     "cuisine_preferences",
+    "cuisine_sub_preferences",
+    "activity_sub_categories",
     "must_haves",
     "avoid",
     "notes"
@@ -56,13 +58,19 @@ private val MINIMAL_INTAKE_RESPONSE_EXAMPLE = """
     "trip_type": "romantic",
     "destination_style": ["beach"]
   },
+  "assistant_message": "Got it.",
   "next_action": "ask_more",
+  "topic_path": "destination_style",
   "question_id": "destination_type",
+  "allow_multiple": true,
   "question_title": "What kind of destination?",
   "options": [
     { "id": "tropical", "label": "Tropical", "message": "Tropical." },
     { "id": "coastal_town", "label": "Coastal town", "message": "A coastal town." },
-    { "id": "beach_resort", "label": "Beach resort", "message": "A beach resort." }
+    { "id": "beach_resort", "label": "Beach resort", "message": "A beach resort." },
+    { "id": "hidden_cove", "label": "Hidden cove", "message": "A quieter hidden cove." },
+    { "id": "island", "label": "Island", "message": "An island destination." },
+    { "id": "warm_city", "label": "Warm city", "message": "A warm city near the coast." }
   ]
 }
 """.trimIndent()
@@ -73,7 +81,10 @@ class AiTripIntakeOrchestrator {
         latestUserInput: String,
         history: List<LlmMessage> = emptyList(),
         askedQuestionIds: List<String> = emptyList(),
-        planningObjective: String = ""
+        planningObjective: String = "",
+        plannerContext: PlannerContext? = null,
+        repairInstruction: String = "",
+        forcedTopicPath: String = ""
     ): AiTripIntakeTurnResult? {
         if (latestUserInput.isBlank()) return null
 
@@ -83,7 +94,10 @@ class AiTripIntakeOrchestrator {
                 latestUserInput = latestUserInput,
                 history = history,
                 askedQuestionIds = askedQuestionIds,
-                planningObjective = planningObjective
+                planningObjective = planningObjective,
+                plannerContext = plannerContext,
+                repairInstruction = repairInstruction,
+                forcedTopicPath = forcedTopicPath
             ),
             model = LlmConfig.intakeModel,
             temperature = 0.2,
@@ -154,7 +168,10 @@ class AiTripIntakeOrchestrator {
         latestUserInput: String,
         history: List<LlmMessage>,
         askedQuestionIds: List<String>,
-        planningObjective: String
+        planningObjective: String,
+        plannerContext: PlannerContext?,
+        repairInstruction: String,
+        forcedTopicPath: String
     ): List<LlmMessage> {
         return listOf(
             LlmMessage(
@@ -165,22 +182,29 @@ class AiTripIntakeOrchestrator {
                     append("Aggressively infer trip requirements stated directly or indirectly. ")
                     append("Examples: 'me and my wife', 'my husband and I', 'my partner and I', or 'for my spouse and me' imply party_summary='Two adults' and trip_type='romantic'. ")
                     append("A tropical or warm location implies a warm-weather destination style. ")
+                    append("Aggressively extract date_window from time expressions: 'next month' → 'next month', 'next summer' → 'summer', 'in 3 months' → 'in 3 months', 'June' → 'June', 'over the holidays' → 'December'. ")
+                    append("Aggressively extract duration_days from duration expressions: 'a week' → 7, '10 days' → 10, 'long weekend' → 3, 'two weeks' → 14, 'about 5 days' → 5. ")
+                    append("Aggressively extract budget_level from any budget signal: 'cheap', 'on a budget', 'budget-friendly' → budget; 'comfortable', 'mid-range', 'not too expensive' → comfort; 'luxury', 'high-end', 'no expense spared' → luxury; 'mix of both', 'some splurges', 'mostly budget but a few nice things' → mixed. ")
                     append("profile_patch is an additive partial patch, not a full replacement. ")
                     append("Only include profile_patch keys you can newly infer from the latest turn. Omit keys you cannot newly infer. ")
                     append("Supported profile_patch keys: ${SUPPORTED_INTAKE_PROFILE_PATCH_FIELDS.joinToString(", ")}. ")
                     append("ack_key must be exactly one of: got_it, sounds_good, understood, perfect. ")
+                    append("assistant_message must be a single short acknowledgment sentence. ")
                     append("next_action must be exactly one of: ask_more, suggest_destinations, build_trip. ")
                     append("Do not ask a follow-up question for information already present in the profile. ")
-                    append("Do not repeat the same planning gap if it appears in asked_question_ids. ")
-                    append("Do not suggest specific destinations until you have gathered trip_type, at least 2 interests, and budget_level. Ask about missing fields first. ")
+                    append("Do not repeat the same planning gap if it appears in asked_question_ids or already asked topic paths. ")
+                    append("Do not suggest specific destinations until the app planner says the profile is ready or the question budget is exhausted. Ask about missing allowed fields first. ")
                     append("If the user has enough direction for destination suggestions but no destination yet, set next_action to suggest_destinations. ")
                     append("If destination is known AND date_window is known AND duration_days is known, set next_action to build_trip. ")
                     append("If destination is known but date_window or duration_days is still missing, set next_action to ask_more and ask about the missing timing field — do NOT set build_trip just because destination is confirmed. ")
                     append("Return exactly one of these outcomes: no follow-up, or one cards follow-up. ")
                     append("If more information is still needed before either of those, set next_action to ask_more. ")
-                    append("When next_action is ask_more, cards are the only valid follow-up mode. Ask exactly one short cards-friendly follow-up with 2 to 6 options. ")
-                    append("Use a stable snake_case question_id, a short question_title, and short option labels. Users can still type free text instead of tapping a card. ")
-                    append("When next_action is suggest_destinations or build_trip, set question_id and question_title to empty strings and set options to an empty array. ")
+                    append("When next_action is ask_more, cards are the only valid follow-up mode. Ask exactly one short cards-friendly follow-up with 4, 5, or 6 options. ")
+                    append("Use 5 or 6 options for broad preference topics like destination_style, interests, food_preferences, or activity_preferences; use 4 options for focused decisions like budget, pace, duration, restaurant help, or activity help. ")
+                    append("Use topic_path for semantic progression and duplicate detection. Use question_id only as the specific card instance id. ")
+                    append("Use a stable snake_case question_id, a required snake/dot topic_path, a short question_title, and short option labels. Users can still type free text instead of tapping a card. ")
+                    append("When next_action is suggest_destinations, include destination_recommendations with 2 or 3 items if no destination is locked. ")
+                    append("When next_action is suggest_destinations or build_trip, set topic_path, question_id, and question_title to empty strings and set options to an empty array. ")
                     append("Return JSON only.")
                 }
             ),
@@ -190,25 +214,57 @@ class AiTripIntakeOrchestrator {
                     append("Current intake profile JSON:\n${currentProfile.toPromptJson()}\n\n")
                     append("Fields still missing:\n${currentProfile.missingFields().joinToString().ifBlank { "None" }}")
                     if (currentProfile.destination.isNotBlank() && currentProfile.dateWindow.isBlank()) {
-                        append("\n\nPriority rule: destination is set but date_window is missing. The ONLY valid next_action is ask_more. Ask when the user would like to travel (question_id='travel_timeline'). Do not set next_action=build_trip.")
+                        append("\n\nPriority rule: destination is set but date_window is missing. The ONLY valid next_action is ask_more. Ask when the user would like to travel with topic_path='travel_timeline' and question_id='travel_timeline'. Do not set next_action=build_trip.")
                     } else if (currentProfile.destination.isNotBlank() && currentProfile.dateWindow.isNotBlank() && currentProfile.durationDays == null) {
-                        append("\n\nPriority rule: destination and date_window are set but duration_days is missing. The ONLY valid next_action is ask_more. Ask how many days the user wants to travel (question_id='trip_duration'). Do not set next_action=build_trip.")
+                        val durationAlreadyAsked = plannerContext?.askedQuestionRecords?.any { record -> record.topicPath == "duration" } == true
+                        if (!durationAlreadyAsked) {
+                            append("\n\nPriority rule: destination and date_window are set but duration_days is missing. The ONLY valid next_action is ask_more. Ask how many days the user wants to travel with topic_path='duration' and question_id='trip_duration'. Do not set next_action=build_trip.")
+                        } else {
+                            val nextTopic = plannerContext?.nextBestAllowedTopicPath()
+                            if (nextTopic != null) {
+                                append("\n\nNote: duration was already asked. Ask the next profile question using topic_path='$nextTopic' before building the trip.")
+                            } else {
+                                append("\n\nPriority rule: all timing and profile topics are confirmed. Set next_action to build_trip now.")
+                            }
+                        }
+                    } else if (currentProfile.destination.isNotBlank() && currentProfile.dateWindow.isNotBlank() && currentProfile.durationDays != null) {
+                        val nextTopic = plannerContext?.nextBestAllowedTopicPath()
+                        if (nextTopic != null) {
+                            append("\n\nNote: destination, date_window, and duration_days are confirmed. Ask the next profile question using topic_path='$nextTopic' before building the trip.")
+                        } else {
+                            append("\n\nPriority rule: destination, date_window, duration_days, and all remaining profile topics are confirmed. Set next_action to build_trip now.")
+                        }
                     }
+                    plannerContext?.let { context ->
+                        appendLine()
+                        appendLine()
+                        appendLine("App planner phase: ${context.phase}")
+                        appendLine("Allowed topic roots: ${context.allowedTopicPathSummary()}")
+                        appendLine("Already asked topic paths: ${context.askedTopicSummary()}")
+                        appendLine("Pre-destination card question count: ${context.preDestinationQuestionCount}")
+                        if (context.shouldForceVisualAction()) {
+                            append("Planner gate: visual recommendations are due now; do not ask another question.")
+                        }
+                    }
+                    appendLine()
+                    appendLine("Child topic rule: after food_preferences is answered with a broad cuisine (e.g., Japanese), you may ask one child follow-up with topic_path='food_preferences.<cuisine>' (e.g., 'food_preferences.japanese'), parent_topic_path='food_preferences', parent_answer_id matching the selected answer id, and patch cuisine_sub_preferences with specific sub-types (e.g., ['sushi', 'ramen']). Do the same for activity_preferences using topic_path='activity_preferences.<type>' and patch activity_sub_categories. Do not go deeper than one child level. Only ask the child follow-up if it adds meaningful value — skip it if the Layer 1 answer is already specific enough (e.g., if the user said 'sushi' directly at Layer 1, no child follow-up is needed).")
                 }
             ),
             LlmMessage(
                 role = "system",
                 content = buildString {
                     appendLine("Return exactly one JSON object with these top-level keys and no others:")
-                    appendLine("ack_key, profile_patch, next_action, question_id, question_title, options")
+                    appendLine("ack_key, assistant_message, profile_patch, next_action, topic_path, question_id, parent_topic_path, parent_answer_id, question_title, allow_multiple, options, destination_recommendations")
                     appendLine()
                     appendLine("Produce exactly one of these shapes:")
-                    appendLine("1. No follow-up: next_action is suggest_destinations or build_trip, question_id is '', question_title is '', options is [].")
-                    appendLine("2. One cards follow-up: next_action is ask_more, question_id is snake_case, question_title is concise, options has 2 to 6 objects.")
+                    appendLine("1. No follow-up: next_action is suggest_destinations or build_trip, topic_path is '', question_id is '', question_title is '', allow_multiple is false, options is [].")
+                    appendLine("2. One cards follow-up: next_action is ask_more, topic_path is required, question_id is snake_case, question_title is concise, allow_multiple is true or false, options has 4, 5, or 6 objects.")
                     appendLine()
-                    appendLine("Do not return resolved_fields, missing_fields, next_action_reason, question_kind, question_subtitle, allow_multiple, allow_other, other_prompt_hint, text_prompt, destination_recommendations, place_recommendations, or decision.")
-                    appendLine("If next_action='ask_more', question_id must be snake_case, question_title must be concise, and options must contain 2 to 6 objects with id, label, and message.")
-                    appendLine("If next_action is not 'ask_more', set question_id and question_title to empty strings and set options to [].")
+                    appendLine("allow_multiple: set to true for broad preference topics where multiple answers apply — food_preferences, interests, activity_preferences, destination_style, must_haves. Set to false for single-choice decisions — budget, pace, duration, travel_timeline, traveler_context, discovery_help.")
+                    appendLine()
+                    appendLine("Do not return resolved_fields, missing_fields, next_action_reason, question_kind, question_subtitle, allow_other, other_prompt_hint, text_prompt, place_recommendations, or decision.")
+                    appendLine("If next_action='ask_more', topic_path and question_id must be present, parent fields may be empty, and options must contain 4, 5, or 6 objects with id, label, and message.")
+                    appendLine("If next_action is not 'ask_more', set topic_path, question_id, and question_title to empty strings and set options to [].")
                     appendLine("profile_patch may be {} when the latest turn adds no new structured facts.")
                     appendLine()
                     appendLine("Example:")
@@ -220,6 +276,15 @@ class AiTripIntakeOrchestrator {
                 content = buildString {
                     appendLine("Current planning objective: ${planningObjective.ifBlank { "Not set yet" }}")
                     appendLine("Asked question ids: ${askedQuestionIds.joinToString().ifBlank { "None yet" }}")
+                    if (repairInstruction.isNotBlank()) {
+                        appendLine()
+                        appendLine(repairInstruction)
+                    }
+                    if (forcedTopicPath.isNotBlank()) {
+                        appendLine()
+                        appendLine("Forced next topic_path: $forcedTopicPath")
+                        appendLine("Ask exactly one card question for that topic_path. Do not choose a different topic.")
+                    }
                     val recentHistory = history
                         .filter { message -> message.role == "user" || message.role == "assistant" }
                         .takeLast(6)
@@ -310,26 +375,34 @@ class AiTripIntakeOrchestrator {
 
 private fun JsonObject.toMinimalTurnResult(): AiTripIntakeTurnResult {
     val nextAction = enumValueOrDefault("next_action", AiTripIntakeNextAction.ASK_MORE)
+    val topicPath = getStringOrEmpty("topic_path").toPlannerTopicPath()
     val questionId = getStringOrEmpty("question_id")
     val questionTitle = getStringOrEmpty("question_title")
     val options = getAsJsonArrayOrNull("options")
         ?.toAnswerOptions()
         .orEmpty()
-        .take(6)
     val hasCardFollowUp = nextAction == AiTripIntakeNextAction.ASK_MORE &&
+        topicPath.isPlannerTopicPath() &&
         questionId.isNotBlank() &&
-        questionTitle.isNotBlank() &&
-        options.size in 2..6
+        questionTitle.isNotBlank()
 
     return AiTripIntakeTurnResult(
         ackKey = enumValueOrDefault("ack_key", AiTripIntakeAckKey.GOT_IT),
+        assistantMessageText = getStringOrEmpty("assistant_message"),
         profilePatch = getAsJsonObjectOrNull("profile_patch")?.toIntakeProfilePatch()
             ?: AiTripIntakeProfile(),
         nextAction = nextAction,
         questionKind = if (hasCardFollowUp) AiTripIntakeQuestionKind.CARDS else AiTripIntakeQuestionKind.NONE,
+        topicPath = topicPath.takeIf { hasCardFollowUp }.orEmpty(),
         questionId = questionId.takeIf { hasCardFollowUp }.orEmpty(),
+        parentTopicPath = getStringOrEmpty("parent_topic_path").toPlannerTopicPath().takeIf { hasCardFollowUp }.orEmpty(),
+        parentAnswerId = getStringOrEmpty("parent_answer_id").takeIf { hasCardFollowUp }.orEmpty(),
         questionTitle = questionTitle.takeIf { hasCardFollowUp }.orEmpty(),
-        options = options.takeIf { hasCardFollowUp }.orEmpty()
+        options = options.takeIf { hasCardFollowUp }.orEmpty(),
+        destinationRecommendations = getAsJsonArrayOrNull("destination_recommendations")
+            ?.toDestinationRecommendations()
+            .orEmpty()
+            .take(3)
     )
 }
 

@@ -15,6 +15,8 @@ import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Icon
+import androidx.compose.material3.Switch
+import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -31,15 +33,23 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.example.travelcents.ui.components.TcTextField
+import com.example.travelcents.ui.main.current.CurrentTripViewModel
 import com.example.travelcents.ui.main.newTrip.TripWizardColors
+import com.example.travelcents.ui.theme.DeepSea1
 import com.example.travelcents.ui.theme.DeepSea2
 import com.example.travelcents.ui.theme.DeepSea3
 import com.example.travelcents.ui.theme.DeepSea4
 import com.example.travelcents.ui.theme.DeepSea5
 
 @Composable
-fun AccountTab(viewModel: SettingsViewModel, onLoggedOut: () -> Unit) {
+fun AccountTab(
+    viewModel: SettingsViewModel,
+    currentTripViewModel: CurrentTripViewModel? = null,
+    onLoggedOut: () -> Unit
+) {
     val userState by viewModel.userState.collectAsStateWithLifecycle()
+    val advisoryDemoModeEnabled by currentTripViewModel?.isAdvisoryDemoModeEnabled?.collectAsStateWithLifecycle()
+        ?: remember { mutableStateOf(false) }
 
     var isEditing by remember { mutableStateOf(false) }
     var editFirstName by remember { mutableStateOf("") }
@@ -97,6 +107,33 @@ fun AccountTab(viewModel: SettingsViewModel, onLoggedOut: () -> Unit) {
     }
 
     Column(modifier = Modifier.fillMaxWidth()) {
+        currentTripViewModel?.let { tripViewModel ->
+            SettingHeader("Advisories")
+            SettingCard {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(vertical = 6.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text("Demo updates", color = DeepSea5, fontSize = 15.sp, fontWeight = FontWeight.Medium)
+                        Text("Refresh advisory suggestions when the itinerary opens", color = DeepSea4, fontSize = 12.sp)
+                    }
+                    Switch(
+                        checked = advisoryDemoModeEnabled,
+                        onCheckedChange = tripViewModel::setAdvisoryDemoModeEnabled,
+                        colors = SwitchDefaults.colors(
+                            checkedThumbColor = DeepSea1,
+                            checkedTrackColor = TripWizardColors.Blue,
+                            uncheckedThumbColor = DeepSea4,
+                            uncheckedTrackColor = DeepSea3
+                        )
+                    )
+                }
+            }
+        }
 
         // Personal Info section
         SettingHeader("Personal Information")

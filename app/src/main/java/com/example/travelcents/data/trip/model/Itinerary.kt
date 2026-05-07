@@ -1,5 +1,11 @@
 package com.example.travelcents.data.trip.model
 
+const val TRIP_STATUS_AI_CHAT_DRAFT = "ai_chat_draft"
+
+fun isAiChatDraftStatus(status: String): Boolean {
+    return status.equals(TRIP_STATUS_AI_CHAT_DRAFT, ignoreCase = true)
+}
+
 data class Itinerary(
     val itineraryId: String,
     val userId: String,

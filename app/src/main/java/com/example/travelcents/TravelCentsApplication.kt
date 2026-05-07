@@ -6,6 +6,8 @@ import coil.ImageLoader
 import coil.ImageLoaderFactory
 import coil.disk.DiskCache
 import coil.memory.MemoryCache
+import com.example.travelcents.BuildConfig
+import com.example.travelcents.data.debug.DebugPreferencesRepository
 import com.example.travelcents.data.firebase.FirestoreStartupConfig
 import com.example.travelcents.data.trip.TripPerformanceLogger
 import com.example.travelcents.notification.ChatNotificationManager
@@ -18,6 +20,7 @@ class TravelCentsApplication : Application(), ImageLoaderFactory {
     override fun onCreate() {
         super.onCreate()
         TripPerformanceLogger.markAppStart()
+        if (BuildConfig.DEBUG) DebugPreferencesRepository.init(this)
         FirebaseFirestore.getInstance().firestoreSettings = FirestoreStartupConfig.buildSettings()
         Log.d(TAG, "Configured Firestore offline cache settings at app startup.")
 

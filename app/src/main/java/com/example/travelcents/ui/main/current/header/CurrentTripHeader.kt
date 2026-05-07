@@ -20,6 +20,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.DateRange
 import androidx.compose.material.icons.filled.DeleteOutline
 import androidx.compose.material.icons.filled.DragHandle
@@ -58,6 +59,8 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.travelcents.data.trip.TripKey
 import com.example.travelcents.data.trip.model.Itinerary
+import com.example.travelcents.data.trip.model.isAiChatDraftStatus
+import com.example.travelcents.ui.components.ProfileAvatar
 import com.example.travelcents.ui.main.current.TripMemberUi
 import com.example.travelcents.ui.modules.formatDayOfWeekFull
 import com.example.travelcents.ui.modules.formatHeroDate
@@ -75,6 +78,7 @@ private val SwitcherButtonShape = RoundedCornerShape(18.dp)
 @Composable
 fun CurrentTripHeader(
     tripTitle: String,
+    tripStatus: String,
     heroDate: String,
     currentTripId: String?,
     currentTripOwnerUid: String?,
@@ -92,6 +96,7 @@ fun CurrentTripHeader(
     members: List<TripMemberUi>,
     onCalendarClick: () -> Unit,
     onBackClick: () -> Unit,
+    onDoneReordering: () -> Unit,
     onAddClick: () -> Unit,
     onShareClick: () -> Unit,
     onToggleReorder: () -> Unit,
@@ -108,6 +113,8 @@ fun CurrentTripHeader(
     var showMembersSheet by remember { mutableStateOf(false) }
     var editableTitle by remember { mutableStateOf(tripTitle) }
     val displayTitle = tripTitle.ifBlank { "My Trip" }
+    val showDraftBadge = isAiChatDraftStatus(tripStatus) ||
+        tripStatus.equals("preview", ignoreCase = true)
     val titleSidePadding = if (allTrips.size > 1) 60.dp else 64.dp
 
     LaunchedEffect(tripTitle, showRenameDialog) {
@@ -265,6 +272,9 @@ fun CurrentTripHeader(
                             textAlign = TextAlign.Center,
                             modifier = Modifier.weight(1f, fill = false)
                         )
+                        if (showDraftBadge) {
+                            TripStatusPill(label = "Draft")
+                        }
                         Icon(
                             imageVector = Icons.Default.KeyboardArrowDown,
                             contentDescription = "Switch trip",
@@ -273,20 +283,30 @@ fun CurrentTripHeader(
                         )
                     }
                 } else {
-                    Text(
-                        text = displayTitle,
-                        color = CurrentTripHeroAccent,
-                        fontSize = 18.sp,
-                        fontWeight = FontWeight.ExtraBold,
-                        fontFamily = TravelCentsFonts.Headline,
-                        maxLines = 1,
-                        softWrap = false,
-                        overflow = TextOverflow.Ellipsis,
-                        textAlign = TextAlign.Center,
+                    Row(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .widthIn(max = selectorMaxWidth)
-                    )
+                            .widthIn(max = selectorMaxWidth),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.Center
+                    ) {
+                        Text(
+                            text = displayTitle,
+                            color = CurrentTripHeroAccent,
+                            fontSize = 18.sp,
+                            fontWeight = FontWeight.ExtraBold,
+                            fontFamily = TravelCentsFonts.Headline,
+                            maxLines = 1,
+                            softWrap = false,
+                            overflow = TextOverflow.Ellipsis,
+                            textAlign = TextAlign.Center,
+                            modifier = Modifier.weight(1f, fill = false)
+                        )
+                        if (showDraftBadge) {
+                            Spacer(modifier = Modifier.width(6.dp))
+                            TripStatusPill(label = "Draft")
+                        }
+                    }
                 }
 
                 DropdownMenu(
@@ -298,21 +318,30 @@ fun CurrentTripHeader(
                 ) {
                     allTrips.forEach { trip ->
                         val isCurrentTrip = trip.itineraryId == currentTripId && trip.ownerUid == currentTripOwnerUid
-                        val tripLabel = buildString {
-                            append(trip.tripName)
-                            if (trip.status.equals("archived", ignoreCase = true)) {
-                                append(" · Archived")
-                            } else if (!viewerUid.isNullOrBlank() && trip.ownerUid != viewerUid) {
-                                append(" · Shared")
-                            }
+                        val tripBadges = buildList {
+                            if (isAiChatDraftStatus(trip.status)) add("Draft")
+                            if (trip.status.equals("archived", ignoreCase = true)) add("Archived")
+                            if (!viewerUid.isNullOrBlank() && trip.ownerUid != viewerUid) add("Shared")
                         }
                         DropdownMenuItem(
                             text = {
-                                Text(
-                                    text = tripLabel,
-                                    color = if (isCurrentTrip) DeepSea5 else DeepSea4,
-                                    fontWeight = if (isCurrentTrip) FontWeight.Bold else FontWeight.Normal
-                                )
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                ) {
+                                    Text(
+                                        text = trip.tripName,
+                                        color = if (isCurrentTrip) DeepSea5 else DeepSea4,
+                                        fontWeight = if (isCurrentTrip) FontWeight.Bold else FontWeight.Normal,
+                                        maxLines = 1,
+                                        overflow = TextOverflow.Ellipsis,
+                                        modifier = Modifier.weight(1f)
+                                    )
+                                    tripBadges.forEach { badge ->
+                                        TripStatusPill(label = badge)
+                                    }
+                                }
                             },
                             onClick = {
                                 switcherExpanded = false
@@ -330,11 +359,29 @@ fun CurrentTripHeader(
                 }
             }
 
+            val showDoneButton = !isInCalendarMode && isReorderActive
             HeaderModeButton(
-                icon = if (isInCalendarMode) Icons.AutoMirrored.Filled.ArrowBack else Icons.Default.DateRange,
-                label = if (isInCalendarMode) "Itinerary" else "Calendar",
-                contentDescription = if (isInCalendarMode) "Back to itinerary" else "Open calendar view",
-                onClick = if (isInCalendarMode) onBackClick else onCalendarClick,
+                icon = when {
+                    showDoneButton -> Icons.Default.CheckCircle
+                    isInCalendarMode -> Icons.AutoMirrored.Filled.ArrowBack
+                    else -> Icons.Default.DateRange
+                },
+                label = when {
+                    showDoneButton -> "Done"
+                    isInCalendarMode -> "Itinerary"
+                    else -> "Calendar"
+                },
+                contentDescription = when {
+                    showDoneButton -> "Finish reordering"
+                    isInCalendarMode -> "Back to itinerary"
+                    else -> "Open calendar view"
+                },
+                onClick = when {
+                    showDoneButton -> onDoneReordering
+                    isInCalendarMode -> onBackClick
+                    else -> onCalendarClick
+                },
+                highlightColor = if (showDoneButton) Color(0xFF79E2A0) else CurrentTripHeroAccent,
                 modifier = Modifier.align(Alignment.TopStart)
             )
 
@@ -415,58 +462,54 @@ fun CurrentTripHeader(
                     )
                 }
             }
-        }
-
-        Spacer(modifier = Modifier.height(8.dp))
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(end = if (members.isNotEmpty()) 24.dp else 0.dp),
-            verticalAlignment = Alignment.Bottom,
-            horizontalArrangement = Arrangement.spacedBy(16.dp)
-        ) {
-            Box(
-                modifier = Modifier.weight(1f),
-                contentAlignment = Alignment.BottomStart
-            ) {
-                when {
-                    isInCalendarMode && isWeekMode -> WeekDateHero(
-                        selectedDate = selectedDate,
-                        sortedDates = sortedDates,
-                        onDateSelected = onDateSelected
-                    )
-                    isInCalendarMode -> DayDateHero(
-                        selectedDate = selectedDate,
-                        sortedDates = sortedDates,
-                        onDateSelected = onDateSelected
-                    )
-                    else -> CurrentTripHeroLayout {
-                        Text(
-                            text = formatDayOfWeekFull(heroDate),
-                            color = DeepSea4,
-                            fontSize = 15.sp,
-                            fontWeight = FontWeight.SemiBold,
-                            letterSpacing = 0.8.sp,
-                            lineHeight = 16.sp,
-                            fontFamily = TravelCentsFonts.Body
-                        )
-                        Text(
-                            text = formatHeroDate(heroDate),
-                            color = DeepSea5,
-                            fontSize = 48.sp,
-                            fontWeight = FontWeight.ExtraBold,
-                            lineHeight = 50.sp,
-                            fontFamily = TravelCentsFonts.Headline
-                        )
-                    }
-                }
-            }
 
             if (members.isNotEmpty()) {
                 MemberAvatarRow(
                     members = members,
-                    onClick = { showMembersSheet = true }
+                    onClick = { showMembersSheet = true },
+                    modifier = Modifier
+                        .align(Alignment.TopEnd)
+                        .padding(top = 44.dp, end = 4.dp)
                 )
+            }
+        }
+
+        Spacer(modifier = Modifier.height(8.dp))
+        Box(
+            modifier = Modifier
+                .fillMaxWidth(),
+            contentAlignment = Alignment.BottomStart
+        ) {
+            when {
+                isInCalendarMode && isWeekMode -> WeekDateHero(
+                    selectedDate = selectedDate,
+                    sortedDates = sortedDates,
+                    onDateSelected = onDateSelected
+                )
+                isInCalendarMode -> DayDateHero(
+                    selectedDate = selectedDate,
+                    sortedDates = sortedDates,
+                    onDateSelected = onDateSelected
+                )
+                else -> CurrentTripHeroLayout {
+                    Text(
+                        text = formatDayOfWeekFull(heroDate),
+                        color = DeepSea4,
+                        fontSize = 15.sp,
+                        fontWeight = FontWeight.SemiBold,
+                        letterSpacing = 0.8.sp,
+                        lineHeight = 16.sp,
+                        fontFamily = TravelCentsFonts.Body
+                    )
+                    Text(
+                        text = formatHeroDate(heroDate),
+                        color = DeepSea5,
+                        fontSize = 48.sp,
+                        fontWeight = FontWeight.ExtraBold,
+                        lineHeight = 50.sp,
+                        fontFamily = TravelCentsFonts.Headline
+                    )
+                }
             }
         }
 
@@ -483,11 +526,38 @@ fun CurrentTripHeader(
 }
 
 @Composable
+private fun TripStatusPill(label: String) {
+    val accent = when (label.lowercase()) {
+        "draft" -> CurrentTripHeroAccent
+        "archived" -> Color(0xFFE7A36A)
+        else -> DeepSea4
+    }
+    Box(
+        modifier = Modifier
+            .clip(RoundedCornerShape(50.dp))
+            .background(accent.copy(alpha = 0.14f))
+            .border(1.dp, accent.copy(alpha = 0.32f), RoundedCornerShape(50.dp))
+            .padding(horizontal = 8.dp, vertical = 3.dp),
+        contentAlignment = Alignment.Center
+    ) {
+        Text(
+            text = label,
+            color = accent,
+            fontSize = 10.sp,
+            lineHeight = 10.sp,
+            fontWeight = FontWeight.Bold,
+            fontFamily = TravelCentsFonts.Body
+        )
+    }
+}
+
+@Composable
 private fun HeaderModeButton(
     icon: androidx.compose.ui.graphics.vector.ImageVector,
     label: String,
     contentDescription: String,
     onClick: () -> Unit,
+    highlightColor: Color,
     modifier: Modifier = Modifier
 ) {
     val buttonShape = RoundedCornerShape(14.dp)
@@ -505,19 +575,19 @@ private fun HeaderModeButton(
                 .size(34.dp)
                 .clip(buttonShape)
                 .background(SurfaceContainerHigh)
-                .border(1.dp, DeepSea3.copy(alpha = 0.75f), buttonShape),
+                .border(1.dp, highlightColor.copy(alpha = 0.45f), buttonShape),
             contentAlignment = Alignment.Center
         ) {
             Icon(
                 imageVector = icon,
                 contentDescription = contentDescription,
-                tint = CurrentTripHeroAccent,
+                tint = highlightColor,
                 modifier = Modifier.size(18.dp)
             )
         }
         Text(
             text = label,
-            color = DeepSea4,
+            color = highlightColor,
             fontSize = 10.sp,
             lineHeight = 10.sp,
             fontWeight = FontWeight.SemiBold,
@@ -528,31 +598,31 @@ private fun HeaderModeButton(
 }
 
 @Composable
-private fun MemberAvatarRow(members: List<TripMemberUi>, onClick: () -> Unit) {
+private fun MemberAvatarRow(
+    members: List<TripMemberUi>,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier
+) {
     val display = members.take(2)
     val overflow = members.size - display.size
 
     Row(
-        modifier = Modifier.clickable(onClick = onClick),
+        modifier = modifier.clickable(onClick = onClick),
         horizontalArrangement = Arrangement.spacedBy((-12).dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
         display.forEach { member ->
-            Box(
+            ProfileAvatar(
+                photoUrl = member.avatarUrl,
+                contentDescription = "${member.displayName} profile picture",
                 modifier = Modifier
-                    .size(40.dp)
-                    .border(2.dp, DeepSea1, CircleShape)
-                    .clip(CircleShape)
-                    .background(SurfaceContainerHigh),
-                contentAlignment = Alignment.Center
-            ) {
-                Text(
-                    text = member.initial.uppercaseChar().toString(),
-                    color = CurrentTripHeroAccent,
-                    fontSize = 15.sp,
-                    fontWeight = FontWeight.Bold
-                )
-            }
+                    .size(40.dp),
+                borderColor = DeepSea1,
+                backgroundColor = SurfaceContainerHigh,
+                placeholderTint = CurrentTripHeroAccent,
+                borderWidth = 2.dp,
+                iconSize = 18.dp
+            )
         }
         if (overflow > 0) {
             Box(
@@ -604,20 +674,16 @@ private fun MemberListSheet(members: List<TripMemberUi>, onDismiss: () -> Unit) 
                         .padding(vertical = 8.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Box(
-                        modifier = Modifier
-                            .size(36.dp)
-                            .clip(CircleShape)
-                            .background(SurfaceContainerHigh),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Text(
-                            text = member.initial.uppercaseChar().toString(),
-                            color = CurrentTripHeroAccent,
-                            fontSize = 14.sp,
-                            fontWeight = FontWeight.Bold
-                        )
-                    }
+                    ProfileAvatar(
+                        photoUrl = member.avatarUrl,
+                        contentDescription = "${member.displayName} profile picture",
+                        modifier = Modifier.size(36.dp),
+                        borderColor = DeepSea3.copy(alpha = 0.6f),
+                        backgroundColor = SurfaceContainerHigh,
+                        placeholderTint = CurrentTripHeroAccent,
+                        borderWidth = 1.dp,
+                        iconSize = 17.dp
+                    )
                     Spacer(modifier = Modifier.width(12.dp))
                     Text(
                         text = member.displayName,

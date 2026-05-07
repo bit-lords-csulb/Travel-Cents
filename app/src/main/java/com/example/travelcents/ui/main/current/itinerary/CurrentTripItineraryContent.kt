@@ -43,6 +43,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
@@ -62,6 +63,7 @@ import coil.compose.AsyncImage
 import com.example.travelcents.data.trip.advisory.TripAdvisory
 import com.example.travelcents.data.trip.model.EventOption
 import com.example.travelcents.data.trip.model.TravelEvent
+import com.example.travelcents.ui.main.current.eventDisplayType
 import com.example.travelcents.ui.main.current.overlays.cards.CompactFlightSummaryContent
 import com.example.travelcents.ui.main.current.overlays.cards.EventTypeChip
 import com.example.travelcents.ui.main.current.overlays.cards.FlightHeroMedia
@@ -109,8 +111,8 @@ fun CurrentTripItineraryContent(
     onOpenAlternatives: (String) -> Unit,
     onReviewAdvisory: (TripAdvisory) -> Unit = {},
     onDismissAdvisory: (String) -> Unit = {},
-    onMoveEvent: (eventId: String, fromDate: String, toDate: String, toIndex: Int) -> Unit,
-    onPersistEventPlacements: (Set<String>) -> Unit,
+    onCommitEventOrder: (events: List<TravelEvent>) -> Unit,
+    onPendingReorderDatesChange: (Set<String>) -> Unit = {},
     onVisibleDateChange: (String) -> Unit = {}
 ) {
     Column(
@@ -130,12 +132,19 @@ fun CurrentTripItineraryContent(
                 return@CurrentTripPageSurface
             }
 
-            val itineraryItems = remember(events) { buildCurrentTripItineraryItems(events) }
+            var localReorderEvents by remember(jiggleMode, events) {
+                mutableStateOf(events)
+            }
+            val displayEvents = if (jiggleMode) localReorderEvents else events
+            val itineraryItems = remember(displayEvents) { buildCurrentTripItineraryItems(displayEvents) }
             val advisoriesByEvent = remember(advisories) {
                 advisories.groupBy(TripAdvisory::eventId)
             }
             val lazyListState = rememberLazyListState()
             var affectedDragDates by remember { mutableStateOf<Set<String>>(emptySet()) }
+            var hasPendingLocalReorder by remember { mutableStateOf(false) }
+            val latestReorderEvents by rememberUpdatedState(localReorderEvents)
+            val latestHasPendingLocalReorder by rememberUpdatedState(hasPendingLocalReorder)
 
             val infiniteTransition = rememberInfiniteTransition(label = "trip_itinerary_jiggle")
             val wobbleAngle by infiniteTransition.animateFloat(
@@ -152,14 +161,32 @@ fun CurrentTripItineraryContent(
                 val toItem = itineraryItems.firstOrNull { it.key == to.key } as? CurrentTripItineraryItem.EventCard
                     ?: return@rememberReorderableLazyListState
                 affectedDragDates = affectedDragDates + setOf(fromItem.event.date, toItem.event.date)
-                onMoveEvent(fromItem.event.eventId, fromItem.event.date, toItem.event.date, toItem.dayIndex)
+                localReorderEvents = moveCurrentTripEvent(
+                    events = localReorderEvents,
+                    eventId = fromItem.event.eventId,
+                    fromDate = fromItem.event.date,
+                    toDate = toItem.event.date,
+                    toIndex = toItem.dayIndex
+                )
+                hasPendingLocalReorder = true
             }
 
-            LaunchedEffect(reorderState.isAnyItemDragging) {
-                if (!reorderState.isAnyItemDragging && affectedDragDates.isNotEmpty()) {
-                    onPersistEventPlacements(affectedDragDates)
-                    affectedDragDates = emptySet()
-                }
+            LaunchedEffect(affectedDragDates) {
+                onPendingReorderDatesChange(affectedDragDates)
+            }
+
+            LaunchedEffect(jiggleMode, reorderState) {
+                if (!jiggleMode) return@LaunchedEffect
+                var wasDragging = false
+                snapshotFlow { reorderState.isAnyItemDragging }
+                    .distinctUntilChanged()
+                    .collect { isDragging ->
+                        if (wasDragging && !isDragging && latestHasPendingLocalReorder) {
+                            onCommitEventOrder(latestReorderEvents)
+                            hasPendingLocalReorder = false
+                        }
+                        wasDragging = isDragging
+                    }
             }
 
             LaunchedEffect(lazyListState, itineraryItems, jiggleMode) {
@@ -239,7 +266,7 @@ fun CurrentTripItineraryContent(
                                     hasAlternatives = !optionsLoaded || activeOptionCount > 1,
                                     isDragging = isDragging,
                                     jiggleMode = jiggleMode,
-                                    wobbleAngle = cardRotation,
+                                    wobbleAngle = if (isDragging) 0f else cardRotation,
                                     modifier = Modifier.draggableHandle(enabled = jiggleMode),
                                     onCardClick = { onEventClick(item.event) },
                                     onDeleteClick = { onDeleteClick(item.event) },
@@ -374,7 +401,7 @@ internal fun TripEventCard(
                         CompactFlightCardContent(accent = accent, summary = flightSummary)
                     } else {
                         Row(verticalAlignment = Alignment.CenterVertically) {
-                            EventTypeChip(type = event.type, accent = accent)
+                            EventTypeChip(type = eventDisplayType(event), accent = accent)
                             if (event.startTime.isNotBlank()) {
                                 Spacer(modifier = Modifier.width(8.dp))
                                 Text(
@@ -535,8 +562,8 @@ internal fun CurrentTripItineraryCard(
                             contentAlignment = Alignment.Center
                         ) {
                             Icon(
-                                imageVector = eventTypeIcon(event.type),
-                                contentDescription = event.type,
+                                imageVector = eventTypeIcon(eventDisplayType(event)),
+                                contentDescription = eventDisplayType(event),
                                 tint = accent,
                                 modifier = Modifier.size(28.dp)
                             )
@@ -549,7 +576,7 @@ internal fun CurrentTripItineraryCard(
                             .padding(horizontal = 14.dp, vertical = 14.dp)
                     ) {
                         Row(verticalAlignment = Alignment.CenterVertically) {
-                            EventTypeChip(type = event.type, accent = accent)
+                            EventTypeChip(type = eventDisplayType(event), accent = accent)
                             if (event.startTime.isNotBlank()) {
                                 Spacer(modifier = Modifier.width(8.dp))
                                 Text(
@@ -661,6 +688,52 @@ private fun buildCurrentTripItineraryItems(events: List<TravelEvent>): List<Curr
             add(CurrentTripItineraryItem.DaySpacer(date))
         }
     }
+}
+
+private fun moveCurrentTripEvent(
+    events: List<TravelEvent>,
+    eventId: String,
+    fromDate: String,
+    toDate: String,
+    toIndex: Int
+): List<TravelEvent> {
+    val movingEvent = events.firstOrNull { it.eventId == eventId } ?: return events
+    val normalizedFromDate = normalizeDateForItinerary(fromDate)
+    val normalizedToDate = normalizeDateForItinerary(toDate)
+
+    val grouped = events
+        .groupBy { normalizeDateForItinerary(it.date) }
+        .mapValues { (_, dayEvents) -> dayEvents.toMutableList() }
+        .toMutableMap()
+
+    val sourceList = grouped[normalizedFromDate] ?: mutableListOf()
+    sourceList.removeAll { it.eventId == eventId }
+
+    val targetList = if (normalizedFromDate == normalizedToDate) {
+        sourceList
+    } else {
+        grouped.getOrPut(normalizedToDate) { mutableListOf() }
+    }
+
+    val insertionIndex = toIndex.coerceIn(0, targetList.size)
+    targetList.add(insertionIndex, movingEvent.copy(date = normalizedToDate))
+
+    return grouped
+        .toSortedMap(compareBy<String> { if (it.isBlank()) "9999-12-31" else it })
+        .values
+        .flatMap { dayEvents ->
+            dayEvents.mapIndexed { index, event ->
+                event.copy(
+                    details = event.details.toMutableMap().apply {
+                        put("sortOrder", index.toString())
+                    }
+                )
+            }
+        }
+}
+
+private fun normalizeDateForItinerary(date: String): String {
+    return if (date.equals(UndatedGroupKey, ignoreCase = true)) "" else date.trim()
 }
 
 private fun itineraryEventTypePriority(event: TravelEvent): Int {

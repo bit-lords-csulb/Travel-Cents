@@ -11,8 +11,6 @@ class TripSyncCoordinator(
     private val legacyRemoteRepository: TripRepository
 ) {
     suspend fun refreshHomeIfNeeded(viewerUid: String) {
-        val localTripCount = localDataSource.getHomeTripCount(viewerUid)
-        val localManifestVersion = localDataSource.getManifestVersion(viewerUid)
         val remoteManifest = runCatching {
             remoteDataSource.fetchManifest(viewerUid)
         }.getOrElse { error ->
@@ -22,9 +20,6 @@ class TripSyncCoordinator(
 
         if (remoteManifest != null) {
             localDataSource.recordManifestCheck(viewerUid, remoteManifest.manifestVersion)
-            if (localTripCount > 0 && localManifestVersion == remoteManifest.manifestVersion.toString()) {
-                return
-            }
 
             val tripRefs = runCatching {
                 remoteDataSource.fetchTripRefs(viewerUid)

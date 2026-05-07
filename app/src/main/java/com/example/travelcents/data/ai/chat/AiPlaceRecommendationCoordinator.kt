@@ -13,6 +13,7 @@ import com.example.travelcents.data.trip.model.YelpBusiness
 import com.example.travelcents.data.trip.model.detailValue
 import com.example.travelcents.data.trip.model.displayName
 import com.example.travelcents.data.trip.remote.SerpRepository
+import com.example.travelcents.data.trip.remote.YelpCategoryTranslator
 import com.example.travelcents.data.trip.remote.YelpRepository
 import java.time.LocalDate
 import java.time.format.DateTimeFormatter
@@ -21,8 +22,8 @@ import java.util.UUID
 
 class AiPlaceRecommendationCoordinator(
     private val curatedTripCatalog: AiCuratedTripCatalog = AiCuratedTripCatalog(),
-    private val restaurantProvider: suspend (String, Int) -> List<YelpBusiness> = YelpRepository::fetchRestaurantPool,
-    private val activityProvider: suspend (String, Int) -> List<YelpBusiness> = YelpRepository::fetchActivityPool,
+    private val restaurantProvider: suspend (String, Int) -> List<YelpBusiness> = { loc, n -> YelpRepository.fetchRestaurantPool(loc, n) },
+    private val activityProvider: suspend (String, Int) -> List<YelpBusiness> = { loc, n -> YelpRepository.fetchActivityPool(loc, n) },
     private val hotelProvider: suspend (TravelRequest, Itinerary) -> List<TravelEvent> = SerpRepository::searchHotels
 ) {
     suspend fun recommendRowForToolCall(
@@ -120,15 +121,23 @@ class AiPlaceRecommendationCoordinator(
         destination: String,
         cuisines: List<String> = emptyList()
     ): AiPlaceRecommendationRow? {
-        val businesses = restaurantProvider(destination, PROVIDER_RESULT_LIMIT)
-            .let { candidates -> rankBusinessesByTerms(candidates, cuisines) }
+        val allTerms = (cuisines + intakeProfile.cuisineSubPreferences).distinct()
+        val yelpCategories = YelpCategoryTranslator.cuisinesToCategories(allTerms)
+        val dietaryTerm = YelpCategoryTranslator.toDietaryTerm(allTerms)
+
+        val businesses = YelpRepository.fetchRestaurantPool(
+            location = destination,
+            targetCount = PROVIDER_RESULT_LIMIT,
+            yelpCategories = yelpCategories.takeIf { it.isNotBlank() },
+            term = dietaryTerm
+        ).let { candidates -> rankBusinessesByTerms(candidates, allTerms) }
             .distinctBy(YelpBusiness::id)
             .take(PROVIDER_RESULT_LIMIT)
         if (businesses.size < 2) return null
 
         return AiPlaceRecommendationRow(
             title = "Food spots in ${shortDestination(destination)}",
-            subtitle = cuisines.takeIf(List<String>::isNotEmpty)
+            subtitle = allTerms.takeIf(List<String>::isNotEmpty)
                 ?.joinToString(separator = ", ")
                 ?.let { requested -> "Restaurant ideas pulled from live local results for $requested." }
                 ?: "Restaurant ideas pulled from live local results.",
@@ -155,15 +164,21 @@ class AiPlaceRecommendationCoordinator(
         destination: String,
         categories: List<String> = emptyList()
     ): AiPlaceRecommendationRow? {
-        val businesses = activityProvider(destination, PROVIDER_RESULT_LIMIT)
-            .let { candidates -> rankBusinessesByTerms(candidates, categories) }
+        val allTerms = (categories + intakeProfile.activitySubCategories).distinct()
+        val yelpCategories = YelpCategoryTranslator.activitiesToCategories(allTerms)
+
+        val businesses = YelpRepository.fetchActivityPool(
+            location = destination,
+            targetCount = PROVIDER_RESULT_LIMIT,
+            yelpCategories = yelpCategories.takeIf { it.isNotBlank() }
+        ).let { candidates -> rankBusinessesByTerms(candidates, allTerms) }
             .distinctBy(YelpBusiness::id)
             .take(PROVIDER_RESULT_LIMIT)
         if (businesses.size < 2) return null
 
         return AiPlaceRecommendationRow(
             title = "Activity ideas in ${shortDestination(destination)}",
-            subtitle = categories.takeIf(List<String>::isNotEmpty)
+            subtitle = allTerms.takeIf(List<String>::isNotEmpty)
                 ?.joinToString(separator = ", ")
                 ?.let { requested -> "Live activity picks for $requested." }
                 ?: "Live activity picks that match the current trip direction.",

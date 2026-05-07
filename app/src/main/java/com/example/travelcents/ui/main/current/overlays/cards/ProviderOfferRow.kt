@@ -5,6 +5,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -67,20 +68,13 @@ fun ProviderOfferRow(
                 fontSize = 12.sp
             )
         }
-        Box(
-            modifier = Modifier
-                .clip(RoundedCornerShape(999.dp))
-                .background(accent)
-                .padding(horizontal = 14.dp, vertical = 8.dp),
-            contentAlignment = Alignment.Center
-        ) {
-            Text(
-                text = actionLabel,
-                color = CardBackground,
-                fontSize = 12.sp,
-                fontWeight = FontWeight.Bold
-            )
-        }
+        Spacer(modifier = Modifier.width(12.dp))
+        ItineraryActionButton(
+            label = actionLabel,
+            onClick = onClick,
+            accent = accent,
+            contentPadding = PaddingValues(horizontal = 14.dp, vertical = 10.dp)
+        )
     }
 }
 

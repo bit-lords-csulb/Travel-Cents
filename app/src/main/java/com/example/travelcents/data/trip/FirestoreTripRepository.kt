@@ -187,6 +187,7 @@ class FirestoreTripRepository(
     ) {
         val existingSnapshot = tripDocument(key).get().await()
         val previousMemberUids = existingSnapshot.memberUids().toSet()
+        val version = System.currentTimeMillis()
         val tripRef = tripDocument(key)
         db.runTransaction { transaction ->
             val snapshot = transaction.get(tripRef)
@@ -208,7 +209,9 @@ class FirestoreTripRepository(
                     "ownerUid" to key.ownerUid,
                     "memberUids" to access.memberUids,
                     "roleByUid" to access.roleByUid,
-                    "accessSchemaVersion" to Itinerary.ACCESS_SCHEMA_VERSION
+                    "accessSchemaVersion" to Itinerary.ACCESS_SCHEMA_VERSION,
+                    "membersVersion" to version,
+                    "updatedAtEpochMs" to version
                 ),
                 SetOptions.merge()
             )

@@ -7,6 +7,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.sp
 import com.example.travelcents.ui.main.current.calendar.visibleWeekDatesForSelection
 import com.example.travelcents.ui.modules.formatWeekRangeHero
+import com.example.travelcents.ui.modules.parseIsoDate
 import com.example.travelcents.ui.theme.DeepSea5
 import com.example.travelcents.ui.theme.TravelCentsFonts
 
@@ -19,11 +20,10 @@ fun WeekDateHero(
     val visibleDates = remember(sortedDates, selectedDate) {
         visibleWeekDatesForSelection(sortedDates, selectedDate)
     }
-    val weekStartIndex = sortedDates.indexOf(visibleDates.firstOrNull()).coerceAtLeast(0)
-    val previousAnchor = sortedDates.getOrNull((weekStartIndex - 7).coerceAtLeast(0))
-        ?.takeIf { visibleDates.firstOrNull() != sortedDates.firstOrNull() }
-    val nextAnchor = sortedDates.getOrNull((weekStartIndex + 7).coerceAtMost(sortedDates.lastIndex))
-        ?.takeIf { visibleDates.lastOrNull() != sortedDates.lastOrNull() }
+    val anchorDate = parseIsoDate(selectedDate.ifBlank { visibleDates.firstOrNull().orEmpty() })
+        ?: parseIsoDate(visibleDates.firstOrNull().orEmpty())
+    val previousAnchor = anchorDate?.minusDays(7)?.toString()
+    val nextAnchor = anchorDate?.plusDays(7)?.toString()
 
     val rangeLabel = remember(visibleDates) {
         formatWeekRangeHero(
@@ -34,12 +34,12 @@ fun WeekDateHero(
 
     CurrentTripHeroLayout(
         previousAction = CurrentTripHeroNavAction(
-            enabled = previousAnchor != null,
+            enabled = anchorDate != null,
             contentDescription = "Previous week",
             onClick = { previousAnchor?.let(onDateSelected) }
         ),
         nextAction = CurrentTripHeroNavAction(
-            enabled = nextAnchor != null,
+            enabled = anchorDate != null,
             contentDescription = "Next week",
             onClick = { nextAnchor?.let(onDateSelected) }
         )

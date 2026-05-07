@@ -65,6 +65,7 @@ import com.example.travelcents.ui.main.current.overlays.cards.FlightPricingCard
 import com.example.travelcents.ui.main.current.overlays.cards.FlightStatusCard
 import com.example.travelcents.ui.main.current.overlays.cards.LoyaltyCard
 import com.example.travelcents.ui.main.current.overlays.cards.HotelAmenitiesCard
+import com.example.travelcents.ui.main.current.overlays.cards.HotelActionRow
 import com.example.travelcents.ui.main.current.overlays.cards.HotelBookingCard
 import com.example.travelcents.ui.main.current.overlays.cards.HotelOverviewCard
 import com.example.travelcents.ui.main.current.overlays.cards.HotelPricingCard
@@ -93,6 +94,7 @@ import com.example.travelcents.ui.main.current.overlays.cards.eventReviewCountLa
 import com.example.travelcents.ui.main.current.overlays.cards.eventTimeSummary
 import com.example.travelcents.ui.main.current.overlays.cards.googleMapsDirectionsUrl
 import com.example.travelcents.ui.main.current.overlays.cards.googleMapsSearchUrl
+import com.example.travelcents.ui.main.current.overlays.cards.preferredHotelBookingUrl
 import com.example.travelcents.ui.main.current.overlays.cards.toFlightSummaryModel
 import com.example.travelcents.ui.modules.TripPhotoGalleryDialog
 import com.example.travelcents.ui.modules.galleryPhotoModels
@@ -274,6 +276,13 @@ fun CurrentTripEventDetailsDialog(
                                 val ticketsUrl = event.details["tickets_url"]?.takeIf { it.isNotBlank() }
                                 val url = ticketsUrl ?: officialUrl ?: mapsUrl
                                 uriHandler.openUri(url)
+                            }
+                        )
+                    } else if (event.type.equals("hotel", ignoreCase = true)) {
+                        HotelActionRow(
+                            onDirections = { uriHandler.openUri(directionsUrl) },
+                            onBook = {
+                                preferredHotelBookingUrl(event)?.let(uriHandler::openUri)
                             }
                         )
                     } else {

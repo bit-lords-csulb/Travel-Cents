@@ -20,7 +20,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -60,6 +60,7 @@ import com.example.travelcents.data.ai.chat.AiChatItem
 import com.example.travelcents.data.ai.chat.AiChatPreviewDraft
 import com.example.travelcents.data.ai.chat.AiCuratedTripStarter
 import com.example.travelcents.data.ai.chat.AiDestinationRecommendation
+import com.example.travelcents.data.ai.chat.AiPlaceRecommendationRowType
 import com.example.travelcents.data.ai.chat.AiTripIntakeProfile
 import com.example.travelcents.data.trip.TripKey
 import com.example.travelcents.data.trip.model.TravelEvent
@@ -257,13 +258,19 @@ fun AiTripChatPage(
                             )
                         }
                     }
-                    items(uiState.items, key = { it.id }) { item ->
+                    itemsIndexed(uiState.items, key = { _, item -> item.id }) { index, item ->
                         when (item) {
                             is AiChatItem.TextMessage -> {
+                                val previousTextMessage = uiState.items
+                                    .getOrNull(index - 1) as? AiChatItem.TextMessage
                                 AiChatBubble(
                                     text = item.text,
                                     sender = item.sender,
-                                    tags = item.tags
+                                    tags = item.tags,
+                                    userDisplayName = uiState.userDisplayName,
+                                    userProfileImageUrl = uiState.userProfileImageUrl,
+                                    isUserProfileLoading = uiState.isUserProfileLoading,
+                                    showSenderHeader = previousTextMessage?.sender != item.sender
                                 )
                             }
 
@@ -385,6 +392,12 @@ fun AiTripChatPage(
                             }
 
                             is AiChatItem.PlaceRecommendationRow -> {
+                                val collapsedLabel = when (item.row.rowType) {
+                                    AiPlaceRecommendationRowType.RESTAURANTS -> "Restaurant carousel"
+                                    AiPlaceRecommendationRowType.ACTIVITIES -> "Activity carousel"
+                                    AiPlaceRecommendationRowType.HOTELS -> "Hotel carousel"
+                                    else -> item.row.title
+                                }
                                 AiRecommendationRow(
                                     title = item.row.title,
                                     subtitle = item.row.subtitle,
@@ -400,6 +413,11 @@ fun AiTripChatPage(
                                             imageUrl = recommendation.imageUrl
                                         )
                                     },
+                                    isDone = item.row.isDone,
+                                    collapsedLabel = collapsedLabel,
+                                    onDoneBrowsing = if (!item.row.isDone) {
+                                        { viewModel.doneBrowsingPlaceRow() }
+                                    } else null,
                                     onRecommendationSelected = { recommendationId ->
                                         item.row.recommendations
                                             .firstOrNull { recommendation -> recommendation.id == recommendationId }

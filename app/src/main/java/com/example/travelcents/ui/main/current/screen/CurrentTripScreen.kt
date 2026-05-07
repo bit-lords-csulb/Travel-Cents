@@ -25,6 +25,7 @@ import com.example.travelcents.ui.main.current.calendar.buildTripDateRange
 import com.example.travelcents.ui.main.current.header.CurrentTripHeader
 import com.example.travelcents.ui.modules.buildCalendarDates
 import com.example.travelcents.ui.modules.sortEventsForCalendar
+import com.example.travelcents.ui.modules.parseIsoDate
 import com.example.travelcents.ui.modules.todayIsoDate
 import com.example.travelcents.ui.theme.DeepSea1
 import com.example.travelcents.ui.theme.TravelCentsFonts
@@ -75,6 +76,8 @@ fun CurrentTripScreen(
     var advisorySheetId by remember { mutableStateOf<String?>(null) }
     var showShareSheet by remember { mutableStateOf(false) }
     var shareConfirmation by remember { mutableStateOf<String?>(null) }
+    var seededTripKey by rememberSaveable { mutableStateOf<String?>(null) }
+    var pendingReorderDates by remember { mutableStateOf<Set<String>>(emptySet()) }
     val activeAdvisory = remember(advisorySheetId, advisories, eventOptions) {
         advisories.firstOrNull { it.advisoryId == advisorySheetId }
             ?.withLatestAdvisoryOptions(eventOptions)
@@ -88,6 +91,14 @@ fun CurrentTripScreen(
         )
     }
 
+    fun finishReorderSession() {
+        if (pendingReorderDates.isNotEmpty()) {
+            viewModel.persistEventPlacements(pendingReorderDates)
+            pendingReorderDates = emptySet()
+        }
+        jiggleMode = false
+    }
+
     LaunchedEffect(autoLoadTrip, tripId) {
         if (autoLoadTrip) {
             viewModel.loadTrip(tripId)
@@ -98,16 +109,22 @@ fun CurrentTripScreen(
         viewModel.loadAllTrips()
     }
 
-    LaunchedEffect(calendarDates, uiState.dateFrom) {
-        val fallbackDate = uiState.dateFrom.ifBlank { todayIsoDate() }
-        if (selectedDate.isBlank() || selectedDate !in calendarDates) {
-            selectedDate = calendarDates.firstOrNull() ?: fallbackDate
+    LaunchedEffect(uiState.currentTripId, uiState.dateFrom, uiState.dateTo, calendarDates) {
+        val tripKey = uiState.currentTripId ?: "preview:${uiState.tripTitle}|${uiState.dateFrom}|${uiState.dateTo}"
+        if (seededTripKey != tripKey || selectedDate.isBlank()) {
+            selectedDate = initialCalendarSelection(
+                dateFrom = uiState.dateFrom,
+                dateTo = uiState.dateTo,
+                calendarDates = calendarDates
+            )
+            seededTripKey = tripKey
         }
     }
 
     LaunchedEffect(uiState.canEditTrip) {
         if (!uiState.canEditTrip) {
             jiggleMode = false
+            pendingReorderDates = emptySet()
         }
     }
 
@@ -172,6 +189,7 @@ fun CurrentTripScreen(
             ) {
                 CurrentTripHeader(
                     tripTitle = uiState.tripTitle,
+                    tripStatus = uiState.tripStatus,
                     heroDate = itineraryVisibleDate.ifBlank { uiState.dateFrom },
                     currentTripId = uiState.currentTripId,
                     currentTripOwnerUid = uiState.currentTripOwnerUid,
@@ -189,6 +207,7 @@ fun CurrentTripScreen(
                     members = tripMembers,
                     onCalendarClick = { onNavigateToMode(CurrentDisplayMode.DAY) },
                     onBackClick = { onNavigateToMode(CurrentDisplayMode.ITINERARY) },
+                    onDoneReordering = ::finishReorderSession,
                     onAddClick = {
                         if (!uiState.canEditTrip) {
                             viewModel.postError("Shared trips are read-only for now.")
@@ -218,18 +237,26 @@ fun CurrentTripScreen(
                             if (displayMode != CurrentDisplayMode.ITINERARY) {
                                 onNavigateToMode(CurrentDisplayMode.ITINERARY)
                             }
-                            jiggleMode = !jiggleMode
+                            if (jiggleMode) {
+                                finishReorderSession()
+                            } else {
+                                pendingReorderDates = emptySet()
+                                jiggleMode = true
+                            }
                         }
                     },
                     onArchiveTrip = { tripId ->
+                        pendingReorderDates = emptySet()
                         jiggleMode = false
                         viewModel.archiveTrip(tripId)
                     },
                     onDeleteTrip = { tripId ->
+                        pendingReorderDates = emptySet()
                         jiggleMode = false
                         viewModel.deleteTrip(tripId)
                     },
                     onSwitchTrip = { tripKey ->
+                        pendingReorderDates = emptySet()
                         jiggleMode = false
                         selectedEventId = null
                         optionsPanelEventId = null
@@ -249,13 +276,6 @@ fun CurrentTripScreen(
                         )
                     }
                 )
-
-                if (uiState.currentTripId != null) {
-                    CurrentTripDemoAdvisoryToggle(
-                        enabled = advisoryDemoModeEnabled,
-                        onEnabledChange = viewModel::setAdvisoryDemoModeEnabled
-                    )
-                }
 
                 if (uiState.infoMessage != null || uiState.errorMessage != null) {
                     CurrentTripMessageCard(
@@ -309,8 +329,8 @@ fun CurrentTripScreen(
                                 }
                             },
                             onDismissAdvisory = viewModel::dismissAdvisory,
-                            onMoveEvent = viewModel::moveEventLocally,
-                            onPersistEventPlacements = viewModel::persistEventPlacements,
+                            onCommitEventOrder = viewModel::applyCommittedEventOrder,
+                            onPendingReorderDatesChange = { pendingReorderDates = it },
                             onVisibleDateChange = { itineraryVisibleDate = it }
                         )
                         displayMode == CurrentDisplayMode.WEEK -> CurrentTripWeekView(
@@ -320,13 +340,6 @@ fun CurrentTripScreen(
                             selectedDate = selectedDate,
                             onDateSelected = { selectedDate = it },
                             onEventClick = { selectedEventId = it.eventId },
-                            onDeleteClick = {
-                                if (uiState.canEditTrip) {
-                                    deleteCandidate = it.toEditablePlan()
-                                } else {
-                                    viewModel.postError("Shared trips are read-only for now.")
-                                }
-                            },
                             onCreatePlan = { date, startMinutes ->
                                 if (uiState.canEditTrip) {
                                     editorPlan = newEditablePlan(date, startMinutes)
@@ -342,13 +355,6 @@ fun CurrentTripScreen(
                             selectedDate = selectedDate,
                             onDateSelected = { selectedDate = it },
                             onEventClick = { selectedEventId = it.eventId },
-                            onDeleteClick = {
-                                if (uiState.canEditTrip) {
-                                    deleteCandidate = it.toEditablePlan()
-                                } else {
-                                    viewModel.postError("Shared trips are read-only for now.")
-                                }
-                            },
                             onCreatePlan = { date, startMinutes ->
                                 if (uiState.canEditTrip) {
                                     editorPlan = newEditablePlan(date, startMinutes)
@@ -426,6 +432,21 @@ fun CurrentTripScreen(
             }
         }
     }
+}
+
+private fun initialCalendarSelection(
+    dateFrom: String,
+    dateTo: String,
+    calendarDates: List<String>
+): String {
+    val today = todayIsoDate()
+    val start = parseIsoDate(dateFrom)
+    val end = parseIsoDate(dateTo)
+    val todayDate = parseIsoDate(today)
+    if (start != null && end != null && todayDate != null && !todayDate.isBefore(start) && !todayDate.isAfter(end)) {
+        return today
+    }
+    return dateFrom.ifBlank { calendarDates.firstOrNull() ?: today }
 }
 
 private fun TripAdvisory.withLatestAdvisoryOptions(

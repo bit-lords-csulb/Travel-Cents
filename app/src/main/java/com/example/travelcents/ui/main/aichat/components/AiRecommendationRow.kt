@@ -18,9 +18,18 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.KeyboardArrowDown
+import androidx.compose.material.icons.filled.KeyboardArrowUp
+import androidx.compose.material3.Icon
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -55,43 +64,134 @@ fun AiRecommendationRow(
     subtitle: String,
     recommendations: List<AiRecommendationCardModel>,
     onRecommendationSelected: (String) -> Unit,
+    modifier: Modifier = Modifier,
+    isDone: Boolean = false,
+    collapsedLabel: String = title,
+    onDoneBrowsing: (() -> Unit)? = null
+) {
+    var isCollapsed by remember(isDone) { mutableStateOf(isDone) }
+
+    if (isCollapsed) {
+        CollapsedCarouselRow(
+            label = collapsedLabel,
+            itemCount = recommendations.size,
+            onExpand = { isCollapsed = false },
+            modifier = modifier
+        )
+    } else {
+        Column(
+            modifier = modifier.fillMaxWidth(),
+            verticalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.Top
+            ) {
+                Column(
+                    modifier = Modifier.weight(1f),
+                    verticalArrangement = Arrangement.spacedBy(4.dp)
+                ) {
+                    Text(
+                        text = title,
+                        color = DeepSea5,
+                        fontSize = 16.sp,
+                        fontWeight = FontWeight.Bold,
+                        fontFamily = TravelCentsFonts.Headline
+                    )
+                    if (subtitle.isNotBlank()) {
+                        Text(
+                            text = subtitle,
+                            color = DeepSea4,
+                            fontSize = 12.sp,
+                            lineHeight = 17.sp,
+                            fontFamily = TravelCentsFonts.Body
+                        )
+                    }
+                }
+                if (isDone) {
+                    Icon(
+                        imageVector = Icons.Filled.KeyboardArrowUp,
+                        contentDescription = "Collapse",
+                        tint = DeepSea4,
+                        modifier = Modifier
+                            .size(24.dp)
+                            .clickable { isCollapsed = true }
+                    )
+                }
+            }
+
+            LazyRow(
+                horizontalArrangement = Arrangement.spacedBy(12.dp),
+                contentPadding = PaddingValues(end = 8.dp)
+            ) {
+                items(recommendations, key = { recommendation -> recommendation.id }) { recommendation ->
+                    RecommendationCard(
+                        recommendation = recommendation,
+                        onClick = { onRecommendationSelected(recommendation.id) }
+                    )
+                }
+            }
+
+            if (!isDone && onDoneBrowsing != null) {
+                TextButton(
+                    onClick = onDoneBrowsing,
+                    modifier = Modifier.align(Alignment.End)
+                ) {
+                    Text(
+                        text = "Done browsing",
+                        color = TripWizardColors.Blue,
+                        fontSize = 13.sp,
+                        fontWeight = FontWeight.SemiBold,
+                        fontFamily = TravelCentsFonts.Body
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun CollapsedCarouselRow(
+    label: String,
+    itemCount: Int,
+    onExpand: () -> Unit,
     modifier: Modifier = Modifier
 ) {
-    Column(
-        modifier = modifier.fillMaxWidth(),
-        verticalArrangement = Arrangement.spacedBy(12.dp)
+    Surface(
+        modifier = modifier
+            .fillMaxWidth()
+            .clickable(onClick = onExpand),
+        shape = RoundedCornerShape(16.dp),
+        color = TripWizardColors.ContainerLow,
+        border = BorderStroke(1.dp, Color.White.copy(alpha = 0.08f))
     ) {
-        Column(
-            verticalArrangement = Arrangement.spacedBy(4.dp)
+        Row(
+            modifier = Modifier.padding(horizontal = 16.dp, vertical = 14.dp),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
         ) {
-            Text(
-                text = title,
-                color = DeepSea5,
-                fontSize = 16.sp,
-                fontWeight = FontWeight.Bold,
-                fontFamily = TravelCentsFonts.Headline
-            )
-            if (subtitle.isNotBlank()) {
+            Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
                 Text(
-                    text = subtitle,
+                    text = label,
+                    color = DeepSea5,
+                    fontSize = 14.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    fontFamily = TravelCentsFonts.Headline
+                )
+                Text(
+                    text = "$itemCount places found",
                     color = DeepSea4,
                     fontSize = 12.sp,
-                    lineHeight = 17.sp,
                     fontFamily = TravelCentsFonts.Body
                 )
             }
-        }
-
-        LazyRow(
-            horizontalArrangement = Arrangement.spacedBy(12.dp),
-            contentPadding = PaddingValues(end = 8.dp)
-        ) {
-            items(recommendations, key = { recommendation -> recommendation.id }) { recommendation ->
-                RecommendationCard(
-                    recommendation = recommendation,
-                    onClick = { onRecommendationSelected(recommendation.id) }
-                )
-            }
+            Icon(
+                imageVector = Icons.Filled.KeyboardArrowDown,
+                contentDescription = "Expand",
+                tint = DeepSea4,
+                modifier = Modifier.size(22.dp)
+            )
         }
     }
 }

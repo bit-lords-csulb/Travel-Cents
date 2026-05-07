@@ -87,7 +87,12 @@ data class AiChatCardGroup(
     val options: List<AiChatCardOption>,
     val allowMultiple: Boolean = true,
     val allowOther: Boolean = false,
-    val otherPromptHint: String = ""
+    val otherPromptHint: String = "",
+    val topicPath: String = "",
+    val questionId: String = id,
+    val source: PlannerQuestionSource = PlannerQuestionSource.LLM,
+    val parentTopicPath: String = "",
+    val parentAnswerId: String = ""
 )
 
 data class AiDestinationRecommendation(
@@ -133,5 +138,6 @@ data class AiPlaceRecommendationRow(
     val recommendations: List<AiPlaceRecommendation>,
     val rowType: AiPlaceRecommendationRowType = AiPlaceRecommendationRowType.GENERAL,
     val actionLabels: List<String> = emptyList(),
-    val actionsEnabled: Boolean = false
+    val actionsEnabled: Boolean = false,
+    val isDone: Boolean = false
 )

@@ -9,12 +9,17 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.example.travelcents.BuildConfig
 import com.example.travelcents.data.ai.chat.AiChatCardGroup
+import com.example.travelcents.data.ai.chat.PlannerQuestionSource
+import com.example.travelcents.data.debug.DebugPreferencesRepository
 import com.example.travelcents.ui.main.newTrip.TripWizardColors
 import com.example.travelcents.ui.theme.DeepSea4
 import com.example.travelcents.ui.theme.DeepSea5
@@ -93,6 +98,27 @@ fun AiResponseCardGroup(
                 lineHeight = 15.sp,
                 fontFamily = TravelCentsFonts.Body
             )
+
+            val showDebugBadge by if (BuildConfig.DEBUG) {
+                DebugPreferencesRepository.showAiDebugUi.collectAsState()
+            } else {
+                androidx.compose.runtime.remember { androidx.compose.runtime.mutableStateOf(false) }
+            }
+            if (showDebugBadge) {
+                val (label, color) = when (group.source) {
+                    PlannerQuestionSource.LLM -> "⬡ LLM" to Color(0xFF6BCB77)
+                    PlannerQuestionSource.APP_FALLBACK -> "⬡ APP_FALLBACK" to Color(0xFFFFB347)
+                    PlannerQuestionSource.DISCOVERY -> "⬡ DISCOVERY" to Color(0xFF74C0FC)
+                    PlannerQuestionSource.STARTER_GRID -> "⬡ STARTER" to Color(0xFFAAAAAA)
+                }
+                Text(
+                    text = "$label · topic=${group.topicPath.ifBlank { "-" }} · multi=${group.allowMultiple}",
+                    color = color.copy(alpha = 0.8f),
+                    fontSize = 9.sp,
+                    fontWeight = FontWeight.Medium,
+                    fontFamily = TravelCentsFonts.Body
+                )
+            }
         }
     }
 }

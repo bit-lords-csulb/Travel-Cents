@@ -16,7 +16,11 @@ import org.junit.Test
 class TripSyncCoordinatorTest {
 
     @Test
-    fun refreshHomeIfNeeded_skipsTripRefFetchWhenManifestMatches() = runBlocking {
+    fun refreshHomeIfNeeded_fetchesTripRefsWhenManifestMatches() = runBlocking {
+        val tripRefs = listOf(
+            itinerary("owner-1", "trip-1", createdAt = "2026-01-01T00:00:00Z"),
+            itinerary("owner-2", "trip-2", createdAt = "2026-01-02T00:00:00Z")
+        )
         val local = FakeHomeSyncLocalStore(
             homeTripCount = 2,
             manifestVersion = "42"
@@ -26,7 +30,8 @@ class TripSyncCoordinatorTest {
                 manifestVersion = 42L,
                 tripCount = 2,
                 latestActiveTripKey = TripKey("owner-1", "trip-1")
-            )
+            ),
+            tripRefs = tripRefs
         )
         val repository = FakeTripRepository()
         val coordinator = TripSyncCoordinator(local, remote, repository)
@@ -34,9 +39,10 @@ class TripSyncCoordinatorTest {
         coordinator.refreshHomeIfNeeded("viewer-1")
 
         assertEquals(1, remote.fetchManifestCalls)
-        assertEquals(0, remote.fetchTripRefsCalls)
+        assertEquals(1, remote.fetchTripRefsCalls)
         assertTrue(local.recordedManifestChecks.contains(42L))
-        assertNull(local.lastReplaceRequest)
+        assertEquals(tripRefs, local.lastReplaceRequest?.trips)
+        assertEquals(42L, local.lastReplaceRequest?.manifestVersion)
     }
 
     @Test
