@@ -46,6 +46,7 @@ fun EditChatPage(
     onBackClick: () -> Unit,
     onNavigateToChats: () -> Unit,
     viewModel: EditChatViewModel = viewModel(
+        key = group.id,
         factory = EditChatViewModel.Factory(group)
     )
 ) {

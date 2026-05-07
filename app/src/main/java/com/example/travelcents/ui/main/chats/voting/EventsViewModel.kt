@@ -5,6 +5,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
 import com.example.travelcents.data.social.model.Group
+import com.example.travelcents.data.social.repository.SocialUserRepository
 import com.example.travelcents.data.sync.TripSyncRemoteDataSource
 import com.example.travelcents.data.trip.TripAccessRole
 import com.example.travelcents.data.trip.TripKey
@@ -20,7 +21,10 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 
-class EventsViewModel(initialGroup: Group) : ViewModel() {
+class EventsViewModel(
+    initialGroup: Group,
+    private val userRepository: SocialUserRepository = SocialUserRepository()
+) : ViewModel() {
 
     private val auth = Firebase.auth
     private val db = Firebase.firestore
@@ -43,6 +47,9 @@ class EventsViewModel(initialGroup: Group) : ViewModel() {
 
     private val _events = MutableStateFlow<List<Event>>(emptyList())
     val events: StateFlow<List<Event>> = _events.asStateFlow()
+
+    private val _creatorProfiles = MutableStateFlow<Map<String, Pair<String, String>>>(emptyMap())
+    val creatorProfiles: StateFlow<Map<String, Pair<String, String>>> = _creatorProfiles.asStateFlow()
 
     private val _isLoading = MutableStateFlow(true)
     val isLoading: StateFlow<Boolean> = _isLoading.asStateFlow()
@@ -109,7 +116,20 @@ class EventsViewModel(initialGroup: Group) : ViewModel() {
                     )
                 }
                 _events.value =
-                    fetchedEvents.sortedByDescending { it.upvotes.size - it.downvotes.size }
+                    fetchedEvents.sortedByDescending { it.upvotes.size }
+                fetchMissingCreatorProfiles(fetchedEvents)
+            }
+    }
+
+    private fun fetchMissingCreatorProfiles(events: List<Event>) {
+        events
+            .map { it.createdBy }
+            .filter { it.isNotBlank() && it !in _creatorProfiles.value }
+            .distinct()
+            .forEach { uid ->
+                userRepository.fetchUserFullProfile(uid) { name, photo ->
+                    _creatorProfiles.value = _creatorProfiles.value + (uid to (name to photo))
+                }
             }
     }
 
