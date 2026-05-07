@@ -28,6 +28,8 @@ data class PersistedAiChatSnapshot(
     val activeDestinationRecommendationRow: PersistedAiDestinationRecommendationRow? = null,
     val activeCuratedTripRow: PersistedAiCuratedTripRow? = null,
     val activePlaceRecommendationRow: PersistedAiPlaceRecommendationRow? = null,
+    val pendingPlaceRecommendationRow: PersistedAiPlaceRecommendationRow? = null,
+    val donePlaceRecommendationRows: List<PersistedAiPlaceRecommendationRow>? = null,
     val activePreferenceQuestionCard: AiChatItem.PreferenceQuestionCard? = null,
     val activeSuggestionCarouselCard: AiChatItem.SuggestionCarouselCard? = null,
     val anchorMessageId: String? = null,
@@ -122,7 +124,8 @@ data class PersistedAiPlaceRecommendationRow(
     val recommendations: List<PersistedAiPlaceRecommendation>,
     val rowType: String = AiPlaceRecommendationRowType.GENERAL.name,
     val actionLabels: List<String> = emptyList(),
-    val actionsEnabled: Boolean = false
+    val actionsEnabled: Boolean = false,
+    val isDone: Boolean = false
 )
 
 data class PersistedAiChatStoreState(
@@ -480,7 +483,8 @@ fun AiPlaceRecommendationRow.toPersisted(): PersistedAiPlaceRecommendationRow {
         },
         rowType = rowType.name,
         actionLabels = actionLabels,
-        actionsEnabled = actionsEnabled
+        actionsEnabled = actionsEnabled,
+        isDone = isDone
     )
 }
 
@@ -504,6 +508,7 @@ fun PersistedAiPlaceRecommendationRow.toModel(): AiPlaceRecommendationRow {
             AiPlaceRecommendationRowType.valueOf(rowType)
         }.getOrDefault(AiPlaceRecommendationRowType.GENERAL),
         actionLabels = actionLabels,
-        actionsEnabled = actionsEnabled
+        actionsEnabled = actionsEnabled,
+        isDone = isDone
     )
 }

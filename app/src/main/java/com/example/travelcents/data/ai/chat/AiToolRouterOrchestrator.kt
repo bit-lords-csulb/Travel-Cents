@@ -74,7 +74,13 @@ class AiToolRouterOrchestrator {
                         "Instead set viability_warning to a short warning that names the limitation and suggests broader alternatives. " +
                         "For search_events use Ticketmaster-style classifications when possible, such as Music, Sports, Arts & Theatre, or Family. " +
                         "For search_hotels, only emit the tool call when check_in and check_out can be inferred as exact ISO dates in YYYY-MM-DD format. Otherwise do not emit search_hotels. " +
-                        "For search_restaurants and search_activities, set cuisines or categories from the latest turn when useful, otherwise return empty arrays. " +
+                        "For search_restaurants, set cuisines to Yelp-compatible category aliases derived from the user's food preferences. " +
+                        "Examples: Italian → [\"italian\"], Sushi → [\"sushi\", \"japanese\"], Ramen → [\"ramen\"], Mexican → [\"mexican\"], Seafood → [\"seafood\"], Indian → [\"indpak\"], American → [\"newamerican\"]. " +
+                        "For dietary restrictions (vegan, halal, gluten-free), leave cuisines empty — the app handles them as a term filter. " +
+                        "Emit search_restaurants when the user message asks for restaurant options or their food preferences make it clearly relevant. " +
+                        "For search_activities, set categories to Yelp aliases. " +
+                        "Examples: Museum → [\"museums\"], Hiking → [\"hiking\", \"parks\"], Nightlife → [\"nightlife\"], Jazz → [\"jazzandblues\"], Theater → [\"theater\"], Tours → [\"tours\"], Galleries → [\"galleries\", \"artmuseums\"]. " +
+                        "Emit search_activities when the user message asks for activities or their interest preferences make it relevant. Both search_restaurants and search_activities can be emitted together. " +
                         "If a field does not apply to a tool call, leave string fields empty and array fields empty."
             ),
             LlmMessage(

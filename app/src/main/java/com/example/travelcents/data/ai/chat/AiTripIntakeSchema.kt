@@ -134,6 +134,10 @@ data class AiTripIntakeProfile(
     val interests: List<String> = emptyList(),
     @SerializedName("cuisine_preferences")
     val cuisinePreferences: List<String> = emptyList(),
+    @SerializedName("cuisine_sub_preferences")
+    val cuisineSubPreferences: List<String> = emptyList(),
+    @SerializedName("activity_sub_categories")
+    val activitySubCategories: List<String> = emptyList(),
     @SerializedName("must_haves")
     val mustHaves: List<String> = emptyList(),
     @SerializedName("avoid")
@@ -164,6 +168,7 @@ data class AiTripIntakeProfile(
                 "date_from" to dateFrom,
                 "date_to" to dateTo,
                 "date_window" to dateWindow,
+                "duration_days" to durationDays,
                 "budget_level" to budgetLevel.promptValue(),
                 "pace" to pace.promptValue(),
                 "interests" to interests,
@@ -394,6 +399,8 @@ fun AiTripIntakeProfile.mergePatch(patch: AiTripIntakeProfile?): AiTripIntakePro
         pace = patch.pace.takeUnless { it == AiTripPacePreference.UNKNOWN } ?: pace,
         interests = (interests + patch.interests).distinct(),
         cuisinePreferences = (cuisinePreferences + patch.cuisinePreferences).distinct(),
+        cuisineSubPreferences = (cuisineSubPreferences + patch.cuisineSubPreferences).distinct(),
+        activitySubCategories = (activitySubCategories + patch.activitySubCategories).distinct(),
         mustHaves = (mustHaves + patch.mustHaves).distinct(),
         avoid = (avoid + patch.avoid).distinct(),
         notes = (notes + patch.notes).distinct().takeLast(6),

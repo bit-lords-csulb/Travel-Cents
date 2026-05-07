@@ -38,6 +38,8 @@ data class AiChatSessionState(
     val activeDestinationRecommendationRow: AiDestinationRecommendationRow? = null,
     val activeCuratedTripRow: AiCuratedTripRow? = null,
     val activePlaceRecommendationRow: AiPlaceRecommendationRow? = null,
+    val pendingPlaceRecommendationRow: AiPlaceRecommendationRow? = null,
+    val donePlaceRecommendationRows: List<AiPlaceRecommendationRow> = emptyList(),
     val activeSingleEventCard: AiSingleEventSuggestion? = null,
     val activePreferenceQuestionCard: AiChatItem.PreferenceQuestionCard? = null,
     val activeSuggestionCarouselCard: AiChatItem.SuggestionCarouselCard? = null,

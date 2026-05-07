@@ -60,6 +60,7 @@ import com.example.travelcents.data.ai.chat.AiChatItem
 import com.example.travelcents.data.ai.chat.AiChatPreviewDraft
 import com.example.travelcents.data.ai.chat.AiCuratedTripStarter
 import com.example.travelcents.data.ai.chat.AiDestinationRecommendation
+import com.example.travelcents.data.ai.chat.AiPlaceRecommendationRowType
 import com.example.travelcents.data.ai.chat.AiTripIntakeProfile
 import com.example.travelcents.data.trip.TripKey
 import com.example.travelcents.data.trip.model.TravelEvent
@@ -385,6 +386,12 @@ fun AiTripChatPage(
                             }
 
                             is AiChatItem.PlaceRecommendationRow -> {
+                                val collapsedLabel = when (item.row.rowType) {
+                                    AiPlaceRecommendationRowType.RESTAURANTS -> "Restaurant carousel"
+                                    AiPlaceRecommendationRowType.ACTIVITIES -> "Activity carousel"
+                                    AiPlaceRecommendationRowType.HOTELS -> "Hotel carousel"
+                                    else -> item.row.title
+                                }
                                 AiRecommendationRow(
                                     title = item.row.title,
                                     subtitle = item.row.subtitle,
@@ -400,6 +407,11 @@ fun AiTripChatPage(
                                             imageUrl = recommendation.imageUrl
                                         )
                                     },
+                                    isDone = item.row.isDone,
+                                    collapsedLabel = collapsedLabel,
+                                    onDoneBrowsing = if (!item.row.isDone) {
+                                        { viewModel.doneBrowsingPlaceRow() }
+                                    } else null,
                                     onRecommendationSelected = { recommendationId ->
                                         item.row.recommendations
                                             .firstOrNull { recommendation -> recommendation.id == recommendationId }

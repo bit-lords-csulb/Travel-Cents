@@ -186,6 +186,8 @@ class AiChatViewModel(application: Application) : AndroidViewModel(application) 
             activeDestinationRecommendationRow = null,
             activeCuratedTripRow = null,
             activePlaceRecommendationRow = null,
+            pendingPlaceRecommendationRow = null,
+            donePlaceRecommendationRows = emptyList(),
             activeSingleEventCard = null,
             anchorMessageId = null
         )
@@ -344,6 +346,8 @@ class AiChatViewModel(application: Application) : AndroidViewModel(application) 
             activeDestinationRecommendationRow = null,
             activeCuratedTripRow = null,
             activePlaceRecommendationRow = null,
+            pendingPlaceRecommendationRow = null,
+            donePlaceRecommendationRows = emptyList(),
             activeSingleEventCard = null,
             activePreferenceQuestionCard = foodPreferenceQuestionCard(),
             activeSuggestionCarouselCard = null,
@@ -647,6 +651,8 @@ class AiChatViewModel(application: Application) : AndroidViewModel(application) 
             activeDestinationRecommendationRow = null,
             activeCuratedTripRow = null,
             activePlaceRecommendationRow = null,
+            pendingPlaceRecommendationRow = null,
+            donePlaceRecommendationRows = emptyList(),
             activeSingleEventCard = null,
             lockedDestination = starter.destination,
             lockedDestinationImageUrl = starter.heroImageUrl,
@@ -890,6 +896,8 @@ class AiChatViewModel(application: Application) : AndroidViewModel(application) 
             activeDestinationRecommendationRow = null,
             activeCuratedTripRow = null,
             activePlaceRecommendationRow = null,
+            pendingPlaceRecommendationRow = null,
+            donePlaceRecommendationRows = emptyList(),
             activeSingleEventCard = null,
             anchorMessageId = submittedMessage.id
         )
@@ -1020,6 +1028,8 @@ class AiChatViewModel(application: Application) : AndroidViewModel(application) 
             activeDestinationRecommendationRow = destinationRow,
             activeCuratedTripRow = curatedTripRow,
             activePlaceRecommendationRow = null,
+            pendingPlaceRecommendationRow = null,
+            donePlaceRecommendationRows = emptyList(),
             activeSingleEventCard = null
         )
         isLoading = false
@@ -1122,6 +1132,9 @@ class AiChatViewModel(application: Application) : AndroidViewModel(application) 
                     )
                 )
             }
+            sessionState.donePlaceRecommendationRows.forEach { row ->
+                add(AiChatItem.PlaceRecommendationRow(id = row.id, row = row))
+            }
             sessionState.activePlaceRecommendationRow?.let { row ->
                 val bookmarkedIds = _bookmarkedPlaceIds.value
                 val enrichedRow = row.copy(
@@ -1190,6 +1203,8 @@ class AiChatViewModel(application: Application) : AndroidViewModel(application) 
             activeDestinationRecommendationRow = snapshot.activeDestinationRecommendationRow?.toModel(),
             activeCuratedTripRow = snapshot.activeCuratedTripRow?.toModel(),
             activePlaceRecommendationRow = snapshot.activePlaceRecommendationRow?.toModel(),
+            pendingPlaceRecommendationRow = snapshot.pendingPlaceRecommendationRow?.toModel(),
+            donePlaceRecommendationRows = snapshot.donePlaceRecommendationRows.orEmpty().map { it.toModel() },
             activePreferenceQuestionCard = snapshot.activePreferenceQuestionCard,
             activeSuggestionCarouselCard = snapshot.activeSuggestionCarouselCard,
             anchorMessageId = snapshot.anchorMessageId,
@@ -1250,6 +1265,8 @@ class AiChatViewModel(application: Application) : AndroidViewModel(application) 
             activeDestinationRecommendationRow = sessionState.activeDestinationRecommendationRow?.toPersisted(),
             activeCuratedTripRow = sessionState.activeCuratedTripRow?.toPersisted(),
             activePlaceRecommendationRow = sessionState.activePlaceRecommendationRow?.toPersisted(),
+            pendingPlaceRecommendationRow = sessionState.pendingPlaceRecommendationRow?.toPersisted(),
+            donePlaceRecommendationRows = sessionState.donePlaceRecommendationRows.map { it.toPersisted() },
             activePreferenceQuestionCard = sessionState.activePreferenceQuestionCard,
             activeSuggestionCarouselCard = sessionState.activeSuggestionCarouselCard,
             anchorMessageId = sessionState.anchorMessageId,
@@ -1600,6 +1617,8 @@ class AiChatViewModel(application: Application) : AndroidViewModel(application) 
             activeDestinationRecommendationRow = null,
             activeCuratedTripRow = null,
             activePlaceRecommendationRow = null,
+            pendingPlaceRecommendationRow = null,
+            donePlaceRecommendationRows = emptyList(),
             activeSingleEventCard = null,
             anchorMessageId = submittedMessage.id
         )
@@ -1706,13 +1725,14 @@ class AiChatViewModel(application: Application) : AndroidViewModel(application) 
                     }
                 }
             }
-            val placeRecommendationRow = toolDispatch.placeRecommendationRow
+            val firstPlaceRow = toolDispatch.placeRecommendationRows.firstOrNull()
+            val secondPlaceRow = toolDispatch.placeRecommendationRows.getOrNull(1)
             val singleEventCard = toolDispatch.singleEventResolution?.suggestion
 
             val anyUiResolved = intakeFollowUpGroup != null ||
                 destinationRecommendationRow != null ||
                 curatedTripRow != null ||
-                placeRecommendationRow != null ||
+                firstPlaceRow != null ||
                 singleEventCard != null
             val intakeDeadEnd = false
             if (!anyUiResolved && plannerResolution.rejectionReason.isNotBlank()) {
@@ -1732,7 +1752,7 @@ class AiChatViewModel(application: Application) : AndroidViewModel(application) 
                 history = sessionState.llmHistory,
                 ticketmasterGrounding = toolDispatch.singleEventResolution?.groundingContext,
                 viabilityWarning = toolDispatch.viabilityWarning,
-                placeRecommendationRow = toolDispatch.placeRecommendationRow,
+                placeRecommendationRow = firstPlaceRow,
                 intakeDeadEnd = intakeDeadEnd,
                 isPostDestinationLock = sessionState.lockedDestination?.isNotBlank() == true,
                 assistantOverride = plannerResolution.assistantMessage
@@ -1765,7 +1785,8 @@ class AiChatViewModel(application: Application) : AndroidViewModel(application) 
                 activeResponseCardGroup = followUpGroup,
                 activeDestinationRecommendationRow = destinationRecommendationRow,
                 activeCuratedTripRow = curatedTripRow,
-                activePlaceRecommendationRow = placeRecommendationRow,
+                activePlaceRecommendationRow = firstPlaceRow,
+                pendingPlaceRecommendationRow = secondPlaceRow,
                 activeSingleEventCard = singleEventCard
             )
             isLoading = false
@@ -2064,7 +2085,7 @@ class AiChatViewModel(application: Application) : AndroidViewModel(application) 
         val eventCall = toolRouterResult.toolCalls
             .filterIsInstance<AiToolCall.SearchEvents>()
             .firstOrNull()
-        val placeCall = toolRouterResult.toolCalls.firstOrNull { toolCall ->
+        val placeCalls = toolRouterResult.toolCalls.filter { toolCall ->
             toolCall is AiToolCall.SearchRestaurants ||
                 toolCall is AiToolCall.SearchActivities ||
                 toolCall is AiToolCall.SearchHotels
@@ -2078,7 +2099,7 @@ class AiChatViewModel(application: Application) : AndroidViewModel(application) 
                 profile = profile
             )
         }
-        val placeRecommendationRow = placeCall?.let { toolCall ->
+        val placeRecommendationRows = placeCalls.mapNotNull { toolCall ->
             placeRecommendationCoordinator.recommendRowForToolCall(
                 toolCall = toolCall,
                 intakeProfile = intakeProfile,
@@ -2087,7 +2108,7 @@ class AiChatViewModel(application: Application) : AndroidViewModel(application) 
         }
 
         return AiToolDispatchResult(
-            placeRecommendationRow = placeRecommendationRow,
+            placeRecommendationRows = placeRecommendationRows,
             singleEventResolution = singleEventResolution,
             viabilityWarning = toolRouterResult.viabilityWarning
         )
@@ -2102,6 +2123,19 @@ class AiChatViewModel(application: Application) : AndroidViewModel(application) 
             AiPlaceRecommendationRowType.HOTELS -> "I pulled a few live hotel options below."
             else -> null
         }
+    }
+
+    fun doneBrowsingPlaceRow() {
+        val current = sessionState.activePlaceRecommendationRow ?: return
+        val doneRow = current.copy(isDone = true)
+        val pending = sessionState.pendingPlaceRecommendationRow
+        sessionState = sessionState.copy(
+            donePlaceRecommendationRows = sessionState.donePlaceRecommendationRows + doneRow,
+            activePlaceRecommendationRow = pending,
+            pendingPlaceRecommendationRow = null
+        )
+        persistLastSession()
+        publishUiState()
     }
 
     private fun resolveDestinationRecommendationRow(
@@ -2297,7 +2331,7 @@ class AiChatViewModel(application: Application) : AndroidViewModel(application) 
 }
 
 private data class AiToolDispatchResult(
-    val placeRecommendationRow: AiPlaceRecommendationRow? = null,
+    val placeRecommendationRows: List<AiPlaceRecommendationRow> = emptyList(),
     val singleEventResolution: AiSingleEventResolution? = null,
     val viabilityWarning: String = ""
 )

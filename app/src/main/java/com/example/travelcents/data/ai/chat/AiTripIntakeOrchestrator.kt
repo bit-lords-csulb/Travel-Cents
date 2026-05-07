@@ -25,6 +25,8 @@ private val SUPPORTED_INTAKE_PROFILE_PATCH_FIELDS = listOf(
     "pace",
     "interests",
     "cuisine_preferences",
+    "cuisine_sub_preferences",
+    "activity_sub_categories",
     "must_haves",
     "avoid",
     "notes"
@@ -211,6 +213,8 @@ class AiTripIntakeOrchestrator {
                         append("\n\nPriority rule: destination is set but date_window is missing. The ONLY valid next_action is ask_more. Ask when the user would like to travel with topic_path='travel_timeline' and question_id='travel_timeline'. Do not set next_action=build_trip.")
                     } else if (currentProfile.destination.isNotBlank() && currentProfile.dateWindow.isNotBlank() && currentProfile.durationDays == null) {
                         append("\n\nPriority rule: destination and date_window are set but duration_days is missing. The ONLY valid next_action is ask_more. Ask how many days the user wants to travel with topic_path='duration' and question_id='trip_duration'. Do not set next_action=build_trip.")
+                    } else if (currentProfile.destination.isNotBlank() && currentProfile.dateWindow.isNotBlank() && currentProfile.durationDays != null) {
+                        append("\n\nPriority rule: destination, date_window, and duration_days are all confirmed. All required timing is complete. Set next_action to build_trip now. Do not ask any more questions.")
                     }
                     plannerContext?.let { context ->
                         appendLine()
@@ -223,6 +227,8 @@ class AiTripIntakeOrchestrator {
                             append("Planner gate: visual recommendations are due now; do not ask another question.")
                         }
                     }
+                    appendLine()
+                    appendLine("Child topic rule: after food_preferences is answered with a broad cuisine (e.g., Japanese), you may ask one child follow-up with topic_path='food_preferences.<cuisine>' (e.g., 'food_preferences.japanese'), parent_topic_path='food_preferences', parent_answer_id matching the selected answer id, and patch cuisine_sub_preferences with specific sub-types (e.g., ['sushi', 'ramen']). Do the same for activity_preferences using topic_path='activity_preferences.<type>' and patch activity_sub_categories. Do not go deeper than one child level. Only ask the child follow-up if it adds meaningful value — skip it if the Layer 1 answer is already specific enough (e.g., if the user said 'sushi' directly at Layer 1, no child follow-up is needed).")
                 }
             ),
             LlmMessage(
