@@ -602,6 +602,9 @@ fun PlannerContext.nextBestAllowedTopicPath(): String? {
                 buildList {
                     if (profile.dateWindow.isBlank()) add("travel_timeline")
                     if (profile.durationDays == null) add("duration")
+                    if (profile.dateWindow.isNotBlank() || profile.durationDays != null) {
+                        add("discovery_help")
+                    }
                     if (profile.budgetLevel == AiBudgetLevel.UNKNOWN && profile.budgetTotal == null) add("budget")
                     if (profile.pace == AiTripPacePreference.UNKNOWN) add("pace")
                     if (profile.cuisinePreferences.isEmpty()) add("food_preferences")
@@ -729,7 +732,7 @@ fun List<AskedQuestionRecord>.recordAnsweredPlannerQuestion(
     }
 }
 
-private const val PRE_DESTINATION_QUESTION_LIMIT = 4
+private const val PRE_DESTINATION_QUESTION_LIMIT = 7
 
 private fun allowedTopicRootsForPhase(phase: PlannerPhase): Set<String> {
     return when (phase) {
@@ -754,6 +757,7 @@ private fun allowedTopicRootsForPhase(phase: PlannerPhase): Set<String> {
             "travel_timeline",
             "date_window",
             "duration",
+            "discovery_help",
             "budget",
             "pace",
             "food_preferences",

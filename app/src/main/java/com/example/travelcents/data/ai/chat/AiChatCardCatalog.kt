@@ -194,6 +194,19 @@ object AiChatCardCatalog {
                 )
             )
 
+            "discovery_help" -> plannerGroup(
+                id = "discovery_help",
+                topicPath = "discovery_help",
+                title = "Should I find options for you?",
+                allowMultiple = false,
+                options = listOf(
+                    option("discovery_restaurants", "Restaurants", "Yes, find restaurant recommendations in the destination."),
+                    option("discovery_activities", "Activities", "Yes, find activity options in the destination."),
+                    option("discovery_both", "Both", "Yes, find restaurants and activities in the destination."),
+                    option("discovery_skip", "Skip for now", "Skip finding places for now.")
+                )
+            )
+
             "must_haves" -> plannerGroup(
                 id = "must_haves",
                 topicPath = "must_haves",
