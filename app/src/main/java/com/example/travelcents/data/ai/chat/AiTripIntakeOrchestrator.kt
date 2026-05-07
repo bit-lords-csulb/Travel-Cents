@@ -216,7 +216,17 @@ class AiTripIntakeOrchestrator {
                     if (currentProfile.destination.isNotBlank() && currentProfile.dateWindow.isBlank()) {
                         append("\n\nPriority rule: destination is set but date_window is missing. The ONLY valid next_action is ask_more. Ask when the user would like to travel with topic_path='travel_timeline' and question_id='travel_timeline'. Do not set next_action=build_trip.")
                     } else if (currentProfile.destination.isNotBlank() && currentProfile.dateWindow.isNotBlank() && currentProfile.durationDays == null) {
-                        append("\n\nPriority rule: destination and date_window are set but duration_days is missing. The ONLY valid next_action is ask_more. Ask how many days the user wants to travel with topic_path='duration' and question_id='trip_duration'. Do not set next_action=build_trip.")
+                        val durationAlreadyAsked = plannerContext?.askedQuestionRecords?.any { record -> record.topicPath == "duration" } == true
+                        if (!durationAlreadyAsked) {
+                            append("\n\nPriority rule: destination and date_window are set but duration_days is missing. The ONLY valid next_action is ask_more. Ask how many days the user wants to travel with topic_path='duration' and question_id='trip_duration'. Do not set next_action=build_trip.")
+                        } else {
+                            val nextTopic = plannerContext?.nextBestAllowedTopicPath()
+                            if (nextTopic != null) {
+                                append("\n\nNote: duration was already asked. Ask the next profile question using topic_path='$nextTopic' before building the trip.")
+                            } else {
+                                append("\n\nPriority rule: all timing and profile topics are confirmed. Set next_action to build_trip now.")
+                            }
+                        }
                     } else if (currentProfile.destination.isNotBlank() && currentProfile.dateWindow.isNotBlank() && currentProfile.durationDays != null) {
                         val nextTopic = plannerContext?.nextBestAllowedTopicPath()
                         if (nextTopic != null) {

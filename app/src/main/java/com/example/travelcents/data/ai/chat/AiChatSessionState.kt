@@ -51,6 +51,9 @@ data class AiChatSessionState(
 
 data class AiChatUiState(
     val items: List<AiChatItem> = emptyList(),
+    val userDisplayName: String = "User",
+    val userProfileImageUrl: String = "",
+    val isUserProfileLoading: Boolean = false,
     val starterCards: List<AiChatCardOption> = emptyList(),
     val draftText: String = "",
     val selectedDraftOptions: List<AiChatCardOption> = emptyList(),

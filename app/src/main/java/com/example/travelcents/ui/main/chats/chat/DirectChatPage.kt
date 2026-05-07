@@ -15,7 +15,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -70,6 +70,7 @@ fun DirectChatPage(
     val isOnline     by viewModel.isOnline.collectAsState()
     val currentUid    = viewModel.currentUid
     val listState     = rememberLazyListState()
+    val senderProfiles by viewModel.senderProfiles.collectAsState()
 
     LaunchedEffect(chatId) {
         if (chatId.isNotBlank()) {
@@ -150,10 +151,20 @@ fun DirectChatPage(
             verticalArrangement = Arrangement.spacedBy(4.dp),
             contentPadding = PaddingValues(top = 16.dp, bottom = 8.dp)
         ) {
-            items(messages, key = { it.id }) { message ->
+            itemsIndexed(messages, key = { _, message -> message.id }) { index, message ->
+                val previousMessage = messages.getOrNull(index - 1)
+                val senderProfile = senderProfiles[message.senderId]
+                val isMine = message.senderId == currentUid
                 ChatBubble(
                     message = message,
-                    isMine = message.senderId == currentUid,
+                    isMine = isMine,
+                    showSenderHeader = previousMessage?.senderId != message.senderId,
+                    senderDisplayName = senderProfile?.displayName
+                        ?.takeIf(String::isNotBlank)
+                        ?: message.senderName,
+                    senderPhotoUrl = senderProfile?.photoUrl
+                        ?.takeIf(String::isNotBlank)
+                        ?: if (isMine) "" else friend.profileImageUrl,
                     onTripCardClick = onTripCardClick
                 )
             }

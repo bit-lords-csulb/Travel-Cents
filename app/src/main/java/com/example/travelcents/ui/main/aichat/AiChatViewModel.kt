@@ -57,8 +57,11 @@ import com.example.travelcents.data.ai.chat.isReadyForDestinationRecommendations
 import com.example.travelcents.data.ai.chat.nextBestAllowedTopicPath
 import com.example.travelcents.data.ai.chat.recordAnsweredPlannerQuestion
 import com.example.travelcents.data.ai.chat.recordAskedPlannerQuestion
+import com.example.travelcents.data.ai.chat.allowedTopicPathSummary
+import com.example.travelcents.data.ai.chat.askedTopicSummary
 import com.example.travelcents.data.ai.chat.repairPrompt
 import com.example.travelcents.data.ai.chat.shouldForceVisualAction
+import com.example.travelcents.BuildConfig
 import com.example.travelcents.data.ai.chat.toDestinationRecommendationRow
 import com.example.travelcents.data.ai.chat.toPlannerTopicPath
 import com.example.travelcents.data.ai.chat.withDestinationRecommendations
@@ -80,6 +83,8 @@ import com.example.travelcents.data.trip.model.YelpBusiness
 import com.example.travelcents.data.trip.model.YelpOptionPoolItem
 import com.example.travelcents.data.trip.model.detailValue
 import com.example.travelcents.data.trip.remote.YelpRepository
+import com.example.travelcents.data.user.UserProfileRepository
+import com.example.travelcents.data.user.model.CurrentUserProfile
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FirebaseFirestore
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -103,8 +108,10 @@ class AiChatViewModel(application: Application) : AndroidViewModel(application) 
     private val auth = FirebaseAuth.getInstance()
     private val tripSyncRemoteDataSource = TripSyncRemoteDataSource(FirebaseFirestore.getInstance())
     private val bookmarksRepository = BookmarksRepository()
+    private val userProfileRepository = UserProfileRepository()
 
     private val _bookmarkedPlaceIds = MutableStateFlow<Set<String>>(emptySet())
+    private val _currentUserProfile = MutableStateFlow(CurrentUserProfile(firstName = "User", isLoading = true))
 
     private var pendingAddToTripEvent: AiSingleEventSuggestion? = null
     private var availableTripsForAdd: List<AiChatTripOption> = emptyList()
@@ -120,6 +127,7 @@ class AiChatViewModel(application: Application) : AndroidViewModel(application) 
 
     init {
         restoreLastSessionOrStartFresh()
+        observeCurrentUserProfile()
         observeBookmarks()
     }
 
@@ -1069,6 +1077,15 @@ class AiChatViewModel(application: Application) : AndroidViewModel(application) 
         }
     }
 
+    private fun observeCurrentUserProfile() {
+        viewModelScope.launch {
+            userProfileRepository.observeCurrentUserProfile().collect { profile ->
+                _currentUserProfile.value = profile
+                publishUiState()
+            }
+        }
+    }
+
     private fun publishUiState() {
         val selectedOtherOption = sessionState.selectedDraftOptions.lastOrNull { option -> option.requiresText }
         val composerHint = if (selectedOtherOption != null) {
@@ -1080,9 +1097,13 @@ class AiChatViewModel(application: Application) : AndroidViewModel(application) 
         } else {
             ""
         }
+        val userProfile = _currentUserProfile.value
 
         _uiState.value = AiChatUiState(
             items = buildVisibleItems(),
+            userDisplayName = userProfile.chatDisplayName(),
+            userProfileImageUrl = userProfile.profileImageUrl,
+            isUserProfileLoading = userProfile.isLoading,
             starterCards = sessionState.starterCards,
             draftText = sessionState.draftText,
             selectedDraftOptions = sessionState.selectedDraftOptions,
@@ -1103,6 +1124,26 @@ class AiChatViewModel(application: Application) : AndroidViewModel(application) 
             lockedDestinationImageUrl = sessionState.lockedDestinationImageUrl,
             previewDraft = sessionState.previewDraft
         )
+    }
+
+    private fun CurrentUserProfile.chatDisplayName(): String {
+        displayName
+            .takeIf { it.isNotBlank() && it != "User" }
+            ?.let { return it }
+
+        username.trim()
+            .takeIf(String::isNotBlank)
+            ?.let { return it }
+
+        email
+            .substringBefore('@')
+            .replace('.', ' ')
+            .replace('_', ' ')
+            .trim()
+            .takeIf(String::isNotBlank)
+            ?.let { return it }
+
+        return "User"
     }
 
     private fun buildVisibleItems(): List<AiChatItem> {
@@ -1735,11 +1776,19 @@ class AiChatViewModel(application: Application) : AndroidViewModel(application) 
                 firstPlaceRow != null ||
                 singleEventCard != null
             val intakeDeadEnd = false
-            if (!anyUiResolved && plannerResolution.rejectionReason.isNotBlank()) {
-                Log.w(
-                    TAG,
-                    "Planner recovered without a generic dead-end card. reason=${plannerResolution.rejectionReason}"
-                )
+
+            Log.d("PlannerDebug", buildString {
+                appendLine("══ UI RESULT ══")
+                appendLine("anyUiResolved=$anyUiResolved  intakeDeadEnd=$intakeDeadEnd")
+                appendLine("followUpGroup=${intakeFollowUpGroup?.id} (source=${intakeFollowUpGroup?.source})")
+                appendLine("destRow=${destinationRecommendationRow?.id}")
+                appendLine("curatedRow=${curatedTripRow?.id}")
+                appendLine("placeRow=${firstPlaceRow?.id}")
+                append("nextAction=${enrichedIntakeResult?.nextAction}  forceVisual=${plannerResolution.forceVisualAction}")
+            })
+
+            if (!anyUiResolved) {
+                Log.w("PlannerDebug", "DEAD END — nothing resolved. rejection=${plannerResolution.rejectionReason}")
             }
 
             val followUpGroup = intakeFollowUpGroup
@@ -1758,9 +1807,11 @@ class AiChatViewModel(application: Application) : AndroidViewModel(application) 
                 assistantOverride = plannerResolution.assistantMessage
             )
 
+            val debugTags = if (BuildConfig.DEBUG) plannerResolution.debugLog else emptyList()
             conversationItems += AiChatItem.TextMessage(
                 text = assistantResponse,
-                sender = AiChatSender.ASSISTANT
+                sender = AiChatSender.ASSISTANT,
+                tags = debugTags
             )
 
             sessionState = sessionState.copy(
@@ -1804,11 +1855,26 @@ class AiChatViewModel(application: Application) : AndroidViewModel(application) 
         history: List<LlmMessage>,
         plannerContext: PlannerContext
     ): PlannerTurnResolution {
+        val trail = mutableListOf<String>()
+        val p = plannerContext.currentProfile
+
+        Log.d("PlannerDebug", buildString {
+            appendLine("══ PLANNER TURN ══")
+            appendLine("phase=${plannerContext.phase}  preDestQ=${plannerContext.preDestinationQuestionCount}  forceVisual=${plannerContext.shouldForceVisualAction()}")
+            appendLine("profile: dest='${p.destination}' dateWindow='${p.dateWindow}' duration=${p.durationDays} budget=${p.budgetLevel} pace=${p.pace} interests=${p.interests.size} cuisine=${p.cuisinePreferences.size}")
+            appendLine("askedTopics=${plannerContext.askedTopicSummary()}")
+            append("nextBestTopic=${plannerContext.nextBestAllowedTopicPath()}")
+        })
+
         if (plannerContext.shouldForceVisualAction()) {
+            val reason = "planner gate: visual recommendations due"
+            trail += "FORCE_VISUAL [$reason]"
+            Log.d("PlannerDebug", "Resolution: $reason")
             return PlannerTurnResolution(
                 forceVisualAction = true,
                 assistantMessage = "I have enough to show a few visual options now.",
-                rejectionReason = "planner gate requires visual recommendations"
+                rejectionReason = reason,
+                debugLog = trail
             )
         }
 
@@ -1837,11 +1903,19 @@ class AiChatViewModel(application: Application) : AndroidViewModel(application) 
             }.getOrNull()
         }
 
+        fun logAttempt(label: String, result: AiTripIntakeTurnResult?, accepted: Boolean, reason: String) {
+            val action = result?.nextAction?.name ?: "null"
+            val topic = result?.topicPath?.ifBlank { "-" } ?: "null"
+            val opts = result?.options?.size ?: 0
+            val multi = result?.allowMultiple ?: false
+            val line = "$label: action=$action topic=$topic opts=$opts multi=$multi → ${if (accepted) "ACCEPTED" else "REJECTED [$reason]"}"
+            trail += line
+            Log.d("PlannerDebug", line)
+        }
+
         fun validate(result: AiTripIntakeTurnResult?): PlannerTurnResolution {
             if (result == null) {
-                return PlannerTurnResolution(
-                    rejectionReason = "model returned no valid planner JSON"
-                )
+                return PlannerTurnResolution(rejectionReason = "model returned no valid planner JSON")
             }
 
             val prospectiveProfile = plannerContext.currentProfile.mergePatch(result.profilePatch)
@@ -1869,14 +1943,17 @@ class AiChatViewModel(application: Application) : AndroidViewModel(application) 
         }
 
         val first = validate(callPlanner())
-        if (first.isUsable) return first
+        logAttempt("A1", first.intakeResult, first.isUsable, first.rejectionReason)
+        if (first.isUsable) return first.copy(debugLog = trail)
 
         val repaired = validate(
             callPlanner(repairInstruction = plannerContext.repairPrompt(first.rejectionReason))
         )
-        if (repaired.isUsable) return repaired
+        logAttempt("A2-repair", repaired.intakeResult, repaired.isUsable, repaired.rejectionReason)
+        if (repaired.isUsable) return repaired.copy(debugLog = trail)
 
         val forcedTopicPath = plannerContext.nextBestAllowedTopicPath()
+        Log.d("PlannerDebug", "forcedTopicPath=$forcedTopicPath")
         if (forcedTopicPath != null) {
             val forced = validate(
                 callPlanner(
@@ -1884,21 +1961,30 @@ class AiChatViewModel(application: Application) : AndroidViewModel(application) 
                     forcedTopicPath = forcedTopicPath
                 )
             )
-            if (forced.isUsable) return forced
+            logAttempt("A3-forced[$forcedTopicPath]", forced.intakeResult, forced.isUsable, forced.rejectionReason)
+            if (forced.isUsable) return forced.copy(debugLog = trail)
 
             AiChatCardCatalog.fallbackQuestionGroup(forcedTopicPath)?.let { fallbackGroup ->
+                val line = "APP_FALLBACK: $forcedTopicPath"
+                trail += line
+                Log.d("PlannerDebug", "Resolution: $line")
                 return PlannerTurnResolution(
                     followUpGroup = fallbackGroup,
                     assistantMessage = "I can narrow that down with one more choice.",
-                    rejectionReason = forced.rejectionReason.ifBlank { repaired.rejectionReason }
+                    rejectionReason = forced.rejectionReason.ifBlank { repaired.rejectionReason },
+                    debugLog = trail
                 )
             }
         }
 
+        val finalReason = repaired.rejectionReason.ifBlank { first.rejectionReason }
+        trail += "FORCE_VISUAL: all attempts exhausted [$finalReason]"
+        Log.d("PlannerDebug", "Resolution: FORCE_VISUAL all attempts exhausted — $finalReason")
         return PlannerTurnResolution(
             forceVisualAction = true,
             assistantMessage = "I have enough to show a few visual options now.",
-            rejectionReason = repaired.rejectionReason.ifBlank { first.rejectionReason }
+            rejectionReason = finalReason,
+            debugLog = trail
         )
     }
 
@@ -2341,7 +2427,8 @@ private data class PlannerTurnResolution(
     val followUpGroup: AiChatCardGroup? = null,
     val forceVisualAction: Boolean = false,
     val assistantMessage: String = "",
-    val rejectionReason: String = ""
+    val rejectionReason: String = "",
+    val debugLog: List<String> = emptyList()
 ) {
     val isUsable: Boolean
         get() = forceVisualAction ||

@@ -16,6 +16,11 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.stateIn
 
+data class ChatSenderProfile(
+    val displayName: String = "",
+    val photoUrl: String = ""
+)
+
 class ChatViewModel(
     private val group: Group,
     private val userRepository: SocialUserRepository = SocialUserRepository(),
@@ -41,6 +46,11 @@ class ChatViewModel(
     private val _currentName = MutableStateFlow("")
     val currentName: StateFlow<String> = _currentName.asStateFlow()
 
+    private val _senderProfiles = MutableStateFlow<Map<String, ChatSenderProfile>>(emptyMap())
+    val senderProfiles: StateFlow<Map<String, ChatSenderProfile>> = _senderProfiles.asStateFlow()
+
+    private val requestedProfileUids = mutableSetOf<String>()
+
     private var messagesListener: ListenerRegistration? = null
 
     init {
@@ -50,6 +60,7 @@ class ChatViewModel(
 
     private fun fetchCurrentUserName() {
         if (currentUid.isEmpty()) return
+        fetchSenderProfile(currentUid)
         userRepository.fetchUserDisplayName(currentUid) { name ->
             _currentName.value = name
         }
@@ -59,6 +70,17 @@ class ChatViewModel(
         messagesListener?.remove()
         messagesListener = groupsRepository.listenToMessages(group.id) { messages ->
             _messages.value = messages
+            messages.map { it.senderId }
+                .filter(String::isNotBlank)
+                .distinct()
+                .forEach(::fetchSenderProfile)
+        }
+    }
+
+    private fun fetchSenderProfile(uid: String) {
+        if (!requestedProfileUids.add(uid)) return
+        userRepository.fetchUserFullProfile(uid) { name, photoUrl ->
+            _senderProfiles.value = _senderProfiles.value + (uid to ChatSenderProfile(name, photoUrl))
         }
     }
 

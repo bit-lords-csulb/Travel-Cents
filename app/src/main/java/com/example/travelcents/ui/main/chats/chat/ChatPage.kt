@@ -18,7 +18,7 @@ import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -45,12 +45,14 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import coil.compose.AsyncImage
 import com.example.travelcents.data.social.model.Group
 import com.example.travelcents.data.social.model.Message
+import com.example.travelcents.ui.components.ProfileAvatar
 import com.example.travelcents.ui.theme.DeepSea1
 import com.example.travelcents.ui.theme.DeepSea2
 import com.example.travelcents.ui.theme.DeepSea3
@@ -105,6 +107,7 @@ fun ChatPage(
     val currentUid = viewModel.currentUid
     val listState = rememberLazyListState()
     val liveGroup by viewModel.groupState.collectAsState()
+    val senderProfiles by viewModel.senderProfiles.collectAsState()
 
     // Auto-scroll to bottom on new messages
     LaunchedEffect(messages.size) {
@@ -211,10 +214,17 @@ fun ChatPage(
             verticalArrangement = Arrangement.spacedBy(4.dp),
             contentPadding = PaddingValues(top = 16.dp, bottom = 8.dp)
         ) {
-            items(messages, key = { it.id }) { message ->
+            itemsIndexed(messages, key = { _, message -> message.id }) { index, message ->
+                val previousMessage = messages.getOrNull(index - 1)
+                val senderProfile = senderProfiles[message.senderId]
                 ChatBubble(
                     message = message,
                     isMine = message.senderId == currentUid,
+                    showSenderHeader = previousMessage?.senderId != message.senderId,
+                    senderDisplayName = senderProfile?.displayName
+                        ?.takeIf(String::isNotBlank)
+                        ?: message.senderName,
+                    senderPhotoUrl = senderProfile?.photoUrl.orEmpty(),
                     onTripCardClick = onTripCardClick
                 )
             }
@@ -270,18 +280,20 @@ fun ChatPage(
 fun ChatBubble(
     message: Message,
     isMine: Boolean,
+    showSenderHeader: Boolean,
+    senderDisplayName: String,
+    senderPhotoUrl: String,
     onTripCardClick: ((tripId: String, ownerUid: String) -> Unit)? = null
 ) {
     Column(
         modifier = Modifier.fillMaxWidth(),
         horizontalAlignment = if (isMine) Alignment.End else Alignment.Start
     ) {
-        if (!isMine) {
-            Text(
-                text = message.senderName,
-                color = DeepSea5.copy(alpha = 0.5f),
-                fontSize = 11.sp,
-                modifier = Modifier.padding(start = 4.dp, bottom = 2.dp)
+        if (showSenderHeader) {
+            ChatSenderHeader(
+                displayName = senderDisplayName,
+                photoUrl = senderPhotoUrl,
+                isMine = isMine
             )
         }
 
@@ -324,6 +336,60 @@ fun ChatBubble(
         )
 
         Spacer(modifier = Modifier.height(6.dp))
+    }
+}
+
+@Composable
+private fun ChatSenderHeader(
+    displayName: String,
+    photoUrl: String,
+    isMine: Boolean
+) {
+    val resolvedName = displayName.ifBlank { if (isMine) "You" else "Unknown" }
+    Row(
+        modifier = Modifier
+            .widthIn(max = 280.dp)
+            .padding(
+                start = if (isMine) 0.dp else 4.dp,
+                end = if (isMine) 4.dp else 0.dp,
+                bottom = 2.dp
+            ),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(8.dp)
+    ) {
+        if (!isMine) {
+            ProfileAvatar(
+                photoUrl = photoUrl,
+                contentDescription = "$resolvedName profile picture",
+                modifier = Modifier.size(24.dp),
+                borderColor = DeepSea3,
+                backgroundColor = DeepSea3,
+                placeholderTint = DeepSea5,
+                borderWidth = 1.dp,
+                iconSize = 13.dp
+            )
+        }
+        Text(
+            text = resolvedName,
+            color = DeepSea5.copy(alpha = 0.62f),
+            fontSize = 11.sp,
+            fontWeight = FontWeight.SemiBold,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+            modifier = Modifier.weight(1f, fill = false)
+        )
+        if (isMine) {
+            ProfileAvatar(
+                photoUrl = photoUrl,
+                contentDescription = "$resolvedName profile picture",
+                modifier = Modifier.size(24.dp),
+                borderColor = DeepSea3,
+                backgroundColor = DeepSea3,
+                placeholderTint = DeepSea5,
+                borderWidth = 1.dp,
+                iconSize = 13.dp
+            )
+        }
     }
 }
 
@@ -407,4 +473,3 @@ private fun TripCardBubble(
         }
     }
 }
-

@@ -462,58 +462,54 @@ fun CurrentTripHeader(
                     )
                 }
             }
-        }
-
-        Spacer(modifier = Modifier.height(8.dp))
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(end = if (members.isNotEmpty()) 24.dp else 0.dp),
-            verticalAlignment = Alignment.Bottom,
-            horizontalArrangement = Arrangement.spacedBy(16.dp)
-        ) {
-            Box(
-                modifier = Modifier.weight(1f),
-                contentAlignment = Alignment.BottomStart
-            ) {
-                when {
-                    isInCalendarMode && isWeekMode -> WeekDateHero(
-                        selectedDate = selectedDate,
-                        sortedDates = sortedDates,
-                        onDateSelected = onDateSelected
-                    )
-                    isInCalendarMode -> DayDateHero(
-                        selectedDate = selectedDate,
-                        sortedDates = sortedDates,
-                        onDateSelected = onDateSelected
-                    )
-                    else -> CurrentTripHeroLayout {
-                        Text(
-                            text = formatDayOfWeekFull(heroDate),
-                            color = DeepSea4,
-                            fontSize = 15.sp,
-                            fontWeight = FontWeight.SemiBold,
-                            letterSpacing = 0.8.sp,
-                            lineHeight = 16.sp,
-                            fontFamily = TravelCentsFonts.Body
-                        )
-                        Text(
-                            text = formatHeroDate(heroDate),
-                            color = DeepSea5,
-                            fontSize = 48.sp,
-                            fontWeight = FontWeight.ExtraBold,
-                            lineHeight = 50.sp,
-                            fontFamily = TravelCentsFonts.Headline
-                        )
-                    }
-                }
-            }
 
             if (members.isNotEmpty()) {
                 MemberAvatarRow(
                     members = members,
-                    onClick = { showMembersSheet = true }
+                    onClick = { showMembersSheet = true },
+                    modifier = Modifier
+                        .align(Alignment.TopEnd)
+                        .padding(top = 44.dp, end = 4.dp)
                 )
+            }
+        }
+
+        Spacer(modifier = Modifier.height(8.dp))
+        Box(
+            modifier = Modifier
+                .fillMaxWidth(),
+            contentAlignment = Alignment.BottomStart
+        ) {
+            when {
+                isInCalendarMode && isWeekMode -> WeekDateHero(
+                    selectedDate = selectedDate,
+                    sortedDates = sortedDates,
+                    onDateSelected = onDateSelected
+                )
+                isInCalendarMode -> DayDateHero(
+                    selectedDate = selectedDate,
+                    sortedDates = sortedDates,
+                    onDateSelected = onDateSelected
+                )
+                else -> CurrentTripHeroLayout {
+                    Text(
+                        text = formatDayOfWeekFull(heroDate),
+                        color = DeepSea4,
+                        fontSize = 15.sp,
+                        fontWeight = FontWeight.SemiBold,
+                        letterSpacing = 0.8.sp,
+                        lineHeight = 16.sp,
+                        fontFamily = TravelCentsFonts.Body
+                    )
+                    Text(
+                        text = formatHeroDate(heroDate),
+                        color = DeepSea5,
+                        fontSize = 48.sp,
+                        fontWeight = FontWeight.ExtraBold,
+                        lineHeight = 50.sp,
+                        fontFamily = TravelCentsFonts.Headline
+                    )
+                }
             }
         }
 
@@ -602,12 +598,16 @@ private fun HeaderModeButton(
 }
 
 @Composable
-private fun MemberAvatarRow(members: List<TripMemberUi>, onClick: () -> Unit) {
+private fun MemberAvatarRow(
+    members: List<TripMemberUi>,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier
+) {
     val display = members.take(2)
     val overflow = members.size - display.size
 
     Row(
-        modifier = Modifier.clickable(onClick = onClick),
+        modifier = modifier.clickable(onClick = onClick),
         horizontalArrangement = Arrangement.spacedBy((-12).dp),
         verticalAlignment = Alignment.CenterVertically
     ) {

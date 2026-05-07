@@ -609,8 +609,8 @@ fun PlannerContext.nextBestAllowedTopicPath(): String? {
             firstUnasked(
                 buildList {
                     if (profile.dateWindow.isBlank()) add("travel_timeline")
-                    if (profile.durationDays == null) add("duration")
-                    if (profile.dateWindow.isNotBlank() || profile.durationDays != null) {
+                    if (profile.durationDays == null && "duration" !in askedTopics) add("duration")
+                    if (profile.dateWindow.isNotBlank() || profile.durationDays != null || "duration" in askedTopics) {
                         add("discovery_help")
                     }
                     if (profile.budgetLevel == AiBudgetLevel.UNKNOWN && profile.budgetTotal == null) add("budget")

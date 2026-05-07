@@ -20,7 +20,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -258,13 +258,19 @@ fun AiTripChatPage(
                             )
                         }
                     }
-                    items(uiState.items, key = { it.id }) { item ->
+                    itemsIndexed(uiState.items, key = { _, item -> item.id }) { index, item ->
                         when (item) {
                             is AiChatItem.TextMessage -> {
+                                val previousTextMessage = uiState.items
+                                    .getOrNull(index - 1) as? AiChatItem.TextMessage
                                 AiChatBubble(
                                     text = item.text,
                                     sender = item.sender,
-                                    tags = item.tags
+                                    tags = item.tags,
+                                    userDisplayName = uiState.userDisplayName,
+                                    userProfileImageUrl = uiState.userProfileImageUrl,
+                                    isUserProfileLoading = uiState.isUserProfileLoading,
+                                    showSenderHeader = previousTextMessage?.sender != item.sender
                                 )
                             }
 
