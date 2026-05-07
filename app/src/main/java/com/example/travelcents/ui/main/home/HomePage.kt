@@ -106,10 +106,13 @@ fun HomePage(
 ) {
     val homeUiState by homeViewModel.uiState.collectAsStateWithLifecycle()
     var selectedTripIndex by remember { mutableIntStateOf(0) }
-    val selectedCarouselTrip = homeUiState.trips.getOrNull(selectedTripIndex)
-    val statusTrip = remember(homeUiState.trips, selectedTripIndex) {
+    val homeCarouselTrips = remember(homeUiState.trips) {
+        homeUiState.trips.filterNot { trip -> isAiChatDraftStatus(trip.status) }
+    }
+    val selectedCarouselTrip = homeCarouselTrips.getOrNull(selectedTripIndex)
+    val statusTrip = remember(homeCarouselTrips, selectedTripIndex) {
         resolveHomeStatusTrip(
-            trips = homeUiState.trips,
+            trips = homeCarouselTrips,
             selectedTrip = selectedCarouselTrip
         )
     }
@@ -129,11 +132,17 @@ fun HomePage(
         destinationWeather = statusTrip?.let { homeUiState.destinationWeather[it.itineraryId] }
     )
 
-    LaunchedEffect(homeUiState.isLoading, homeUiState.trips.size) {
+    LaunchedEffect(homeCarouselTrips.size) {
+        if (selectedTripIndex > homeCarouselTrips.lastIndex) {
+            selectedTripIndex = homeCarouselTrips.lastIndex.coerceAtLeast(0)
+        }
+    }
+
+    LaunchedEffect(homeUiState.isLoading, homeCarouselTrips.size) {
         if (!homeUiState.isLoading) {
             TripPerformanceLogger.recordHomeFirstRender(
                 source = "HomePage",
-                tripCount = homeUiState.trips.size
+                tripCount = homeCarouselTrips.size
             )
         }
     }
@@ -157,7 +166,7 @@ fun HomePage(
         Spacer(modifier = Modifier.height(4.dp))
 
         TripsCarousel(
-            trips = homeUiState.trips,
+            trips = homeCarouselTrips,
             viewerUid = homeUiState.viewerUid,
             tripImages = homeUiState.tripImages,
             isLoading = homeUiState.isLoading,
