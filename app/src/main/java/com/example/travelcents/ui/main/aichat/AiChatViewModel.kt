@@ -51,6 +51,7 @@ import com.example.travelcents.data.ai.chat.PreferenceProfile
 import com.example.travelcents.data.ai.chat.PersistedAiChatMessage
 import com.example.travelcents.data.ai.chat.PersistedAiChatSnapshot
 import com.example.travelcents.data.ai.chat.SuggestionItem
+import com.example.travelcents.data.ai.chat.cardIdToIntakeProfilePatch
 import com.example.travelcents.data.ai.chat.mergeIntakeProfile
 import com.example.travelcents.data.ai.chat.mergePatch
 import com.example.travelcents.data.ai.chat.isReadyForDestinationRecommendations
@@ -1643,7 +1644,8 @@ class AiChatViewModel(application: Application) : AndroidViewModel(application) 
         conversationItems += submittedMessage
 
         val updatedProfile = AiTravelerProfileReducer.merge(sessionState.profile, trimmedLlmUserMessage)
-        val updatedIntakeProfile = sessionState.intakeProfile.mergePatch(updatedProfile.intakeProfile())
+        val cardPatch = cardIdToIntakeProfilePatch(answeredDraftOptions.map { it.id })
+        val updatedIntakeProfile = sessionState.intakeProfile.mergePatch(updatedProfile.intakeProfile()).mergePatch(cardPatch)
         val updatedPlannerPhase = plannerPhaseFor(updatedIntakeProfile)
         sessionState = sessionState.copy(
             profile = updatedProfile,
@@ -1775,23 +1777,30 @@ class AiChatViewModel(application: Application) : AndroidViewModel(application) 
                 curatedTripRow != null ||
                 firstPlaceRow != null ||
                 singleEventCard != null
-            val intakeDeadEnd = false
+            val intakeDeadEnd = !anyUiResolved
+            val isPostDestinationLockNow = sessionState.lockedDestination?.isNotBlank() == true
+            val effectiveFollowUpGroup = when {
+                intakeDeadEnd && isPostDestinationLockNow -> AiChatCardCatalog.postDestinationDeadEndGroup()
+                intakeDeadEnd -> AiChatCardCatalog.deadEndActionGroup()
+                else -> intakeFollowUpGroup
+            }
 
             Log.d("PlannerDebug", buildString {
                 appendLine("══ UI RESULT ══")
                 appendLine("anyUiResolved=$anyUiResolved  intakeDeadEnd=$intakeDeadEnd")
                 appendLine("followUpGroup=${intakeFollowUpGroup?.id} (source=${intakeFollowUpGroup?.source})")
+                appendLine("effectiveFollowUpGroup=${effectiveFollowUpGroup?.id}")
                 appendLine("destRow=${destinationRecommendationRow?.id}")
                 appendLine("curatedRow=${curatedTripRow?.id}")
                 appendLine("placeRow=${firstPlaceRow?.id}")
                 append("nextAction=${enrichedIntakeResult?.nextAction}  forceVisual=${plannerResolution.forceVisualAction}")
             })
 
-            if (!anyUiResolved) {
-                Log.w("PlannerDebug", "DEAD END — nothing resolved. rejection=${plannerResolution.rejectionReason}")
+            if (intakeDeadEnd) {
+                Log.w("PlannerDebug", "DEAD END — recovering with ${effectiveFollowUpGroup?.id}. rejection=${plannerResolution.rejectionReason}")
             }
 
-            val followUpGroup = intakeFollowUpGroup
+            val followUpGroup = effectiveFollowUpGroup
 
             val assistantResponse = buildAssistantResponse(
                 intakeResult = enrichedIntakeResult,

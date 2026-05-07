@@ -65,6 +65,28 @@ object AiChatCardCatalog {
         )
     }
 
+    fun postDestinationDeadEndGroup(): AiChatCardGroup {
+        return AiChatCardGroup(
+            id = DEAD_END_GROUP_ID,
+            title = "What would you like to do next?",
+            allowMultiple = false,
+            options = listOf(
+                AiChatCardOption(
+                    id = "${DEAD_END_GROUP_ID}_build",
+                    label = "Build a starter trip",
+                    message = "Build a starter trip itinerary from my profile.",
+                    groupId = DEAD_END_GROUP_ID
+                ),
+                AiChatCardOption(
+                    id = "${DEAD_END_GROUP_ID}_refine",
+                    label = "Keep refining",
+                    message = "Ask me a different question to refine the trip.",
+                    groupId = DEAD_END_GROUP_ID
+                )
+            )
+        )
+    }
+
     fun timelineQuestionGroup(): AiChatCardGroup {
         return AiChatCardGroup(
             id = "travel_timeline",

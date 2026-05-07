@@ -124,6 +124,8 @@ data class AiTripIntakeProfile(
     val dateWindow: String = "",
     @SerializedName("duration_days")
     val durationDays: Int? = null,
+    @SerializedName("duration_flexible")
+    val durationFlexible: Boolean = false,
     @SerializedName("budget_level")
     val budgetLevel: AiBudgetLevel = AiBudgetLevel.UNKNOWN,
     @SerializedName("budget_total")
@@ -394,6 +396,7 @@ fun AiTripIntakeProfile.mergePatch(patch: AiTripIntakeProfile?): AiTripIntakePro
         dateTo = patch.dateTo.ifBlank { dateTo },
         dateWindow = patch.dateWindow.ifBlank { dateWindow },
         durationDays = patch.durationDays ?: durationDays,
+        durationFlexible = patch.durationFlexible || durationFlexible,
         budgetLevel = patch.budgetLevel.takeUnless { it == AiBudgetLevel.UNKNOWN } ?: budgetLevel,
         budgetTotal = patch.budgetTotal ?: budgetTotal,
         pace = patch.pace.takeUnless { it == AiTripPacePreference.UNKNOWN } ?: pace,
@@ -406,6 +409,60 @@ fun AiTripIntakeProfile.mergePatch(patch: AiTripIntakeProfile?): AiTripIntakePro
         notes = (notes + patch.notes).distinct().takeLast(6),
         confidence = confidence + patch.confidence
     )
+}
+
+fun cardIdToIntakeProfilePatch(selectedCardIds: List<String>): AiTripIntakeProfile {
+    var patch = AiTripIntakeProfile()
+    for (id in selectedCardIds) {
+        patch = when (id) {
+            "budget_value"   -> patch.copy(budgetLevel = AiBudgetLevel.BUDGET)
+            "budget_comfort" -> patch.copy(budgetLevel = AiBudgetLevel.COMFORT)
+            "budget_splurge", "budget_luxury" -> patch.copy(budgetLevel = AiBudgetLevel.LUXURY)
+            "pace_relaxed"   -> patch.copy(pace = AiTripPacePreference.RELAXED)
+            "pace_balanced"  -> patch.copy(pace = AiTripPacePreference.BALANCED)
+            "pace_packed"    -> patch.copy(pace = AiTripPacePreference.PACKED)
+            "duration_weekend"   -> patch.copy(durationDays = 2)
+            "duration_four_days" -> patch.copy(durationDays = 4)
+            "duration_week"      -> patch.copy(durationDays = 7)
+            "duration_flexible"  -> patch.copy(durationFlexible = true)
+            "travel_timeline_next_month" -> patch.copy(dateWindow = "next month")
+            "travel_timeline_3_months"   -> patch.copy(dateWindow = "in 3 months")
+            "travel_timeline_6_months"   -> patch.copy(dateWindow = "in 6 months")
+            "traveler_context_solo"    -> patch.copy(tripType = AiTripType.SOLO)
+            "traveler_context_couple"  -> patch.copy(tripType = AiTripType.ROMANTIC)
+            "traveler_context_family"  -> patch.copy(tripType = AiTripType.FAMILY)
+            "traveler_context_friends" -> patch.copy(tripType = AiTripType.FRIENDS)
+            "destination_style_beach"    -> patch.copy(destinationStyle = patch.destinationStyle + "beach")
+            "destination_style_city"     -> patch.copy(destinationStyle = patch.destinationStyle + "city")
+            "destination_style_nature"   -> patch.copy(destinationStyle = patch.destinationStyle + "nature")
+            "destination_style_culture"  -> patch.copy(destinationStyle = patch.destinationStyle + "culture")
+            "destination_style_food"     -> patch.copy(destinationStyle = patch.destinationStyle + "food")
+            "destination_style_relaxing" -> patch.copy(destinationStyle = patch.destinationStyle + "relaxing")
+            "interests_food"       -> patch.copy(interests = patch.interests + "food")
+            "interests_history"    -> patch.copy(interests = patch.interests + "history")
+            "interests_outdoors"   -> patch.copy(interests = patch.interests + "outdoors")
+            "interests_shopping"   -> patch.copy(interests = patch.interests + "shopping")
+            "interests_nightlife"  -> patch.copy(interests = patch.interests + "nightlife")
+            "interests_relaxation" -> patch.copy(interests = patch.interests + "relaxation")
+            "food_preferences_local"       -> patch.copy(cuisinePreferences = patch.cuisinePreferences + "local cuisine")
+            "food_preferences_street_food" -> patch.copy(cuisinePreferences = patch.cuisinePreferences + "street food")
+            "food_preferences_fine_dining" -> patch.copy(cuisinePreferences = patch.cuisinePreferences + "fine dining")
+            "food_preferences_cafes"       -> patch.copy(cuisinePreferences = patch.cuisinePreferences + "cafes")
+            "food_preferences_seafood"     -> patch.copy(cuisinePreferences = patch.cuisinePreferences + "seafood")
+            "food_preferences_vegetarian"  -> patch.copy(cuisinePreferences = patch.cuisinePreferences + "vegetarian")
+            "activity_preferences_landmarks" -> patch.copy(activitySubCategories = patch.activitySubCategories + "landmarks")
+            "activity_preferences_museums"   -> patch.copy(activitySubCategories = patch.activitySubCategories + "museums")
+            "activity_preferences_outdoors"  -> patch.copy(activitySubCategories = patch.activitySubCategories + "outdoor activities")
+            "activity_preferences_tours"     -> patch.copy(activitySubCategories = patch.activitySubCategories + "tours")
+            "activity_preferences_shows"     -> patch.copy(activitySubCategories = patch.activitySubCategories + "shows")
+            "must_haves_walkable"     -> patch.copy(mustHaves = patch.mustHaves + "walkable")
+            "must_haves_easy_flights" -> patch.copy(mustHaves = patch.mustHaves + "easy flights")
+            "must_haves_great_food"   -> patch.copy(mustHaves = patch.mustHaves + "great food")
+            "must_haves_scenic"       -> patch.copy(mustHaves = patch.mustHaves + "scenic views")
+            else -> patch
+        }
+    }
+    return patch
 }
 
 fun AiTravelerProfile.mergeIntakeProfile(intakeProfile: AiTripIntakeProfile): AiTravelerProfile {
@@ -609,8 +666,8 @@ fun PlannerContext.nextBestAllowedTopicPath(): String? {
             firstUnasked(
                 buildList {
                     if (profile.dateWindow.isBlank()) add("travel_timeline")
-                    if (profile.durationDays == null && "duration" !in askedTopics) add("duration")
-                    if (profile.dateWindow.isNotBlank() || profile.durationDays != null || "duration" in askedTopics) {
+                    if (profile.durationDays == null && !profile.durationFlexible && "duration" !in askedTopics) add("duration")
+                    if (profile.dateWindow.isNotBlank() || profile.durationDays != null || profile.durationFlexible || "duration" in askedTopics) {
                         add("discovery_help")
                     }
                     if (profile.budgetLevel == AiBudgetLevel.UNKNOWN && profile.budgetTotal == null) add("budget")
@@ -821,7 +878,7 @@ private fun topicPathTargetsKnownProfileField(
         "activity_preferences" -> profile.activitySubCategories.isNotEmpty()
         "budget" -> profile.budgetLevel != AiBudgetLevel.UNKNOWN || profile.budgetTotal != null
         "pace" -> profile.pace != AiTripPacePreference.UNKNOWN
-        "duration" -> profile.durationDays != null
+        "duration" -> profile.durationDays != null || profile.durationFlexible
         "travel_timeline",
         "date_window" -> profile.dateWindow.isNotBlank() || (profile.dateFrom.isNotBlank() && profile.dateTo.isNotBlank())
         "origin" -> profile.origin.isNotBlank()
