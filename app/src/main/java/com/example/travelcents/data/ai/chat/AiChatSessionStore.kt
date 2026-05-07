@@ -21,7 +21,9 @@ data class PersistedAiChatSnapshot(
     val discoverySlots: List<DiscoverySlot>? = null,
     val discoverySuggestionPool: List<SuggestionItem>? = null,
     val llmHistory: List<LlmMessage> = emptyList(),
-    val askedFollowUpGroupIds: List<String> = emptyList(),
+    val askedQuestionRecords: List<AskedQuestionRecord> = emptyList(),
+    val plannerPhase: PlannerPhase = PlannerPhase.PRE_DESTINATION,
+    val preDestinationQuestionCount: Int = 0,
     val activeResponseCardGroup: PersistedAiChatCardGroup? = null,
     val activeDestinationRecommendationRow: PersistedAiDestinationRecommendationRow? = null,
     val activeCuratedTripRow: PersistedAiCuratedTripRow? = null,
@@ -55,7 +57,12 @@ data class PersistedAiChatCardGroup(
     val options: List<PersistedAiChatCardOption>,
     val allowMultiple: Boolean,
     val allowOther: Boolean = false,
-    val otherPromptHint: String = ""
+    val otherPromptHint: String = "",
+    val topicPath: String = "",
+    val questionId: String = id,
+    val source: PlannerQuestionSource = PlannerQuestionSource.LLM,
+    val parentTopicPath: String = "",
+    val parentAnswerId: String = ""
 )
 
 data class PersistedAiCuratedTripStarter(
@@ -325,7 +332,12 @@ fun AiChatCardGroup.toPersisted(): PersistedAiChatCardGroup {
         },
         allowMultiple = allowMultiple,
         allowOther = allowOther,
-        otherPromptHint = otherPromptHint
+        otherPromptHint = otherPromptHint,
+        topicPath = topicPath,
+        questionId = questionId,
+        source = source,
+        parentTopicPath = parentTopicPath,
+        parentAnswerId = parentAnswerId
     )
 }
 
@@ -345,7 +357,12 @@ fun PersistedAiChatCardGroup.toModel(): AiChatCardGroup {
         },
         allowMultiple = allowMultiple,
         allowOther = allowOther,
-        otherPromptHint = otherPromptHint
+        otherPromptHint = otherPromptHint,
+        topicPath = topicPath,
+        questionId = questionId,
+        source = source,
+        parentTopicPath = parentTopicPath,
+        parentAnswerId = parentAnswerId
     )
 }
 

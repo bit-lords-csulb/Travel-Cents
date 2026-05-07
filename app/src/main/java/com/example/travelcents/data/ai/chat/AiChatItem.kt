@@ -87,7 +87,12 @@ data class AiChatCardGroup(
     val options: List<AiChatCardOption>,
     val allowMultiple: Boolean = true,
     val allowOther: Boolean = false,
-    val otherPromptHint: String = ""
+    val otherPromptHint: String = "",
+    val topicPath: String = "",
+    val questionId: String = id,
+    val source: PlannerQuestionSource = PlannerQuestionSource.LLM,
+    val parentTopicPath: String = "",
+    val parentAnswerId: String = ""
 )
 
 data class AiDestinationRecommendation(

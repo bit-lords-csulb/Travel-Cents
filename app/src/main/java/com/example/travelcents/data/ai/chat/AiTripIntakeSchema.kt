@@ -55,6 +55,54 @@ enum class AiTripIntakeQuestionKind {
     CARDS
 }
 
+enum class PlannerPhase {
+    PRE_DESTINATION,
+    VISUAL_RECOMMENDATIONS,
+    DESTINATION_LOCKED,
+    TRIP_BUILD
+}
+
+enum class PlannerQuestionSource {
+    LLM,
+    APP_FALLBACK,
+    DISCOVERY,
+    STARTER_GRID
+}
+
+data class AskedQuestionRecord(
+    @SerializedName("topic_path")
+    val topicPath: String = "",
+    @SerializedName("question_id")
+    val questionId: String = "",
+    @SerializedName("source")
+    val source: PlannerQuestionSource = PlannerQuestionSource.LLM,
+    @SerializedName("phase")
+    val phase: PlannerPhase = PlannerPhase.PRE_DESTINATION,
+    @SerializedName("parent_topic_path")
+    val parentTopicPath: String = "",
+    @SerializedName("parent_answer_id")
+    val parentAnswerId: String = "",
+    @SerializedName("answer_ids")
+    val answerIds: List<String> = emptyList(),
+    @SerializedName("answered")
+    val answered: Boolean = false
+)
+
+data class PlannerContext(
+    val phase: PlannerPhase = PlannerPhase.PRE_DESTINATION,
+    val askedQuestionRecords: List<AskedQuestionRecord> = emptyList(),
+    val currentProfile: AiTripIntakeProfile = AiTripIntakeProfile(),
+    val preDestinationQuestionCount: Int = 0,
+    val visualRecommendationsDue: Boolean = false
+)
+
+data class PlannerValidationResult(
+    val accepted: Boolean,
+    val rejectionReason: String = "",
+    val cardGroup: AiChatCardGroup? = null,
+    val forceVisualAction: Boolean = false
+)
+
 data class AiTripIntakeProfile(
     @SerializedName("schema_version")
     val schemaVersion: Int = INTAKE_SCHEMA_VERSION,
@@ -139,6 +187,16 @@ data class AiTripIntakeAnswerOption(
 data class AiTripIntakeFollowUpQuestion(
     @SerializedName("id")
     val id: String,
+    @SerializedName("topic_path")
+    val topicPath: String = "",
+    @SerializedName("question_id")
+    val questionId: String = id,
+    @SerializedName("source")
+    val source: PlannerQuestionSource = PlannerQuestionSource.LLM,
+    @SerializedName("parent_topic_path")
+    val parentTopicPath: String = "",
+    @SerializedName("parent_answer_id")
+    val parentAnswerId: String = "",
     @SerializedName("title")
     val title: String,
     @SerializedName("subtitle")
@@ -191,6 +249,8 @@ data class AiTripIntakePlaceRecommendation(
 data class AiTripIntakeTurnResult(
     @SerializedName("ack_key")
     val ackKey: AiTripIntakeAckKey = AiTripIntakeAckKey.GOT_IT,
+    @SerializedName("assistant_message")
+    val assistantMessageText: String = "",
     @SerializedName("profile_patch")
     val profilePatch: AiTripIntakeProfile = AiTripIntakeProfile(),
     @SerializedName("resolved_fields")
@@ -203,8 +263,16 @@ data class AiTripIntakeTurnResult(
     val nextActionReason: String = "",
     @SerializedName("question_kind")
     val questionKind: AiTripIntakeQuestionKind = AiTripIntakeQuestionKind.NONE,
+    @SerializedName("topic_path")
+    val topicPath: String = "",
     @SerializedName("question_id")
     val questionId: String = "",
+    @SerializedName("question_source")
+    val questionSource: PlannerQuestionSource = PlannerQuestionSource.LLM,
+    @SerializedName("parent_topic_path")
+    val parentTopicPath: String = "",
+    @SerializedName("parent_answer_id")
+    val parentAnswerId: String = "",
     @SerializedName("question_title")
     val questionTitle: String = "",
     @SerializedName("question_subtitle")
@@ -239,9 +307,10 @@ data class AiTripIntakeTurnResult(
 ) {
     private val hasValidCardPayload: Boolean
         get() = nextAction == AiTripIntakeNextAction.ASK_MORE &&
+            topicPath.isPlannerTopicPath() &&
             questionId.isNotBlank() &&
             questionTitle.isNotBlank() &&
-            options.size in 2..6
+            options.hasPlannerAnswerOptionCount()
 
     private val effectiveQuestionKind: AiTripIntakeQuestionKind
         get() = when {
@@ -251,7 +320,7 @@ data class AiTripIntakeTurnResult(
         }
 
     val assistantMessage: String
-        get() = ackKey.displayText()
+        get() = assistantMessageText.trim().ifBlank { ackKey.displayText() }
 
     val planningObjective: String
         get() = when (nextAction) {
@@ -266,6 +335,11 @@ data class AiTripIntakeTurnResult(
 
             return AiTripIntakeFollowUpQuestion(
                 id = questionId,
+                topicPath = topicPath,
+                questionId = questionId,
+                source = questionSource,
+                parentTopicPath = parentTopicPath,
+                parentAnswerId = parentAnswerId,
                 title = questionTitle,
                 subtitle = questionSubtitle,
                 allowMultiple = allowMultiple,
@@ -275,7 +349,8 @@ data class AiTripIntakeTurnResult(
             ).takeIf { question ->
                 question.id.isNotBlank() &&
                     question.title.isNotBlank() &&
-                    question.options.size in 2..6
+                    question.topicPath.isPlannerTopicPath() &&
+                    question.options.hasPlannerAnswerOptionCount()
             }
         }
 }
@@ -342,9 +417,12 @@ fun AiTravelerProfile.mergeIntakeProfile(intakeProfile: AiTripIntakeProfile): Ai
 }
 
 fun AiTripIntakeFollowUpQuestion.toCardGroup(): AiChatCardGroup? {
-    if (id.isBlank() || title.isBlank() || options.isEmpty()) return null
+    if (id.isBlank() || title.isBlank() || !topicPath.isPlannerTopicPath() || !options.hasPlannerAnswerOptionCount()) {
+        return null
+    }
 
-    val normalizedId = sanitizeFollowUpId(id)
+    val normalizedId = sanitizeFollowUpId(questionId.ifBlank { id })
+    val normalizedTopicPath = topicPath.toPlannerTopicPath()
     val maxRegularOptions = if (allowOther) 5 else 6
     return AiChatCardGroup(
         id = normalizedId,
@@ -355,6 +433,14 @@ fun AiTripIntakeFollowUpQuestion.toCardGroup(): AiChatCardGroup? {
         otherPromptHint = otherPromptHint.ifBlank {
             "Type the answer that fits best."
         },
+        topicPath = normalizedTopicPath,
+        questionId = normalizedId,
+        source = source,
+        parentTopicPath = parentTopicPath.toPlannerTopicPath(),
+        parentAnswerId = parentAnswerId
+            .takeIf(String::isNotBlank)
+            ?.let { rawParentAnswerId -> sanitizeFollowUpOptionId(rawParentAnswerId, normalizedId) }
+            .orEmpty(),
         options = options
             .filter { option -> option.id.isNotBlank() && option.label.isNotBlank() && option.message.isNotBlank() }
             .take(maxRegularOptions)
@@ -396,7 +482,7 @@ fun AiTripIntakeFollowUpQuestion.toCardGroup(): AiChatCardGroup? {
                 }
             }
     ).takeIf { group ->
-        group.options.size in 2..6
+        group.options.hasPlannerCardOptionCount()
     }
 }
 
@@ -412,6 +498,323 @@ fun AiTripIntakeTurnResult.withDestinationRecommendations(
 
 fun AiTripIntakeTurnResult.toPlaceRecommendationRow(): AiPlaceRecommendationRow? {
     return AiRecommendationMapper.placeRowFromIntake(placeRecommendations)
+}
+
+fun List<AiTripIntakeAnswerOption>.hasPlannerAnswerOptionCount(): Boolean {
+    return size == 4 || size == 6
+}
+
+fun List<AiChatCardOption>.hasPlannerCardOptionCount(): Boolean {
+    return size == 4 || size == 6
+}
+
+fun String.toPlannerTopicPath(): String {
+    val normalizedSegments = trim()
+        .lowercase(Locale.US)
+        .replace(Regex("[^a-z0-9.]+"), "_")
+        .split('.')
+        .map { segment -> segment.trim('_') }
+        .filter(String::isNotBlank)
+    return normalizedSegments.joinToString(".")
+}
+
+fun String.isPlannerTopicPath(): Boolean {
+    val normalized = toPlannerTopicPath()
+    if (normalized.isBlank()) return false
+    return normalized.split('.').all { segment ->
+        segment.matches(Regex("[a-z][a-z0-9_]*"))
+    }
+}
+
+fun AiTripIntakeProfile.isReadyForDestinationRecommendations(): Boolean {
+    val hasTravelerContext = tripType != AiTripType.UNKNOWN || partySummary.isNotBlank()
+    val hasStyleDirection = destinationStyle.isNotEmpty() || interests.size >= 2
+    val hasBudget = budgetLevel != AiBudgetLevel.UNKNOWN || budgetTotal != null
+    return hasTravelerContext && hasStyleDirection && hasBudget
+}
+
+fun PlannerContext.shouldForceVisualAction(): Boolean {
+    if (visualRecommendationsDue) return true
+    if (phase == PlannerPhase.PRE_DESTINATION && preDestinationQuestionCount >= PRE_DESTINATION_QUESTION_LIMIT) {
+        return true
+    }
+    return phase == PlannerPhase.PRE_DESTINATION &&
+        currentProfile.destination.isBlank() &&
+        currentProfile.isReadyForDestinationRecommendations()
+}
+
+fun PlannerContext.allowedTopicPathSummary(): String {
+    return allowedTopicRootsForPhase(phase).joinToString()
+}
+
+fun PlannerContext.askedTopicSummary(): String {
+    return askedQuestionRecords
+        .map { record -> record.topicPath }
+        .filter(String::isNotBlank)
+        .distinct()
+        .joinToString()
+        .ifBlank { "None yet" }
+}
+
+fun PlannerContext.repairPrompt(rejectionReason: String): String {
+    return buildString {
+        appendLine("Repair the previous planner response.")
+        appendLine("Rejection reason: $rejectionReason")
+        appendLine("Current planner phase: $phase")
+        appendLine("Allowed topic roots: ${allowedTopicPathSummary()}")
+        appendLine("Already asked topic paths: ${askedTopicSummary()}")
+        appendLine("If you ask a card question, topic_path is required and options must contain exactly 4 or exactly 6 objects.")
+        appendLine("Use a child topic only when parent_topic_path and parent_answer_id justify a narrower drill-down.")
+        if (shouldForceVisualAction()) {
+            append("The app says visual recommendations are due now, so do not ask another question.")
+        }
+    }
+}
+
+fun PlannerContext.nextBestAllowedTopicPath(): String? {
+    if (shouldForceVisualAction()) return null
+    val askedTopics = askedQuestionRecords.map { record -> record.topicPath }.toSet()
+
+    fun firstUnasked(candidates: List<String>): String? {
+        return candidates.firstOrNull { candidate -> candidate !in askedTopics }
+    }
+
+    return when (phase) {
+        PlannerPhase.PRE_DESTINATION -> {
+            val profile = currentProfile
+            firstUnasked(
+                buildList {
+                    if (profile.tripType == AiTripType.UNKNOWN && profile.partySummary.isBlank()) add("traveler_context")
+                    if (profile.destinationStyle.isEmpty() && profile.interests.size < 2) add("destination_style")
+                    if (profile.budgetLevel == AiBudgetLevel.UNKNOWN && profile.budgetTotal == null) add("budget")
+                    if (profile.interests.size < 2) add("interests")
+                    if (profile.pace == AiTripPacePreference.UNKNOWN) add("pace")
+                    if (profile.cuisinePreferences.isEmpty()) add("food_preferences")
+                    add("activity_preferences")
+                    add("must_haves")
+                }
+            )
+        }
+
+        PlannerPhase.DESTINATION_LOCKED -> {
+            val profile = currentProfile
+            firstUnasked(
+                buildList {
+                    if (profile.dateWindow.isBlank()) add("travel_timeline")
+                    if (profile.durationDays == null) add("duration")
+                    if (profile.budgetLevel == AiBudgetLevel.UNKNOWN && profile.budgetTotal == null) add("budget")
+                    if (profile.pace == AiTripPacePreference.UNKNOWN) add("pace")
+                    if (profile.cuisinePreferences.isEmpty()) add("food_preferences")
+                    add("activity_preferences")
+                }
+            )
+        }
+
+        PlannerPhase.VISUAL_RECOMMENDATIONS,
+        PlannerPhase.TRIP_BUILD -> null
+    }
+}
+
+fun AiTripIntakeTurnResult.validatePlannerTurn(
+    context: PlannerContext
+): PlannerValidationResult {
+    if (nextAction != AiTripIntakeNextAction.ASK_MORE) {
+        return PlannerValidationResult(accepted = true, forceVisualAction = nextAction == AiTripIntakeNextAction.SUGGEST_DESTINATIONS)
+    }
+
+    if (context.shouldForceVisualAction()) {
+        return PlannerValidationResult(
+            accepted = false,
+            rejectionReason = "visual recommendations are due; no more card questions are allowed",
+            forceVisualAction = true
+        )
+    }
+
+    val question = followUpQuestion ?: return PlannerValidationResult(
+        accepted = false,
+        rejectionReason = "next_action=ask_more requires topic_path, question_id, title, and exactly 4 or 6 valid options"
+    )
+
+    val group = question.toCardGroup() ?: return PlannerValidationResult(
+        accepted = false,
+        rejectionReason = "card question is malformed or does not have exactly 4 or 6 usable options"
+    )
+
+    val topicPath = group.topicPath.toPlannerTopicPath()
+    val duplicate = context.askedQuestionRecords.any { record ->
+        record.topicPath == topicPath
+    }
+    val childAllowed = isAllowedChildRefinement(group, context.askedQuestionRecords)
+
+    if (duplicate && !childAllowed) {
+        return PlannerValidationResult(
+            accepted = false,
+            rejectionReason = "topic_path '$topicPath' was already asked"
+        )
+    }
+
+    if (!topicPathAllowedForPhase(topicPath, context.phase)) {
+        return PlannerValidationResult(
+            accepted = false,
+            rejectionReason = "topic_path '$topicPath' is outside phase $context.phase"
+        )
+    }
+
+    if (!childAllowed && topicPathTargetsKnownProfileField(topicPath, context.currentProfile)) {
+        return PlannerValidationResult(
+            accepted = false,
+            rejectionReason = "topic_path '$topicPath' targets profile information already known"
+        )
+    }
+
+    if (group.parentTopicPath.isNotBlank() && !childAllowed) {
+        return PlannerValidationResult(
+            accepted = false,
+            rejectionReason = "child topic '$topicPath' is missing a matching answered parent topic and answer"
+        )
+    }
+
+    return PlannerValidationResult(
+        accepted = true,
+        cardGroup = group
+    )
+}
+
+fun AiChatCardGroup.toAskedQuestionRecord(
+    phase: PlannerPhase,
+    answerIds: List<String> = emptyList(),
+    answered: Boolean = false
+): AskedQuestionRecord {
+    return AskedQuestionRecord(
+        topicPath = topicPath.toPlannerTopicPath(),
+        questionId = questionId.ifBlank { id },
+        source = source,
+        phase = phase,
+        parentTopicPath = parentTopicPath.toPlannerTopicPath(),
+        parentAnswerId = parentAnswerId,
+        answerIds = answerIds.map { answerId -> sanitizeFollowUpOptionId(answerId, id) }.distinct(),
+        answered = answered
+    )
+}
+
+fun List<AskedQuestionRecord>.recordAskedPlannerQuestion(
+    group: AiChatCardGroup?,
+    phase: PlannerPhase
+): List<AskedQuestionRecord> {
+    group ?: return this
+    if (group.topicPath.isBlank()) return this
+    val record = group.toAskedQuestionRecord(phase = phase)
+    return filterNot { existing ->
+        existing.topicPath == record.topicPath && existing.questionId == record.questionId
+    }.plus(record)
+}
+
+fun List<AskedQuestionRecord>.recordAnsweredPlannerQuestion(
+    group: AiChatCardGroup?,
+    selectedOptions: List<AiChatCardOption>
+): List<AskedQuestionRecord> {
+    group ?: return this
+    val topicPath = group.topicPath.toPlannerTopicPath()
+    if (topicPath.isBlank()) return this
+    val answerIds = selectedOptions
+        .filter { option -> option.groupId == group.id }
+        .map { option -> sanitizeFollowUpOptionId(option.id, group.id) }
+        .distinct()
+    return map { record ->
+        if (record.topicPath == topicPath && record.questionId == group.questionId.ifBlank { group.id }) {
+            record.copy(answerIds = answerIds, answered = true)
+        } else {
+            record
+        }
+    }
+}
+
+private const val PRE_DESTINATION_QUESTION_LIMIT = 4
+
+private fun allowedTopicRootsForPhase(phase: PlannerPhase): Set<String> {
+    return when (phase) {
+        PlannerPhase.PRE_DESTINATION -> setOf(
+            "traveler_context",
+            "party",
+            "destination_style",
+            "interests",
+            "food_preferences",
+            "activity_preferences",
+            "budget",
+            "pace",
+            "duration",
+            "travel_timeline",
+            "date_window",
+            "origin",
+            "must_haves",
+            "avoid"
+        )
+
+        PlannerPhase.DESTINATION_LOCKED -> setOf(
+            "travel_timeline",
+            "date_window",
+            "duration",
+            "budget",
+            "pace",
+            "food_preferences",
+            "activity_preferences",
+            "restaurant_help",
+            "activity_help",
+            "hotel_preferences",
+            "neighborhood_preferences",
+            "must_haves",
+            "avoid"
+        )
+
+        PlannerPhase.VISUAL_RECOMMENDATIONS,
+        PlannerPhase.TRIP_BUILD -> emptySet()
+    }
+}
+
+private fun topicPathAllowedForPhase(topicPath: String, phase: PlannerPhase): Boolean {
+    val root = topicPath.substringBefore('.')
+    return root in allowedTopicRootsForPhase(phase)
+}
+
+private fun isAllowedChildRefinement(
+    group: AiChatCardGroup,
+    askedQuestionRecords: List<AskedQuestionRecord>
+): Boolean {
+    val topicPath = group.topicPath.toPlannerTopicPath()
+    val parentTopicPath = group.parentTopicPath.toPlannerTopicPath()
+    val parentAnswerId = group.parentAnswerId
+    if (topicPath.isBlank() || parentTopicPath.isBlank() || parentAnswerId.isBlank()) return false
+    if (!topicPath.startsWith("$parentTopicPath.")) return false
+    if (askedQuestionRecords.any { record -> record.topicPath == topicPath }) return false
+    fun List<String>.containsAnswerId(rawAnswerId: String): Boolean {
+        return any { answerId -> answerId == rawAnswerId || answerId.endsWith("_$rawAnswerId") }
+    }
+    return askedQuestionRecords.any { record ->
+        record.topicPath == parentTopicPath &&
+            record.answered &&
+            record.answerIds.containsAnswerId(parentAnswerId)
+    }
+}
+
+private fun topicPathTargetsKnownProfileField(
+    topicPath: String,
+    profile: AiTripIntakeProfile
+): Boolean {
+    return when (topicPath.substringBefore('.')) {
+        "traveler_context",
+        "party" -> profile.tripType != AiTripType.UNKNOWN || profile.partySummary.isNotBlank()
+        "destination_style" -> profile.destinationStyle.isNotEmpty()
+        "interests" -> profile.interests.size >= 2
+        "food_preferences" -> profile.cuisinePreferences.isNotEmpty()
+        "activity_preferences" -> profile.interests.size >= 2
+        "budget" -> profile.budgetLevel != AiBudgetLevel.UNKNOWN || profile.budgetTotal != null
+        "pace" -> profile.pace != AiTripPacePreference.UNKNOWN
+        "duration" -> profile.durationDays != null
+        "travel_timeline",
+        "date_window" -> profile.dateWindow.isNotBlank() || (profile.dateFrom.isNotBlank() && profile.dateTo.isNotBlank())
+        "origin" -> profile.origin.isNotBlank()
+        else -> false
+    }
 }
 
 private fun sanitizeFollowUpId(rawId: String): String {
